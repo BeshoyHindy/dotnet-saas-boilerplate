@@ -4,7 +4,7 @@ Applies to **both** `clients/admin` and `clients/dashboard`. Read this for any R
 the app-specific file (`admin.md` / `dashboard.md`) for divergences.
 
 Stack: React 19 · Vite 7 · TypeScript · TanStack Query v5 · React Router 7 · Radix UI · Tailwind v4 ·
-class-variance-authority (shadcn-style) · `@microsoft/signalr`. Path alias `@` → `src` (`vite.config.ts`).
+class-variance-authority (shadcn-style). Path alias `@` → `src` (`vite.config.ts`).
 
 ## API client (`src/lib/api-client.ts`, `src/api/*`)
 
@@ -68,16 +68,12 @@ Login `POST /api/v1/identity/token/issue` with header `X-Client-App: "admin"|"da
 
 So "neutrals must be chroma 0" is a **dashboard** rule. Admin neutrals are intentionally cool — match the file you're editing.
 
-## Realtime (SignalR)
-
-`src/realtime/realtime-context.tsx`: one `HubConnection` to `/api/v1/realtime/hub`. `@microsoft/signalr` is **dynamically imported** (lazy ~37KB) only when an authed session opens the hub. Auth via `accessTokenFactory`; a `tokenEpoch` (bumped by `tokenStore.subscribe`) forces reconnect on login/refresh/impersonation. Consume with `useRealtimeEvent("EventName", handler, deps)` (handler kept in a ref). Pre-register new event names in the provider's event list.
-
 ## Testing (Playwright, route-mocked)
 
 - `playwright.config.ts`: `testDir: ./tests`, chromium, auto-boots `npm run dev`, no real backend.
 - Tests in `tests/{area}/{name}.spec.ts`; helpers in `tests/helpers/`.
 - **JWT seeding:** `seedAuthedSession(page, TEST_USER)` builds a fake JWT and `addInitScript`-writes `boilerplate.{app}.*` to localStorage before React boots (server isn't called, so signature is junk).
-- **Route mocking:** `mockJsonResponse(page, urlGlob, body)` / `mockProblemDetails(...)`. `installShellMocks(page)` stubs every call `AppShell` fires and **aborts** SSE/SignalR. Playwright matches most-recently-registered first → broad shell mocks in `beforeEach`, page-specific mocks after (they win).
+- **Route mocking:** `mockJsonResponse(page, urlGlob, body)` / `mockProblemDetails(...)`. `installShellMocks(page)` stubs every call `AppShell` fires. Playwright matches most-recently-registered first → broad shell mocks in `beforeEach`, page-specific mocks after (they win).
 - `beforeEach`: `seedAuthedSession(page, TEST_USER)` → `installShellMocks(page)`.
 
 ## Add a page/feature (shared steps)

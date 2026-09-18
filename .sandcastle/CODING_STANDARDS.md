@@ -62,7 +62,6 @@ Host (composition root)  →  Modules.{Name} (runtime)  →  Modules.{Name}.Cont
 | HybridCache keys, tags, invalidation | `.agents/rules/caching.md` |
 | CORS, security headers, rate limiting, idempotency, quotas | `.agents/rules/security.md` |
 | Serilog, correlation, OpenTelemetry | `.agents/rules/logging.md` |
-| SignalR and SSE | `.agents/rules/realtime.md` |
 | Storage, jobs, resilience | `.agents/rules/storage.md`, `jobs.md`, `resilience.md` |
 | Unit tests | `.agents/rules/testing.md` |
 | Container-backed tests | `.agents/rules/integration-testing.md` |
@@ -126,9 +125,8 @@ whole round. So when you add or change one:
 - **Set the Finbuckle tenant context in the SAME method that calls the code under test.** It is an
   `AsyncLocal`: a context set inside an awaited helper is gone by the time the caller resumes, the
   tenant filter then sees no tenant, and tenant-filtered queries quietly return nothing.
-- **Remember the harness's eager wiring** — storage is re-registered after `AddHeroStorage`, rate
-  limiting is read before host build, and SignalR tests must force long-polling. See
-  `.agents/rules/integration-testing.md`.
+- **Remember the harness's eager wiring** — storage is re-registered after `AddHeroStorage` and rate
+  limiting is read before host build. See `.agents/rules/integration-testing.md`.
 
 ### Browser suites are scoped, never full
 

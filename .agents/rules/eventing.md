@@ -21,7 +21,7 @@ Inject **`IOutboxWriter`** (`Boilerplate.BuildingBlocks.Eventing.Abstractions`) 
 
 **Publishing is asynchronous.** The consumer runs on the next dispatch cycle, not inside the request. Don't write a caller — or a test — that assumes the side effect already happened. Integration tests drain explicitly via `OutboxDrain.DrainAsync`.
 
-Any exception to publishing via the outbox needs a strong reason (e.g. a handler pushing over SignalR where a delayed update would read as broken), documented in a comment at the call site.
+Any exception to publishing via the outbox needs a strong reason, documented in a comment at the call site.
 
 ## One store, owned by the framework
 

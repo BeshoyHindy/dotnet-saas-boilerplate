@@ -1,6 +1,6 @@
 # Boilerplate — Dashboard
 
-Tenant-facing dashboard for the Boilerplate. Shows realtime telemetry over Server-Sent Events and the tenant's validity window.
+Tenant-facing dashboard for the Boilerplate. Shows the tenant's validity window and recent activity.
 
 Built with React 19, Vite 7, TypeScript, TanStack Query, React Router, Tailwind 4 + shadcn/ui, and Recharts. Standalone — not part of a pnpm workspace — so it plugs into .NET Aspire as a plain `ExecutableResource`.
 

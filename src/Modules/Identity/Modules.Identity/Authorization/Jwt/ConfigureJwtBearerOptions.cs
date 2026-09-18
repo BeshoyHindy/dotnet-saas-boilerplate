@@ -188,24 +188,6 @@ public class ConfigureJwtBearerOptions : IConfigureNamedOptions<JwtBearerOptions
                 }
             },
             OnForbidden = _ => throw new ForbiddenException(),
-            OnMessageReceived = context =>
-            {
-                var accessToken = context.Request.Query["access_token"];
-                if (string.IsNullOrEmpty(accessToken))
-                {
-                    return Task.CompletedTask;
-                }
-
-                var path = context.HttpContext.Request.Path;
-                // Browser EventSource/SignalR can't send an Authorization header, so they use
-                // ?access_token=. The narrow path allow-list keeps query-string tokens from leaking elsewhere.
-                if (path.StartsWithSegments("/notifications", StringComparison.OrdinalIgnoreCase)
-                    || path.StartsWithSegments("/api/v1/realtime/hub", StringComparison.OrdinalIgnoreCase))
-                {
-                    context.Token = accessToken;
-                }
-                return Task.CompletedTask;
-            }
         };
     }
 

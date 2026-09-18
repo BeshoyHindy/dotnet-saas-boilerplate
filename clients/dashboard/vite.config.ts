@@ -9,9 +9,9 @@ export default defineConfig(({ mode }) => {
   const apiBase = env.VITE_API_BASE_URL ?? "https://localhost:7030";
 
   // Dev only: serve the runtime config with apiBase pointed straight at the API. This makes
-  // REST + the long-lived SSE / SignalR streams hit localhost:7030 directly instead of being
-  // proxied through Vite. Otherwise those streams hold connections on localhost:5174 and, under
-  // HTTP/1.1's ~6-per-host cap, intermittently starve lazy route-chunk loads ("page won't load").
+  // REST calls hit localhost:7030 directly instead of being proxied through Vite. Otherwise those
+  // requests hold connections on localhost:5174 and, under HTTP/1.1's ~6-per-host cap,
+  // intermittently starve lazy route-chunk loads ("page won't load").
   // The committed public/config.json keeps apiBase="" as the same-origin production default.
   const devDirectApiConfig: Plugin = {
     name: "boilerplate-dev-direct-api-config",
@@ -49,12 +49,7 @@ export default defineConfig(({ mode }) => {
       port: 5174,
       strictPort: true,
       proxy: {
-        // ws: true forwards the WebSocket upgrade used by SignalR's hub
-        // transport at /api/v1/realtime/hub. Without it the negotiate
-        // succeeds over HTTP but the WS upgrade falls into Vite's own
-        // dev server, so the realtime status stalls on "CONNECTING" while
-        // SignalR retries forever.
-        "/api": { target: apiBase, changeOrigin: true, secure: false, ws: true },
+        "/api": { target: apiBase, changeOrigin: true, secure: false },
         "/openapi": { target: apiBase, changeOrigin: true, secure: false },
         "/scalar": { target: apiBase, changeOrigin: true, secure: false },
         // Health probes live at the root (not under /api). Without this the

@@ -66,7 +66,6 @@ builder.AddHeroPlatform(o =>
     o.EnableCaching = true;
     o.EnableMailing = true;
     o.EnableJobs = true;
-    o.EnableRealtime = true;
 });
 
 // The transactional outbox is framework infrastructure with exactly one owner
@@ -86,7 +85,6 @@ app.UseHeroPlatform(p =>
 {
     p.MapModules = true;
     p.ServeStaticFiles = true;
-    p.MapRealtime = true;
 });
 
 app.MapGet("/", () => Results.Ok(new { message = "hello world!" }))

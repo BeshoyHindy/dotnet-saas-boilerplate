@@ -40,7 +40,6 @@ If Docker is down, integration tests fail fast with `DockerUnavailableException`
 
 - Set the Finbuckle tenant context **inline** in the test method (AsyncLocal — an awaited helper loses it → NRE in the tenant filter).
 - `AddHeroStorage` reads config eagerly; rewire `IStorageService` **after** registration in the factory.
-- SignalR hub tests force **long-polling** (TestServer has no WebSocket).
 
 ## Frontend tests
 

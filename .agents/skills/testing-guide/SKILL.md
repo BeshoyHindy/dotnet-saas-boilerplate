@@ -94,8 +94,8 @@ Don't weaken these to make a change pass — fix the code.
 ## Integration tests
 
 `Integration.Tests` runs over real Postgres/Redis/MinIO via Testcontainers — **Docker required**. Set the
-Finbuckle tenant context inline, rewire `IStorageService` post-registration for MinIO, force long-polling
-for SignalR. All detailed in `.agents/rules/integration-testing.md`.
+Finbuckle tenant context inline and rewire `IStorageService` post-registration for MinIO. All detailed in
+`.agents/rules/integration-testing.md`.
 
 ## Run
 

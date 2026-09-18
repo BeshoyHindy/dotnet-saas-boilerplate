@@ -22,10 +22,9 @@ Form layout primitives live in `src/components/list/` (`PageHeader`, `Field`, `F
 - **Route gating:** wrap gated route elements in `<RouteGuard perms={[IdentityPermissions.Users.View]}>…</RouteGuard>`. It renders a "Resolving permissions" state while `!permissionsHydrated`, else `<ForbiddenView missing={…}/>`. (`ProtectedRoute` also accepts a `permissions?` prop.)
 - **Mirror server permissions by hand** in `src/lib/permissions.ts` (`IdentityPermissions`, `MultitenancyPermissions`, … frozen objects + `PERMISSION_CATALOG` driving the role editor). There is intentionally **no** runtime catalog fetch — when the server adds a permission, mirror the constant here.
 
-## Routing & realtime
+## Routing
 
 - Routes wrap elements in `<RouteGuard perms={…}>` (no per-route Suspense wrapper).
-- `RealtimeProvider` is mounted in `App.tsx` and wires only `["NotificationCreated"]`.
 
 ## Theme
 
