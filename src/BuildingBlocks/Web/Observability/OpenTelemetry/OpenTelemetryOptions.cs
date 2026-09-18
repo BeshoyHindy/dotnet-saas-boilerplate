@@ -35,7 +35,6 @@ public sealed class OpenTelemetryOptions
     /// <summary>
     /// EF/Redis instrumentation filtering options.
     /// </summary>
-    public DataOptions Data { get; set; } = new();
 
     public sealed class TracingOptions
     {
@@ -90,15 +89,6 @@ public sealed class OpenTelemetryOptions
             /// <summary>Custom bucket boundaries (seconds). If null/empty, defaults apply.</summary>
             public double[]? BucketBoundaries { get; set; }
         }
-    }
-
-    public sealed class DataOptions
-    {
-        /// <summary>Suppress SQL text in EF instrumentation to reduce PII/noise.</summary>
-        public bool FilterEfStatements { get; set; } = true;
-
-        /// <summary>Suppress Redis command text in instrumentation to reduce noise.</summary>
-        public bool FilterRedisCommands { get; set; } = true;
     }
 
 }
