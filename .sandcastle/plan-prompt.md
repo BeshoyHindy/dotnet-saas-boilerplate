@@ -4,7 +4,7 @@ Pick this round's work for **{{PROJECT_NAME}}**: read the open `{{ISSUE_LABEL}}`
 
 # DEPENDENCIES
 
-**Explicit edges are authoritative.** A "Blocked by" section in an issue body — or a native GitHub blocking relationship — is a blocking dependency. If a "Blocked by" reference points at an issue that is not in the list below, check it with `gh issue view <number> --json state`: a closed blocker no longer blocks; an open one still does, whatever its labels.
+**Explicit edges are authoritative.** Every issue below carries a `blockedBy` array: the numbers of the issues that still block it, taken from GitHub's native blocking relationships and already filtered to the OPEN ones. A non-empty `blockedBy` means blocked, whatever those blockers' labels are and whether or not they appear in the list; an empty one means nothing blocks it natively. A "Blocked by" section in an issue body is a blocking dependency too — if such a reference points at an issue that is not in the list below, check it with `gh issue view <number> --json state`: a closed blocker no longer blocks; an open one still does, whatever its labels.
 
 Beyond explicit edges, treat issue B as blocked by issue A when:
 

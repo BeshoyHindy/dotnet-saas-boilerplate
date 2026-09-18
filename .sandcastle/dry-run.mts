@@ -23,6 +23,12 @@ export type CommandExec = (file: string, args: readonly string[]) => string;
 export interface OpenIssue {
   readonly number: number;
   readonly title: string;
+  /**
+   * The issue's OPEN blockers, from GitHub's native issue dependencies. Closed
+   * blockers are dropped while parsing — they no longer block anything — so an
+   * empty array means "ready to be worked".
+   */
+  readonly blockedBy: readonly number[];
 }
 
 export type IssueQuery =
@@ -37,6 +43,129 @@ export type IssueQuery =
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+/**
+ * The issue nodes inside whatever `gh` printed: either a bare array (a
+ * `gh issue list --json` listing) or the `issues` connection of a GraphQL
+ * response, which is the only listing that also carries blocking edges.
+ */
+function issueNodes(parsed: unknown): readonly unknown[] | undefined {
+  if (Array.isArray(parsed)) {
+    return parsed;
+  }
+  const repository = asRecord(asRecord(asRecord(parsed)?.data)?.repository);
+  const nodes = asRecord(repository?.issues)?.nodes;
+  return Array.isArray(nodes) ? nodes : undefined;
+}
+
+type BlockerQuery =
+  | { readonly ok: true; readonly blockedBy: number[] }
+  | { readonly ok: false; readonly error: string };
+
+/**
+ * An issue's OPEN blockers, from the `blockedBy` connection.
+ *
+ * Fail-closed on anything unexpected: a listing that stopped reporting edges —
+ * a renamed field, a permission the token lost — must not read as "nothing
+ * blocks anything", which would queue issues whose prerequisites are unmerged.
+ */
+function openBlockers(issueNumber: number, raw: unknown): BlockerQuery {
+  const nodes = asRecord(raw)?.nodes;
+  if (!Array.isArray(nodes)) {
+    return {
+      ok: false,
+      error:
+        `gh returned issue #${issueNumber} without its blockedBy edges — the ` +
+        "configured listing query must ask for them, because an unknown " +
+        "blocker set is never treated as unblocked",
+    };
+  }
+
+  const blockedBy: number[] = [];
+  for (const node of nodes) {
+    const blocker = asRecord(node);
+    if (typeof blocker?.number !== "number" || typeof blocker.state !== "string") {
+      return {
+        ok: false,
+        error:
+          `gh returned a blocker of issue #${issueNumber} without a number and ` +
+          "a state",
+      };
+    }
+    // Closed blockers no longer block; only open ones hold an issue back.
+    if (blocker.state.toUpperCase() === "OPEN") {
+      blockedBy.push(blocker.number);
+    }
+  }
+  return { ok: true, blockedBy };
+}
+
+/**
+ * Turn the listing `gh` printed into issues plus their open blockers.
+ *
+ * Pure, so every shape a misconfigured query can produce is a unit test rather
+ * than a surprise forty minutes into a round.
+ */
+export function parseIssueListing(stdout: string): IssueQuery {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stdout.trim() === "" ? "[]" : stdout);
+  } catch {
+    return {
+      ok: false,
+      error:
+        `gh did not return JSON (is the query missing --json?): ` +
+        `${stdout.slice(0, 200)}`,
+    };
+  }
+
+  // A GraphQL error envelope: gh exits non-zero on one, but a partial response
+  // carries both `data` and `errors`, and half a backlog is not a backlog.
+  const errors = asRecord(parsed)?.errors;
+  if (Array.isArray(errors) && errors.length > 0) {
+    const messages = errors
+      .map((error) => String(asRecord(error)?.message ?? error))
+      .join("; ");
+    return { ok: false, error: `the issue query returned errors: ${messages}` };
+  }
+
+  const nodes = issueNodes(parsed);
+  if (nodes === undefined) {
+    return { ok: false, error: "gh returned JSON that is not an array of issues" };
+  }
+
+  const issues: OpenIssue[] = [];
+  for (const entry of nodes) {
+    const candidate = asRecord(entry);
+    if (candidate === undefined) {
+      return { ok: false, error: "gh returned an issue entry that is not an object" };
+    }
+    if (typeof candidate.number !== "number" || typeof candidate.title !== "string") {
+      return {
+        ok: false,
+        error:
+          "gh returned an issue without a number and a title — the configured " +
+          "--json fields must include both",
+      };
+    }
+    const blockers = openBlockers(candidate.number, candidate.blockedBy);
+    if (!blockers.ok) {
+      return blockers;
+    }
+    issues.push({
+      number: candidate.number,
+      title: candidate.title,
+      blockedBy: blockers.blockedBy,
+    });
+  }
+  return { ok: true, issues };
 }
 
 /**
@@ -55,39 +184,7 @@ export function listAgentIssues(
   } catch (err) {
     return { ok: false, error: errorMessage(err) };
   }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(stdout.trim() === "" ? "[]" : stdout);
-  } catch {
-    return {
-      ok: false,
-      error:
-        `gh did not return JSON (is the query missing --json?): ` +
-        `${stdout.slice(0, 200)}`,
-    };
-  }
-  if (!Array.isArray(parsed)) {
-    return { ok: false, error: "gh returned JSON that is not an array of issues" };
-  }
-
-  const issues: OpenIssue[] = [];
-  for (const entry of parsed) {
-    if (typeof entry !== "object" || entry === null) {
-      return { ok: false, error: "gh returned an issue entry that is not an object" };
-    }
-    const candidate = entry as Record<string, unknown>;
-    if (typeof candidate.number !== "number" || typeof candidate.title !== "string") {
-      return {
-        ok: false,
-        error:
-          "gh returned an issue without a number and a title — the configured " +
-          "--json fields must include both",
-      };
-    }
-    issues.push({ number: candidate.number, title: candidate.title });
-  }
-  return { ok: true, issues };
+  return parseIssueListing(stdout);
 }
 
 /**
@@ -155,16 +252,23 @@ export function renderDryRun(
     lines.push("  (none — a real run would plan nothing and exit)");
   } else {
     for (const issue of query.issues) {
+      // The blocked/unblocked mark is the native GitHub dependency edge, not a
+      // guess: the planner reasons about more than this, but never less.
+      const blocked =
+        issue.blockedBy.length === 0
+          ? "unblocked"
+          : `BLOCKED by ${issue.blockedBy.map((number) => `#${number}`).join(", ")}`;
       lines.push(
         `  #${issue.number} ${issue.title}` +
-          ` → ${config.git.branchPrefix}${issue.number}`,
+          ` → ${config.git.branchPrefix}${issue.number} · ${blocked}`,
       );
     }
+    const unblocked = query.issues.filter((issue) => issue.blockedBy.length === 0).length;
     lines.push(
       "",
-      `  ${query.issues.length} issue(s) visible; a round would queue up to ` +
-        `${limits.plannerQueueDepth} of the unblocked ones and run ` +
-        `${limits.maxConcurrentAgents} at a time.`,
+      `  ${query.issues.length} issue(s) visible, ${unblocked} unblocked; a ` +
+        `round would queue up to ${limits.plannerQueueDepth} of the unblocked ` +
+        `ones and run ${limits.maxConcurrentAgents} at a time.`,
     );
   }
   lines.push("");
