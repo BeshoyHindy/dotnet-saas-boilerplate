@@ -5,7 +5,7 @@ import { SettingsSection } from "@/pages/settings/settings-layout";
 /**
  * Notification preferences — placeholder.
  *
- * In-app notifications + SignalR bell are wired up, but per-user
+ * In-app notifications + the notification bell are wired up, but per-user
  * preference persistence isn't built yet. Honest placeholder until
  * `/api/v1/notifications/preferences` (or similar) ships.
  */

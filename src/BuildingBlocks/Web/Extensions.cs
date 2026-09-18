@@ -8,7 +8,6 @@ using Boilerplate.BuildingBlocks.Web.Cors;
 using Boilerplate.BuildingBlocks.Web.Exceptions;
 using Boilerplate.BuildingBlocks.Web.FeatureFlags;
 using Boilerplate.BuildingBlocks.Web.Idempotency;
-using Boilerplate.BuildingBlocks.Web.Sse;
 using Boilerplate.BuildingBlocks.Web.Health;
 using Boilerplate.BuildingBlocks.Web.Mediator.Behaviors;
 using Boilerplate.BuildingBlocks.Web.Modules;
@@ -113,11 +112,6 @@ public static class Extensions
             builder.Services.AddHeroIdempotency(builder.Configuration);
         }
 
-        if (options.EnableSse)
-        {
-            builder.Services.AddHeroSse();
-        }
-
         if (options.EnableRealtime)
         {
             builder.Services.AddHeroRealtime(builder.Configuration);
@@ -194,11 +188,6 @@ public static class Extensions
         // Always expose health endpoints
         app.MapHeroHealthEndpoints();
 
-        if (options.MapSseEndpoints)
-        {
-            app.MapHeroSseEndpoints();
-        }
-
         if (options.MapRealtime)
         {
             app.MapHeroRealtime();
@@ -230,7 +219,6 @@ public sealed class AppPlatformOptions
     public bool EnableOpenTelemetry { get; set; } = true;
     public bool EnableFeatureFlags { get; set; } = false;
     public bool EnableIdempotency { get; set; } = true;
-    public bool EnableSse { get; set; } = false;
     public bool EnableRealtime { get; set; } = false;
 }
 
@@ -240,6 +228,5 @@ public sealed class AppPipelineOptions
     public bool UseOpenApi { get; set; } = true;
     public bool ServeStaticFiles { get; set; } = true;
     public bool MapModules { get; set; } = true;
-    public bool MapSseEndpoints { get; set; } = false;
     public bool MapRealtime { get; set; } = false;
 }

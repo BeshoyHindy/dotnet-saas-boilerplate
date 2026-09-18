@@ -192,7 +192,6 @@ const ACTION_VERBS: Record<string, string> = {
 const ACTION_OVERRIDES: Record<string, string> = {
   IssueJwtToken: "signed in",
   RefreshToken: "refreshed their session",
-  SseToken: "connected to the live stream",
   GetUnreadNotificationCount: "checked notifications",
 };
 

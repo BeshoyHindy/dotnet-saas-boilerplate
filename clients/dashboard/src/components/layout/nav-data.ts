@@ -1,5 +1,4 @@
 import {
-  Activity,
   FolderOpen,
   HeartPulse,
   LayoutDashboard,
@@ -58,15 +57,6 @@ export const topNavBottom: NavSpec[] = [
 
 // Section accordion. Single-select — only one section open at a time.
 export const sections: NavSection[] = [
-  {
-    id: "operations",
-    caption: "Operations",
-    icon: Activity,
-    items: [
-      // Live activity is SSE-backed; the stream is auth-only (no permission), so no gate.
-      { to: "/activity", label: "Live activity", icon: Activity },
-    ],
-  },
   {
     id: "identity",
     caption: "Identity",

@@ -66,7 +66,6 @@ builder.AddHeroPlatform(o =>
     o.EnableCaching = true;
     o.EnableMailing = true;
     o.EnableJobs = true;
-    o.EnableSse = true;
     o.EnableRealtime = true;
 });
 
@@ -87,7 +86,6 @@ app.UseHeroPlatform(p =>
 {
     p.MapModules = true;
     p.ServeStaticFiles = true;
-    p.MapSseEndpoints = true;
     p.MapRealtime = true;
 });
 

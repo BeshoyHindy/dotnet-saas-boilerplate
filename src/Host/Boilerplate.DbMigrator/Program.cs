@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Reflection;
 using Boilerplate.BuildingBlocks.Eventing;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
@@ -108,7 +108,6 @@ builder.AddHeroPlatform(o =>
     o.EnableOpenApi = false;
     o.EnableJobs = false;
     o.EnableMailing = false;
-    o.EnableSse = false;
     o.EnableRealtime = false;
     o.EnableFeatureFlags = false;
     o.EnableIdempotency = false;

@@ -8,7 +8,6 @@ import {
   markNotificationRead,
   type NotificationDto,
 } from "@/api/notifications";
-import { useRealtimeEvent } from "@/realtime/realtime-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -38,11 +37,6 @@ export function NotificationsInboxPage() {
     queryFn: () =>
       listNotifications({ unreadOnly: filter === "unread", pageSize: 100 }),
     staleTime: 15_000,
-  });
-
-  // Live append on new notification.
-  useRealtimeEvent<unknown>("NotificationCreated", () => {
-    queryClient.invalidateQueries({ queryKey: ["notifications"] });
   });
 
   const markOne = useMutation({

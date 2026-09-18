@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Command } from "cmdk";
 import {
-  Activity,
   Folder,
   HeartPulse,
   KeyRound,
@@ -104,14 +103,6 @@ export function CommandPaletteDialog({
             Icon: LayoutDashboard,
             keywords: ["home", "dashboard"],
             perform: go("/"),
-          },
-          {
-            id: "nav-activity",
-            label: "Live activity",
-            hint: "Real-time event stream",
-            Icon: Activity,
-            keywords: ["events", "sse", "log"],
-            perform: go("/activity"),
           },
           {
             id: "nav-files",
