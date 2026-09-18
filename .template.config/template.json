@@ -17,7 +17,7 @@
     },
     "identity": "Boilerplate.Templates",
     "name": "Modular .NET SaaS Starter",
-    "description": "A production-ready full-stack starter: modular .NET 10 monolith (VSA, CQRS, multitenancy, Identity, Aspire) + two React 19 apps + Docker/Terraform.",
+    "description": "A production-ready full-stack starter: modular .NET 10 monolith (VSA, CQRS, multitenancy, Identity, Aspire) + two React 19 apps + Docker.",
     "shortName": "saas",
     "sourceName": "Boilerplate",
     "preferNameDirectory": true,
@@ -38,12 +38,6 @@
             "type": "parameter",
             "datatype": "bool",
             "description": "Skip dotnet restore after project creation.",
-            "defaultValue": "false"
-        },
-        "includeTools": {
-            "type": "parameter",
-            "datatype": "bool",
-            "description": "Internal: keep the CLI project in the solution (this repo only).",
             "defaultValue": "false"
         },
         "contactEmail": {
@@ -104,7 +98,6 @@
                 "docs/**",
                 "nupkgs/**",
                 "scripts/**",
-                "src/Tools/**",
                 "clients/**/node_modules/**",
                 "clients/**/dist/**",
                 "clients/**/build/**",

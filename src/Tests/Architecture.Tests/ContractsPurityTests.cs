@@ -1,5 +1,4 @@
 using Boilerplate.Modules.Auditing.Contracts;
-using Boilerplate.Modules.Chat.Contracts;
 using Boilerplate.Modules.Identity.Contracts;
 using Boilerplate.Modules.Multitenancy.Contracts;
 using NetArchTest.Rules;
@@ -18,7 +17,6 @@ public class ContractsPurityTests
     private static readonly Assembly[] ContractsAssemblies =
     [
         typeof(AuditingContractsMarker).Assembly,
-        typeof(ChatContractsMarker).Assembly,
         typeof(IdentityContractsMarker).Assembly,
         typeof(MultitenancyContractsMarker).Assembly
     ];
@@ -90,9 +88,6 @@ public class ContractsPurityTests
             "Boilerplate.Modules.Auditing.Features",
             "Boilerplate.Modules.Auditing.Data",
             "Boilerplate.Modules.Auditing.Persistence",
-            "Boilerplate.Modules.Chat.Features",
-            "Boilerplate.Modules.Chat.Data",
-            "Boilerplate.Modules.Chat.Domain",
             "Boilerplate.Modules.Identity.Features",
             "Boilerplate.Modules.Identity.Data",
             "Boilerplate.Modules.Identity.Persistence",

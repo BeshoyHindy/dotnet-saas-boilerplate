@@ -964,48 +964,6 @@
     @keyframes app-toast-fade-in { from { opacity: 0; } to { opacity: 1; } }
   }
 
-  /* ── CHAT TOASTS — opt out of the console-card treatment.
-        Sonner appends per-toast `className` to the toaster's global
-        classNames.toast, so the wrapper li carries BOTH .app-toast (from
-        AppToaster) AND .app-chat-toast-wrapper (per-toast). The rules
-        below neutralise every piece of console-card chrome — the
-        gradient border, the frosted surface, the atmospheric glow, the
-        icon disc, the drain bar, the close button — so the chat card
-        rendered inside the title slot can paint edge-to-edge without
-        the surrounding toast peeking through.
-
-        We deliberately DO NOT `display: none` the title element itself,
-        because sonner hosts the custom JSX inside it. ────────────── */
-  [data-sonner-toast].app-toast.app-chat-toast-wrapper {
-    display: block !important;
-    grid-template-columns: none !important;
-    grid-template-areas: none !important;
-    background: transparent !important;
-    border: none !important;
-    padding: 0 !important;
-    box-shadow: none !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-  }
-  [data-sonner-toast].app-toast.app-chat-toast-wrapper::before,
-  [data-sonner-toast].app-toast.app-chat-toast-wrapper::after {
-    display: none !important;
-  }
-  [data-sonner-toast].app-toast.app-chat-toast-wrapper [data-icon],
-  [data-sonner-toast].app-toast.app-chat-toast-wrapper .app-toast-close {
-    display: none !important;
-  }
-  [data-sonner-toast].app-toast.app-chat-toast-wrapper .app-toast-title {
-    grid-area: unset !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    display: block !important;
-    color: inherit !important;
-  }
-  [data-sonner-toast].app-toast.app-chat-toast-wrapper .app-toast-title::before {
-    content: none !important;
-    display: none !important;
-  }
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -1150,15 +1108,9 @@
 }
 .reduce-motion body { background-image: none; }
 
-/* CHAT-ONLY page chrome (.chat-typing-dot, .chat-unread-divider,
-   .chat-day-rule, .chat-reaction-chip, .chat-channel-header,
-   .chat-jump-pill, .chat-mention) lives in `pages/chat/chat.css` so
-   Vite extracts it into the chat-route CSS chunk — every other page
-   stops shipping ~3 KB gzip of selectors it'll never use.
-
-   The .chat-status-pill family below stays here because the same
-   primitive is consumed by the global notification-bell footer via
-   RealtimeStatusPill. */
+/* The .chat-status-pill family below is a shared connection-status
+   primitive (named for its original chat use) consumed by the global
+   notification-bell footer via RealtimeStatusPill. */
 
 /* Connection-state pill — used in the rail footer + bell footer to honestly
    reflect SignalR status. The dot pulses while reconnecting. */

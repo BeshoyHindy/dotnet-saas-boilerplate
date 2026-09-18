@@ -96,7 +96,7 @@ jobs:
 
       - name: Run unit tests with coverage
         run: |
-          for proj in Architecture Auditing Caching Generic Identity Multitenancy Billing Catalog Chat Files Framework Webhooks; do
+          for proj in Architecture Auditing Caching Generic Identity Multitenancy Billing Files Framework Webhooks; do
             echo "::group::${proj}.Tests"
             dotnet test "src/Tests/${proj}.Tests" -c Release --no-build \
               --collect:"XPlat Code Coverage" --settings coverage.runsettings \
@@ -371,11 +371,9 @@ jobs:
 
       # Distribution model is source-ownership: consumers get the FULL source via the
       # `dotnet new saas` template (below), NOT per-module/BuildingBlocks NuGet packages.
-      # Only two artifacts publish to NuGet — the `boilerplate` global CLI tool and the template.
+      # Only one artifact publishes to NuGet — the template.
       # (The previous per-module packs were incomplete — 4 of 10 modules — and contradicted
       # the locked source-ownership model, so they were removed.)
-      - name: Pack CLI Tool
-        run: dotnet pack src/Tools/CLI/Boilerplate.CLI.csproj -c Release --no-build -o ./nupkgs -p:PackageVersion=${{ steps.version.outputs.version }}
 
       # The dotnet new template package — the primary distribution artifact. Packs the
       # repo (with its root .template.config) so consumers can `dotnet new install` then

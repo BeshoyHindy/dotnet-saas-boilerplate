@@ -9,8 +9,6 @@ using Boilerplate.Modules.Multitenancy;
 using Boilerplate.Modules.Multitenancy.Contracts.v1.GetTenantStatus;
 using Boilerplate.Modules.Webhooks;
 using Boilerplate.Modules.Billing;
-using Boilerplate.Modules.Catalog;
-using Boilerplate.Modules.Tickets;
 using Boilerplate.Modules.Multitenancy.Features.v1.GetTenantStatus;
 using System.Reflection;
 using System.Text.Json.Serialization;
@@ -54,14 +52,8 @@ builder.Services.AddMediator(o =>
         typeof(Boilerplate.Modules.Webhooks.WebhooksModule),
         typeof(Boilerplate.Modules.Billing.Contracts.BillingContractsMarker),
         typeof(Boilerplate.Modules.Billing.BillingModule),
-        typeof(Boilerplate.Modules.Catalog.Contracts.CatalogContractsMarker),
-        typeof(Boilerplate.Modules.Catalog.CatalogModule),
-        typeof(Boilerplate.Modules.Tickets.Contracts.TicketsContractsMarker),
-        typeof(Boilerplate.Modules.Tickets.TicketsModule),
         typeof(Boilerplate.Modules.Files.Contracts.v1.Commands.RequestUploadUrlCommand),
         typeof(Boilerplate.Modules.Files.FilesModule),
-        typeof(Boilerplate.Modules.Chat.Contracts.v1.Commands.CreateChannelCommand),
-        typeof(Boilerplate.Modules.Chat.ChatModule),
         typeof(Boilerplate.Modules.Notifications.Contracts.v1.Commands.MarkNotificationReadCommand),
         typeof(Boilerplate.Modules.Notifications.NotificationsModule)];
 });
@@ -74,9 +66,6 @@ var moduleAssemblies = new Assembly[]
     typeof(Boilerplate.Modules.Files.FilesModule).Assembly,
     typeof(WebhooksModule).Assembly,
     typeof(BillingModule).Assembly,
-    typeof(CatalogModule).Assembly,
-    typeof(TicketsModule).Assembly,
-    typeof(Boilerplate.Modules.Chat.ChatModule).Assembly,
     typeof(Boilerplate.Modules.Notifications.NotificationsModule).Assembly,
 };
 
@@ -99,9 +88,6 @@ builder.AddModules(moduleAssemblies);
 // Self-heal deployments carrying retired per-module `{module}-outbox-dispatcher` Hangfire recurring jobs
 // (the outbox is now dispatched by OutboxDispatcherHostedService). No-op once the storage is clean.
 builder.Services.AddHostedService<Boilerplate.Api.OrphanedOutboxRecurringJobCleanupService>();
-
-// Demo data is provisioned by the DbMigrator's `seed-demo` verb, not the API — the API never mutates data on startup.
-// See src/Host/Boilerplate.DbMigrator/README.md.
 
 var app = builder.Build();
 

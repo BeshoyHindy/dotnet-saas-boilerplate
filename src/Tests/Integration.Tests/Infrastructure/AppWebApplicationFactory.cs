@@ -137,7 +137,6 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
                 ["HangfireOptions:Route"] = "/jobs",
                 ["RateLimitingOptions:Enabled"] = "false",
                 ["PasswordPolicy:EnforcePasswordExpiry"] = "false",
-                ["Seed:DemoPassword"] = "Password123!",
                 ["Seed:DefaultAdminPassword"] = TestConstants.DefaultPassword,
                 ["SecurityHeadersOptions:Enabled"] = "false",
                 ["Storage:Provider"] = "s3",

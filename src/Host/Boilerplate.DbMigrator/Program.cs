@@ -6,7 +6,6 @@ using Boilerplate.BuildingBlocks.Web;
 using Boilerplate.BuildingBlocks.Web.Modules;
 using Boilerplate.Modules.Auditing;
 using Boilerplate.Modules.Billing;
-using Boilerplate.Modules.Catalog;
 using Boilerplate.Modules.Identity;
 using Boilerplate.Modules.Identity.Contracts.v1.Tokens.TokenGeneration;
 using Boilerplate.Modules.Identity.Features.v1.Tokens.TokenGeneration;
@@ -15,10 +14,8 @@ using Boilerplate.Modules.Multitenancy.Contracts;
 using Boilerplate.Modules.Multitenancy.Contracts.v1.GetTenantStatus;
 using Boilerplate.Modules.Multitenancy.Data;
 using Boilerplate.Modules.Multitenancy.Features.v1.GetTenantStatus;
-using Boilerplate.Modules.Tickets;
 using Boilerplate.Modules.Webhooks;
 using Boilerplate.DbMigrator;
-using Boilerplate.DbMigrator.DemoSeed;
 using Finbuckle.MultiTenant.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -39,7 +36,7 @@ if (cli.Help)
 var builder = Host.CreateApplicationBuilder(args);
 
 // Disable build-time DI validation: auto-on in Development, it walks ALL descriptors incl. handlers this
-// reduced-graph process never invokes (Chat→IHubContext, Identity→IMailService) and throws — false positive.
+// reduced-graph process never invokes (e.g. Identity→IMailService) and throws — false positive.
 builder.ConfigureContainer(new DefaultServiceProviderFactory(
     new ServiceProviderOptions { ValidateOnBuild = false, ValidateScopes = false }));
 
@@ -92,14 +89,8 @@ builder.Services.AddMediator(o =>
         typeof(Boilerplate.Modules.Webhooks.WebhooksModule),
         typeof(Boilerplate.Modules.Billing.Contracts.BillingContractsMarker),
         typeof(Boilerplate.Modules.Billing.BillingModule),
-        typeof(Boilerplate.Modules.Catalog.Contracts.CatalogContractsMarker),
-        typeof(Boilerplate.Modules.Catalog.CatalogModule),
-        typeof(Boilerplate.Modules.Tickets.Contracts.TicketsContractsMarker),
-        typeof(Boilerplate.Modules.Tickets.TicketsModule),
         typeof(Boilerplate.Modules.Files.Contracts.v1.Commands.RequestUploadUrlCommand),
         typeof(Boilerplate.Modules.Files.FilesModule),
-        typeof(Boilerplate.Modules.Chat.Contracts.v1.Commands.CreateChannelCommand),
-        typeof(Boilerplate.Modules.Chat.ChatModule),
         typeof(Boilerplate.Modules.Notifications.Contracts.v1.Commands.MarkNotificationReadCommand),
         typeof(Boilerplate.Modules.Notifications.NotificationsModule),
     ];
@@ -113,9 +104,6 @@ var moduleAssemblies = new Assembly[]
     typeof(Boilerplate.Modules.Files.FilesModule).Assembly,
     typeof(WebhooksModule).Assembly,
     typeof(BillingModule).Assembly,
-    typeof(CatalogModule).Assembly,
-    typeof(TicketsModule).Assembly,
-    typeof(Boilerplate.Modules.Chat.ChatModule).Assembly,
     typeof(Boilerplate.Modules.Notifications.NotificationsModule).Assembly,
 };
 
@@ -156,10 +144,6 @@ foreach (var descriptor in builder.Services
 {
     builder.Services.Remove(descriptor);
 }
-
-// DemoSeeder is opt-in via the `seed-demo` verb. Register unconditionally so
-// the DI graph is satisfied; the verb dispatch below decides whether to call it.
-builder.Services.AddScoped<DemoSeeder>();
 
 using var host = builder.Build();
 var logger = host.Services.GetRequiredService<ILogger<MigratorCommand>>();
@@ -244,8 +228,7 @@ try
     }
 
     // ── Step 2 — per-tenant migrations + (optional) seeds ────────────────
-    // `seed-demo` short-circuits this: it provisions its own demo tenants inline (Step 3 below).
-    if (!cli.CatalogOnly && cli.Command != "seed-demo")
+    if (!cli.CatalogOnly)
     {
         var tenantStore = host.Services.GetRequiredService<IMultiTenantStore<AppTenantInfo>>();
         var tenantService = host.Services.GetRequiredService<ITenantService>();
@@ -286,28 +269,6 @@ try
                 await tenantService.SeedTenantAsync(tenant, CancellationToken.None).ConfigureAwait(false);
             }
         }
-    }
-
-    // ── Step 3 — demo seed (verb: `seed-demo`) ───────────────────────────
-    // Dev-only: provisions acme + globex with rich demo content; hard-fails outside Development.
-    if (cli.Command == "seed-demo")
-    {
-        var env = host.Services.GetRequiredService<IHostEnvironment>();
-        if (!env.IsDevelopment())
-        {
-            await Console.Error.WriteLineAsync(
-                $"[demo-seed] REFUSING to run — DOTNET_ENVIRONMENT is '{env.EnvironmentName}'. "
-                + "seed-demo is dev-only by design.")
-                .ConfigureAwait(false);
-            return 1;
-        }
-
-        await Console.Out.WriteLineAsync("[demo-seed] provisioning acme + globex with demo content…")
-            .ConfigureAwait(false);
-        using var scope = host.Services.CreateScope();
-        var seeder = scope.ServiceProvider.GetRequiredService<DemoSeeder>();
-        await seeder.RunAsync(CancellationToken.None).ConfigureAwait(false);
-        await Console.Out.WriteLineAsync("[demo-seed] done").ConfigureAwait(false);
     }
 
     await Console.Out.WriteLineAsync("[migrator] finished successfully.").ConfigureAwait(false);

@@ -36,14 +36,8 @@
     <ProjectReference Include="..\..\Modules\Webhooks\Modules.Webhooks\Boilerplate.Modules.Webhooks.csproj" />
     <ProjectReference Include="..\..\Modules\Billing\Modules.Billing\Boilerplate.Modules.Billing.csproj" />
     <ProjectReference Include="..\..\Modules\Billing\Modules.Billing.Contracts\Boilerplate.Modules.Billing.Contracts.csproj" />
-    <ProjectReference Include="..\..\Modules\Catalog\Modules.Catalog\Boilerplate.Modules.Catalog.csproj" />
-    <ProjectReference Include="..\..\Modules\Catalog\Modules.Catalog.Contracts\Boilerplate.Modules.Catalog.Contracts.csproj" />
-    <ProjectReference Include="..\..\Modules\Tickets\Modules.Tickets\Boilerplate.Modules.Tickets.csproj" />
-    <ProjectReference Include="..\..\Modules\Tickets\Modules.Tickets.Contracts\Boilerplate.Modules.Tickets.Contracts.csproj" />
     <ProjectReference Include="..\..\Modules\Files\Modules.Files\Boilerplate.Modules.Files.csproj" />
     <ProjectReference Include="..\..\Modules\Files\Modules.Files.Contracts\Boilerplate.Modules.Files.Contracts.csproj" />
-    <ProjectReference Include="..\..\Modules\Chat\Modules.Chat\Boilerplate.Modules.Chat.csproj" />
-    <ProjectReference Include="..\..\Modules\Chat\Modules.Chat.Contracts\Boilerplate.Modules.Chat.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

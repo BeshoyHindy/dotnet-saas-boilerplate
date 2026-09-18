@@ -51,7 +51,7 @@ The React apps read their API URL at runtime from `public/config.json` — no re
 src/
   BuildingBlocks/      Shared framework libraries — yours to modify
   Modules/             Bounded contexts: Identity, Multitenancy, Auditing, Billing,
-                       Catalog, Chat, Files, Notifications, Tickets, Webhooks
+                       Files, Notifications, Webhooks
   Host/
     Boilerplate.Api/                    API composition root
     Boilerplate.AppHost/                .NET Aspire orchestrator
@@ -63,7 +63,7 @@ clients/
   dashboard/           Tenant app (React 19 + Vite + Tailwind, SSE live feed)
 deploy/
   docker/              Production docker-compose + .env
-  terraform/           AWS infrastructure (ECS, RDS, ElastiCache, S3)
+  dokploy/             Dokploy deployment configuration
 ```
 
 ## Database
@@ -78,8 +78,8 @@ dotnet run --project src/Host/Boilerplate.DbMigrator -- apply --seed
 
 This project shipped with sensible defaults. Before production:
 
-- [ ] **Secrets** — set strong values in `deploy/docker/.env` (the CLI generates these for you;
-      otherwise `cp deploy/docker/.env.example deploy/docker/.env` and fill them in).
+- [ ] **Secrets** — set strong values in `deploy/docker/.env`
+      (`cp deploy/docker/.env.example deploy/docker/.env` and fill them in).
       Never commit `.env`.
 - [ ] **Branding** — the clients render a plain text wordmark; swap it (and add a logo under
       `clients/*/public/`) in `clients/*/src/components/**` for your own identity.
@@ -87,13 +87,13 @@ This project shipped with sensible defaults. Before production:
       `src/Host/Boilerplate.Api/appsettings.json`.
 - [ ] **OpenAPI contact** — update `OpenApiOptions.Contact` in `appsettings.json`.
 - [ ] **Container registry & infra** — set your registry and review bucket / database names
-      in `deploy/terraform/apps/starter/**/variables.tf` and `terraform.tfvars`.
+      in `deploy/dokploy` and `deploy/docker`.
 
 ## Production (Docker Compose)
 
 ```bash
 cd deploy/docker
-# .env is generated for you by the CLI; otherwise: cp .env.example .env && edit
+# cp .env.example .env && edit
 docker compose up -d --build
 ```
 

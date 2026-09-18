@@ -2,6 +2,17 @@ import { env } from "@/env";
 import { tokenStore } from "@/auth/token-store";
 import { decodeJwt } from "@/auth/jwt";
 
+/** Shared paged-list envelope used by search/list endpoints across modules. */
+export type PagedResponse<T> = {
+  items: T[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+};
+
 export type ApiError = {
   status: number;
   title?: string;

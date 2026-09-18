@@ -3,8 +3,6 @@
 ##
 ## Get latest from `dotnet new gitignore`
 
-*.terraform
-terraform.tfstate
 # dotenv files
 .env
 

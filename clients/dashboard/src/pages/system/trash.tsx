@@ -3,36 +3,16 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   FileText,
-  FolderTree,
-  Package,
   RotateCcw,
-  Tags,
-  Ticket,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  listTrashedBrands,
-  listTrashedCategories,
-  listTrashedProducts,
-  restoreBrand,
-  restoreCategory,
-  restoreProduct,
-  type BrandDto,
-  type CategoryDto,
-  type PagedResponse,
-  type ProductDto,
-} from "@/api/catalog";
-import {
-  listTrashedTickets,
-  restoreTicket,
-  type TicketDto,
-} from "@/api/tickets";
 import {
   listTrashedFiles,
   restoreFile,
   type FileAssetDto,
 } from "@/api/files";
+import type { PagedResponse } from "@/lib/api-client";
 import { useAuth } from "@/auth/use-auth";
 import {
   TRASH_TAB_PERMISSIONS,
@@ -77,10 +57,6 @@ const TABS: ReadonlyArray<{
   /** Permission gating this tab — mirrors what its trash endpoint enforces. */
   perm: string;
 }> = [
-  { key: "products", label: "Products", icon: Package, perm: TRASH_TAB_PERMISSIONS.products },
-  { key: "brands", label: "Brands", icon: Tags, perm: TRASH_TAB_PERMISSIONS.brands },
-  { key: "categories", label: "Categories", icon: FolderTree, perm: TRASH_TAB_PERMISSIONS.categories },
-  { key: "tickets", label: "Tickets", icon: Ticket, perm: TRASH_TAB_PERMISSIONS.tickets },
   { key: "files", label: "Files", icon: FileText, perm: TRASH_TAB_PERMISSIONS.files },
 ];
 
@@ -90,7 +66,7 @@ const TABS: ReadonlyArray<{
 
 export function TrashPage() {
   const { user } = useAuth();
-  const [tab, setTab] = useState<TabKey>("products");
+  const [tab, setTab] = useState<TabKey>("files");
   const [pageNumber, setPageNumber] = useState(1);
 
   // Show only the tabs whose trash endpoint the user can actually reach, so they
@@ -159,18 +135,6 @@ export function TrashPage() {
       </nav>
 
       {/* Active panel */}
-      {activeTab === "products" && (
-        <ProductsTab pageNumber={pageNumber} setPageNumber={setPageNumber} />
-      )}
-      {activeTab === "brands" && (
-        <BrandsTab pageNumber={pageNumber} setPageNumber={setPageNumber} />
-      )}
-      {activeTab === "categories" && (
-        <CategoriesTab pageNumber={pageNumber} setPageNumber={setPageNumber} />
-      )}
-      {activeTab === "tickets" && (
-        <TicketsTab pageNumber={pageNumber} setPageNumber={setPageNumber} />
-      )}
       {activeTab === "files" && (
         <FilesTab pageNumber={pageNumber} setPageNumber={setPageNumber} />
       )}
@@ -183,166 +147,6 @@ export function TrashPage() {
 // ───────────────────────────────────────────────────────────────────────
 //  Per-resource tabs (each owns its own query + restore mutation)
 // ───────────────────────────────────────────────────────────────────────
-
-function ProductsTab({
-  pageNumber,
-  setPageNumber,
-}: {
-  pageNumber: number;
-  setPageNumber: (n: number) => void;
-}) {
-  const queryClient = useQueryClient();
-  const query = useQuery({
-    queryKey: ["trash", "products", pageNumber],
-    queryFn: () => listTrashedProducts(pageNumber, PAGE_SIZE),
-  });
-  const restore = useMutation({
-    mutationFn: (id: string) => restoreProduct(id),
-    onSuccess: () => {
-      toast.success("Product restored");
-      void queryClient.invalidateQueries({ queryKey: ["trash", "products"] });
-      void queryClient.invalidateQueries({ queryKey: ["catalog", "products"] });
-    },
-    onError: (e) => toast.error(describe(e)),
-  });
-  return (
-    <TrashShell
-      label="Products"
-      query={query}
-      pageNumber={pageNumber}
-      setPageNumber={setPageNumber}
-      mapRow={(p: ProductDto) => ({
-        id: p.id,
-        title: p.name,
-        subtitle: `SKU ${p.sku}`,
-        deletedOnUtc: p.deletedOnUtc,
-        deletedBy: p.deletedBy,
-        isRestoring: restore.isPending && restore.variables === p.id,
-        onRestore: () => restore.mutate(p.id),
-      })}
-    />
-  );
-}
-
-function BrandsTab({
-  pageNumber,
-  setPageNumber,
-}: {
-  pageNumber: number;
-  setPageNumber: (n: number) => void;
-}) {
-  const queryClient = useQueryClient();
-  const query = useQuery({
-    queryKey: ["trash", "brands", pageNumber],
-    queryFn: () => listTrashedBrands(pageNumber, PAGE_SIZE),
-  });
-  const restore = useMutation({
-    mutationFn: (id: string) => restoreBrand(id),
-    onSuccess: () => {
-      toast.success("Brand restored");
-      void queryClient.invalidateQueries({ queryKey: ["trash", "brands"] });
-      void queryClient.invalidateQueries({ queryKey: ["catalog", "brands"] });
-    },
-    onError: (e) => toast.error(describe(e)),
-  });
-  return (
-    <TrashShell
-      label="Brands"
-      query={query}
-      pageNumber={pageNumber}
-      setPageNumber={setPageNumber}
-      mapRow={(b: BrandDto) => ({
-        id: b.id,
-        title: b.name,
-        subtitle: `/${b.slug}`,
-        deletedOnUtc: b.deletedOnUtc,
-        deletedBy: b.deletedBy,
-        isRestoring: restore.isPending && restore.variables === b.id,
-        onRestore: () => restore.mutate(b.id),
-      })}
-    />
-  );
-}
-
-function CategoriesTab({
-  pageNumber,
-  setPageNumber,
-}: {
-  pageNumber: number;
-  setPageNumber: (n: number) => void;
-}) {
-  const queryClient = useQueryClient();
-  const query = useQuery({
-    queryKey: ["trash", "categories", pageNumber],
-    queryFn: () => listTrashedCategories(pageNumber, PAGE_SIZE),
-  });
-  const restore = useMutation({
-    mutationFn: (id: string) => restoreCategory(id),
-    onSuccess: () => {
-      toast.success("Category restored");
-      void queryClient.invalidateQueries({ queryKey: ["trash", "categories"] });
-      void queryClient.invalidateQueries({ queryKey: ["catalog", "categories"] });
-    },
-    onError: (e) => toast.error(describe(e)),
-  });
-  return (
-    <TrashShell
-      label="Categories"
-      query={query}
-      pageNumber={pageNumber}
-      setPageNumber={setPageNumber}
-      mapRow={(c: CategoryDto) => ({
-        id: c.id,
-        title: c.name,
-        subtitle: `/${c.slug}`,
-        deletedOnUtc: c.deletedOnUtc,
-        deletedBy: c.deletedBy,
-        isRestoring: restore.isPending && restore.variables === c.id,
-        onRestore: () => restore.mutate(c.id),
-      })}
-    />
-  );
-}
-
-function TicketsTab({
-  pageNumber,
-  setPageNumber,
-}: {
-  pageNumber: number;
-  setPageNumber: (n: number) => void;
-}) {
-  const queryClient = useQueryClient();
-  const query = useQuery({
-    queryKey: ["trash", "tickets", pageNumber],
-    queryFn: () => listTrashedTickets(pageNumber, PAGE_SIZE),
-  });
-  const restore = useMutation({
-    mutationFn: (id: string) => restoreTicket(id),
-    onSuccess: () => {
-      toast.success("Ticket restored");
-      void queryClient.invalidateQueries({ queryKey: ["trash", "tickets"] });
-      void queryClient.invalidateQueries({ queryKey: ["tickets"] });
-    },
-    onError: (e) => toast.error(describe(e)),
-  });
-  return (
-    <TrashShell
-      label="Tickets"
-      query={query}
-      pageNumber={pageNumber}
-      setPageNumber={setPageNumber}
-      mapRow={(t: TicketDto) => ({
-        id: t.id,
-        title: t.title,
-        subtitle: t.number,
-        deletedOnUtc: t.deletedOnUtc,
-        deletedBy: t.deletedBy,
-        isRestoring: restore.isPending && restore.variables === t.id,
-        onRestore: () => restore.mutate(t.id),
-      })}
-    />
-  );
-}
 
 function FilesTab({
   pageNumber,
@@ -563,10 +367,6 @@ function RestoreConfirmDialog({
 
 function tabPath(label: string): string {
   switch (label) {
-    case "Products": return "catalog/products";
-    case "Brands": return "catalog/brands";
-    case "Categories": return "catalog/categories";
-    case "Tickets": return "tickets";
     case "Files": return "files";
     default: return "";
   }

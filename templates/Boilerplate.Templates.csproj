@@ -21,12 +21,12 @@
     <PackageVersion>10.0.0</PackageVersion>
     <Authors>Boilerplate</Authors>
     <Company>Boilerplate</Company>
-    <Description>A production-ready full-stack starter: a modular .NET 10 monolith (Vertical Slice, CQRS, multitenancy, Identity, Aspire) plus two React 19 apps, Docker Compose, and Terraform. Scaffolds full, owned source — no per-module NuGet dependencies.</Description>
+    <Description>A production-ready full-stack starter: a modular .NET 10 monolith (Vertical Slice, CQRS, multitenancy, Identity, Aspire) plus two React 19 apps and Docker Compose. Scaffolds full, owned source — no per-module NuGet dependencies.</Description>
     <PackageTags>dotnet-new;templates;template;webapi;modular-monolith;vertical-slice;multitenancy;aspire;react</PackageTags>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageIcon>icon.png</PackageIcon>
-    <!-- Render the project README on the nuget.org gallery page (same README the CLI ships). -->
+    <!-- Render the project README on the nuget.org gallery page. -->
     <PackageReadmeFile>README.md</PackageReadmeFile>
 
     <TargetFramework>net10.0</TargetFramework>
@@ -52,9 +52,9 @@
 
   <!--
     Template content = ONLY git-tracked files. This is self-maintaining: no local or
-    gitignored state can ever leak into the package (bin/obj, node_modules, .terraform,
-    *.tfstate, audit-dlq dumps, release-nupkgs, .claude worktrees, *.user). The previous
-    `..\**\*` filesystem glob with a denylist shipped 583 MB incl. Terraform state.
+    gitignored state can ever leak into the package (bin/obj, node_modules,
+    audit-dlq dumps, release-nupkgs, .claude worktrees, *.user). The previous
+    `..\**\*` filesystem glob with a denylist shipped hundreds of MB of local state.
     Filtering is pushed into git via :(exclude) pathspecs — on top of git-tracking we
     drop this pack project (templates/), the docs leftover, and repo-internal AI/CI
     tooling (.github, .agents, .vscode, .devcontainer, scripts) a consumer's

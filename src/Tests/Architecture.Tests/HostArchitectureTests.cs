@@ -39,9 +39,6 @@ public class HostArchitectureTests
         {
             "Boilerplate.Modules.Auditing.Features",
             "Boilerplate.Modules.Auditing.Data",
-            "Boilerplate.Modules.Chat.Features",
-            "Boilerplate.Modules.Chat.Data",
-            "Boilerplate.Modules.Chat.Domain",
             "Boilerplate.Modules.Identity.Features",
             "Boilerplate.Modules.Identity.Data",
             "Boilerplate.Modules.Multitenancy.Features",

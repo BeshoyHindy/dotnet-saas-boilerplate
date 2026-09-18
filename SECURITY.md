@@ -26,7 +26,7 @@ Fixes ship as a patched commit on `main` plus a GitHub Security Advisory. Report
 
 ## Scope
 
-In scope: `src/` (BuildingBlocks, Modules, Host), default `appsettings.*.json`, the CLI in `src/Tools/CLI`, and the `clients/` apps.
+In scope: `src/` (BuildingBlocks, Modules, Host), default `appsettings.*.json`, and the `clients/` apps.
 
 Out of scope: third-party NuGet/npm packages (report upstream) and issues in downstream forks (contact that fork's maintainer).
 

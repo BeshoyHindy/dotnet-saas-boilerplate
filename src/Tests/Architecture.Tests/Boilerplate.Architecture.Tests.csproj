@@ -38,8 +38,6 @@
     <ProjectReference Include="..\..\Modules\Multitenancy\Modules.Multitenancy.Contracts\Boilerplate.Modules.Multitenancy.Contracts.csproj" />
     <ProjectReference Include="..\..\Modules\Files\Modules.Files\Boilerplate.Modules.Files.csproj" />
     <ProjectReference Include="..\..\Modules\Files\Modules.Files.Contracts\Boilerplate.Modules.Files.Contracts.csproj" />
-    <ProjectReference Include="..\..\Modules\Chat\Modules.Chat\Boilerplate.Modules.Chat.csproj" />
-    <ProjectReference Include="..\..\Modules\Chat\Modules.Chat.Contracts\Boilerplate.Modules.Chat.Contracts.csproj" />
     <ProjectReference Include="..\..\Host\Boilerplate.Api\Boilerplate.Api.csproj" />
     <ProjectReference Include="..\..\Host\Boilerplate.Migrations.PostgreSQL\Boilerplate.Migrations.PostgreSQL.csproj" />
   </ItemGroup>

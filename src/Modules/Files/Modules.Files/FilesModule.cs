@@ -33,10 +33,10 @@ namespace Boilerplate.Modules.Files;
 
 /// <summary>
 /// Files module: presigned-URL file lifecycle (upload, finalize, serve, delete) shared across the
-/// kit's owning features (Catalog product images, Ticket attachments, My Files, avatars, tenant
-/// logos). Module order 350 places it between Auditing (300) and Webhooks (400); owning modules
-/// (Catalog=600, Tickets=700) load later and register their <see cref="IFileAccessPolicy"/>
-/// implementations during their own ConfigureServices.
+/// kit's owning features (My Files, avatars, tenant logos, and any module that attaches files to
+/// its own entities). Module order 350 places it between Auditing (300) and Webhooks (400); owning
+/// modules load later and register their <see cref="IFileAccessPolicy"/> implementations during
+/// their own ConfigureServices.
 /// </summary>
 public sealed class FilesModule : IModule
 {
@@ -78,8 +78,8 @@ public sealed class FilesModule : IModule
             .WithApiVersionSet(versionSet)
             .RequireAuthorization();
 
-        // Literal routes first so they win over the /{id:guid} catch-all (matches the Catalog
-        // pattern for /trash etc.).
+        // Literal routes first so they win over the /{id:guid} catch-all (the same pattern the
+        // other modules use for /trash etc.).
         group.MapRequestUploadUrlEndpoint();         // POST  /upload-url
         group.MapListMyFilesEndpoint();              // GET   /mine
         group.MapListSharedFilesEndpoint();          // GET   /shared

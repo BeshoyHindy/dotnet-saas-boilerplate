@@ -20,9 +20,9 @@ using Microsoft.Extensions.Hosting;
 namespace Boilerplate.Modules.Notifications;
 
 /// <summary>
-/// Notifications module: per-user inbox driven by integration events from other modules. Module
-/// Order 750 places it BEFORE Chat (800) so its integration-event handlers are registered
-/// before Chat starts publishing — handler registration is order-sensitive.
+/// Notifications module: per-user inbox driven by integration events from other modules. Its
+/// Order (750) keeps it ahead of any module that publishes into the inbox — integration-event
+/// handler registration is order-sensitive.
 /// </summary>
 public sealed class NotificationsModule : IModule
 {
