@@ -62,7 +62,7 @@ Host (composition root)  →  Modules.{Name} (runtime)  →  Modules.{Name}.Cont
 | HybridCache keys, tags, invalidation | `.agents/rules/caching.md` |
 | CORS, security headers, rate limiting, idempotency, quotas | `.agents/rules/security.md` |
 | Serilog, correlation, OpenTelemetry | `.agents/rules/logging.md` |
-| Storage, jobs, resilience | `.agents/rules/storage.md`, `jobs.md`, `resilience.md` |
+| Storage, jobs | `.agents/rules/storage.md`, `jobs.md` |
 | Unit tests | `.agents/rules/testing.md` |
 | Container-backed tests | `.agents/rules/integration-testing.md` |
 | A specific module's quirks | `.agents/rules/modules/{module}.md` |

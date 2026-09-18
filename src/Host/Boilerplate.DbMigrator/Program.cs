@@ -108,7 +108,6 @@ builder.AddHeroPlatform(o =>
     o.EnableOpenApi = false;
     o.EnableJobs = false;
     o.EnableMailing = false;
-    o.EnableFeatureFlags = false;
     o.EnableIdempotency = false;
     o.EnableCaching = true;
 });

@@ -6,7 +6,6 @@ using Boilerplate.BuildingBlocks.Shared.Constants;
 using Boilerplate.BuildingBlocks.Web.Auth;
 using Boilerplate.BuildingBlocks.Web.Cors;
 using Boilerplate.BuildingBlocks.Web.Exceptions;
-using Boilerplate.BuildingBlocks.Web.FeatureFlags;
 using Boilerplate.BuildingBlocks.Web.Idempotency;
 using Boilerplate.BuildingBlocks.Web.Health;
 using Boilerplate.BuildingBlocks.Web.Mediator.Behaviors;
@@ -99,11 +98,6 @@ public static class Extensions
             {
                 builder.Services.AddHealthChecks().AddCheck<RedisHealthCheck>("redis");
             }
-        }
-
-        if (options.EnableFeatureFlags)
-        {
-            builder.Services.AddHeroFeatureFlags(builder.Configuration);
         }
 
         if (options.EnableIdempotency)
@@ -207,7 +201,6 @@ public sealed class AppPlatformOptions
     public bool EnableJobs { get; set; } = false;
     public bool EnableMailing { get; set; } = false;
     public bool EnableOpenTelemetry { get; set; } = true;
-    public bool EnableFeatureFlags { get; set; } = false;
     public bool EnableIdempotency { get; set; } = true;
 }
 
