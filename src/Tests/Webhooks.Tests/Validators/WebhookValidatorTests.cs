@@ -1,9 +1,9 @@
-using FSH.Modules.Webhooks.Contracts.v1.CreateWebhookSubscription;
-using FSH.Modules.Webhooks.Contracts.v1.DeleteWebhookSubscription;
-using FSH.Modules.Webhooks.Contracts.v1.TestWebhookSubscription;
-using FSH.Modules.Webhooks.Features.v1.CreateWebhookSubscription;
-using FSH.Modules.Webhooks.Features.v1.DeleteWebhookSubscription;
-using FSH.Modules.Webhooks.Features.v1.TestWebhookSubscription;
+using Boilerplate.Modules.Webhooks.Contracts.v1.CreateWebhookSubscription;
+using Boilerplate.Modules.Webhooks.Contracts.v1.DeleteWebhookSubscription;
+using Boilerplate.Modules.Webhooks.Contracts.v1.TestWebhookSubscription;
+using Boilerplate.Modules.Webhooks.Features.v1.CreateWebhookSubscription;
+using Boilerplate.Modules.Webhooks.Features.v1.DeleteWebhookSubscription;
+using Boilerplate.Modules.Webhooks.Features.v1.TestWebhookSubscription;
 
 namespace Webhooks.Tests.Validators;
 

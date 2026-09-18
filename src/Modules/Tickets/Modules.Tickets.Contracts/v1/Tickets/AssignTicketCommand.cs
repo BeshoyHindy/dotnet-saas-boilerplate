@@ -1,6 +1,6 @@
 using Mediator;
 
-namespace FSH.Modules.Tickets.Contracts.v1.Tickets;
+namespace Boilerplate.Modules.Tickets.Contracts.v1.Tickets;
 
 /// <summary>
 /// Assigns a ticket to a user. Pass null `AssigneeUserId` to clear the

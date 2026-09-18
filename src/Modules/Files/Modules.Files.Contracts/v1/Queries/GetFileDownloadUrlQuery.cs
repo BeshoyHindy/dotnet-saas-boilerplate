@@ -1,7 +1,7 @@
-using FSH.Modules.Files.Contracts.v1.DTOs;
+using Boilerplate.Modules.Files.Contracts.v1.DTOs;
 using Mediator;
 
-namespace FSH.Modules.Files.Contracts.v1.Queries;
+namespace Boilerplate.Modules.Files.Contracts.v1.Queries;
 
 /// <summary>
 /// Mint a short-lived presigned GET URL for a FileAsset. When <paramref name="Inline"/> is

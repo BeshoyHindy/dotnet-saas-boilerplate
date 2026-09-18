@@ -1,6 +1,6 @@
-﻿using FSH.Framework.Web.Modules;
+﻿using Boilerplate.BuildingBlocks.Web.Modules;
 
-namespace FSH.Modules.Identity;
+namespace Boilerplate.Modules.Identity;
 
 public sealed class IdentityModuleConstants : IModuleConstants
 {

@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Notifications.Contracts.v1.Commands;
+using Boilerplate.Modules.Notifications.Contracts.v1.Commands;
 
-namespace FSH.Modules.Notifications.Features.v1.MarkNotificationRead;
+namespace Boilerplate.Modules.Notifications.Features.v1.MarkNotificationRead;
 
 public sealed class MarkNotificationReadCommandValidator : AbstractValidator<MarkNotificationReadCommand>
 {

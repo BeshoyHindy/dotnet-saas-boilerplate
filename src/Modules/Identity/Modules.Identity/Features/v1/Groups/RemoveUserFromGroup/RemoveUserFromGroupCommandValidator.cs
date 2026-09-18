@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Identity.Contracts.v1.Groups.RemoveUserFromGroup;
+using Boilerplate.Modules.Identity.Contracts.v1.Groups.RemoveUserFromGroup;
 
-namespace FSH.Modules.Identity.Features.v1.Groups.RemoveUserFromGroup;
+namespace Boilerplate.Modules.Identity.Features.v1.Groups.RemoveUserFromGroup;
 
 public sealed class RemoveUserFromGroupCommandValidator : AbstractValidator<RemoveUserFromGroupCommand>
 {

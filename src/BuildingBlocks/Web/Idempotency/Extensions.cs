@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FSH.Framework.Web.Idempotency;
+namespace Boilerplate.BuildingBlocks.Web.Idempotency;
 
 public static class Extensions
 {

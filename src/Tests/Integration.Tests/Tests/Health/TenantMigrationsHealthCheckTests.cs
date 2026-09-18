@@ -1,8 +1,8 @@
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Multitenancy;
-using FSH.Modules.Multitenancy.Data;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Multitenancy;
+using Boilerplate.Modules.Multitenancy.Data;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Testcontainers.PostgreSql;
 
@@ -12,15 +12,15 @@ namespace Integration.Tests.Tests.Health;
 /// Direct unit tests for <see cref="TenantMigrationsHealthCheck"/> — the production-readiness
 /// gate added when API-side auto-migration was removed. Asserts that the check returns
 /// <c>Unhealthy</c> against an unmigrated database and <c>Healthy</c> after the schema is
-/// brought to head (the exact transition <c>FSH.Starter.DbMigrator</c> performs in production).
+/// brought to head (the exact transition <c>Boilerplate.DbMigrator</c> performs in production).
 /// Uses a real Postgres testcontainer + an in-memory <see cref="IMultiTenantStore{TTenantInfo}"/>
-/// to keep the test independent of the shared <c>FshWebApplicationFactory</c> — avoiding
+/// to keep the test independent of the shared <c>AppWebApplicationFactory</c> — avoiding
 /// the global Hangfire state that would otherwise leak across test classes.
 /// </summary>
 public sealed class TenantMigrationsHealthCheckTests : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
-        .WithDatabase("fsh_migrations_check")
+        .WithDatabase("boilerplate_migrations_check")
         .WithUsername("postgres")
         .WithPassword("integration_test_pwd")
         .WithAutoRemove(true)
@@ -46,7 +46,7 @@ public sealed class TenantMigrationsHealthCheckTests : IAsyncLifetime
         var beforeResult = await check.CheckHealthAsync(context, CancellationToken.None);
         beforeResult.Status.ShouldBe(HealthStatus.Unhealthy);
         beforeResult.Description.ShouldNotBeNull();
-        beforeResult.Description!.ShouldContain("FSH.Starter.DbMigrator");
+        beforeResult.Description!.ShouldContain("Boilerplate.DbMigrator");
 
         // ── Apply migrations (what DbMigrator does in production) ────────
         using (var scope = provider.CreateScope())
@@ -91,7 +91,7 @@ public sealed class TenantMigrationsHealthCheckTests : IAsyncLifetime
         services.AddSingleton<IMultiTenantStore<AppTenantInfo>>(new SingleTenantStore());
         services.AddScoped<IMultiTenantContextSetter, FakeMultiTenantContextSetter>();
         services.AddDbContext<TenantDbContext>(opts =>
-            opts.UseNpgsql(connectionString, b => b.MigrationsAssembly("FSH.Starter.Migrations.PostgreSQL")));
+            opts.UseNpgsql(connectionString, b => b.MigrationsAssembly("Boilerplate.Migrations.PostgreSQL")));
         return services.BuildServiceProvider();
     }
 

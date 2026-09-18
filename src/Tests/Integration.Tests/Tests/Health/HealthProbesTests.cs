@@ -2,12 +2,12 @@ using Integration.Tests.Infrastructure;
 
 namespace Integration.Tests.Tests.Health;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class HealthProbesTests
 {
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
 
-    public HealthProbesTests(FshWebApplicationFactory factory)
+    public HealthProbesTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
     }

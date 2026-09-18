@@ -1,8 +1,8 @@
-using FSH.Modules.Identity.Contracts.Services;
-using FSH.Modules.Identity.Contracts.v1.Users.ResetPassword;
+using Boilerplate.Modules.Identity.Contracts.Services;
+using Boilerplate.Modules.Identity.Contracts.v1.Users.ResetPassword;
 using Mediator;
 
-namespace FSH.Modules.Identity.Features.v1.Users.ResetPassword;
+namespace Boilerplate.Modules.Identity.Features.v1.Users.ResetPassword;
 
 public sealed class ResetPasswordCommandHandler : ICommandHandler<ResetPasswordCommand, string>
 {

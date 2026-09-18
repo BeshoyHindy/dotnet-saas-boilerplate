@@ -22,7 +22,7 @@ public static class {X}Permissions
         public const string View   = "Permissions.{Resources}.View";
         public const string Create = "Permissions.{Resources}.Create";   // ← new
     }
-    public static IReadOnlyList<FshPermission> All { get; } = [ /* … include the new one … */ ];
+    public static IReadOnlyList<AppPermission> All { get; } = [ /* … include the new one … */ ];
 }
 ```
 

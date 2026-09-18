@@ -1,9 +1,9 @@
-using FSH.Modules.Identity.Contracts.DTOs;
-using FSH.Modules.Identity.Contracts.Services;
-using FSH.Modules.Identity.Contracts.v1.Roles.UpsertRole;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
+using Boilerplate.Modules.Identity.Contracts.Services;
+using Boilerplate.Modules.Identity.Contracts.v1.Roles.UpsertRole;
 using Mediator;
 
-namespace FSH.Modules.Identity.Features.v1.Roles.UpsertRole;
+namespace Boilerplate.Modules.Identity.Features.v1.Roles.UpsertRole;
 
 public sealed class UpsertRoleCommandHandler : ICommandHandler<UpsertRoleCommand, RoleDto>
 {

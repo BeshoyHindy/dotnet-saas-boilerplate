@@ -1,4 +1,4 @@
-using FSH.Modules.Chat.Contracts.v1.DTOs;
+using Boilerplate.Modules.Chat.Contracts.v1.DTOs;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 
@@ -16,13 +16,13 @@ namespace Integration.Tests.Tests.Chat;
 /// All assertions go through the HTTP client + tenant header so the Finbuckle tenant query filter
 /// (default-ON via BaseDbContext) is the thing under test.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class ChatTenantIsolationTests
 {
     private const string ChatBasePath = "/api/v1/chat";
     private readonly AuthHelper _auth;
 
-    public ChatTenantIsolationTests(FshWebApplicationFactory factory)
+    public ChatTenantIsolationTests(AppWebApplicationFactory factory)
     {
         _auth = new AuthHelper(factory);
     }

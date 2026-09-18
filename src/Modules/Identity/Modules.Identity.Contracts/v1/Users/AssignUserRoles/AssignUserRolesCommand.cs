@@ -1,7 +1,7 @@
-﻿using FSH.Modules.Identity.Contracts.DTOs;
+﻿using Boilerplate.Modules.Identity.Contracts.DTOs;
 using Mediator;
 
-namespace FSH.Modules.Identity.Contracts.v1.Users.AssignUserRoles;
+namespace Boilerplate.Modules.Identity.Contracts.v1.Users.AssignUserRoles;
 
 public sealed class AssignUserRolesCommand : ICommand<string>
 {

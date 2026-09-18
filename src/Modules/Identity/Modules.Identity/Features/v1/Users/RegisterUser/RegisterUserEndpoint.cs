@@ -1,13 +1,13 @@
-using FSH.Modules.Identity.Contracts.Authorization;
-using FSH.Framework.Shared.Identity.Authorization;
-using FSH.Framework.Web.Idempotency;
-using FSH.Modules.Identity.Contracts.v1.Users.RegisterUser;
+using Boilerplate.Modules.Identity.Contracts.Authorization;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.BuildingBlocks.Web.Idempotency;
+using Boilerplate.Modules.Identity.Contracts.v1.Users.RegisterUser;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Identity.Features.v1.Users.RegisterUser;
+namespace Boilerplate.Modules.Identity.Features.v1.Users.RegisterUser;
 
 public static class RegisterUserEndpoint
 {

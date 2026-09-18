@@ -3,13 +3,13 @@
 // localStorage/sessionStorage is per-origin, so the admin and dashboard apps
 // never share these keys (different hosts). That lets us use short, un-prefixed
 // key names without colliding — and, importantly, the activity heartbeat key
-// does NOT start with "fsh.{app}." so it won't trip each app's auth storage
+// does NOT start with "boilerplate.{app}." so it won't trip each app's auth storage
 // listeners on every cross-tab tick.
 
 /** Shared "last user activity" timestamp — one value across every tab of this origin. */
-const LAST_ACTIVITY_KEY = "fsh.lastActivity";
+const LAST_ACTIVITY_KEY = "boilerplate.lastActivity";
 /** Ephemeral, per-tab reason stash read once by the login page after a sign-out. */
-const SIGNED_OUT_REASON_KEY = "fsh.signedOutReason";
+const SIGNED_OUT_REASON_KEY = "boilerplate.signedOutReason";
 
 export type InactivityPhase = "active" | "warning" | "expired";
 

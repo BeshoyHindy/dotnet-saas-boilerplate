@@ -1,6 +1,6 @@
-using FSH.Modules.Identity.Contracts.DTOs;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
 
-namespace FSH.Modules.Identity.Contracts.Services;
+namespace Boilerplate.Modules.Identity.Contracts.Services;
 
 /// <summary>
 /// Service for user role management.

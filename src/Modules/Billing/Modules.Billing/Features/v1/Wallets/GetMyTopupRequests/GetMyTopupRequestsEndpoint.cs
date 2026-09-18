@@ -1,13 +1,13 @@
-using FSH.Framework.Shared.Identity.Authorization;
-using FSH.Modules.Billing.Contracts;
-using FSH.Modules.Billing.Contracts.Authorization;
-using FSH.Modules.Billing.Contracts.v1.Wallets;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.Modules.Billing.Contracts;
+using Boilerplate.Modules.Billing.Contracts.Authorization;
+using Boilerplate.Modules.Billing.Contracts.v1.Wallets;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Billing.Features.v1.Wallets.GetMyTopupRequests;
+namespace Boilerplate.Modules.Billing.Features.v1.Wallets.GetMyTopupRequests;
 
 public static class GetMyTopupRequestsEndpoint
 {

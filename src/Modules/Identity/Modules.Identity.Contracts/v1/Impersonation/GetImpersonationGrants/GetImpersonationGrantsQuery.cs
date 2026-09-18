@@ -1,6 +1,6 @@
 using Mediator;
 
-namespace FSH.Modules.Identity.Contracts.v1.Impersonation.GetImpersonationGrants;
+namespace Boilerplate.Modules.Identity.Contracts.v1.Impersonation.GetImpersonationGrants;
 
 // Status (null = all) and ActorUserId filters. ImpersonatedTenantId filters by target tenant, but
 // tenant admins are forced to their own tenant server-side regardless.

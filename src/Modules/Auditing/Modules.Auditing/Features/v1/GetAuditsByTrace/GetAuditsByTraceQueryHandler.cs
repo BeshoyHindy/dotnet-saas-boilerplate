@@ -1,11 +1,11 @@
-using FSH.Modules.Auditing.Contracts;
-using FSH.Modules.Auditing.Contracts.Dtos;
-using FSH.Modules.Auditing.Contracts.v1.GetAuditsByTrace;
-using FSH.Modules.Auditing.Persistence;
+using Boilerplate.Modules.Auditing.Contracts;
+using Boilerplate.Modules.Auditing.Contracts.Dtos;
+using Boilerplate.Modules.Auditing.Contracts.v1.GetAuditsByTrace;
+using Boilerplate.Modules.Auditing.Persistence;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Auditing.Features.v1.GetAuditsByTrace;
+namespace Boilerplate.Modules.Auditing.Features.v1.GetAuditsByTrace;
 
 public sealed class GetAuditsByTraceQueryHandler : IQueryHandler<GetAuditsByTraceQuery, IReadOnlyList<AuditSummaryDto>>
 {

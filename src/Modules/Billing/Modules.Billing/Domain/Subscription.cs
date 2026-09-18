@@ -1,7 +1,7 @@
-using FSH.Framework.Core.Domain;
-using FSH.Modules.Billing.Contracts;
+using Boilerplate.BuildingBlocks.Core.Domain;
+using Boilerplate.Modules.Billing.Contracts;
 
-namespace FSH.Modules.Billing.Domain;
+namespace Boilerplate.Modules.Billing.Domain;
 
 /// <summary>
 /// Binds a tenant to a billing plan over a time window. At most one subscription is Active per

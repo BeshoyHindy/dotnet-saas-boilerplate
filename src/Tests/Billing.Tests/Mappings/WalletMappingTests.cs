@@ -1,7 +1,7 @@
-using FSH.Framework.Core.Domain;
-using FSH.Modules.Billing.Domain;
-using FSH.Modules.Billing.Mappings;
-using FSH.Modules.Billing.Contracts;
+using Boilerplate.BuildingBlocks.Core.Domain;
+using Boilerplate.Modules.Billing.Domain;
+using Boilerplate.Modules.Billing.Mappings;
+using Boilerplate.Modules.Billing.Contracts;
 using Shouldly;
 using Xunit;
 

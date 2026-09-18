@@ -145,13 +145,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // a `storage` event fires when ANOTHER tab logs in/out (e.g. inactivity
   // sign-out). Rebuild from the (now changed) tokens so a logout in one tab
   // drops every tab to /login. Scoped to the token keys so the inactivity
-  // heartbeat ("fsh.lastActivity") doesn't trigger a rebuild every second.
+  // heartbeat ("boilerplate.lastActivity") doesn't trigger a rebuild every second.
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (
         e.key !== null &&
-        e.key !== "fsh.admin.accessToken" &&
-        e.key !== "fsh.admin.refreshToken"
+        e.key !== "boilerplate.admin.accessToken" &&
+        e.key !== "boilerplate.admin.refreshToken"
       ) {
         return;
       }

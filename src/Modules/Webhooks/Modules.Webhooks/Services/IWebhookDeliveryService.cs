@@ -1,4 +1,4 @@
-namespace FSH.Modules.Webhooks.Services;
+namespace Boilerplate.Modules.Webhooks.Services;
 
 public interface IWebhookDeliveryService
 {

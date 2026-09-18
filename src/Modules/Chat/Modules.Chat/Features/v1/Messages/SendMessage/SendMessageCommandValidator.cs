@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Chat.Contracts.v1.Commands;
+using Boilerplate.Modules.Chat.Contracts.v1.Commands;
 
-namespace FSH.Modules.Chat.Features.v1.Messages.SendMessage;
+namespace Boilerplate.Modules.Chat.Features.v1.Messages.SendMessage;
 
 public sealed class SendMessageCommandValidator : AbstractValidator<SendMessageCommand>
 {

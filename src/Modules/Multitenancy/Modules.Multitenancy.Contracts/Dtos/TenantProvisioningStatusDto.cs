@@ -1,4 +1,4 @@
-namespace FSH.Modules.Multitenancy.Contracts.Dtos;
+namespace Boilerplate.Modules.Multitenancy.Contracts.Dtos;
 
 public sealed record TenantProvisioningStepDto(
     string Step,

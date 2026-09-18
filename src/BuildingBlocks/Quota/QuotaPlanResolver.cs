@@ -1,7 +1,7 @@
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Framework.Shared.Quota;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Quota;
 
-namespace FSH.Framework.Quota;
+namespace Boilerplate.BuildingBlocks.Quota;
 
 /// <summary>
 /// Resolves the effective limit for a given tenant + resource. Tenant-local overrides on

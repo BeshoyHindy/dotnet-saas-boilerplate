@@ -23,4 +23,4 @@ Local/dev without MinIO uses `LocalPresignTokenStore` (in-memory one-shot tokens
 
 ## Test gotcha
 
-`AddHeroStorage` reads `Storage:Provider` **before** a test factory's in-memory config overlay applies, so it wires `LocalStorageService`. Integration tests that need MinIO must **remove the `IStorageService`/`LocalStorageService`/`S3StorageService` descriptors post-registration and re-register the S3 stack** pointed at the MinIO container (see `FshWebApplicationFactory`). See `integration-testing.md`.
+`AddHeroStorage` reads `Storage:Provider` **before** a test factory's in-memory config overlay applies, so it wires `LocalStorageService`. Integration tests that need MinIO must **remove the `IStorageService`/`LocalStorageService`/`S3StorageService` descriptors post-registration and re-register the S3 stack** pointed at the MinIO container (see `AppWebApplicationFactory`). See `integration-testing.md`.

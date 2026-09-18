@@ -1,4 +1,4 @@
-﻿namespace FSH.Modules.Auditing.Contracts;
+﻿namespace Boilerplate.Modules.Auditing.Contracts;
 
 /// <summary>
 /// Ambient context for the current operation/request. 

@@ -1,9 +1,9 @@
-using FSH.Framework.Shared.Storage;
-using FSH.Modules.Identity.Contracts.DTOs;
-using FSH.Modules.Identity.Contracts.Services;
+using Boilerplate.BuildingBlocks.Shared.Storage;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
+using Boilerplate.Modules.Identity.Contracts.Services;
 using System.Security.Claims;
 
-namespace FSH.Modules.Identity.Services;
+namespace Boilerplate.Modules.Identity.Services;
 
 /// <summary>
 /// Facade service that delegates to focused single-responsibility services.

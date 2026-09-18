@@ -192,7 +192,7 @@ export async function deleteRole(id: string): Promise<void> {
 }
 
 // One row in the host's permission catalog. Mirrors
-// FSH.Modules.Identity.Contracts.DTOs.PermissionCatalogEntryDto. The catalog
+// Boilerplate.Modules.Identity.Contracts.DTOs.PermissionCatalogEntryDto. The catalog
 // endpoint is the single source of truth — every module's permissions land
 // here at startup, filtered to the caller's tenant context (Admin set for
 // regular tenants; Admin + Root set for the root tenant).

@@ -4,7 +4,7 @@ import { installAdminShellMocks, ADMIN_PERMS } from "../helpers/shell-mocks";
 
 // AppearanceSettings is purely client-side: it calls ThemeProvider.setTheme,
 // which toggles the "dark" class on <html> and persists to the
-// "fsh.admin.theme" localStorage key. No API to mock beyond the shell.
+// "boilerplate.admin.theme" localStorage key. No API to mock beyond the shell.
 
 test.beforeEach(async ({ page }) => {
   await seedAuthedSession(page, { ...TEST_USER, permissions: [...ADMIN_PERMS] });
@@ -55,7 +55,7 @@ test.describe("settings · appearance", () => {
     await light.click();
     await expect(page.locator("html")).not.toHaveClass(/dark/);
 
-    const stored = await page.evaluate(() => localStorage.getItem("fsh.admin.theme"));
+    const stored = await page.evaluate(() => localStorage.getItem("boilerplate.admin.theme"));
     expect(stored).toBe("light");
   });
 });

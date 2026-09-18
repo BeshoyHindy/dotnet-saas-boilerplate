@@ -1,5 +1,5 @@
-using FSH.Framework.Eventing.Abstractions;
-using FSH.Framework.Eventing.InMemory;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
+using Boilerplate.BuildingBlocks.Eventing.InMemory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 

@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-namespace FSH.Framework.Web.Health;
+namespace Boilerplate.BuildingBlocks.Web.Health;
 
 /// <summary>
 /// Health check that verifies Redis connectivity by performing a round-trip set/remove.

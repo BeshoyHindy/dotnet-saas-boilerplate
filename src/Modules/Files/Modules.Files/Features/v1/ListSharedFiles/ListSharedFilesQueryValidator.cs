@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Files.Contracts.v1.Queries;
+using Boilerplate.Modules.Files.Contracts.v1.Queries;
 
-namespace FSH.Modules.Files.Features.v1.ListSharedFiles;
+namespace Boilerplate.Modules.Files.Features.v1.ListSharedFiles;
 
 public sealed class ListSharedFilesQueryValidator : AbstractValidator<ListSharedFilesQuery>
 {

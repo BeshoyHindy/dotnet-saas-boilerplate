@@ -1,5 +1,5 @@
-using FSH.Modules.Files.Authorization;
-using FSH.Modules.Files.Contracts;
+using Boilerplate.Modules.Files.Authorization;
+using Boilerplate.Modules.Files.Contracts;
 
 namespace Files.Tests.Authorization;
 

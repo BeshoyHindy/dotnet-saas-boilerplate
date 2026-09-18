@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
-using FSH.Framework.Web.Modules;
+using Boilerplate.BuildingBlocks.Web.Modules;
 
-[assembly: FshModule(typeof(FSH.Modules.Notifications.NotificationsModule), 750)]
-[assembly: InternalsVisibleTo("Notifications.Tests")]
-[assembly: InternalsVisibleTo("Integration.Tests")]
+[assembly: AppModule(typeof(Boilerplate.Modules.Notifications.NotificationsModule), 750)]
+[assembly: InternalsVisibleTo("Boilerplate.Notifications.Tests")]
+[assembly: InternalsVisibleTo("Boilerplate.Integration.Tests")]

@@ -1,12 +1,12 @@
-using FSH.Modules.Billing.Contracts.v1.Invoices;
-using FSH.Modules.Billing.Contracts.v1.Plans;
-using FSH.Modules.Billing.Contracts.v1.Subscriptions;
-using FSH.Modules.Billing.Contracts.v1.Usage;
-using FSH.Modules.Billing.Features.v1.Invoices.GenerateInvoices;
-using FSH.Modules.Billing.Features.v1.Plans.CreatePlan;
-using FSH.Modules.Billing.Features.v1.Plans.UpdatePlan;
-using FSH.Modules.Billing.Features.v1.Subscriptions.AssignSubscription;
-using FSH.Modules.Billing.Features.v1.Usage.CaptureUsageSnapshots;
+using Boilerplate.Modules.Billing.Contracts.v1.Invoices;
+using Boilerplate.Modules.Billing.Contracts.v1.Plans;
+using Boilerplate.Modules.Billing.Contracts.v1.Subscriptions;
+using Boilerplate.Modules.Billing.Contracts.v1.Usage;
+using Boilerplate.Modules.Billing.Features.v1.Invoices.GenerateInvoices;
+using Boilerplate.Modules.Billing.Features.v1.Plans.CreatePlan;
+using Boilerplate.Modules.Billing.Features.v1.Plans.UpdatePlan;
+using Boilerplate.Modules.Billing.Features.v1.Subscriptions.AssignSubscription;
+using Boilerplate.Modules.Billing.Features.v1.Usage.CaptureUsageSnapshots;
 
 namespace Billing.Tests.Validators;
 

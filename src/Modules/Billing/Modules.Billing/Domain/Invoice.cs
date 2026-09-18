@@ -1,7 +1,7 @@
-using FSH.Framework.Core.Domain;
-using FSH.Modules.Billing.Contracts;
+using Boilerplate.BuildingBlocks.Core.Domain;
+using Boilerplate.Modules.Billing.Contracts;
 
-namespace FSH.Modules.Billing.Domain;
+namespace Boilerplate.Modules.Billing.Domain;
 
 /// <summary>
 /// An invoice for a tenant covering a single monthly period. Starts as Draft, transitions to

@@ -1,4 +1,4 @@
-namespace FSH.Modules.Files.Contracts.v1.DTOs;
+namespace Boilerplate.Modules.Files.Contracts.v1.DTOs;
 
 public sealed record PresignedUploadResponse(
     Guid FileAssetId,

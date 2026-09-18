@@ -1,11 +1,11 @@
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Auditing.Contracts;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Auditing.Contracts;
 using Microsoft.AspNetCore.Http;
 using System.Diagnostics;
 using System.Threading.Channels;
 
-namespace FSH.Modules.Auditing;
+namespace Boilerplate.Modules.Auditing;
 
 /// <summary>
 /// Non-blocking publisher with two lanes: a high-throughput default lane

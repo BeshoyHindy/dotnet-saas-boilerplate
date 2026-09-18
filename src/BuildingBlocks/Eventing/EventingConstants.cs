@@ -1,4 +1,4 @@
-namespace FSH.Framework.Eventing;
+namespace Boilerplate.BuildingBlocks.Eventing;
 
 /// <summary>
 /// Constants for the framework-owned eventing store.

@@ -1,12 +1,12 @@
 ---
 name: create-migration
-description: Create and apply an EF Core migration for a module's DbContext the FSH way (central Migrations project, per-module folder, correct --context). Use after changing entities/EF config. See .agents/rules/database.md.
+description: Create and apply an EF Core migration for a module's DbContext the Boilerplate way (central Migrations project, per-module folder, correct --context). Use after changing entities/EF config. See .agents/rules/database.md.
 argument-hint: "[ModuleName] [MigrationName]"
 ---
 
 # Create Migration
 
-All migrations live in **one** project — `src/Host/FSH.Starter.Migrations.PostgreSQL` — but are foldered
+All migrations live in **one** project — `src/Host/Boilerplate.Migrations.PostgreSQL` — but are foldered
 **per module/context** (`Catalog/`, `Identity/`, …), each with its own `{X}DbContextModelSnapshot`. The DB
 is **not** migrated at API startup; the `DbMigrator` host applies it.
 
@@ -23,7 +23,7 @@ the build after editing entities/config, you can generate against a stale snapsh
 `migrations remove` rewrites the snapshot — only remove the latest, and rebuild after.
 
 ```bash
-dotnet build src/FSH.Starter.slnx
+dotnet build src/Boilerplate.slnx
 ```
 
 ## Step 2 — add the migration
@@ -34,8 +34,8 @@ folder for the context).
 
 ```bash
 dotnet ef migrations add {MigrationName} \
-  --project src/Host/FSH.Starter.Migrations.PostgreSQL \
-  --startup-project src/Host/FSH.Starter.Api \
+  --project src/Host/Boilerplate.Migrations.PostgreSQL \
+  --startup-project src/Host/Boilerplate.Api \
   --context {X}DbContext \
   --output-dir {X}
 ```
@@ -44,8 +44,8 @@ dotnet ef migrations add {MigrationName} \
 
 ```bash
 dotnet ef migrations script --idempotent \
-  --project src/Host/FSH.Starter.Migrations.PostgreSQL \
-  --startup-project src/Host/FSH.Starter.Api \
+  --project src/Host/Boilerplate.Migrations.PostgreSQL \
+  --startup-project src/Host/Boilerplate.Api \
   --context {X}DbContext
 ```
 
@@ -57,8 +57,8 @@ table, and renames surfacing as drop+add (data loss). Adjust the model or hand-e
 Preferred (the canonical path — migrates the tenant catalog then each tenant's per-module schema):
 
 ```bash
-dotnet run --project src/Host/FSH.Starter.DbMigrator -- apply
-dotnet run --project src/Host/FSH.Starter.DbMigrator -- list-pending   # to preview first
+dotnet run --project src/Host/Boilerplate.DbMigrator -- apply
+dotnet run --project src/Host/Boilerplate.DbMigrator -- list-pending   # to preview first
 ```
 
 (Or, single-context local dev, `dotnet ef database update --context {X}DbContext --project … --startup-project …`.)

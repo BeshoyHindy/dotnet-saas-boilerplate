@@ -1,26 +1,26 @@
-﻿using FSH.Framework.Caching;
-using FSH.Framework.Jobs;
-using FSH.Framework.Mailing;
-using FSH.Framework.Persistence;
-using FSH.Framework.Quota;
-using FSH.Framework.Shared.Constants;
-using FSH.Framework.Web.Auth;
-using FSH.Framework.Web.Cors;
-using FSH.Framework.Web.Exceptions;
-using FSH.Framework.Web.FeatureFlags;
-using FSH.Framework.Web.Idempotency;
-using FSH.Framework.Web.Sse;
-using FSH.Framework.Web.Health;
-using FSH.Framework.Web.Mediator.Behaviors;
-using FSH.Framework.Web.Modules;
-using FSH.Framework.Web.Observability.Logging.Serilog;
-using FSH.Framework.Web.Observability.OpenTelemetry;
-using FSH.Framework.Web.OpenApi;
-using FSH.Framework.Web.Origin;
-using FSH.Framework.Web.RateLimiting;
-using FSH.Framework.Web.Realtime;
-using FSH.Framework.Web.Security;
-using FSH.Framework.Web.Versioning;
+﻿using Boilerplate.BuildingBlocks.Caching;
+using Boilerplate.BuildingBlocks.Jobs;
+using Boilerplate.BuildingBlocks.Mailing;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Quota;
+using Boilerplate.BuildingBlocks.Shared.Constants;
+using Boilerplate.BuildingBlocks.Web.Auth;
+using Boilerplate.BuildingBlocks.Web.Cors;
+using Boilerplate.BuildingBlocks.Web.Exceptions;
+using Boilerplate.BuildingBlocks.Web.FeatureFlags;
+using Boilerplate.BuildingBlocks.Web.Idempotency;
+using Boilerplate.BuildingBlocks.Web.Sse;
+using Boilerplate.BuildingBlocks.Web.Health;
+using Boilerplate.BuildingBlocks.Web.Mediator.Behaviors;
+using Boilerplate.BuildingBlocks.Web.Modules;
+using Boilerplate.BuildingBlocks.Web.Observability.Logging.Serilog;
+using Boilerplate.BuildingBlocks.Web.Observability.OpenTelemetry;
+using Boilerplate.BuildingBlocks.Web.OpenApi;
+using Boilerplate.BuildingBlocks.Web.Origin;
+using Boilerplate.BuildingBlocks.Web.RateLimiting;
+using Boilerplate.BuildingBlocks.Web.Realtime;
+using Boilerplate.BuildingBlocks.Web.Security;
+using Boilerplate.BuildingBlocks.Web.Versioning;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Caching.Distributed;
@@ -30,15 +30,15 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Mediator;
 
-namespace FSH.Framework.Web;
+namespace Boilerplate.BuildingBlocks.Web;
 
 public static class Extensions
 {
-    public static IHostApplicationBuilder AddHeroPlatform(this IHostApplicationBuilder builder, Action<FshPlatformOptions>? configure = null)
+    public static IHostApplicationBuilder AddHeroPlatform(this IHostApplicationBuilder builder, Action<AppPlatformOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        var options = new FshPlatformOptions();
+        var options = new AppPlatformOptions();
         configure?.Invoke(options);
 
         PermissionConstants.Register(SystemPermissions.All);
@@ -139,11 +139,11 @@ public static class Extensions
     }
 
 
-    public static WebApplication UseHeroPlatform(this WebApplication app, Action<FshPipelineOptions>? configure = null)
+    public static WebApplication UseHeroPlatform(this WebApplication app, Action<AppPipelineOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        var options = new FshPipelineOptions();
+        var options = new AppPipelineOptions();
         configure?.Invoke(options);
 
         var corsEnabled = options.UseCors && IsCorsEnabled(app.Configuration);
@@ -231,7 +231,7 @@ public static class Extensions
     }
 }
 
-public sealed class FshPlatformOptions
+public sealed class AppPlatformOptions
 {
     public bool EnableCors { get; set; } = true;
     public bool EnableOpenApi { get; set; } = true;
@@ -246,7 +246,7 @@ public sealed class FshPlatformOptions
     public bool EnableQuotas { get; set; } = false;
 }
 
-public sealed class FshPipelineOptions
+public sealed class AppPipelineOptions
 {
     public bool UseCors { get; set; } = true;
     public bool UseOpenApi { get; set; } = true;

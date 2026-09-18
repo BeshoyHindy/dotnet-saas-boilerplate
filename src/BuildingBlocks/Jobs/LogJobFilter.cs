@@ -4,7 +4,7 @@ using Hangfire.Server;
 using Hangfire.States;
 using Hangfire.Storage;
 
-namespace FSH.Framework.Jobs;
+namespace Boilerplate.BuildingBlocks.Jobs;
 
 public class LogJobFilter : IClientFilter, IServerFilter, IElectStateFilter, IApplyStateFilter
 {

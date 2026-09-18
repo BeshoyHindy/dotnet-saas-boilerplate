@@ -1,6 +1,6 @@
 using System.Diagnostics.Metrics;
-using FSH.Framework.Caching;
-using FSH.Framework.Caching.Telemetry;
+using Boilerplate.BuildingBlocks.Caching;
+using Boilerplate.BuildingBlocks.Caching.Telemetry;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,7 +17,7 @@ public sealed class HybridCacheTelemetryCollection;
 /// <summary>
 /// Behavioral tests for the OTel decorator wrapping HybridCache. We assert that
 /// hit/miss counters fire correctly via a <see cref="MeterListener"/> subscribed to the
-/// <c>FSH.Caching</c> meter.
+/// <c>Boilerplate.Caching</c> meter.
 /// </summary>
 [Collection("HybridCacheTelemetry")]
 public sealed class ObservableHybridCacheTests : IDisposable
@@ -44,14 +44,14 @@ public sealed class ObservableHybridCacheTests : IDisposable
         {
             switch (instrument.Name)
             {
-                case "fsh.cache.hits": Interlocked.Add(ref _hits, measurement); break;
-                case "fsh.cache.misses": Interlocked.Add(ref _misses, measurement); break;
-                case "fsh.cache.invalidations": Interlocked.Add(ref _invalidations, measurement); break;
+                case "boilerplate.cache.hits": Interlocked.Add(ref _hits, measurement); break;
+                case "boilerplate.cache.misses": Interlocked.Add(ref _misses, measurement); break;
+                case "boilerplate.cache.invalidations": Interlocked.Add(ref _invalidations, measurement); break;
             }
         });
         _listener.SetMeasurementEventCallback<double>((instrument, measurement, tags, state) =>
         {
-            if (instrument.Name == "fsh.cache.factory.duration")
+            if (instrument.Name == "boilerplate.cache.factory.duration")
             {
                 Interlocked.Increment(ref _factoryDurationCount);
             }

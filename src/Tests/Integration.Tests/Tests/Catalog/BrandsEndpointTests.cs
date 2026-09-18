@@ -3,13 +3,13 @@ using Integration.Tests.Infrastructure.Extensions;
 
 namespace Integration.Tests.Tests.Catalog;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class BrandsEndpointTests
 {
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public BrandsEndpointTests(FshWebApplicationFactory factory)
+    public BrandsEndpointTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

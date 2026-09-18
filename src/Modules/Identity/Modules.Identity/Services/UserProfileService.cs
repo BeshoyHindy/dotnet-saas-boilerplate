@@ -1,23 +1,23 @@
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Framework.Shared.Storage;
-using FSH.Framework.Storage;
-using FSH.Framework.Storage.Services;
-using FSH.Framework.Web.Origin;
-using FSH.Modules.Identity.Contracts.DTOs;
-using FSH.Modules.Identity.Contracts.Services;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Storage;
+using Boilerplate.BuildingBlocks.Storage;
+using Boilerplate.BuildingBlocks.Storage.Services;
+using Boilerplate.BuildingBlocks.Web.Origin;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
+using Boilerplate.Modules.Identity.Contracts.Services;
+using Boilerplate.Modules.Identity.Domain;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
-namespace FSH.Modules.Identity.Services;
+namespace Boilerplate.Modules.Identity.Services;
 
 internal sealed class UserProfileService(
-    UserManager<FshUser> userManager,
-    SignInManager<FshUser> signInManager,
+    UserManager<AppUser> userManager,
+    SignInManager<AppUser> signInManager,
     IStorageService storageService,
     IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor,
     IOptions<OriginOptions> originOptions,
@@ -86,7 +86,7 @@ internal sealed class UserProfileService(
         // dereferencing Data or the common no-image update path NREs.
         if (image?.Data != null)
         {
-            var imageString = await storageService.UploadAsync<FshUser>(image, FileType.Image, cancellationToken);
+            var imageString = await storageService.UploadAsync<AppUser>(image, FileType.Image, cancellationToken);
             user.ImageUrl = new Uri(imageString, UriKind.RelativeOrAbsolute);
             if (deleteCurrentImage && imageUri != null)
             {
@@ -138,7 +138,7 @@ internal sealed class UserProfileService(
     public async Task<bool> ExistsWithEmailAsync(string email, string? exceptId = null, CancellationToken cancellationToken = default)
     {
         EnsureValidTenant();
-        return await userManager.FindByEmailAsync(email.Normalize()) is FshUser user && user.Id != exceptId;
+        return await userManager.FindByEmailAsync(email.Normalize()) is AppUser user && user.Id != exceptId;
     }
 
     public async Task<bool> ExistsWithNameAsync(string name, CancellationToken cancellationToken = default)
@@ -150,7 +150,7 @@ internal sealed class UserProfileService(
     public async Task<bool> ExistsWithPhoneNumberAsync(string phoneNumber, string? exceptId = null, CancellationToken cancellationToken = default)
     {
         EnsureValidTenant();
-        return await userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == phoneNumber, cancellationToken) is FshUser user && user.Id != exceptId;
+        return await userManager.Users.FirstOrDefaultAsync(x => x.PhoneNumber == phoneNumber, cancellationToken) is AppUser user && user.Id != exceptId;
     }
 
     private void EnsureValidTenant()

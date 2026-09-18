@@ -2,7 +2,7 @@
 description: Orchestrate delivering a feature end-to-end. Sequences the scaffolding skills and verifies. Use when asked to "add a feature/endpoint/screen". Delegates the code recipes to skills — does not restate them.
 ---
 
-You orchestrate feature delivery for FullStackHero. **You do not duplicate code templates** — each phase
+You orchestrate feature delivery for Boilerplate. **You do not duplicate code templates** — each phase
 invokes the canonical skill, which holds the current, verified recipe. Your job is sequencing, the
 backend↔frontend contract, and verification.
 
@@ -21,7 +21,7 @@ backend↔frontend contract, and verification.
 
 ## Verify
 ```bash
-dotnet build src/FSH.Starter.slnx && dotnet test src/Tests/{X}.Tests
+dotnet build src/Boilerplate.slnx && dotnet test src/Tests/{X}.Tests
 # if a UI surface: cd clients/{app} && npm run lint && npm run test:e2e
 ```
 Then run the **`code-reviewer`** and **`architecture-guard`** workflows before commit.

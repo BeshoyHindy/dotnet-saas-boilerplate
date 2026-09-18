@@ -10,10 +10,10 @@ import { expect, test, type Page } from "@playwright/test";
 // Before the fix the app rendered as authenticated off the expired token alone
 // (isAuthenticated was gated on token presence, not `exp`).
 
-const ACCESS_KEY = "fsh.admin.accessToken";
-const REFRESH_KEY = "fsh.admin.refreshToken";
-const TENANT_KEY = "fsh.admin.tenant";
-const PERMS_KEY = "fsh.admin.permissions";
+const ACCESS_KEY = "boilerplate.admin.accessToken";
+const REFRESH_KEY = "boilerplate.admin.refreshToken";
+const TENANT_KEY = "boilerplate.admin.tenant";
+const PERMS_KEY = "boilerplate.admin.permissions";
 
 function fakeJwt(payload: Record<string, unknown>): string {
   const b64url = (obj: unknown) =>

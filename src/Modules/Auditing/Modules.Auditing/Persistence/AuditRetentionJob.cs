@@ -1,8 +1,8 @@
-using FSH.Modules.Auditing.Contracts;
+using Boilerplate.Modules.Auditing.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace FSH.Modules.Auditing.Persistence;
+namespace Boilerplate.Modules.Auditing.Persistence;
 
 /// <summary>
 /// Daily Hangfire job that prunes the audit table per

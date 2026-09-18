@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<RootNamespace>Boilerplate.Modules.Identity</RootNamespace>
+		<AssemblyName>Boilerplate.Modules.Identity</AssemblyName>
+		<NoWarn>$(NoWarn);CA1031;CA1812;CA2208;S3267;S3928;CA1062;CA1304;CA1308;CA1311;CA1862;CA2227</NoWarn>
+	</PropertyGroup>
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+	<ItemGroup>
+	  <PackageReference Include="Mediator.Abstractions" />
+	  <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+	  <PackageReference Include="Finbuckle.MultiTenant.Identity.EntityFrameworkCore" />
+	  <PackageReference Include="UAParser" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\..\..\BuildingBlocks\Caching\Boilerplate.BuildingBlocks.Caching.csproj" />
+	  <ProjectReference Include="..\..\..\BuildingBlocks\Eventing\Boilerplate.BuildingBlocks.Eventing.csproj" />
+	  <ProjectReference Include="..\..\..\BuildingBlocks\Jobs\Boilerplate.BuildingBlocks.Jobs.csproj" />
+	  <ProjectReference Include="..\..\..\BuildingBlocks\Mailing\Boilerplate.BuildingBlocks.Mailing.csproj" />
+	  <ProjectReference Include="..\..\..\BuildingBlocks\Persistence\Boilerplate.BuildingBlocks.Persistence.csproj" />
+	  <ProjectReference Include="..\..\..\BuildingBlocks\Storage\Boilerplate.BuildingBlocks.Storage.csproj" />
+	  <ProjectReference Include="..\..\..\BuildingBlocks\Web\Boilerplate.BuildingBlocks.Web.csproj" />
+	  <ProjectReference Include="..\..\Auditing\Modules.Auditing.Contracts\Boilerplate.Modules.Auditing.Contracts.csproj" />
+	  <ProjectReference Include="..\Modules.Identity.Contracts\Boilerplate.Modules.Identity.Contracts.csproj" />
+	</ItemGroup>
+
+</Project>

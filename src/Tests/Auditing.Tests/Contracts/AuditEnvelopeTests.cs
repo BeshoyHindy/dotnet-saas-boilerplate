@@ -1,4 +1,4 @@
-using FSH.Modules.Auditing.Contracts;
+using Boilerplate.Modules.Auditing.Contracts;
 
 namespace Auditing.Tests.Contracts;
 

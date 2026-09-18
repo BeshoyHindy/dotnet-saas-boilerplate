@@ -1,13 +1,13 @@
-using FSH.Modules.Billing.Contracts.Authorization;
-using FSH.Framework.Shared.Identity.Authorization;
-using FSH.Framework.Web.Idempotency;
-using FSH.Modules.Billing.Contracts.v1.Plans;
+using Boilerplate.Modules.Billing.Contracts.Authorization;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.BuildingBlocks.Web.Idempotency;
+using Boilerplate.Modules.Billing.Contracts.v1.Plans;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Billing.Features.v1.Plans.CreatePlan;
+namespace Boilerplate.Modules.Billing.Features.v1.Plans.CreatePlan;
 
 public static class CreatePlanEndpoint
 {

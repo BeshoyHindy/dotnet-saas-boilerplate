@@ -1,4 +1,4 @@
-namespace FSH.Framework.Eventing.Abstractions;
+namespace Boilerplate.BuildingBlocks.Eventing.Abstractions;
 
 /// <summary>
 /// Base integration event contract used for cross-module and cross-service messaging.

@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi;
 
-namespace FSH.Framework.Web.OpenApi;
+namespace Boilerplate.BuildingBlocks.Web.OpenApi;
 
 internal sealed class BearerSecuritySchemeTransformer(IAuthenticationSchemeProvider authenticationSchemeProvider) : IOpenApiDocumentTransformer
 {

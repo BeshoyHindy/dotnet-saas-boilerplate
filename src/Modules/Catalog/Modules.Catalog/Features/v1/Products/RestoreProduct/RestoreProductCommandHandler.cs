@@ -1,11 +1,11 @@
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Persistence;
-using FSH.Modules.Catalog.Contracts.v1.Products;
-using FSH.Modules.Catalog.Data;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.Modules.Catalog.Contracts.v1.Products;
+using Boilerplate.Modules.Catalog.Data;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Catalog.Features.v1.Products.RestoreProduct;
+namespace Boilerplate.Modules.Catalog.Features.v1.Products.RestoreProduct;
 
 public sealed class RestoreProductCommandHandler(CatalogDbContext dbContext)
     : ICommandHandler<RestoreProductCommand, Guid>

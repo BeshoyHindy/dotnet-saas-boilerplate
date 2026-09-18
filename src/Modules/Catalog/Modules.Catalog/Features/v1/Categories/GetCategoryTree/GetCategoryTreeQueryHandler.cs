@@ -1,11 +1,11 @@
-using FSH.Modules.Catalog.Contracts.Dtos;
-using FSH.Modules.Catalog.Contracts.v1.Categories;
-using FSH.Modules.Catalog.Data;
-using FSH.Modules.Catalog.Domain;
+using Boilerplate.Modules.Catalog.Contracts.Dtos;
+using Boilerplate.Modules.Catalog.Contracts.v1.Categories;
+using Boilerplate.Modules.Catalog.Data;
+using Boilerplate.Modules.Catalog.Domain;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Catalog.Features.v1.Categories.GetCategoryTree;
+namespace Boilerplate.Modules.Catalog.Features.v1.Categories.GetCategoryTree;
 
 public sealed class GetCategoryTreeQueryHandler(CatalogDbContext dbContext)
     : IQueryHandler<GetCategoryTreeQuery, IReadOnlyList<CategoryTreeNodeDto>>

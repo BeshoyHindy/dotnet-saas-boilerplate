@@ -1,6 +1,6 @@
-using FSH.Framework.Shared.Constants;
+using Boilerplate.BuildingBlocks.Shared.Constants;
 
-namespace FSH.Modules.Auditing.Contracts.Authorization;
+namespace Boilerplate.Modules.Auditing.Contracts.Authorization;
 
 public static class AuditingPermissions
 {
@@ -15,7 +15,7 @@ public static class AuditingPermissions
         public const string ViewCrossTenant = $"Permissions.{Resource}.ViewCrossTenant";
     }
 
-    public static IReadOnlyList<FshPermission> All { get; } =
+    public static IReadOnlyList<AppPermission> All { get; } =
     [
         new("View Audit Trails", ActionConstants.View, AuditTrails.Resource, IsBasic: true),
         new("View Audit Trails Across Tenants", "ViewCrossTenant", AuditTrails.Resource, IsRoot: true),

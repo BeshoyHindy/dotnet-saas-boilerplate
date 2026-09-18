@@ -1,4 +1,4 @@
-namespace FSH.Framework.Shared.Multitenancy;
+namespace Boilerplate.BuildingBlocks.Shared.Multitenancy;
 
 /// <summary>
 /// Short-lived in-process buffer that carries the initial admin password from

@@ -1,7 +1,7 @@
-using FSH.Framework.Core.Domain;
-using FSH.Modules.Catalog.Domain.Events;
+using Boilerplate.BuildingBlocks.Core.Domain;
+using Boilerplate.Modules.Catalog.Domain.Events;
 
-namespace FSH.Modules.Catalog.Domain;
+namespace Boilerplate.Modules.Catalog.Domain;
 
 public sealed class Product : AggregateRoot<Guid>, ISoftDeletable
 {

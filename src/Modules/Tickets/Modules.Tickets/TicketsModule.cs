@@ -1,22 +1,22 @@
 using Asp.Versioning;
-using FSH.Framework.Persistence;
-using FSH.Framework.Shared.Constants;
-using FSH.Framework.Web.Modules;
-using FSH.Modules.Tickets.Contracts.Authorization;
-using FSH.Modules.Tickets.Data;
-using FSH.Modules.Tickets.Features.v1.Tickets.AddTicketComment;
-using FSH.Modules.Tickets.Features.v1.Tickets.AssignTicket;
-using FSH.Modules.Tickets.Features.v1.Tickets.CloseTicket;
-using FSH.Modules.Tickets.Features.v1.Tickets.CreateTicket;
-using FSH.Modules.Tickets.Features.v1.Tickets.DeleteTicket;
-using FSH.Modules.Tickets.Features.v1.Tickets.GetTicketById;
-using FSH.Modules.Tickets.Features.v1.Tickets.ListTicketComments;
-using FSH.Modules.Tickets.Features.v1.Tickets.ListTrashedTickets;
-using FSH.Modules.Tickets.Features.v1.Tickets.ReopenTicket;
-using FSH.Modules.Tickets.Features.v1.Tickets.ResolveTicket;
-using FSH.Modules.Tickets.Features.v1.Tickets.RestoreTicket;
-using FSH.Modules.Tickets.Features.v1.Tickets.SearchTickets;
-using FSH.Modules.Tickets.Features.v1.Tickets.UpdateTicket;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Constants;
+using Boilerplate.BuildingBlocks.Web.Modules;
+using Boilerplate.Modules.Tickets.Contracts.Authorization;
+using Boilerplate.Modules.Tickets.Data;
+using Boilerplate.Modules.Tickets.Features.v1.Tickets.AddTicketComment;
+using Boilerplate.Modules.Tickets.Features.v1.Tickets.AssignTicket;
+using Boilerplate.Modules.Tickets.Features.v1.Tickets.CloseTicket;
+using Boilerplate.Modules.Tickets.Features.v1.Tickets.CreateTicket;
+using Boilerplate.Modules.Tickets.Features.v1.Tickets.DeleteTicket;
+using Boilerplate.Modules.Tickets.Features.v1.Tickets.GetTicketById;
+using Boilerplate.Modules.Tickets.Features.v1.Tickets.ListTicketComments;
+using Boilerplate.Modules.Tickets.Features.v1.Tickets.ListTrashedTickets;
+using Boilerplate.Modules.Tickets.Features.v1.Tickets.ReopenTicket;
+using Boilerplate.Modules.Tickets.Features.v1.Tickets.ResolveTicket;
+using Boilerplate.Modules.Tickets.Features.v1.Tickets.RestoreTicket;
+using Boilerplate.Modules.Tickets.Features.v1.Tickets.SearchTickets;
+using Boilerplate.Modules.Tickets.Features.v1.Tickets.UpdateTicket;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -24,9 +24,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 
-[assembly: FshModule(typeof(FSH.Modules.Tickets.TicketsModule), 700)]
+[assembly: AppModule(typeof(Boilerplate.Modules.Tickets.TicketsModule), 700)]
 
-namespace FSH.Modules.Tickets;
+namespace Boilerplate.Modules.Tickets;
 
 public sealed class TicketsModule : IModule
 {

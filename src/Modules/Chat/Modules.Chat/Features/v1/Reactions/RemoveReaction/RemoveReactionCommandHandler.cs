@@ -1,14 +1,14 @@
-using FSH.Framework.Core.Context;
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Web.Realtime;
-using FSH.Modules.Chat.Contracts.v1.Commands;
-using FSH.Modules.Chat.Data;
-using FSH.Modules.Chat.Features.v1.Internal;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Web.Realtime;
+using Boilerplate.Modules.Chat.Contracts.v1.Commands;
+using Boilerplate.Modules.Chat.Data;
+using Boilerplate.Modules.Chat.Features.v1.Internal;
 using Mediator;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Chat.Features.v1.Reactions.RemoveReaction;
+namespace Boilerplate.Modules.Chat.Features.v1.Reactions.RemoveReaction;
 
 public sealed class RemoveReactionCommandHandler(
     ChatDbContext db,

@@ -1,4 +1,4 @@
-namespace FSH.Framework.Core.Domain;
+namespace Boilerplate.BuildingBlocks.Core.Domain;
 
 public sealed record Money
 {

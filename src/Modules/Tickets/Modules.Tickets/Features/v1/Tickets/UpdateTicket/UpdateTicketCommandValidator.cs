@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Tickets.Contracts.v1.Tickets;
+using Boilerplate.Modules.Tickets.Contracts.v1.Tickets;
 
-namespace FSH.Modules.Tickets.Features.v1.Tickets.UpdateTicket;
+namespace Boilerplate.Modules.Tickets.Features.v1.Tickets.UpdateTicket;
 
 public sealed class UpdateTicketCommandValidator : AbstractValidator<UpdateTicketCommand>
 {

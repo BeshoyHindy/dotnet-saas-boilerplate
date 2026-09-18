@@ -1,6 +1,6 @@
 ---
 name: add-entity
-description: Add a domain entity/aggregate with EF configuration and a migration to an existing FSH module. Use when adding a new database-backed entity. Pairs with add-feature and create-migration.
+description: Add a domain entity/aggregate with EF configuration and a migration to an existing Boilerplate module. Use when adding a new database-backed entity. Pairs with add-feature and create-migration.
 argument-hint: "[ModuleName] [EntityName]"
 ---
 
@@ -112,8 +112,8 @@ Use the **create-migration** skill (build first, correct `--context`):
 
 ```bash
 dotnet ef migrations add Add{Entity} \
-  --project src/Host/FSH.Starter.Migrations.PostgreSQL \
-  --startup-project src/Host/FSH.Starter.Api \
+  --project src/Host/Boilerplate.Migrations.PostgreSQL \
+  --startup-project src/Host/Boilerplate.Api \
   --context {X}DbContext
 ```
 

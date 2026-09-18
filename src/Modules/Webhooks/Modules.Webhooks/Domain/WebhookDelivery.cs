@@ -1,4 +1,4 @@
-namespace FSH.Modules.Webhooks.Domain;
+namespace Boilerplate.Modules.Webhooks.Domain;
 
 public sealed class WebhookDelivery
 {

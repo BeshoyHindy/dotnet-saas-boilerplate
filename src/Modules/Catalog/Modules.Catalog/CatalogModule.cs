@@ -1,39 +1,39 @@
 using Asp.Versioning;
-using FSH.Framework.Persistence;
-using FSH.Framework.Shared.Constants;
-using FSH.Framework.Web.Modules;
-using FSH.Modules.Catalog.Authorization;
-using FSH.Modules.Catalog.Contracts.Authorization;
-using FSH.Modules.Catalog.Data;
-using FSH.Modules.Files.Contracts;
-using FSH.Modules.Catalog.Features.v1.Brands.CreateBrand;
-using FSH.Modules.Catalog.Features.v1.Brands.DeleteBrand;
-using FSH.Modules.Catalog.Features.v1.Brands.GetBrandById;
-using FSH.Modules.Catalog.Features.v1.Brands.ListTrashedBrands;
-using FSH.Modules.Catalog.Features.v1.Brands.RestoreBrand;
-using FSH.Modules.Catalog.Features.v1.Brands.SearchBrands;
-using FSH.Modules.Catalog.Features.v1.Brands.UpdateBrand;
-using FSH.Modules.Catalog.Features.v1.Categories.CreateCategory;
-using FSH.Modules.Catalog.Features.v1.Categories.DeleteCategory;
-using FSH.Modules.Catalog.Features.v1.Categories.GetCategoryById;
-using FSH.Modules.Catalog.Features.v1.Categories.GetCategoryTree;
-using FSH.Modules.Catalog.Features.v1.Categories.ListTrashedCategories;
-using FSH.Modules.Catalog.Features.v1.Categories.RestoreCategory;
-using FSH.Modules.Catalog.Features.v1.Categories.SearchCategories;
-using FSH.Modules.Catalog.Features.v1.Categories.UpdateCategory;
-using FSH.Modules.Catalog.Features.v1.Products.AddProductImage;
-using FSH.Modules.Catalog.Features.v1.Products.AdjustProductStock;
-using FSH.Modules.Catalog.Features.v1.Products.ChangeProductPrice;
-using FSH.Modules.Catalog.Features.v1.Products.CreateProduct;
-using FSH.Modules.Catalog.Features.v1.Products.DeleteProduct;
-using FSH.Modules.Catalog.Features.v1.Products.GetProductById;
-using FSH.Modules.Catalog.Features.v1.Products.ListTrashedProducts;
-using FSH.Modules.Catalog.Features.v1.Products.RemoveProductImage;
-using FSH.Modules.Catalog.Features.v1.Products.ReorderProductImages;
-using FSH.Modules.Catalog.Features.v1.Products.RestoreProduct;
-using FSH.Modules.Catalog.Features.v1.Products.SearchProducts;
-using FSH.Modules.Catalog.Features.v1.Products.SetProductThumbnail;
-using FSH.Modules.Catalog.Features.v1.Products.UpdateProduct;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Constants;
+using Boilerplate.BuildingBlocks.Web.Modules;
+using Boilerplate.Modules.Catalog.Authorization;
+using Boilerplate.Modules.Catalog.Contracts.Authorization;
+using Boilerplate.Modules.Catalog.Data;
+using Boilerplate.Modules.Files.Contracts;
+using Boilerplate.Modules.Catalog.Features.v1.Brands.CreateBrand;
+using Boilerplate.Modules.Catalog.Features.v1.Brands.DeleteBrand;
+using Boilerplate.Modules.Catalog.Features.v1.Brands.GetBrandById;
+using Boilerplate.Modules.Catalog.Features.v1.Brands.ListTrashedBrands;
+using Boilerplate.Modules.Catalog.Features.v1.Brands.RestoreBrand;
+using Boilerplate.Modules.Catalog.Features.v1.Brands.SearchBrands;
+using Boilerplate.Modules.Catalog.Features.v1.Brands.UpdateBrand;
+using Boilerplate.Modules.Catalog.Features.v1.Categories.CreateCategory;
+using Boilerplate.Modules.Catalog.Features.v1.Categories.DeleteCategory;
+using Boilerplate.Modules.Catalog.Features.v1.Categories.GetCategoryById;
+using Boilerplate.Modules.Catalog.Features.v1.Categories.GetCategoryTree;
+using Boilerplate.Modules.Catalog.Features.v1.Categories.ListTrashedCategories;
+using Boilerplate.Modules.Catalog.Features.v1.Categories.RestoreCategory;
+using Boilerplate.Modules.Catalog.Features.v1.Categories.SearchCategories;
+using Boilerplate.Modules.Catalog.Features.v1.Categories.UpdateCategory;
+using Boilerplate.Modules.Catalog.Features.v1.Products.AddProductImage;
+using Boilerplate.Modules.Catalog.Features.v1.Products.AdjustProductStock;
+using Boilerplate.Modules.Catalog.Features.v1.Products.ChangeProductPrice;
+using Boilerplate.Modules.Catalog.Features.v1.Products.CreateProduct;
+using Boilerplate.Modules.Catalog.Features.v1.Products.DeleteProduct;
+using Boilerplate.Modules.Catalog.Features.v1.Products.GetProductById;
+using Boilerplate.Modules.Catalog.Features.v1.Products.ListTrashedProducts;
+using Boilerplate.Modules.Catalog.Features.v1.Products.RemoveProductImage;
+using Boilerplate.Modules.Catalog.Features.v1.Products.ReorderProductImages;
+using Boilerplate.Modules.Catalog.Features.v1.Products.RestoreProduct;
+using Boilerplate.Modules.Catalog.Features.v1.Products.SearchProducts;
+using Boilerplate.Modules.Catalog.Features.v1.Products.SetProductThumbnail;
+using Boilerplate.Modules.Catalog.Features.v1.Products.UpdateProduct;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -41,9 +41,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 
-[assembly: FshModule(typeof(FSH.Modules.Catalog.CatalogModule), 600)]
+[assembly: AppModule(typeof(Boilerplate.Modules.Catalog.CatalogModule), 600)]
 
-namespace FSH.Modules.Catalog;
+namespace Boilerplate.Modules.Catalog;
 
 public sealed class CatalogModule : IModule
 {

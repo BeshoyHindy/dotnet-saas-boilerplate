@@ -1,6 +1,6 @@
-using FSH.Framework.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Domain;
 
-namespace FSH.Modules.Chat.Domain;
+namespace Boilerplate.Modules.Chat.Domain;
 
 /// <summary>
 /// A single resolved <c>@username</c> mention attached to a <see cref="Message"/>. Stores the

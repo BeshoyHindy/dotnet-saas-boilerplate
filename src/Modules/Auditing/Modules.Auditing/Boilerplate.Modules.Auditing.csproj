@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<RootNamespace>Boilerplate.Modules.Auditing</RootNamespace>
+		<AssemblyName>Boilerplate.Modules.Auditing</AssemblyName>
+		<NoWarn>$(NoWarn);CA1031;CA1308;CA1812;CA1859;S3267</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\..\..\BuildingBlocks\Persistence\Boilerplate.BuildingBlocks.Persistence.csproj" />
+	  <ProjectReference Include="..\..\..\BuildingBlocks\Web\Boilerplate.BuildingBlocks.Web.csproj" />
+	  <ProjectReference Include="..\Modules.Auditing.Contracts\Boilerplate.Modules.Auditing.Contracts.csproj" />
+	  <ProjectReference Include="..\..\Identity\Modules.Identity.Contracts\Boilerplate.Modules.Identity.Contracts.csproj" />
+	</ItemGroup>
+
+</Project>

@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace FSH.Framework.Web.Observability.OpenTelemetry;
+namespace Boilerplate.BuildingBlocks.Web.Observability.OpenTelemetry;
 
 public sealed class OpenTelemetryOptions
 {

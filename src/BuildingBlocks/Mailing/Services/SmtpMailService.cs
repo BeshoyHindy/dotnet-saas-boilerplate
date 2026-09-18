@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 using MimeKit;
 using SmtpClient = MailKit.Net.Smtp.SmtpClient;
 
-namespace FSH.Framework.Mailing.Services;
+namespace Boilerplate.BuildingBlocks.Mailing.Services;
 
 public class SmtpMailService(IOptions<MailOptions> settings, ILogger<SmtpMailService> logger) : IMailService
 {

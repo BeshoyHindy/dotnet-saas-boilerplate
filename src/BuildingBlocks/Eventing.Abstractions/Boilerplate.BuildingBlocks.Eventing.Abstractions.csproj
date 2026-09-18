@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<RootNamespace>Boilerplate.BuildingBlocks.Eventing.Abstractions</RootNamespace>
+		<AssemblyName>Boilerplate.BuildingBlocks.Eventing.Abstractions</AssemblyName>
+		<Description>Lightweight abstractions for Boilerplate eventing - interfaces only, no implementation dependencies</Description>
+		<NoWarn>$(NoWarn);CA1711;CA1716</NoWarn>
+	</PropertyGroup>
+
+</Project>

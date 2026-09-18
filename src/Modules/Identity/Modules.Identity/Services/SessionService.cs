@@ -1,16 +1,16 @@
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Core.Context;
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Identity.Contracts.DTOs;
-using FSH.Modules.Identity.Contracts.Services;
-using FSH.Modules.Identity.Data;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
+using Boilerplate.Modules.Identity.Contracts.Services;
+using Boilerplate.Modules.Identity.Data;
+using Boilerplate.Modules.Identity.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using UAParser;
 
-namespace FSH.Modules.Identity.Services;
+namespace Boilerplate.Modules.Identity.Services;
 
 public sealed class SessionService : ISessionService
 {

@@ -1,4 +1,4 @@
-using FSH.Modules.Billing.Services;
+using Boilerplate.Modules.Billing.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 

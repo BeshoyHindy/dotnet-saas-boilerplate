@@ -1,7 +1,7 @@
-using FSH.Modules.Billing.Contracts.Dtos;
+using Boilerplate.Modules.Billing.Contracts.Dtos;
 using Mediator;
 
-namespace FSH.Modules.Billing.Contracts.v1.Subscriptions;
+namespace Boilerplate.Modules.Billing.Contracts.v1.Subscriptions;
 
 /// <summary>
 /// Returns the current active subscription for the specified tenant. Tenant callers typically

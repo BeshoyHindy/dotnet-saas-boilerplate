@@ -1,6 +1,6 @@
-using FSH.Framework.Core.Domain;
-using FSH.Modules.Billing.Contracts;
-using FSH.Modules.Billing.Domain;
+using Boilerplate.BuildingBlocks.Core.Domain;
+using Boilerplate.Modules.Billing.Contracts;
+using Boilerplate.Modules.Billing.Domain;
 using Shouldly;
 using Xunit;
 

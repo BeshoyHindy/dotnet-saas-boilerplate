@@ -1,8 +1,8 @@
-using FSH.Modules.Identity.Domain;
+using Boilerplate.Modules.Identity.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace FSH.Modules.Identity.Data.Configurations;
+namespace Boilerplate.Modules.Identity.Data.Configurations;
 
 public class UserSessionConfiguration : IEntityTypeConfiguration<UserSession>
 {

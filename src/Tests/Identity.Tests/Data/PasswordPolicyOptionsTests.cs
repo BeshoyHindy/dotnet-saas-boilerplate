@@ -1,4 +1,4 @@
-using FSH.Modules.Identity.Data;
+using Boilerplate.Modules.Identity.Data;
 
 namespace Identity.Tests.Data;
 

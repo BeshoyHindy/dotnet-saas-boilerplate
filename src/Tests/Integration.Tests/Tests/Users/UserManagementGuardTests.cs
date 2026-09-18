@@ -3,12 +3,12 @@ using Integration.Tests.Infrastructure.Extensions;
 
 namespace Integration.Tests.Tests.Users;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class UserManagementGuardTests
 {
     private readonly AuthHelper _auth;
 
-    public UserManagementGuardTests(FshWebApplicationFactory factory)
+    public UserManagementGuardTests(AppWebApplicationFactory factory)
     {
         _auth = new AuthHelper(factory);
     }

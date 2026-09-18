@@ -1,8 +1,8 @@
-using FSH.Modules.Catalog.Domain.Events;
+using Boilerplate.Modules.Catalog.Domain.Events;
 using Mediator;
 using Microsoft.Extensions.Logging;
 
-namespace FSH.Modules.Catalog.Events;
+namespace Boilerplate.Modules.Catalog.Events;
 
 public sealed class CatalogEventHandlers(ILogger<CatalogEventHandlers> logger) :
     INotificationHandler<ProductCreatedDomainEvent>,

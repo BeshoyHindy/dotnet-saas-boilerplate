@@ -1,8 +1,8 @@
-using FSH.Modules.Billing.Contracts;
-using FSH.Modules.Billing.Contracts.v1.Wallets;
-using FSH.Modules.Billing.Features.v1.Wallets.ApproveTopupRequest;
-using FSH.Modules.Billing.Features.v1.Wallets.GetTopupRequests;
-using FSH.Modules.Billing.Features.v1.Wallets.RejectTopupRequest;
+using Boilerplate.Modules.Billing.Contracts;
+using Boilerplate.Modules.Billing.Contracts.v1.Wallets;
+using Boilerplate.Modules.Billing.Features.v1.Wallets.ApproveTopupRequest;
+using Boilerplate.Modules.Billing.Features.v1.Wallets.GetTopupRequests;
+using Boilerplate.Modules.Billing.Features.v1.Wallets.RejectTopupRequest;
 
 namespace Billing.Tests.Validators;
 

@@ -1,7 +1,7 @@
-using FSH.Framework.Shared.Persistence;
-using FSH.Modules.Identity.Contracts.DTOs;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
 
-namespace FSH.Modules.Identity.Contracts.Services;
+namespace Boilerplate.Modules.Identity.Contracts.Services;
 
 public interface IRoleService
 {

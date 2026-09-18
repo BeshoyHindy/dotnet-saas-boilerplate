@@ -13,7 +13,7 @@ namespace Integration.Tests.Tests.Multitenancy;
 /// provisioned tenant appear in the report with provider info and no pending
 /// migrations, plus the authentication contract.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class TenantMigrationsTests
 {
     private static readonly JsonSerializerOptions Json = new()
@@ -24,10 +24,10 @@ public sealed class TenantMigrationsTests
 
     private const string MigrationsPath = $"{TestConstants.TenantsBasePath}/migrations";
 
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public TenantMigrationsTests(FshWebApplicationFactory factory)
+    public TenantMigrationsTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

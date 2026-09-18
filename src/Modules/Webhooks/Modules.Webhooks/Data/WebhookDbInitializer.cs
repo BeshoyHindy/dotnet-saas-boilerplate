@@ -1,8 +1,8 @@
-using FSH.Framework.Persistence;
+using Boilerplate.BuildingBlocks.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace FSH.Modules.Webhooks.Data;
+namespace Boilerplate.Modules.Webhooks.Data;
 
 public sealed class WebhookDbInitializer(
     WebhookDbContext dbContext,

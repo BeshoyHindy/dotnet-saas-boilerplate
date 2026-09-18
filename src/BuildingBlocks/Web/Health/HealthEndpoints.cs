@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-namespace FSH.Framework.Web.Health;
+namespace Boilerplate.BuildingBlocks.Web.Health;
 
 public static class HealthEndpoints
 {

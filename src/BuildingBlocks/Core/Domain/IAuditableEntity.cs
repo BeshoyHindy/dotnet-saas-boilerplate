@@ -1,4 +1,4 @@
-﻿namespace FSH.Framework.Core.Domain;
+﻿namespace Boilerplate.BuildingBlocks.Core.Domain;
 
 /// <summary>
 /// Defines audit metadata for an entity.

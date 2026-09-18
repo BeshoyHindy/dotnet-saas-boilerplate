@@ -13,7 +13,7 @@ public class ModuleArchitectureTests
         string modulesRoot = Path.Combine(solutionRoot, "src", "Modules");
 
         var runtimeProjects = Directory
-            .GetFiles(modulesRoot, "Modules.*.csproj", SearchOption.AllDirectories)
+            .GetFiles(modulesRoot, "Boilerplate.Modules.*.csproj", SearchOption.AllDirectories)
             .Where(path => !path.Contains(".Contracts", StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
@@ -34,7 +34,7 @@ public class ModuleArchitectureTests
             {
                 string referencedName = Path.GetFileNameWithoutExtension(include);
 
-                bool isModuleRuntime = referencedName.StartsWith("Modules.", StringComparison.OrdinalIgnoreCase)
+                bool isModuleRuntime = referencedName.StartsWith("Boilerplate.Modules.", StringComparison.OrdinalIgnoreCase)
                                        && !referencedName.EndsWith(".Contracts", StringComparison.OrdinalIgnoreCase);
 
                 if (!isModuleRuntime)

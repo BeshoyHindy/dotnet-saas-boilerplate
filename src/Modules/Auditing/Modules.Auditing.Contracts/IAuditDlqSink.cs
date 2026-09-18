@@ -1,4 +1,4 @@
-namespace FSH.Modules.Auditing.Contracts;
+namespace Boilerplate.Modules.Auditing.Contracts;
 
 /// <summary>
 /// Fallback destination for audit batches that the primary sink could not

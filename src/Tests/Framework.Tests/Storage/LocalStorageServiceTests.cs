@@ -1,6 +1,6 @@
-using FSH.Framework.Shared.Storage;
-using FSH.Framework.Storage;
-using FSH.Framework.Storage.Local;
+using Boilerplate.BuildingBlocks.Shared.Storage;
+using Boilerplate.BuildingBlocks.Storage;
+using Boilerplate.BuildingBlocks.Storage.Local;
 using Microsoft.AspNetCore.Hosting;
 
 namespace Framework.Tests.Storage;
@@ -14,7 +14,7 @@ public sealed class LocalStorageServiceTests : IDisposable
 
     public LocalStorageServiceTests()
     {
-        _root = Path.Combine(Path.GetTempPath(), "fsh-local-storage-tests", Guid.NewGuid().ToString("N"));
+        _root = Path.Combine(Path.GetTempPath(), "boilerplate-local-storage-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_root);
 
         var environment = Substitute.For<IWebHostEnvironment>();

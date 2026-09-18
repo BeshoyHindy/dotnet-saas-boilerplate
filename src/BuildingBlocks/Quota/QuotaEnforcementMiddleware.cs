@@ -1,14 +1,14 @@
 using System.Diagnostics;
 using System.Globalization;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Auditing;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Framework.Shared.Quota;
+using Boilerplate.BuildingBlocks.Shared.Auditing;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Quota;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
-namespace FSH.Framework.Quota;
+namespace Boilerplate.BuildingBlocks.Quota;
 
 /// <summary>
 /// Per-request quota enforcement for <see cref="QuotaResource.ApiCalls"/>. Runs after auth and the

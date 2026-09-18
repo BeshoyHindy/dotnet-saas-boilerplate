@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Identity.Contracts.v1.Users.AssignUserRoles;
+using Boilerplate.Modules.Identity.Contracts.v1.Users.AssignUserRoles;
 
-namespace FSH.Modules.Identity.Features.v1.Users.AssignUserRoles;
+namespace Boilerplate.Modules.Identity.Features.v1.Users.AssignUserRoles;
 
 public sealed class AssignUserRolesCommandValidator : AbstractValidator<AssignUserRolesCommand>
 {

@@ -1,3 +1,3 @@
-using FSH.Framework.Web.Modules;
+using Boilerplate.BuildingBlocks.Web.Modules;
 
-[assembly: FshModule(typeof(FSH.Modules.Multitenancy.MultitenancyModule), 200)]
+[assembly: AppModule(typeof(Boilerplate.Modules.Multitenancy.MultitenancyModule), 200)]

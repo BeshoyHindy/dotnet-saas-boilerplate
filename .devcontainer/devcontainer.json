@@ -1,10 +1,10 @@
 {
-    "name": "FullStackHero .NET Starter Kit",
+    "name": "Boilerplate",
     "image": "mcr.microsoft.com/dotnet/sdk:10.0",
     "features": {
         "ghcr.io/devcontainers/features/docker-in-docker:2": {}
     },
-    "postCreateCommand": "dotnet restore src/FSH.Starter.slnx",
+    "postCreateCommand": "dotnet restore src/Boilerplate.slnx",
     "forwardPorts": [5030, 7030, 15888],
     "customizations": {
         "vscode": {

@@ -9,8 +9,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Identity.Domain;
 using Integration.Tests.Infrastructure;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,7 +24,7 @@ namespace Integration.Tests.Tests.Impersonation;
 /// can exercise both intra-tenant (tenant admin impersonating their own user) and
 /// cross-tenant (root operator impersonating into another tenant) paths.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class ImpersonationTests : IAsyncLifetime
 {
     private const string ImpersonationBasePath = TestConstants.IdentityBasePath + "/impersonation";
@@ -35,7 +35,7 @@ public sealed class ImpersonationTests : IAsyncLifetime
         PropertyNameCaseInsensitive = true,
     };
 
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
     // Populated by InitializeAsync — a freshly provisioned tenant with a known admin user.
@@ -44,7 +44,7 @@ public sealed class ImpersonationTests : IAsyncLifetime
     private string _tenantAdminUserId = default!;
     private string _rootAdminUserId = default!;
 
-    public ImpersonationTests(FshWebApplicationFactory factory)
+    public ImpersonationTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);
@@ -876,7 +876,7 @@ public sealed class ImpersonationTests : IAsyncLifetime
         scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>().MultiTenantContext =
             new MultiTenantContext<AppTenantInfo>(tenant);
 
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<FshUser>>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
         var user = await userManager.FindByIdAsync(userId);
         user.ShouldNotBeNull();
         if (!user!.EmailConfirmed)

@@ -1,6 +1,6 @@
-using FSH.Framework.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Domain;
 
-namespace FSH.Modules.Catalog.Domain;
+namespace Boilerplate.Modules.Catalog.Domain;
 
 public sealed class Brand : AggregateRoot<Guid>, ISoftDeletable
 {

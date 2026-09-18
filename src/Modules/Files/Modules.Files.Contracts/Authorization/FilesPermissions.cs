@@ -1,11 +1,11 @@
-using FSH.Framework.Shared.Constants;
+using Boilerplate.BuildingBlocks.Shared.Constants;
 
-namespace FSH.Modules.Files.Contracts.Authorization;
+namespace Boilerplate.Modules.Files.Contracts.Authorization;
 
 /// <summary>
 /// Permission constants + the registry entry consumed by <c>FilesModule.ConfigureServices</c>.
 /// Permission names follow the <c>Permissions.{Resource}.{Action}</c> shape per the framework
-/// convention (see <see cref="FshPermission.NameFor"/>).
+/// convention (see <see cref="AppPermission.NameFor"/>).
 /// </summary>
 public static class FilesPermissions
 {
@@ -17,7 +17,7 @@ public static class FilesPermissions
     public const string ViewTrash = $"Permissions.{Resource}.ViewTrash";
     public const string Restore   = $"Permissions.{Resource}.Restore";
 
-    public static IReadOnlyList<FshPermission> All { get; } =
+    public static IReadOnlyList<AppPermission> All { get; } =
     [
         new("Upload Files",      "Upload",    Resource, IsBasic: true),
         new("Delete Own Files",  "DeleteOwn", Resource, IsBasic: true),

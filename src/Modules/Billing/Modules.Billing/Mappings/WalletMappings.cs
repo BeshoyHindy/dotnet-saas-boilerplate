@@ -1,7 +1,7 @@
-using FSH.Modules.Billing.Contracts.Dtos;
-using FSH.Modules.Billing.Domain;
+using Boilerplate.Modules.Billing.Contracts.Dtos;
+using Boilerplate.Modules.Billing.Domain;
 
-namespace FSH.Modules.Billing.Mappings;
+namespace Boilerplate.Modules.Billing.Mappings;
 
 internal static class WalletMappings
 {

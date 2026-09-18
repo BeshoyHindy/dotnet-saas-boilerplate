@@ -1,6 +1,6 @@
-using FSH.Modules.Auditing;
-using FSH.Modules.Identity;
-using FSH.Modules.Multitenancy;
+using Boilerplate.Modules.Auditing;
+using Boilerplate.Modules.Identity;
+using Boilerplate.Modules.Multitenancy;
 using NetArchTest.Rules;
 using Shouldly;
 using System.Reflection;

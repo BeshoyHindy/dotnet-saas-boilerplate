@@ -1,6 +1,6 @@
-using FSH.Framework.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Domain;
 
-namespace FSH.Modules.Identity.Domain.Events;
+namespace Boilerplate.Modules.Identity.Domain.Events;
 
 /// <summary>Raised when a user account is deactivated.</summary>
 public sealed record UserDeactivatedEvent(

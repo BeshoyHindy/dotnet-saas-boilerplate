@@ -1,4 +1,4 @@
-namespace FSH.Modules.Identity.Contracts.DTOs;
+namespace Boilerplate.Modules.Identity.Contracts.DTOs;
 
 public class GroupMemberDto
 {

@@ -1,4 +1,4 @@
-﻿namespace FSH.Framework.Shared.Constants;
+﻿namespace Boilerplate.BuildingBlocks.Shared.Constants;
 
 public static class CustomClaims
 {

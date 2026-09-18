@@ -1,6 +1,6 @@
-using FSH.Framework.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Domain;
 
-namespace FSH.Modules.Identity.Domain.Events;
+namespace Boilerplate.Modules.Identity.Domain.Events;
 
 /// <summary>Raised when roles are assigned to a user.</summary>
 public sealed record UserRoleAssignedEvent(

@@ -1,21 +1,21 @@
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Integration.Tests.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Integration.Tests.Tests.Authentication;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class AccountLockoutTests
 {
     private const int MaxFailedAttempts = 5;
     private const HttpStatusCode HttpLocked = (HttpStatusCode)423;
 
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public AccountLockoutTests(FshWebApplicationFactory factory)
+    public AccountLockoutTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);
@@ -93,7 +93,7 @@ public sealed class AccountLockoutTests
             .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
 
         var userManager = scope.ServiceProvider
-            .GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<FSH.Modules.Identity.Domain.FshUser>>();
+            .GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<Boilerplate.Modules.Identity.Domain.AppUser>>();
         var user = await userManager.FindByEmailAsync(email);
         user.ShouldNotBeNull();
         var token = await userManager.GenerateEmailConfirmationTokenAsync(user!);

@@ -1,7 +1,7 @@
 using Mediator;
 using System.Diagnostics;
 
-namespace FSH.Framework.Web.Observability.OpenTelemetry;
+namespace Boilerplate.BuildingBlocks.Web.Observability.OpenTelemetry;
 
 /// <summary>
 /// Emits spans around Mediator commands/queries to improve trace visibility.

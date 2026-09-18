@@ -34,7 +34,7 @@ export default defineConfig({
     baseURL: "http://localhost:5174",
     trace: "on-first-retry",
     // Disable animations + reduce flake from CSS keyframes / transitions
-    // (we have a lot — parallax orbs, fsh-enter staggers, btn-shimmer).
+    // (we have a lot — parallax orbs, app-enter staggers, btn-shimmer).
     // Tests assert against final state, not in-flight frames.
     actionTimeout: 10_000,
     navigationTimeout: 15_000,

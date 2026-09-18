@@ -14,7 +14,7 @@ namespace Integration.Tests.Tests.Multitenancy;
 /// tenant — the branches in the validator/handler/TenantService that produce error
 /// or terminal results.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class ChangeTenantActivationValidationTests
 {
     private static readonly JsonSerializerOptions Json = new()
@@ -23,10 +23,10 @@ public sealed class ChangeTenantActivationValidationTests
         PropertyNameCaseInsensitive = true,
     };
 
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public ChangeTenantActivationValidationTests(FshWebApplicationFactory factory)
+    public ChangeTenantActivationValidationTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

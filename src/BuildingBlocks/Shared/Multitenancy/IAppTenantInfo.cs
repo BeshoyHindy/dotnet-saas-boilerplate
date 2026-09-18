@@ -1,6 +1,6 @@
-﻿using FSH.Framework.Shared.Quota;
+﻿using Boilerplate.BuildingBlocks.Shared.Quota;
 
-namespace FSH.Framework.Shared.Multitenancy;
+namespace Boilerplate.BuildingBlocks.Shared.Multitenancy;
 
 public interface IAppTenantInfo
 {

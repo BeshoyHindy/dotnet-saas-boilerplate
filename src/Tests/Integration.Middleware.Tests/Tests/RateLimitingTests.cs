@@ -9,7 +9,12 @@ namespace Integration.Middleware.Tests.Tests;
 /// requests deterministically trips the limiter and produces the production OnRejected response
 /// (429 + Retry-After + RFC 9457 ProblemDetails).
 /// </summary>
+/// <remarks>
+/// Both tests share one fixed window (the limiter partitions on client IP and the host lives
+/// for the whole collection), so the burst test must run last — see <see cref="PriorityOrderer"/>.
+/// </remarks>
 [Collection(MiddlewareCollectionDefinition.Name)]
+[TestCaseOrderer(PriorityOrderer.TypeName, PriorityOrderer.AssemblyName)]
 public sealed class RateLimitingTests
 {
     private const int AuthPermitLimit = 3;
@@ -32,6 +37,7 @@ public sealed class RateLimitingTests
     #region Happy Path
 
     [Fact]
+    [TestPriority(1)]
     public async Task TokenIssue_Should_NotRateLimit_When_RequestsAreWithinTheAuthLimit()
     {
         // Arrange
@@ -52,6 +58,7 @@ public sealed class RateLimitingTests
     #region Exception
 
     [Fact]
+    [TestPriority(2)]
     public async Task TokenIssue_Should_Return429WithRetryAfterAndProblemDetails_When_AuthLimitIsExceeded()
     {
         // Arrange

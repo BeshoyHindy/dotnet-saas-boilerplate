@@ -1,13 +1,13 @@
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Persistence.Context;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Framework.Shared.Persistence;
-using FSH.Modules.Notifications.Domain;
+using Boilerplate.BuildingBlocks.Persistence.Context;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Notifications.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
-namespace FSH.Modules.Notifications.Data;
+namespace Boilerplate.Modules.Notifications.Data;
 
 public sealed class NotificationsDbContext : BaseDbContext
 {

@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
-using FSH.Modules.Webhooks.Services;
+using Boilerplate.Modules.Webhooks.Services;
 
 namespace Webhooks.Tests.Services;
 

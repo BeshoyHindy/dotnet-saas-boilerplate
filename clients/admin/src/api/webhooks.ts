@@ -78,7 +78,7 @@ export function listWebhookDeliveries(
 }
 
 /**
- * Curated list of event names commonly emitted by FSH modules. Webhook
+ * Curated list of event names commonly emitted by Boilerplate modules. Webhook
  * subscriptions accept arbitrary strings — these just power the chip
  * picker in the create dialog so operators don't have to remember the
  * canonical kebab-case names.

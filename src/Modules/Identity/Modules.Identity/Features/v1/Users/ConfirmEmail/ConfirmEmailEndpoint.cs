@@ -1,10 +1,10 @@
-using FSH.Modules.Identity.Contracts.v1.Users.ConfirmEmail;
+using Boilerplate.Modules.Identity.Contracts.v1.Users.ConfirmEmail;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Identity.Features.v1.Users.ConfirmEmail;
+namespace Boilerplate.Modules.Identity.Features.v1.Users.ConfirmEmail;
 
 public static class ConfirmEmailEndpoint
 {

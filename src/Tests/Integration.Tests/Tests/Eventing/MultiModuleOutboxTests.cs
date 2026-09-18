@@ -1,11 +1,11 @@
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Eventing.Inbox;
-using FSH.Framework.Eventing.Outbox;
-using FSH.Framework.Eventing.Persistence;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Billing.Contracts.Events;
-using FSH.Modules.Identity.Contracts.Events;
+using Boilerplate.BuildingBlocks.Eventing.Inbox;
+using Boilerplate.BuildingBlocks.Eventing.Outbox;
+using Boilerplate.BuildingBlocks.Eventing.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Billing.Contracts.Events;
+using Boilerplate.Modules.Identity.Contracts.Events;
 using Integration.Tests.Infrastructure;
 
 namespace Integration.Tests.Tests.Eventing;
@@ -17,12 +17,12 @@ namespace Integration.Tests.Tests.Eventing;
 /// the real store against Postgres, with no substitution, so they fail if the single framework-owned
 /// registration regresses.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class MultiModuleOutboxTests
 {
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
 
-    public MultiModuleOutboxTests(FshWebApplicationFactory factory)
+    public MultiModuleOutboxTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
     }
@@ -90,7 +90,7 @@ public sealed class MultiModuleOutboxTests
     public async Task Identity_No_Longer_Owns_The_Outbox_Tables()
     {
         using var scope = await CreateTenantScopeAsync();
-        var identity = scope.ServiceProvider.GetRequiredService<FSH.Modules.Identity.Data.IdentityDbContext>();
+        var identity = scope.ServiceProvider.GetRequiredService<Boilerplate.Modules.Identity.Data.IdentityDbContext>();
 
         identity.Model.FindEntityType(typeof(OutboxMessage)).ShouldBeNull(
             "the outbox is framework infrastructure; a module mapping it again reintroduces the ambiguity");
@@ -118,7 +118,7 @@ public sealed class MultiModuleOutboxTests
         $"corr-{id:N}",
         "Identity",
         Guid.CreateVersion7().ToString(),
-        "outbox-1349@fullstackhero.net",
+        "outbox-1349@example.com",
         "Out",
         "Box");
 

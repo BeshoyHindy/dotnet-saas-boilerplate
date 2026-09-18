@@ -53,7 +53,7 @@ export function DemoAccountsDialog({ open, onOpenChange, onPick }: DemoAccountsD
         />
 
         {/* Header */}
-        <header className="fsh-enter relative px-7 pt-7 pb-5">
+        <header className="app-enter relative px-7 pt-7 pb-5">
           <div className="mb-2.5 flex items-center gap-2">
             <span className="relative flex size-1.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--color-primary)] opacity-75" />
@@ -130,7 +130,7 @@ function AccountRow({
       type="button"
       onClick={() => onPick(account)}
       style={{ animationDelay: `${delay}ms` }}
-      className="fsh-enter group relative flex w-full cursor-pointer items-center gap-3 overflow-hidden rounded-lg px-2 py-2.5 text-left outline-none transition-all duration-200 hover:translate-x-0.5 focus-visible:bg-[var(--color-primary)]/[0.04] active:scale-[0.99]"
+      className="app-enter group relative flex w-full cursor-pointer items-center gap-3 overflow-hidden rounded-lg px-2 py-2.5 text-left outline-none transition-all duration-200 hover:translate-x-0.5 focus-visible:bg-[var(--color-primary)]/[0.04] active:scale-[0.99]"
     >
       {/* Hover gradient wash */}
       <span

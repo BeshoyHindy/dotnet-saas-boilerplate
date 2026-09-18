@@ -1,4 +1,4 @@
-bucket       = "fsh-tfstate"
+bucket       = "boilerplate-tfstate"
 key          = "dev/us-east-1/terraform.tfstate"
 region       = "us-east-1"
 encrypt      = true

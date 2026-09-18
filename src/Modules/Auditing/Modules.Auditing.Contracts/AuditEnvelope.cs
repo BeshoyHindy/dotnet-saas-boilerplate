@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics;
 
-namespace FSH.Modules.Auditing.Contracts;
+namespace Boilerplate.Modules.Auditing.Contracts;
 
 /// <summary>
 /// Concrete event instance ready to be published/persisted.

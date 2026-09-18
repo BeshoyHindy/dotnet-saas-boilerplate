@@ -1,3 +1,3 @@
-using FSH.Framework.Web.Modules;
+using Boilerplate.BuildingBlocks.Web.Modules;
 
-[assembly: FshModule(typeof(FSH.Modules.Auditing.AuditingModule), 300)]
+[assembly: AppModule(typeof(Boilerplate.Modules.Auditing.AuditingModule), 300)]

@@ -1,11 +1,11 @@
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Billing.Contracts;
-using FSH.Modules.Billing.Data;
-using FSH.Modules.Billing.Domain;
-using FSH.Modules.Billing.Services;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Billing.Contracts;
+using Boilerplate.Modules.Billing.Data;
+using Boilerplate.Modules.Billing.Domain;
+using Boilerplate.Modules.Billing.Services;
 using Integration.Tests.Infrastructure;
 
 namespace Integration.Tests.Tests.Billing;
@@ -20,12 +20,12 @@ namespace Integration.Tests.Tests.Billing;
 /// Each test uses a unique synthetic tenant id so wallet state never bleeds between runs.
 /// The Finbuckle context is always set INLINE (AsyncLocal; lost across awaited helpers).
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class WalletTopupServiceTests
 {
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
 
-    public WalletTopupServiceTests(FshWebApplicationFactory factory)
+    public WalletTopupServiceTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
     }

@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace FSH.Modules.Files.Services;
+namespace Boilerplate.Modules.Files.Services;
 
 /// <summary>
 /// Builds canonical storage keys for the Files module:

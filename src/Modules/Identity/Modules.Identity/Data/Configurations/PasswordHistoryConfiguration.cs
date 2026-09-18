@@ -1,8 +1,8 @@
-using FSH.Modules.Identity.Domain;
+using Boilerplate.Modules.Identity.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace FSH.Modules.Identity.Data.Configurations;
+namespace Boilerplate.Modules.Identity.Data.Configurations;
 
 public class PasswordHistoryConfiguration : IEntityTypeConfiguration<PasswordHistory>
 {
@@ -30,7 +30,7 @@ public class PasswordHistoryConfiguration : IEntityTypeConfiguration<PasswordHis
         // Configure the foreign key relationship
         builder
             .HasOne(ph => ph.User)
-            .WithMany((FshUser u) => u.PasswordHistories)
+            .WithMany((AppUser u) => u.PasswordHistories)
             .HasForeignKey(ph => ph.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 

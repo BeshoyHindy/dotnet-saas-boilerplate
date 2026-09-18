@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Identity.Contracts.v1.Impersonation.GetImpersonationGrants;
+using Boilerplate.Modules.Identity.Contracts.v1.Impersonation.GetImpersonationGrants;
 
-namespace FSH.Modules.Identity.Features.v1.Impersonation.GetImpersonationGrants;
+namespace Boilerplate.Modules.Identity.Features.v1.Impersonation.GetImpersonationGrants;
 
 public sealed class GetImpersonationGrantsQueryValidator : AbstractValidator<GetImpersonationGrantsQuery>
 {

@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Catalog.Contracts.v1.Products;
+using Boilerplate.Modules.Catalog.Contracts.v1.Products;
 
-namespace FSH.Modules.Catalog.Features.v1.Products.UpdateProduct;
+namespace Boilerplate.Modules.Catalog.Features.v1.Products.UpdateProduct;
 
 public sealed class UpdateProductCommandValidator : AbstractValidator<UpdateProductCommand>
 {

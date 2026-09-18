@@ -1,14 +1,14 @@
-using FSH.Framework.Core.Context;
-using FSH.Modules.Auditing.Contracts;
-using FSH.Modules.Identity.Contracts.Services;
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Identity.Contracts.v1.Tokens.RefreshToken;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.Modules.Auditing.Contracts;
+using Boilerplate.Modules.Identity.Contracts.Services;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Identity.Contracts.v1.Tokens.RefreshToken;
 using Mediator;
 using Microsoft.Extensions.Logging;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
-namespace FSH.Modules.Identity.Features.v1.Tokens.RefreshToken;
+namespace Boilerplate.Modules.Identity.Features.v1.Tokens.RefreshToken;
 
 public sealed class RefreshTokenCommandHandler
     : ICommandHandler<RefreshTokenCommand, RefreshTokenCommandResponse>

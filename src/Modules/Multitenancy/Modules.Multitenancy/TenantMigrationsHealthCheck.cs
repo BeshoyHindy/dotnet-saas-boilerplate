@@ -1,19 +1,19 @@
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Multitenancy.Data;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Multitenancy.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-namespace FSH.Modules.Multitenancy;
+namespace Boilerplate.Modules.Multitenancy;
 
 /// <summary>
 /// Readiness check: returns <c>Unhealthy</c> when any tenant's <c>TenantDbContext</c> has
 /// pending EF Core migrations, or when the per-tenant migration probe throws. Wired into
 /// <c>/health/ready</c>, which Kubernetes / load-balancer readiness probes key off — so
 /// a pod whose schema is behind the running build is kept out of rotation until the
-/// standalone <c>FSH.Starter.DbMigrator</c> catches it up.
+/// standalone <c>Boilerplate.DbMigrator</c> catches it up.
 /// </summary>
 public sealed class TenantMigrationsHealthCheck : IHealthCheck
 {
@@ -102,6 +102,6 @@ public sealed class TenantMigrationsHealthCheck : IHealthCheck
             parts.Add($"error probing tenant(s): {string.Join(", ", errored)}");
         }
         return "Tenant schema is not at head — " + string.Join("; ", parts) +
-               ". Run FSH.Starter.DbMigrator to apply pending migrations.";
+               ". Run Boilerplate.DbMigrator to apply pending migrations.";
     }
 }

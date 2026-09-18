@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Files.Contracts.v1.Commands;
+using Boilerplate.Modules.Files.Contracts.v1.Commands;
 
-namespace FSH.Modules.Files.Features.v1.FinalizeUpload;
+namespace Boilerplate.Modules.Files.Features.v1.FinalizeUpload;
 
 public sealed class FinalizeUploadCommandValidator : AbstractValidator<FinalizeUploadCommand>
 {

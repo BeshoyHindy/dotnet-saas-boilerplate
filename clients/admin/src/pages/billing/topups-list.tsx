@@ -319,7 +319,7 @@ export function TopupsListPage() {
               {items.map((req, i) => (
                 <li
                   key={req.id}
-                  className="fsh-enter grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-1 border-t border-[var(--color-border)] px-6 py-4 first:border-t-0"
+                  className="app-enter grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-1 border-t border-[var(--color-border)] px-6 py-4 first:border-t-0"
                   style={{ animationDelay: `${Math.min(i, 8) * 25}ms` }}
                 >
                   {/* Identity column */}

@@ -1,11 +1,11 @@
 using System.Net;
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Catalog.Contracts.v1.Products;
-using FSH.Modules.Catalog.Data;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Catalog.Contracts.v1.Products;
+using Boilerplate.Modules.Catalog.Data;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Catalog.Features.v1.Products.AdjustProductStock;
+namespace Boilerplate.Modules.Catalog.Features.v1.Products.AdjustProductStock;
 
 public sealed class AdjustProductStockCommandHandler(CatalogDbContext dbContext)
     : ICommandHandler<AdjustProductStockCommand, int>

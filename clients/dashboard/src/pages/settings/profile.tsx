@@ -101,7 +101,7 @@ export function ProfileSettings() {
   });
 
   return (
-    <form onSubmit={onSubmit} className="space-y-5 fsh-enter">
+    <form onSubmit={onSubmit} className="space-y-5 app-enter">
       {profileQuery.isError && (
         <div
           role="alert"

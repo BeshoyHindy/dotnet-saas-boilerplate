@@ -35,7 +35,7 @@ export function AppearanceSettings() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <div className="space-y-5 fsh-enter">
+    <div className="space-y-5 app-enter">
       {/* Theme */}
       <SettingsSection
         title="Theme"

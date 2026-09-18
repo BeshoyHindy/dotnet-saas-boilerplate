@@ -1,9 +1,9 @@
-using FSH.Framework.Core.Domain;
-using FSH.Framework.Shared.Persistence;
-using FSH.Modules.Chat.Contracts.v1.DTOs;
-using FSH.Modules.Chat.Domain.Events;
+using Boilerplate.BuildingBlocks.Core.Domain;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Chat.Contracts.v1.DTOs;
+using Boilerplate.Modules.Chat.Domain.Events;
 
-namespace FSH.Modules.Chat.Domain;
+namespace Boilerplate.Modules.Chat.Domain;
 
 /// <summary>
 /// A chat channel: a 1:1 DM, a group DM (3+), or a named channel (Slack-style).

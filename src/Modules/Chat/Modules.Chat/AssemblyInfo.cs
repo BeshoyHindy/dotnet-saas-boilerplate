@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
-using FSH.Framework.Web.Modules;
+using Boilerplate.BuildingBlocks.Web.Modules;
 
-[assembly: FshModule(typeof(FSH.Modules.Chat.ChatModule), 800)]
-[assembly: InternalsVisibleTo("Chat.Tests")]
-[assembly: InternalsVisibleTo("Integration.Tests")]
+[assembly: AppModule(typeof(Boilerplate.Modules.Chat.ChatModule), 800)]
+[assembly: InternalsVisibleTo("Boilerplate.Chat.Tests")]
+[assembly: InternalsVisibleTo("Boilerplate.Integration.Tests")]

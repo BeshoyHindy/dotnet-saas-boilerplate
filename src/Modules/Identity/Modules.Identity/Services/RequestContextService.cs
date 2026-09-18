@@ -1,10 +1,10 @@
-using FSH.Framework.Core.Context;
-using FSH.Framework.Web.Origin;
-using FSH.Modules.Identity.Contracts.Services;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Web.Origin;
+using Boilerplate.Modules.Identity.Contracts.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 
-namespace FSH.Modules.Identity.Services;
+namespace Boilerplate.Modules.Identity.Services;
 
 /// <summary>
 /// Provides HTTP request context information through an abstraction.

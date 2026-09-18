@@ -1,6 +1,6 @@
-using FSH.Framework.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Domain;
 
-namespace FSH.Modules.Catalog.Domain.Events;
+namespace Boilerplate.Modules.Catalog.Domain.Events;
 
 public sealed record ProductStockAdjustedDomainEvent(
     Guid ProductId,

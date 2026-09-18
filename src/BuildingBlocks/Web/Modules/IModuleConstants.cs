@@ -1,4 +1,4 @@
-﻿namespace FSH.Framework.Web.Modules;
+﻿namespace Boilerplate.BuildingBlocks.Web.Modules;
 
 public interface IModuleConstants
 {

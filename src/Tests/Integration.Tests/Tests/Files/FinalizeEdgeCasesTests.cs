@@ -1,17 +1,17 @@
 using System.Security.Cryptography;
-using FSH.Modules.Files.Contracts.v1.DTOs;
+using Boilerplate.Modules.Files.Contracts.v1.DTOs;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 
 namespace Integration.Tests.Tests.Files;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class FinalizeEdgeCasesTests
 {
     private const string FilesBasePath = "/api/v1/files";
     private readonly AuthHelper _auth;
 
-    public FinalizeEdgeCasesTests(FshWebApplicationFactory factory)
+    public FinalizeEdgeCasesTests(AppWebApplicationFactory factory)
     {
         _auth = new AuthHelper(factory);
     }

@@ -1,13 +1,13 @@
-using FSH.Framework.Shared.Identity.Authorization;
-using FSH.Modules.Catalog.Contracts.Authorization;
-using FSH.Modules.Catalog.Contracts.v1.Products.ReorderProductImages;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.Modules.Catalog.Contracts.Authorization;
+using Boilerplate.Modules.Catalog.Contracts.v1.Products.ReorderProductImages;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Catalog.Features.v1.Products.ReorderProductImages;
+namespace Boilerplate.Modules.Catalog.Features.v1.Products.ReorderProductImages;
 
 public static class ReorderProductImagesEndpoint
 {

@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<RootNamespace>Boilerplate.BuildingBlocks.Persistence</RootNamespace>
+		<AssemblyName>Boilerplate.BuildingBlocks.Persistence</AssemblyName>
+		<NoWarn>$(NoWarn);S4144;CS0618</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <PackageReference Include="Finbuckle.MultiTenant.EntityFrameworkCore" />
+	  <PackageReference Include="Microsoft.EntityFrameworkCore" />
+	  <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" />
+	  <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+	  <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
+	  <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" />
+	  <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\Core\Boilerplate.BuildingBlocks.Core.csproj" />
+	  <ProjectReference Include="..\Shared\Boilerplate.BuildingBlocks.Shared.csproj" />
+	</ItemGroup>
+	
+</Project>

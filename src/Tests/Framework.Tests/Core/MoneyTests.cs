@@ -1,4 +1,4 @@
-using FSH.Framework.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Domain;
 
 namespace Framework.Tests.Core;
 

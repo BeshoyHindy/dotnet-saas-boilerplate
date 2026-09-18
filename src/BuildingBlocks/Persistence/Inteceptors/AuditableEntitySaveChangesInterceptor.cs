@@ -1,10 +1,10 @@
-using FSH.Framework.Core.Context;
-using FSH.Framework.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 
-namespace FSH.Framework.Persistence.Inteceptors;
+namespace Boilerplate.BuildingBlocks.Persistence.Inteceptors;
 
 /// <summary>
 /// Interceptor that automatically populates audit metadata for entities implementing <see cref="IAuditableEntity"/>

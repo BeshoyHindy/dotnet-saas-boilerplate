@@ -1,13 +1,13 @@
 using System.Diagnostics;
 using System;
-using FSH.Framework.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Serilog.Context;
 
-namespace FSH.Framework.Web.Exceptions;
+namespace Boilerplate.BuildingBlocks.Web.Exceptions;
 
 public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {

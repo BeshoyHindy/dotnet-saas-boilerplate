@@ -1,5 +1,5 @@
-using FSH.Framework.Mailing;
-using FSH.Framework.Mailing.Services;
+using Boilerplate.BuildingBlocks.Mailing;
+using Boilerplate.BuildingBlocks.Mailing.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;

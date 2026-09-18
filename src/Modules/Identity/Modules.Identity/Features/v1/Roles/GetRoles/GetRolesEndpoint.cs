@@ -1,14 +1,14 @@
-using FSH.Framework.Shared.Identity.Authorization;
-using FSH.Framework.Shared.Persistence;
-using FSH.Modules.Identity.Contracts.Authorization;
-using FSH.Modules.Identity.Contracts.DTOs;
-using FSH.Modules.Identity.Contracts.v1.Roles.GetRoles;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Identity.Contracts.Authorization;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
+using Boilerplate.Modules.Identity.Contracts.v1.Roles.GetRoles;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Identity.Features.v1.Roles.GetRoles;
+namespace Boilerplate.Modules.Identity.Features.v1.Roles.GetRoles;
 
 public static class GetRolesEndpoint
 {

@@ -32,7 +32,7 @@ export function NotFoundPage() {
         />
       </div>
 
-      <div className="relative z-10 flex w-full max-w-[460px] flex-col items-center text-center fsh-enter fsh-enter-1">
+      <div className="relative z-10 flex w-full max-w-[460px] flex-col items-center text-center app-enter app-enter-1">
         {/* Icon tile — same muted bg + size-14 rounded-2xl as EntityEmpty */}
         <div className="mb-5 grid size-14 place-items-center rounded-2xl bg-[var(--color-muted)]">
           <FileQuestion className="size-6 text-[oklch(from_var(--color-muted-foreground)_l_c_h_/_0.5)]" />

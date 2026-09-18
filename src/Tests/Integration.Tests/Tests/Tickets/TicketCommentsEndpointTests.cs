@@ -11,13 +11,13 @@ namespace Integration.Tests.Tests.Tickets;
 /// nav-collection child as Modified, not Added, → DbUpdateConcurrencyException).
 /// These tests assert the fixed behaviour.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class TicketCommentsEndpointTests
 {
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public TicketCommentsEndpointTests(FshWebApplicationFactory factory)
+    public TicketCommentsEndpointTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

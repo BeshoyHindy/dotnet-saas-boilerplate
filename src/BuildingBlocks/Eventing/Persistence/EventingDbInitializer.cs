@@ -1,8 +1,8 @@
-using FSH.Framework.Persistence;
+using Boilerplate.BuildingBlocks.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace FSH.Framework.Eventing.Persistence;
+namespace Boilerplate.BuildingBlocks.Eventing.Persistence;
 
 /// <summary>
 /// Migrates the framework eventing schema. Runs per tenant like every other

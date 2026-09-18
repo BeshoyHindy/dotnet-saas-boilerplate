@@ -1,10 +1,10 @@
-using FSH.Framework.Eventing.Abstractions;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace FSH.Framework.Eventing.Outbox;
+namespace Boilerplate.BuildingBlocks.Eventing.Outbox;
 
 /// <summary>
 /// Background service that periodically dispatches outbox messages.

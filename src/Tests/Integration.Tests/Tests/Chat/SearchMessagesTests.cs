@@ -1,9 +1,9 @@
 using System.Net.Http.Json;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Chat.Contracts.v1.DTOs;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Chat.Contracts.v1.DTOs;
+using Boilerplate.Modules.Identity.Domain;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 using Microsoft.AspNetCore.Identity;
@@ -11,14 +11,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Integration.Tests.Tests.Chat;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class SearchMessagesTests
 {
     private const string ChatBasePath = "/api/v1/chat";
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public SearchMessagesTests(FshWebApplicationFactory factory)
+    public SearchMessagesTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);
@@ -144,7 +144,7 @@ public sealed class SearchMessagesTests
         scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>().MultiTenantContext =
             new MultiTenantContext<AppTenantInfo>(tenant);
 
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<FshUser>>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
         var user = await userManager.FindByIdAsync(registered.UserId);
         user.ShouldNotBeNull();
         if (!user!.EmailConfirmed)

@@ -1,4 +1,4 @@
-namespace FSH.Modules.Identity.Domain;
+namespace Boilerplate.Modules.Identity.Domain;
 
 public class UserGroup
 {
@@ -8,7 +8,7 @@ public class UserGroup
     public string? AddedBy { get; private set; }
 
     // Navigation properties (init for EF Core materialization)
-    public virtual FshUser? User { get; init; }
+    public virtual AppUser? User { get; init; }
     public virtual Group? Group { get; init; }
 
     private UserGroup() { } // EF Core

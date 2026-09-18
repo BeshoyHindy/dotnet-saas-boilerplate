@@ -1,6 +1,6 @@
 using Mediator;
 
-namespace FSH.Modules.Multitenancy.Contracts.v1.AdjustTenantValidity;
+namespace Boilerplate.Modules.Multitenancy.Contracts.v1.AdjustTenantValidity;
 
 /// <summary>
 /// Operator override that sets a tenant's validity to an explicit date with no billing side-effect

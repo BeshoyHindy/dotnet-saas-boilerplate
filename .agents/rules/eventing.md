@@ -15,7 +15,7 @@ Read before publishing/handling cross-module events. `src/BuildingBlocks/Eventin
 await _outbox.AddAsync(integrationEvent, ct).ConfigureAwait(false);   // IOutboxWriter
 ```
 
-Inject **`IOutboxWriter`** (`FSH.Framework.Eventing.Abstractions`) — the publish-side contract, and all a module ever needs. `IOutboxStore` is the full dispatcher-side surface and lives in the eventing runtime, which modules don't reference.
+Inject **`IOutboxWriter`** (`Boilerplate.BuildingBlocks.Eventing.Abstractions`) — the publish-side contract, and all a module ever needs. `IOutboxStore` is the full dispatcher-side surface and lives in the eventing runtime, which modules don't reference.
 
 `EfCoreOutboxStore.AddAsync` serializes + `SaveChanges` immediately, joining the caller's transaction when there is one. `OutboxDispatcherHostedService` polls every `OutboxDispatchIntervalSeconds` (default 10), `OutboxDispatcher` **claims** a batch (`OutboxBatchSize`, default 100), publishes via `IEventBus`, and dead-letters after `OutboxMaxRetries` (default 5) → `IsDead`. Failures back off exponentially (`NextRetryAt`); `RedriveDeadLettersAsync` recovers dead rows. `OutboxMessage`/`InboxMessage` are `IGlobalEntity` (no tenant filter — the dispatcher has no tenant context; `TenantId` is an explicit column).
 
@@ -49,7 +49,7 @@ Defaults in BuildingBlocks are single-database (`SingleDatabaseDrainTargetProvid
 
 ## Wiring
 
-The **host** bootstraps eventing once (`FSH.Starter.Api/Program.cs` and `FSH.Starter.DbMigrator/Program.cs`, before `AddModules` so `EventingDbInitializer` migrates the `framework` schema first):
+The **host** bootstraps eventing once (`Boilerplate.Api/Program.cs` and `Boilerplate.DbMigrator/Program.cs`, before `AddModules` so `EventingDbInitializer` migrates the `framework` schema first):
 
 ```csharp
 builder.Services.AddEventingCore(builder.Configuration);   // serializer + bus + dispatcher + EventingDbContext + stores

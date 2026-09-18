@@ -229,7 +229,7 @@ export function HealthPage() {
         }
       />
 
-      <section className="fsh-enter fsh-enter-2">
+      <section className="app-enter app-enter-2">
         {snapshot ? (
           <HeroPanel
             snapshot={snapshot}
@@ -246,7 +246,7 @@ export function HealthPage() {
       </section>
 
       {/* ── Dependencies list ───────────────────────────────────────────── */}
-      <section aria-label="Dependencies" className="fsh-enter fsh-enter-3">
+      <section aria-label="Dependencies" className="app-enter app-enter-3">
         <div className="mb-3 flex items-baseline justify-between gap-3">
           <h2 className="font-display text-[16px] font-semibold tracking-tight text-[var(--color-foreground)]">
             Dependencies
@@ -713,7 +713,7 @@ function ErrorPanel({ message }: { message?: string }) {
     <div
       role="alert"
       className={cn(
-        "fsh-enter flex items-start gap-3 rounded-xl border px-5 py-4",
+        "app-enter flex items-start gap-3 rounded-xl border px-5 py-4",
         "border-[oklch(from_var(--color-destructive)_l_c_h_/_0.30)]",
         "bg-[oklch(from_var(--color-destructive)_l_c_h_/_0.04)]",
       )}

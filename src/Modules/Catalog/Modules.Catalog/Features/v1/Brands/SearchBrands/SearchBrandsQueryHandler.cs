@@ -1,12 +1,12 @@
-using FSH.Framework.Shared.Persistence;
-using FSH.Modules.Catalog.Contracts.Dtos;
-using FSH.Modules.Catalog.Contracts.v1.Brands;
-using FSH.Modules.Catalog.Data;
-using FSH.Modules.Catalog.Domain;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Catalog.Contracts.Dtos;
+using Boilerplate.Modules.Catalog.Contracts.v1.Brands;
+using Boilerplate.Modules.Catalog.Data;
+using Boilerplate.Modules.Catalog.Domain;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Catalog.Features.v1.Brands.SearchBrands;
+namespace Boilerplate.Modules.Catalog.Features.v1.Brands.SearchBrands;
 
 public sealed class SearchBrandsQueryHandler(CatalogDbContext dbContext)
     : IQueryHandler<SearchBrandsQuery, PagedResponse<BrandDto>>

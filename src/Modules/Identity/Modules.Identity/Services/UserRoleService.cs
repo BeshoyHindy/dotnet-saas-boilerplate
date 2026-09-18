@@ -1,21 +1,21 @@
 using System.Net;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Core.Context;
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Shared.Constants;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Identity.Contracts.DTOs;
-using FSH.Modules.Identity.Contracts.Services;
-using FSH.Modules.Identity.Data;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Constants;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
+using Boilerplate.Modules.Identity.Contracts.Services;
+using Boilerplate.Modules.Identity.Data;
+using Boilerplate.Modules.Identity.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Identity.Services;
+namespace Boilerplate.Modules.Identity.Services;
 
 internal sealed class UserRoleService(
-    UserManager<FshUser> userManager,
-    RoleManager<FshRole> roleManager,
+    UserManager<AppUser> userManager,
+    RoleManager<AppRole> roleManager,
     IdentityDbContext db,
     IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor,
     ICurrentUser currentUser,
@@ -68,7 +68,7 @@ internal sealed class UserRoleService(
         return userRoles;
     }
 
-    private async Task ValidateAdminRoleChangeAsync(FshUser user, List<UserRoleDto> userRoles)
+    private async Task ValidateAdminRoleChangeAsync(AppUser user, List<UserRoleDto> userRoles)
     {
         bool isRemovingAdminRole = userRoles.Exists(a => !a.Enabled && a.RoleName == RoleConstants.Admin);
         if (!isRemovingAdminRole)
@@ -104,7 +104,7 @@ internal sealed class UserRoleService(
         await EnsureMinimumAdminCountAsync();
     }
 
-    private bool IsRootTenantAdmin(FshUser user)
+    private bool IsRootTenantAdmin(AppUser user)
     {
         return user.Email == MultitenancyConstants.Root.EmailAddress
             && multiTenantContextAccessor?.MultiTenantContext?.TenantInfo?.Id == MultitenancyConstants.Root.Id;
@@ -122,7 +122,7 @@ internal sealed class UserRoleService(
         }
     }
 
-    private async Task<List<string>> ProcessRoleAssignmentsAsync(FshUser user, List<UserRoleDto> userRoles)
+    private async Task<List<string>> ProcessRoleAssignmentsAsync(AppUser user, List<UserRoleDto> userRoles)
     {
         var assignedRoles = new List<string>();
 
@@ -150,7 +150,7 @@ internal sealed class UserRoleService(
         return assignedRoles;
     }
 
-    private async Task RaiseRolesAssignedEventAsync(FshUser user, List<string> assignedRoles, CancellationToken cancellationToken)
+    private async Task RaiseRolesAssignedEventAsync(AppUser user, List<string> assignedRoles, CancellationToken cancellationToken)
     {
         if (assignedRoles.Count == 0)
         {

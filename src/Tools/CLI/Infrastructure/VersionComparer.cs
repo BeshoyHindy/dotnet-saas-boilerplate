@@ -1,4 +1,4 @@
-namespace FSH.CLI.Infrastructure;
+namespace Boilerplate.CLI.Infrastructure;
 
 /// <summary>
 /// Minimal semantic-version comparison for the CLI's "update available" hints.

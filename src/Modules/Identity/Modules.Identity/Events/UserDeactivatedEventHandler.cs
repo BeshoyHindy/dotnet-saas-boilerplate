@@ -1,8 +1,8 @@
-using FSH.Modules.Identity.Domain.Events;
+using Boilerplate.Modules.Identity.Domain.Events;
 using Mediator;
 using Microsoft.Extensions.Logging;
 
-namespace FSH.Modules.Identity.Events;
+namespace Boilerplate.Modules.Identity.Events;
 
 /// <summary>
 /// Handles the UserDeactivatedEvent domain event.

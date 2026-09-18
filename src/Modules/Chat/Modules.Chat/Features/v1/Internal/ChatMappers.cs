@@ -1,7 +1,7 @@
-using FSH.Modules.Chat.Contracts.v1.DTOs;
-using FSH.Modules.Chat.Domain;
+using Boilerplate.Modules.Chat.Contracts.v1.DTOs;
+using Boilerplate.Modules.Chat.Domain;
 
-namespace FSH.Modules.Chat.Features.v1.Internal;
+namespace Boilerplate.Modules.Chat.Features.v1.Internal;
 
 internal static class ChatMappers
 {

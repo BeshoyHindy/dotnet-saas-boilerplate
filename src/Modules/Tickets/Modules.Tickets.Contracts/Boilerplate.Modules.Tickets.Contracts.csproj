@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<RootNamespace>Boilerplate.Modules.Tickets.Contracts</RootNamespace>
+		<AssemblyName>Boilerplate.Modules.Tickets.Contracts</AssemblyName>
+		<NoWarn>$(NoWarn);S2094</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Mediator.Abstractions" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\..\BuildingBlocks\Shared\Boilerplate.BuildingBlocks.Shared.csproj" />
+	</ItemGroup>
+
+</Project>

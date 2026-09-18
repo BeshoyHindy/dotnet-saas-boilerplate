@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FSH.Framework.Web.Sse;
+namespace Boilerplate.BuildingBlocks.Web.Sse;
 
 public static class Extensions
 {

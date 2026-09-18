@@ -1,6 +1,6 @@
 ---
 name: add-feature
-description: Add a vertical-slice feature (command/query + handler + validator + endpoint) to an existing FSH module. Use when adding an API endpoint or business operation to a module that already exists.
+description: Add a vertical-slice feature (command/query + handler + validator + endpoint) to an existing Boilerplate module. Use when adding an API endpoint or business operation to a module that already exists.
 argument-hint: "[ModuleName] [Area] [FeatureName]"
 ---
 
@@ -26,14 +26,14 @@ src/Modules/{X}/Modules.{X}/Features/v1/{Area}/{Feature}/
 `Mediator` interfaces (`using Mediator;`). Records. A create command can return the raw `Guid`.
 
 ```csharp
-namespace FSH.Modules.{X}.Contracts.v1.{Area};
+namespace Boilerplate.Modules.{X}.Contracts.v1.{Area};
 
 public sealed record Create{Entity}Command(string Name, decimal PriceAmount, string PriceCurrency)
     : ICommand<Guid>;
 ```
 
 Read/list DTOs go in `Modules.{X}.Contracts/Dtos/`. Paginated queries return `PagedResponse<T>`
-(`FSH.Framework.Shared.Persistence`) — see `query-patterns`.
+(`Boilerplate.BuildingBlocks.Shared.Persistence`) — see `query-patterns`.
 
 ## Step 2 — Handler (runtime `Features/`) — inject the DbContext, NOT a repository
 
@@ -57,7 +57,7 @@ public sealed class Create{Entity}CommandHandler(CatalogDbContext dbContext)
 }
 ```
 
-Throw `NotFoundException` / `CustomException(msg, errors, HttpStatusCode)` (`FSH.Framework.Core.Exceptions`) — the global handler maps them to ProblemDetails.
+Throw `NotFoundException` / `CustomException(msg, errors, HttpStatusCode)` (`Boilerplate.BuildingBlocks.Core.Exceptions`) — the global handler maps them to ProblemDetails.
 
 ## Step 3 — Validator (required; same folder)
 
@@ -99,7 +99,7 @@ group.MapCreate{Entity}Endpoint();   // group = endpoints.MapGroup("api/v{versio
 ## Step 6 — Verify
 
 ```bash
-dotnet build src/FSH.Starter.slnx          # 0 warnings (TreatWarningsAsErrors)
+dotnet build src/Boilerplate.slnx          # 0 warnings (TreatWarningsAsErrors)
 dotnet test src/Tests/{X}.Tests            # + add a handler/validator test (see testing-guide)
 ```
 

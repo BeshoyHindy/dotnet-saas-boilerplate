@@ -1,7 +1,7 @@
-using FSH.Framework.Core.Domain;
-using FSH.Modules.Billing.Contracts;
+using Boilerplate.BuildingBlocks.Core.Domain;
+using Boilerplate.Modules.Billing.Contracts;
 
-namespace FSH.Modules.Billing.Domain;
+namespace Boilerplate.Modules.Billing.Domain;
 
 public sealed class WalletTransaction : BaseEntity<Guid>
 {

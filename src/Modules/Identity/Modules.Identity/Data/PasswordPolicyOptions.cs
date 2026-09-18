@@ -1,4 +1,4 @@
-namespace FSH.Modules.Identity.Data;
+namespace Boilerplate.Modules.Identity.Data;
 
 public class PasswordPolicyOptions
 {

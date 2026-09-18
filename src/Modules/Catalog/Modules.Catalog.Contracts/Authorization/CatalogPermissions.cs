@@ -1,6 +1,6 @@
-using FSH.Framework.Shared.Constants;
+using Boilerplate.BuildingBlocks.Shared.Constants;
 
-namespace FSH.Modules.Catalog.Contracts.Authorization;
+namespace Boilerplate.Modules.Catalog.Contracts.Authorization;
 
 public static class CatalogPermissions
 {
@@ -35,7 +35,7 @@ public static class CatalogPermissions
         public const string AdjustStock = $"Permissions.{Resource}.AdjustStock";
     }
 
-    public static IReadOnlyList<FshPermission> All { get; } =
+    public static IReadOnlyList<AppPermission> All { get; } =
     [
         new("View Brands",    ActionConstants.View,   Brands.Resource, IsBasic: true),
         new("Create Brands",  ActionConstants.Create, Brands.Resource),

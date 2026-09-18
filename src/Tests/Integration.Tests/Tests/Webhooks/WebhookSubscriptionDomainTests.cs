@@ -1,4 +1,4 @@
-using FSH.Modules.Webhooks.Domain;
+using Boilerplate.Modules.Webhooks.Domain;
 using Integration.Tests.Infrastructure;
 #pragma warning disable CA1707 // Test method names use underscores by convention
 
@@ -10,10 +10,10 @@ namespace Integration.Tests.Tests.Webhooks;
 /// the HTTP/dispatch tests don't exercise directly (they always use a single, exact-match event).
 /// No web host is required; the entity is constructed in-process.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class WebhookSubscriptionDomainTests
 {
-    public WebhookSubscriptionDomainTests(FshWebApplicationFactory factory)
+    public WebhookSubscriptionDomainTests(AppWebApplicationFactory factory)
     {
         // Factory is injected to satisfy the shared collection fixture; these tests are
         // pure-domain and don't touch the host.

@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 
-namespace FSH.Framework.Web.Security;
+namespace Boilerplate.BuildingBlocks.Web.Security;
 
 public static class SecurityExtensions
 {

@@ -1,5 +1,5 @@
-using FSH.Framework.Quota;
-using FSH.Framework.Shared.Quota;
+using Boilerplate.BuildingBlocks.Quota;
+using Boilerplate.BuildingBlocks.Shared.Quota;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 

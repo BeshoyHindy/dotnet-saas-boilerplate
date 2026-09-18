@@ -3,13 +3,13 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Jobs.Services;
-using FSH.Framework.Mailing;
-using FSH.Framework.Mailing.Services;
-using FSH.Framework.Persistence;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Multitenancy.Data;
-using FSH.Framework.Web.Modules;
+using Boilerplate.BuildingBlocks.Jobs.Services;
+using Boilerplate.BuildingBlocks.Mailing;
+using Boilerplate.BuildingBlocks.Mailing.Services;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Multitenancy.Data;
+using Boilerplate.BuildingBlocks.Web.Modules;
 using Hangfire;
 using Hangfire.InMemory;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -29,8 +29,8 @@ namespace Integration.Middleware.Tests.Infrastructure;
 
 /// <summary>
 /// Single-host factory for the real-wiring middleware tests. Unlike Integration.Tests'
-/// FshWebApplicationFactory, this one:
-/// 1. Keeps the production <see cref="FSH.Framework.Web.Exceptions.GlobalExceptionHandler"/>
+/// AppWebApplicationFactory, this one:
+/// 1. Keeps the production <see cref="Boilerplate.BuildingBlocks.Web.Exceptions.GlobalExceptionHandler"/>
 ///    (no DetailedTestExceptionHandler swap), so unhandled exceptions produce RFC 9457 output.
 /// 2. Enables rate limiting with a tiny auth window so the auth limiter trips deterministically
 ///    while the global tenant/user/ip limiters stay effectively unlimited.
@@ -44,11 +44,11 @@ public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Prog
 {
     private const string MinioAccessKey = "minioadmin";
     private const string MinioSecretKey = "minioadmin";
-    private const string MinioBucket = "fsh-middleware-test-uploads";
+    private const string MinioBucket = "boilerplate-middleware-test-uploads";
 
     private static readonly SemaphoreSlim _migrationLock = new(1, 1);
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
-        .WithDatabase("fsh_middleware_tests")
+        .WithDatabase("boilerplate_middleware_tests")
         .WithUsername("postgres")
         .WithPassword("integration_test_pwd")
         .WithAutoRemove(true)
@@ -143,7 +143,7 @@ public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Prog
             {
                 ["DatabaseOptions:Provider"] = "POSTGRESQL",
                 ["DatabaseOptions:ConnectionString"] = _postgres.GetConnectionString(),
-                ["DatabaseOptions:MigrationsAssembly"] = "FSH.Starter.Migrations.PostgreSQL",
+                ["DatabaseOptions:MigrationsAssembly"] = "Boilerplate.Migrations.PostgreSQL",
                 ["CachingOptions:Redis"] = "",
                 ["JwtOptions:Issuer"] = TestConstants.JwtIssuer,
                 ["JwtOptions:Audience"] = TestConstants.JwtAudience,
@@ -287,7 +287,7 @@ public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Prog
             }
 
             // 5. Run the role-permission syncer through the production code path.
-            var syncer = scope.ServiceProvider.GetRequiredService<FSH.Modules.Identity.Authorization.RolePermissionSyncer>();
+            var syncer = scope.ServiceProvider.GetRequiredService<Boilerplate.Modules.Identity.Authorization.RolePermissionSyncer>();
             await syncer.SyncAsync(CancellationToken.None);
         }
     }

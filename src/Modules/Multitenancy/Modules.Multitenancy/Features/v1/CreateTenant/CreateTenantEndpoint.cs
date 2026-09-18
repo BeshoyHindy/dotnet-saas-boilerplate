@@ -1,15 +1,15 @@
-using FSH.Framework.Shared.Identity.Authorization;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Multitenancy.Contracts.Authorization;
-using FSH.Framework.Web.Idempotency;
-using FSH.Modules.Multitenancy.Contracts.v1.CreateTenant;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Multitenancy.Contracts.Authorization;
+using Boilerplate.BuildingBlocks.Web.Idempotency;
+using Boilerplate.Modules.Multitenancy.Contracts.v1.CreateTenant;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Multitenancy.Features.v1.CreateTenant;
+namespace Boilerplate.Modules.Multitenancy.Features.v1.CreateTenant;
 
 public static class CreateTenantEndpoint
 {

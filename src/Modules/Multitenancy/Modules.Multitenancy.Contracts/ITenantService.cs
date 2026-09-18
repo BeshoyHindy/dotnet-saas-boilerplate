@@ -1,9 +1,9 @@
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Framework.Shared.Persistence;
-using FSH.Modules.Multitenancy.Contracts.Dtos;
-using FSH.Modules.Multitenancy.Contracts.v1.GetTenants;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Multitenancy.Contracts.Dtos;
+using Boilerplate.Modules.Multitenancy.Contracts.v1.GetTenants;
 
-namespace FSH.Modules.Multitenancy.Contracts;
+namespace Boilerplate.Modules.Multitenancy.Contracts;
 
 public interface ITenantService
 {

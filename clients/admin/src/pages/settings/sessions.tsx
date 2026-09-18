@@ -76,7 +76,7 @@ export function SessionsSettings() {
   }
 
   return (
-    <div className="space-y-5 fsh-enter">
+    <div className="space-y-5 app-enter">
       <SettingsSection
         title="Active sessions"
         icon={MonitorSmartphone}

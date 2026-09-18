@@ -1,10 +1,10 @@
-﻿using FSH.Framework.Core.Context;
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Shared.Identity.Claims;
-using FSH.Modules.Identity.Contracts.Services;
+﻿using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Identity.Claims;
+using Boilerplate.Modules.Identity.Contracts.Services;
 using System.Security.Claims;
 
-namespace FSH.Modules.Identity.Services;
+namespace Boilerplate.Modules.Identity.Services;
 
 internal sealed class CurrentUserService : ICurrentUserService
 {

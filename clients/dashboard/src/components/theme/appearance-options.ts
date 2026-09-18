@@ -117,14 +117,14 @@ export const accents: AccentOption[] = [
 export const DEFAULT_ACCENT = "rose";
 export const CUSTOM_ACCENT_ID = "custom";
 
-export const FONT_STORAGE_KEY = "fsh.font";
-export const ACCENT_STORAGE_KEY = "fsh.accent";
+export const FONT_STORAGE_KEY = "boilerplate.font";
+export const ACCENT_STORAGE_KEY = "boilerplate.accent";
 /** Stores `{ h, c }` for the custom accent — h = hue (0-360),
  *  c = chroma scale (0.6 → 1.2 of the indigo template). */
-export const CUSTOM_ACCENT_STORAGE_KEY = "fsh.accent.custom";
+export const CUSTOM_ACCENT_STORAGE_KEY = "boilerplate.accent.custom";
 
 export type DensityMode = "comfortable" | "compact";
-export const DENSITY_STORAGE_KEY = "fsh.density";
+export const DENSITY_STORAGE_KEY = "boilerplate.density";
 export const DEFAULT_DENSITY: DensityMode = "comfortable";
 
 // ────────────────────────────────────────────────────────────────────────
@@ -185,7 +185,7 @@ const LAZY_FONTS_HREF =
     "display=swap",
   ].join("&");
 
-const LAZY_FONTS_LINK_ID = "fsh-lazy-fonts";
+const LAZY_FONTS_LINK_ID = "app-lazy-fonts";
 
 export function ensureLazyFontsLoaded(): void {
   if (typeof document === "undefined") return;

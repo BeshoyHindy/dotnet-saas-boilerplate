@@ -5,7 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Integration.Tests.Tests.Authentication;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class AuthRateLimitWiringTests
 {
     private const string AuthPolicy = "auth";
@@ -21,9 +21,9 @@ public sealed class AuthRateLimitWiringTests
         "self-register"
     };
 
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
 
-    public AuthRateLimitWiringTests(FshWebApplicationFactory factory)
+    public AuthRateLimitWiringTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
     }

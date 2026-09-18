@@ -1,8 +1,8 @@
-using FSH.Framework.Eventing;
-using FSH.Framework.Eventing.Abstractions;
-using FSH.Framework.Eventing.Outbox;
-using FSH.Framework.Eventing.Serialization;
-using FSH.Framework.Persistence;
+using Boilerplate.BuildingBlocks.Eventing;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
+using Boilerplate.BuildingBlocks.Eventing.Outbox;
+using Boilerplate.BuildingBlocks.Eventing.Serialization;
+using Boilerplate.BuildingBlocks.Persistence;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Shouldly;

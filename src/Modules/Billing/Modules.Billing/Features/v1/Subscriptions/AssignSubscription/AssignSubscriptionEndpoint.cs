@@ -1,13 +1,13 @@
-using FSH.Modules.Billing.Contracts.Authorization;
-using FSH.Framework.Shared.Identity.Authorization;
-using FSH.Framework.Web.Idempotency;
-using FSH.Modules.Billing.Contracts.v1.Subscriptions;
+using Boilerplate.Modules.Billing.Contracts.Authorization;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.BuildingBlocks.Web.Idempotency;
+using Boilerplate.Modules.Billing.Contracts.v1.Subscriptions;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Billing.Features.v1.Subscriptions.AssignSubscription;
+namespace Boilerplate.Modules.Billing.Features.v1.Subscriptions.AssignSubscription;
 
 public static class AssignSubscriptionEndpoint
 {

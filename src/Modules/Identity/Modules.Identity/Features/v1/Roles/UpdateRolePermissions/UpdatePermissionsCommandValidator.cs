@@ -1,7 +1,7 @@
 ﻿using FluentValidation;
-using FSH.Modules.Identity.Contracts.v1.Roles.UpdatePermissions;
+using Boilerplate.Modules.Identity.Contracts.v1.Roles.UpdatePermissions;
 
-namespace FSH.Modules.Identity.Features.v1.Roles.UpdateRolePermissions;
+namespace Boilerplate.Modules.Identity.Features.v1.Roles.UpdateRolePermissions;
 
 public sealed class UpdatePermissionsCommandValidator : AbstractValidator<UpdatePermissionsCommand>
 {

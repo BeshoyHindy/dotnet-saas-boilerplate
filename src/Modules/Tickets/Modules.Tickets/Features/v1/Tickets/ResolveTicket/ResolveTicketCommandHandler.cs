@@ -1,10 +1,10 @@
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Tickets.Contracts.v1.Tickets;
-using FSH.Modules.Tickets.Data;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Tickets.Contracts.v1.Tickets;
+using Boilerplate.Modules.Tickets.Data;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Tickets.Features.v1.Tickets.ResolveTicket;
+namespace Boilerplate.Modules.Tickets.Features.v1.Tickets.ResolveTicket;
 
 public sealed class ResolveTicketCommandHandler(TicketsDbContext dbContext)
     : ICommandHandler<ResolveTicketCommand, Guid>

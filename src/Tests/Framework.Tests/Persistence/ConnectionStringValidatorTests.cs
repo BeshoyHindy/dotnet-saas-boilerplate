@@ -1,5 +1,5 @@
-using FSH.Framework.Persistence;
-using FSH.Framework.Shared.Persistence;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -23,7 +23,7 @@ public sealed class ConnectionStringValidatorTests
         var sut = Build(DbProviders.PostgreSQL);
 
         // Act
-        var result = sut.TryValidate("Host=localhost;Port=5432;Database=fsh;Username=postgres;Password=pwd");
+        var result = sut.TryValidate("Host=localhost;Port=5432;Database=boilerplate;Username=postgres;Password=pwd");
 
         // Assert
         result.ShouldBeTrue();
@@ -36,7 +36,7 @@ public sealed class ConnectionStringValidatorTests
         var sut = Build(DbProviders.MSSQL);
 
         // Act
-        var result = sut.TryValidate("Server=localhost;Database=fsh;User Id=sa;Password=pwd;");
+        var result = sut.TryValidate("Server=localhost;Database=boilerplate;User Id=sa;Password=pwd;");
 
         // Assert
         result.ShouldBeTrue();
@@ -49,7 +49,7 @@ public sealed class ConnectionStringValidatorTests
         var sut = Build(DbProviders.PostgreSQL);
 
         // Act
-        var result = sut.TryValidate("Server=localhost;Database=fsh;", DbProviders.MSSQL);
+        var result = sut.TryValidate("Server=localhost;Database=boilerplate;", DbProviders.MSSQL);
 
         // Assert
         result.ShouldBeTrue();

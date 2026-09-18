@@ -1,6 +1,6 @@
-using FSH.Modules.Tickets.Contracts.Dtos;
+using Boilerplate.Modules.Tickets.Contracts.Dtos;
 
-namespace FSH.Modules.Tickets.Domain;
+namespace Boilerplate.Modules.Tickets.Domain;
 
 internal static class TicketMappings
 {

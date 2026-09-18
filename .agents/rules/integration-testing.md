@@ -6,7 +6,7 @@
 
 `WebApplicationFactory` over **real** infra via Testcontainers — PostgreSQL + Redis + MinIO. **Docker must be running**; if it isn't, tests fail fast with `DockerUnavailableException` (environmental, not a regression — run the unit projects instead).
 
-`FshWebApplicationFactory` (`Integration.Tests/Infrastructure/`) boots the containers, overlays in-memory config, swaps `IMailService` → `NoOpMailService`, and rewires storage to MinIO.
+`AppWebApplicationFactory` (`Integration.Tests/Infrastructure/`) boots the containers, overlays in-memory config, swaps `IMailService` → `NoOpMailService`, and rewires storage to MinIO.
 
 ## Must-know gotchas
 
@@ -20,4 +20,4 @@
 ```bash
 dotnet test --collect "XPlat Code Coverage" --settings coverage.runsettings
 ```
-Cobertura; includes `[FSH.Modules.*]` + `[FSH.Framework.*]`; excludes tests, the Migrations project, and `*HostedService`.
+Cobertura; includes `[Boilerplate.Modules.*]` + `[Boilerplate.BuildingBlocks.*]`; excludes tests, the Migrations project, and `*HostedService`.

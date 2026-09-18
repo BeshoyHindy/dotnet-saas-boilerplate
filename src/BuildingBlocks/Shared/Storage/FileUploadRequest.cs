@@ -1,4 +1,4 @@
-namespace FSH.Framework.Shared.Storage;
+namespace Boilerplate.BuildingBlocks.Shared.Storage;
 
 /// <summary>
 /// Represents a file upload request with filename, content type, and data.

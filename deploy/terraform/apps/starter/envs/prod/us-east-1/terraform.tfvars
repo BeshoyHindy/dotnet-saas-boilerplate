@@ -51,7 +51,7 @@ waf_enable_logging                = true
 # S3
 ################################################################################
 
-app_s3_bucket_name                = "prod-fsh-app-bucket"
+app_s3_bucket_name                = "prod-boilerplate-app-bucket"
 app_s3_versioning_enabled         = true
 app_s3_enable_public_read         = false
 app_s3_enable_cloudfront          = true
@@ -62,8 +62,8 @@ app_s3_enable_intelligent_tiering = true
 # Frontend SPAs (S3 + CloudFront) — bucket names must be globally unique
 ################################################################################
 
-dashboard_s3_bucket_name        = "prod-fsh-dashboard"
-admin_s3_bucket_name            = "prod-fsh-admin"
+dashboard_s3_bucket_name        = "prod-boilerplate-dashboard"
+admin_s3_bucket_name            = "prod-boilerplate-admin"
 frontend_cloudfront_price_class = "PriceClass_200"
 
 # Custom domains (ACM cert must be in us-east-1 for CloudFront):
@@ -76,8 +76,8 @@ frontend_cloudfront_price_class = "PriceClass_200"
 # Database
 ################################################################################
 
-db_name                        = "fshdb"
-db_username                    = "fshadmin"
+db_name                        = "boilerplatedb"
+db_username                    = "boilerplateadmin"
 db_manage_master_user_password = true
 db_instance_class              = "db.t4g.medium"
 db_allocated_storage           = 50

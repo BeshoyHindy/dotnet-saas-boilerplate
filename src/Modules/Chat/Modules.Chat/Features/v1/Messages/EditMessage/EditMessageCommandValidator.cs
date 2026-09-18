@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Chat.Contracts.v1.Commands;
+using Boilerplate.Modules.Chat.Contracts.v1.Commands;
 
-namespace FSH.Modules.Chat.Features.v1.Messages.EditMessage;
+namespace Boilerplate.Modules.Chat.Features.v1.Messages.EditMessage;
 
 public sealed class EditMessageCommandValidator : AbstractValidator<EditMessageCommand>
 {

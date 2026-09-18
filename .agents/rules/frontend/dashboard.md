@@ -2,7 +2,7 @@
 
 Tenant-facing application. Read `frontend/shared.md` first; this file is only the divergences.
 
-- **Port** 5174 · dev proxy target `https://localhost:7030` (HTTPS, with `ws: true` for the SignalR hub) · localStorage prefix `fsh.dashboard.*` · login header `X-FSH-App: dashboard`.
+- **Port** 5174 · dev proxy target `https://localhost:7030` (HTTPS, with `ws: true` for the SignalR hub) · localStorage prefix `boilerplate.dashboard.*` · login header `X-Client-App: dashboard`.
 - **Env** (`src/env.ts`): `{ apiBase, defaultTenant, demoMode }`.
 - Dev-proxy is HTTPS on purpose: routing the bearer token through an HTTP→HTTPS 307 redirect stripped the `Authorization` header.
 
@@ -12,7 +12,7 @@ The dashboard does **not** depend on react-hook-form or zod. Use controlled inpu
 
 ## Permissions — fetched, not in the JWT
 
-The JWT carries **only role names**. `auth-context.tsx` fetches the effective permission list from `GET /api/v1/identity/permissions` (`getMyPermissions()` in `src/api/identity.ts`), caches it in `tokenStore` under `fsh.dashboard.permissions`, and exposes a `permissionsHydrated` flag so gated UI doesn't flash while the fetch is in flight (re-fetched on login/impersonation swaps; `refreshPermissions()` for role changes). Nav items are gated via `perm`/`anyPerm` in `src/components/layout/nav-data.ts`. `ProtectedRoute` is still **auth-only** (no per-route permission gating) — don't add `RouteGuard`-style gating here.
+The JWT carries **only role names**. `auth-context.tsx` fetches the effective permission list from `GET /api/v1/identity/permissions` (`getMyPermissions()` in `src/api/identity.ts`), caches it in `tokenStore` under `boilerplate.dashboard.permissions`, and exposes a `permissionsHydrated` flag so gated UI doesn't flash while the fetch is in flight (re-fetched on login/impersonation swaps; `refreshPermissions()` for role changes). Nav items are gated via `perm`/`anyPerm` in `src/components/layout/nav-data.ts`. `ProtectedRoute` is still **auth-only** (no per-route permission gating) — don't add `RouteGuard`-style gating here.
 
 ## Routing & realtime/SSE
 
@@ -23,7 +23,7 @@ The JWT carries **only role names**. `auth-context.tsx` fetches the effective pe
 
 ## Impersonation
 
-`token-store.ts` has `beginImpersonation` / `endImpersonationWithFreshTokens` / `restoreStashedActor` that stash the operator's tokens under `fsh.dashboard.impersonation.*`. `AuthProvider` exposes `beginImpersonation`/`stopImpersonation` and derives `ImpersonationInfo` from `act_sub` / `act_tenant` / `act_name` claims. Admin triggers the handoff one-way via its `dashboardUrl`.
+`token-store.ts` has `beginImpersonation` / `endImpersonationWithFreshTokens` / `restoreStashedActor` that stash the operator's tokens under `boilerplate.dashboard.impersonation.*`. `AuthProvider` exposes `beginImpersonation`/`stopImpersonation` and derives `ImpersonationInfo` from `act_sub` / `act_tenant` / `act_name` claims. Admin triggers the handoff one-way via its `dashboardUrl`.
 
 ## Performance
 

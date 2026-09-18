@@ -1,4 +1,4 @@
-using FSH.Framework.Caching;
+using Boilerplate.BuildingBlocks.Caching;
 
 namespace Framework.Tests.Caching;
 

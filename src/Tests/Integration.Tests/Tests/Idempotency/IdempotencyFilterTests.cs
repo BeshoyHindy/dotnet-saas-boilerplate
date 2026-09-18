@@ -3,7 +3,7 @@ using Integration.Tests.Infrastructure;
 
 namespace Integration.Tests.Tests.Idempotency;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class IdempotencyFilterTests
 {
     private const string IdempotencyHeader = "Idempotency-Key";
@@ -11,7 +11,7 @@ public sealed class IdempotencyFilterTests
 
     private readonly AuthHelper _auth;
 
-    public IdempotencyFilterTests(FshWebApplicationFactory factory)
+    public IdempotencyFilterTests(AppWebApplicationFactory factory)
     {
         _auth = new AuthHelper(factory);
     }

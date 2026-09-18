@@ -1,8 +1,8 @@
 using FluentValidation;
-using FSH.Framework.Web.Validation;
-using FSH.Modules.Auditing.Contracts.v1.GetAudits;
+using Boilerplate.BuildingBlocks.Web.Validation;
+using Boilerplate.Modules.Auditing.Contracts.v1.GetAudits;
 
-namespace FSH.Modules.Auditing.Features.v1.GetAudits;
+namespace Boilerplate.Modules.Auditing.Features.v1.GetAudits;
 
 public sealed class GetAuditsQueryValidator : AbstractValidator<GetAuditsQuery>
 {

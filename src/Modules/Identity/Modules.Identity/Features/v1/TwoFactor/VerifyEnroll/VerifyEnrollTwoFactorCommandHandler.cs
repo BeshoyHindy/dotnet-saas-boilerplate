@@ -1,19 +1,19 @@
-using FSH.Framework.Core.Context;
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Identity.Contracts.v1.TwoFactor;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Identity.Contracts.v1.TwoFactor;
+using Boilerplate.Modules.Identity.Domain;
 using Mediator;
 using Microsoft.AspNetCore.Identity;
 
-namespace FSH.Modules.Identity.Features.v1.TwoFactor.VerifyEnroll;
+namespace Boilerplate.Modules.Identity.Features.v1.TwoFactor.VerifyEnroll;
 
 public sealed class VerifyEnrollTwoFactorCommandHandler
     : ICommandHandler<VerifyEnrollTwoFactorCommand, bool>
 {
-    private readonly UserManager<FshUser> _userManager;
+    private readonly UserManager<AppUser> _userManager;
     private readonly ICurrentUser _currentUser;
 
-    public VerifyEnrollTwoFactorCommandHandler(UserManager<FshUser> userManager, ICurrentUser currentUser)
+    public VerifyEnrollTwoFactorCommandHandler(UserManager<AppUser> userManager, ICurrentUser currentUser)
     {
         _userManager = userManager;
         _currentUser = currentUser;

@@ -1,11 +1,11 @@
 using System.Text.Json;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Framework.Shared.Quota;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Quota;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace FSH.Modules.Multitenancy.Data.Configurations;
+namespace Boilerplate.Modules.Multitenancy.Data.Configurations;
 
 public class AppTenantInfoConfiguration : IEntityTypeConfiguration<AppTenantInfo>
 {

@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace FSH.Modules.Auditing.Contracts;
+namespace Boilerplate.Modules.Auditing.Contracts;
 
 /// <summary>
 /// Forces an enum to serialize as its underlying integer even when a global

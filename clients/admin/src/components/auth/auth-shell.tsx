@@ -13,7 +13,7 @@ import { cn } from "@/lib/cn";
 //   right pane:       focused form column with the // SECTION-RULE chip.
 //
 // The brand stage stays consistent across all auth pages so the operator
-// always knows they're on the FSH Console surface. The right pane carries
+// always knows they're on the Boilerplate Console surface. The right pane carries
 // the page-specific content.
 // ────────────────────────────────────────────────────────────────────────
 
@@ -59,11 +59,11 @@ export function AuthShell({
         />
         <CornerTicks />
         <div className="relative flex flex-1 flex-col justify-between p-12 xl:p-16">
-          <div className="meta text-[var(--color-muted-foreground)] fsh-enter">
-            // FSH / CONSOLE / RECOVER
+          <div className="meta text-[var(--color-muted-foreground)] app-enter">
+            // Boilerplate / CONSOLE / RECOVER
           </div>
-          <BrandMarkXL className="fsh-enter fsh-enter-2 max-w-lg" />
-          <div className="fsh-enter fsh-enter-4 flex items-end justify-between gap-6">
+          <BrandMarkXL className="app-enter app-enter-2 max-w-lg" />
+          <div className="app-enter app-enter-4 flex items-end justify-between gap-6">
             <div className="space-y-1">
               <div className="meta text-[var(--color-muted-foreground)]">authorized personnel</div>
               <div className="font-mono text-[12px] text-[var(--color-muted-foreground)] leading-relaxed">
@@ -85,7 +85,7 @@ export function AuthShell({
       <main className="relative flex flex-col items-center justify-center p-6 lg:p-10">
         <div className="canvas-grid pointer-events-none absolute inset-0" aria-hidden />
 
-        <div className="relative w-full max-w-md space-y-6 fsh-enter">
+        <div className="relative w-full max-w-md space-y-6 app-enter">
           {/* Mobile-only brand (lg+ uses the left pane). */}
           <div className="lg:hidden">
             <BrandMarkXL />

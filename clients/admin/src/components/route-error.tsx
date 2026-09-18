@@ -25,7 +25,7 @@ export function RouteError() {
         }}
       />
 
-      <div className="fsh-enter relative w-full max-w-xl space-y-6 text-center">
+      <div className="app-enter relative w-full max-w-xl space-y-6 text-center">
         <div className="meta text-[var(--color-muted-foreground)]">// SYSTEM RESPONSE</div>
 
         <h1 className="font-display text-[clamp(4rem,9vw,7rem)] font-semibold leading-[0.95] tracking-[var(--tracking-display)]">

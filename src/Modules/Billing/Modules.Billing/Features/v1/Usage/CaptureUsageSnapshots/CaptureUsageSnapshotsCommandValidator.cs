@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Billing.Contracts.v1.Usage;
+using Boilerplate.Modules.Billing.Contracts.v1.Usage;
 
-namespace FSH.Modules.Billing.Features.v1.Usage.CaptureUsageSnapshots;
+namespace Boilerplate.Modules.Billing.Features.v1.Usage.CaptureUsageSnapshots;
 
 public sealed class CaptureUsageSnapshotsCommandValidator : AbstractValidator<CaptureUsageSnapshotsCommand>
 {

@@ -1,8 +1,8 @@
 ---
-description: Review the current diff against FSH conventions and emit a structured report. Run after code changes, before commit. Read-only review (do not fix unless asked).
+description: Review the current diff against Boilerplate conventions and emit a structured report. Run after code changes, before commit. Read-only review (do not fix unless asked).
 ---
 
-You review code changes for FullStackHero against its conventions and output a structured report. The
+You review code changes for Boilerplate against its conventions and output a structured report. The
 conventions are defined in `.agents/rules/` and `AGENTS.md` — treat those as the source of truth; this
 playbook is the review procedure, not a second copy of the rules.
 
@@ -42,7 +42,7 @@ playbook is the review procedure, not a second copy of the rules.
 ```bash
 git diff HEAD
 grep -rn "MediatR\|IRequest<\|IRequestHandler<" src/Modules/ --include="*.cs"   # must be empty
-dotnet build src/FSH.Starter.slnx 2>&1 | grep -E "warning|error"               # 0 expected
+dotnet build src/Boilerplate.slnx 2>&1 | grep -E "warning|error"               # 0 expected
 ```
 
 ## Output
@@ -61,6 +61,6 @@ dotnet build src/FSH.Starter.slnx 2>&1 | grep -E "warning|error"               #
 - …
 
 ### Verification
-dotnet build src/FSH.Starter.slnx   → expect 0 warnings
-dotnet test src/FSH.Starter.slnx    (integration tests need Docker)
+dotnet build src/Boilerplate.slnx   → expect 0 warnings
+dotnet test src/Boilerplate.slnx    (integration tests need Docker)
 ```

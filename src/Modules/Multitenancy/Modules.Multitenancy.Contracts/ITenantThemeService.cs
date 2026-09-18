@@ -1,6 +1,6 @@
-using FSH.Modules.Multitenancy.Contracts.Dtos;
+using Boilerplate.Modules.Multitenancy.Contracts.Dtos;
 
-namespace FSH.Modules.Multitenancy.Contracts;
+namespace Boilerplate.Modules.Multitenancy.Contracts;
 
 public interface ITenantThemeService
 {

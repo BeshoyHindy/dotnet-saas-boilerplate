@@ -1,8 +1,8 @@
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Identity.Contracts.Authorization;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Identity.Contracts.Authorization;
+using Boilerplate.Modules.Identity.Domain;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 using Microsoft.AspNetCore.Identity;
@@ -18,7 +18,7 @@ namespace Integration.Tests.Tests.Roles;
 /// state immediately. This is distinct from <c>RolePermissionSyncerTests</c> (claim
 /// restoration into RoleClaims) — here we exercise the cache layer itself.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class PermissionCacheInvalidationTests
 {
     // Non-basic permission: a user with only a custom role won't have this unless the role grants it,
@@ -26,10 +26,10 @@ public sealed class PermissionCacheInvalidationTests
     private const string ProbePermission = IdentityPermissions.Groups.Create;
     private const string SecondaryPermission = IdentityPermissions.Groups.Delete;
 
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public PermissionCacheInvalidationTests(FshWebApplicationFactory factory)
+    public PermissionCacheInvalidationTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);
@@ -240,8 +240,8 @@ public sealed class PermissionCacheInvalidationTests
         scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()
             .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
 
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<FshUser>>();
-        var user = new FshUser
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+        var user = new AppUser
         {
             FirstName = "Cache",
             LastName = "Probe",

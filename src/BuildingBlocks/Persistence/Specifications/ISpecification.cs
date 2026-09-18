@@ -1,6 +1,6 @@
 using System.Linq.Expressions;
 
-namespace FSH.Framework.Persistence;
+namespace Boilerplate.BuildingBlocks.Persistence;
 
 /// <summary>
 /// Entity-level specification describing how to compose a query for <typeparamref name="T"/>.

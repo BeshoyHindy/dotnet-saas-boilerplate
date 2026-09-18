@@ -73,17 +73,12 @@ export function ForgotPasswordPage() {
       </div>
 
       {/* Card column */}
-      <div className="relative z-10 w-full max-w-[420px] fsh-enter fsh-enter-1">
+      <div className="relative z-10 w-full max-w-[420px] app-enter app-enter-1">
         {/* Brand lockup */}
         <div className="mb-8 flex flex-col items-center">
           <div className="flex items-center gap-2.5">
-            <img
-              src="/logo-fullstackhero.png"
-              alt="fullstackhero"
-              className="size-9 object-contain"
-            />
             <span className="font-display text-[26px] font-semibold tracking-tight text-[var(--color-foreground)]">
-              fullstack<span className="text-[var(--color-primary)]">hero</span>
+              Boilerplate
             </span>
           </div>
           <div className="mt-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[oklch(from_var(--color-muted-foreground)_l_c_h_/_0.7)]">
@@ -97,7 +92,7 @@ export function ForgotPasswordPage() {
         <div className="rounded-xl border border-[var(--color-border)] bg-[oklch(from_var(--color-card)_l_c_h_/_0.85)] shadow-[0_1px_3px_oklch(0_0_0_/_0.04),0_8px_24px_oklch(0_0_0_/_0.06)] backdrop-blur-xl">
           <div className="px-6 py-7 sm:px-8 sm:py-9">
             {submitted ? (
-              <div className="fsh-enter space-y-5 text-center">
+              <div className="app-enter space-y-5 text-center">
                 <div className="grid place-items-center">
                   <span
                     aria-hidden
@@ -216,7 +211,7 @@ export function ForgotPasswordPage() {
                       id="forgot-error"
                       role="alert"
                       className={cn(
-                        "fsh-enter flex items-start gap-2 rounded-lg border px-3 py-2 text-sm",
+                        "app-enter flex items-start gap-2 rounded-lg border px-3 py-2 text-sm",
                         "border-[oklch(from_var(--color-destructive)_l_c_h_/_0.30)]",
                         "bg-[oklch(from_var(--color-destructive)_l_c_h_/_0.06)]",
                         "text-[var(--color-destructive)]",

@@ -1,11 +1,11 @@
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Identity.Contracts.Services;
-using FSH.Modules.Identity.Contracts.v1.Groups.RemoveUserFromGroup;
-using FSH.Modules.Identity.Data;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Identity.Contracts.Services;
+using Boilerplate.Modules.Identity.Contracts.v1.Groups.RemoveUserFromGroup;
+using Boilerplate.Modules.Identity.Data;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Identity.Features.v1.Groups.RemoveUserFromGroup;
+namespace Boilerplate.Modules.Identity.Features.v1.Groups.RemoveUserFromGroup;
 
 public sealed class RemoveUserFromGroupCommandHandler : ICommandHandler<RemoveUserFromGroupCommand, Unit>
 {

@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using FSH.Framework.Caching;
+using Boilerplate.BuildingBlocks.Caching;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Distributed;
@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace FSH.Framework.Web.Idempotency;
+namespace Boilerplate.BuildingBlocks.Web.Idempotency;
 
 /// <summary>
 /// Endpoint filter that provides idempotency for POST/PUT/PATCH requests.

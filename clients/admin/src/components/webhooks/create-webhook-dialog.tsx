@@ -139,7 +139,7 @@ export function CreateWebhookDialog({
           </div>
           <DialogDescription>
             Your endpoint receives a JSON payload with the event details. We sign each request
-            with HMAC-SHA256 in the <code className="code-chip">X-FSH-Signature</code> header
+            with HMAC-SHA256 in the <code className="code-chip">X-Webhook-Signature</code> header
             using the secret below — store it on your side and verify before trusting the body.
           </DialogDescription>
         </DialogHeader>
@@ -150,7 +150,7 @@ export function CreateWebhookDialog({
               <Input
                 id="webhook-url"
                 type="url"
-                placeholder="https://api.acme.com/webhooks/fsh"
+                placeholder="https://api.acme.com/webhooks/boilerplate"
                 autoComplete="off"
                 className="font-mono"
                 aria-invalid={errors.url ? true : undefined}

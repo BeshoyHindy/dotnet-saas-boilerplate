@@ -1,11 +1,11 @@
-using FSH.Framework.Shared.Persistence;
-using FSH.Modules.Webhooks.Contracts.Dtos;
-using FSH.Modules.Webhooks.Contracts.v1.GetWebhookDeliveries;
-using FSH.Modules.Webhooks.Data;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Webhooks.Contracts.Dtos;
+using Boilerplate.Modules.Webhooks.Contracts.v1.GetWebhookDeliveries;
+using Boilerplate.Modules.Webhooks.Data;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Webhooks.Features.v1.GetWebhookDeliveries;
+namespace Boilerplate.Modules.Webhooks.Features.v1.GetWebhookDeliveries;
 
 public sealed class GetWebhookDeliveriesQueryHandler(
     WebhookDbContext dbContext) : IQueryHandler<GetWebhookDeliveriesQuery, PagedResponse<WebhookDeliveryDto>>

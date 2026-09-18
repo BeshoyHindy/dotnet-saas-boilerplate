@@ -1,6 +1,6 @@
-using FSH.Modules.Multitenancy.Contracts.Dtos;
+using Boilerplate.Modules.Multitenancy.Contracts.Dtos;
 using Mediator;
 
-namespace FSH.Modules.Multitenancy.Contracts.v1.GetTenantTheme;
+namespace Boilerplate.Modules.Multitenancy.Contracts.v1.GetTenantTheme;
 
 public sealed record GetTenantThemeQuery : IQuery<TenantThemeDto>;

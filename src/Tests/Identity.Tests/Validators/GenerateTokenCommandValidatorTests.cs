@@ -1,5 +1,5 @@
-using FSH.Modules.Identity.Contracts.v1.Tokens.TokenGeneration;
-using FSH.Modules.Identity.Features.v1.Tokens.TokenGeneration;
+using Boilerplate.Modules.Identity.Contracts.v1.Tokens.TokenGeneration;
+using Boilerplate.Modules.Identity.Features.v1.Tokens.TokenGeneration;
 
 namespace Identity.Tests.Validators;
 

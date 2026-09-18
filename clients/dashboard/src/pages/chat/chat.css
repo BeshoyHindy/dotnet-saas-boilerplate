@@ -4,13 +4,13 @@
  * extracts it into the per-route CSS chunk; the main shell stops
  * shipping these rules for users who never open a channel.
  *
- * NB: `chat-status-pill` / `chat-status-dot` / `fsh-chat-status-pulse`
+ * NB: `chat-status-pill` / `chat-status-dot` / `app-chat-status-pulse`
  * stay in globals.css because the same primitive is used by the
  * RealtimeStatusPill in the global notification-bell footer.
  */
 
 /* Typing indicator — three dots that breathe. */
-@keyframes fsh-chat-typing {
+@keyframes app-chat-typing {
   0%   { transform: translateY(0);    opacity: 0.45; }
   30%  { transform: translateY(-2px); opacity: 1; }
   60%  { transform: translateY(0);    opacity: 0.45; }
@@ -18,7 +18,7 @@
 }
 
 .chat-typing-dot {
-  animation: fsh-chat-typing 1100ms infinite var(--ease-out-cubic);
+  animation: app-chat-typing 1100ms infinite var(--ease-out-cubic);
 }
 .chat-typing-dot:nth-child(2) { animation-delay: 160ms; }
 .chat-typing-dot:nth-child(3) { animation-delay: 320ms; }
@@ -106,7 +106,7 @@
 
 /* Jump-to-bottom pill — floats above the composer when scrolled up and
    new messages have arrived. */
-@keyframes fsh-chat-jump-in {
+@keyframes app-chat-jump-in {
   0%   { transform: translateY(8px) scale(0.96); opacity: 0; }
   100% { transform: translateY(0)    scale(1);    opacity: 1; }
 }
@@ -127,7 +127,7 @@
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 500;
-  animation: fsh-chat-jump-in var(--duration-default) var(--ease-out-cubic) both;
+  animation: app-chat-jump-in var(--duration-default) var(--ease-out-cubic) both;
   transition: transform var(--duration-fast) var(--ease-out-cubic),
               box-shadow var(--duration-fast) var(--ease-out-cubic),
               border-color var(--duration-fast) var(--ease-out-cubic);

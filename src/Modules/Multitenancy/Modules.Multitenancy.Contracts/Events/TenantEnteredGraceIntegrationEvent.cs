@@ -1,6 +1,6 @@
-using FSH.Framework.Eventing.Abstractions;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
 
-namespace FSH.Modules.Multitenancy.Contracts.Events;
+namespace Boilerplate.Modules.Multitenancy.Contracts.Events;
 
 /// <summary>
 /// Raised by the daily expiry scan when a tenant has passed <c>ValidUpto</c> but is still inside the

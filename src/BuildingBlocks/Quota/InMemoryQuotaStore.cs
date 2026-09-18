@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace FSH.Framework.Quota;
+namespace Boilerplate.BuildingBlocks.Quota;
 
 /// <summary>
 /// Singleton backing store for <see cref="InMemoryQuotaService"/> so counters survive request scopes.

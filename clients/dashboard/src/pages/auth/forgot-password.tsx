@@ -76,7 +76,7 @@ export function ForgotPasswordPage() {
       }
     >
       {submitted ? (
-        <div className="fsh-enter space-y-5 text-center">
+        <div className="app-enter space-y-5 text-center">
           <div className="grid place-items-center">
             <span
               aria-hidden
@@ -186,7 +186,7 @@ export function ForgotPasswordPage() {
                 id="forgot-error"
                 role="alert"
                 className={cn(
-                  "fsh-enter flex items-start gap-2 rounded-lg border px-3 py-2 text-sm",
+                  "app-enter flex items-start gap-2 rounded-lg border px-3 py-2 text-sm",
                   "border-[oklch(from_var(--color-destructive)_l_c_h_/_0.30)]",
                   "bg-[oklch(from_var(--color-destructive)_l_c_h_/_0.06)]",
                   "text-[var(--color-destructive)]",

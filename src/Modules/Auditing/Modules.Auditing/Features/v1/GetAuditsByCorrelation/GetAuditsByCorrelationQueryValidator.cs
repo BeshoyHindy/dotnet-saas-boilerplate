@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Auditing.Contracts.v1.GetAuditsByCorrelation;
+using Boilerplate.Modules.Auditing.Contracts.v1.GetAuditsByCorrelation;
 
-namespace FSH.Modules.Auditing.Features.v1.GetAuditsByCorrelation;
+namespace Boilerplate.Modules.Auditing.Features.v1.GetAuditsByCorrelation;
 
 public sealed class GetAuditsByCorrelationQueryValidator : AbstractValidator<GetAuditsByCorrelationQuery>
 {

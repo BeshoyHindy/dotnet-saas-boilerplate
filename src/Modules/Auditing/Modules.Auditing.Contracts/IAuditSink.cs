@@ -1,4 +1,4 @@
-﻿namespace FSH.Modules.Auditing.Contracts;
+﻿namespace Boilerplate.Modules.Auditing.Contracts;
 
 /// <summary>
 /// Destination for audit events (e.g., SQL, file, OTLP). Implementations must be efficient and batch-friendly.

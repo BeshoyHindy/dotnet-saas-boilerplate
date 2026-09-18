@@ -1,9 +1,9 @@
 using System.Text.Json;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Identity.Contracts.DTOs;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
+using Boilerplate.Modules.Identity.Domain;
 using Integration.Tests.Infrastructure;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,7 +20,7 @@ namespace Integration.Tests.Tests.Authentication;
 /// a framework-compatible TOTP implementation that is a significant side quest. Tracked
 /// as backlog item 3.2b. Manual verification with a real authenticator app is routine.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class TwoFactorAuthTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -29,10 +29,10 @@ public sealed class TwoFactorAuthTests
         PropertyNameCaseInsensitive = true
     };
 
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public TwoFactorAuthTests(FshWebApplicationFactory factory)
+    public TwoFactorAuthTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);
@@ -209,7 +209,7 @@ public sealed class TwoFactorAuthTests
         return enabled;
     }
 
-    private async Task WithRootTenantScopeAsync(Func<UserManager<FshUser>, Task> action)
+    private async Task WithRootTenantScopeAsync(Func<UserManager<AppUser>, Task> action)
     {
         using var scope = _factory.Services.CreateScope();
         var tenant = await scope.ServiceProvider
@@ -218,7 +218,7 @@ public sealed class TwoFactorAuthTests
         scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()
             .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
 
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<FshUser>>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
         await action(userManager);
     }
 

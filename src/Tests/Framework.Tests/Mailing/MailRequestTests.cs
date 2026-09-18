@@ -1,5 +1,5 @@
 using System.Collections.ObjectModel;
-using FSH.Framework.Mailing;
+using Boilerplate.BuildingBlocks.Mailing;
 
 namespace Framework.Tests.Mailing;
 

@@ -1,4 +1,4 @@
-﻿namespace FSH.Framework.Storage;
+﻿namespace Boilerplate.BuildingBlocks.Storage;
 
 public enum FileType
 {

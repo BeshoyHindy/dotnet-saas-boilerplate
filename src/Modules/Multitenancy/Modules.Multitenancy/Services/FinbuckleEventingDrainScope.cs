@@ -1,9 +1,9 @@
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Eventing.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 
-namespace FSH.Modules.Multitenancy.Services;
+namespace Boilerplate.Modules.Multitenancy.Services;
 
 /// <summary>
 /// Installs an <see cref="AppTenantInfo"/> carrying the tenant's connection string, so an

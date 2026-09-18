@@ -8,7 +8,7 @@ type ThemeContextValue = {
   toggle: () => void;
 };
 
-const STORAGE_KEY = "fsh.admin.theme";
+const STORAGE_KEY = "boilerplate.admin.theme";
 
 // Console is dark-first. We try storage → system pref → dark, in that order.
 function resolveInitialTheme(): Theme {

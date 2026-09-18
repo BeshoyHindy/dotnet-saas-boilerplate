@@ -1,4 +1,4 @@
-namespace FSH.Modules.Identity.Contracts.v1.Impersonation;
+namespace Boilerplate.Modules.Identity.Contracts.v1.Impersonation;
 
 public sealed record ImpersonationResponse(
     string AccessToken,

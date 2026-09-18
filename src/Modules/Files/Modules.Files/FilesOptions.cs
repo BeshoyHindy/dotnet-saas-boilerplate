@@ -1,4 +1,4 @@
-namespace FSH.Modules.Files;
+namespace Boilerplate.Modules.Files;
 
 /// <summary>
 /// Configuration for the Files module. Bound from the <c>Files</c> section of appsettings.json.

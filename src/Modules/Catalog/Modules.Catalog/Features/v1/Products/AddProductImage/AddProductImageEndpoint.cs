@@ -1,14 +1,14 @@
-using FSH.Framework.Shared.Identity.Authorization;
-using FSH.Modules.Catalog.Contracts.Authorization;
-using FSH.Modules.Catalog.Contracts.Dtos;
-using FSH.Modules.Catalog.Contracts.v1.Products.AddProductImage;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.Modules.Catalog.Contracts.Authorization;
+using Boilerplate.Modules.Catalog.Contracts.Dtos;
+using Boilerplate.Modules.Catalog.Contracts.v1.Products.AddProductImage;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Catalog.Features.v1.Products.AddProductImage;
+namespace Boilerplate.Modules.Catalog.Features.v1.Products.AddProductImage;
 
 public static class AddProductImageEndpoint
 {

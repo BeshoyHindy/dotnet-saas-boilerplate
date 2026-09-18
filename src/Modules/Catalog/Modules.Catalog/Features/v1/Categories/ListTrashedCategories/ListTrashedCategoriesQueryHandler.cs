@@ -1,12 +1,12 @@
-using FSH.Framework.Persistence;
-using FSH.Framework.Shared.Persistence;
-using FSH.Modules.Catalog.Contracts.Dtos;
-using FSH.Modules.Catalog.Contracts.v1.Categories;
-using FSH.Modules.Catalog.Data;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Catalog.Contracts.Dtos;
+using Boilerplate.Modules.Catalog.Contracts.v1.Categories;
+using Boilerplate.Modules.Catalog.Data;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Catalog.Features.v1.Categories.ListTrashedCategories;
+namespace Boilerplate.Modules.Catalog.Features.v1.Categories.ListTrashedCategories;
 
 public sealed class ListTrashedCategoriesQueryHandler(CatalogDbContext dbContext)
     : IQueryHandler<ListTrashedCategoriesQuery, PagedResponse<CategoryDto>>

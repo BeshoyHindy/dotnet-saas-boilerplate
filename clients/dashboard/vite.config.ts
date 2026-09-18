@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
   // HTTP/1.1's ~6-per-host cap, intermittently starve lazy route-chunk loads ("page won't load").
   // The committed public/config.json keeps apiBase="" as the same-origin production default.
   const devDirectApiConfig: Plugin = {
-    name: "fsh-dev-direct-api-config",
+    name: "boilerplate-dev-direct-api-config",
     apply: "serve",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {

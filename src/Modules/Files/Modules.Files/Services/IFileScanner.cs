@@ -1,6 +1,6 @@
-using FSH.Modules.Files.Domain;
+using Boilerplate.Modules.Files.Domain;
 
-namespace FSH.Modules.Files.Services;
+namespace Boilerplate.Modules.Files.Services;
 
 /// <summary>
 /// Hook point for antivirus / content scanning. The Files module's <c>FinalizeUpload</c> handler

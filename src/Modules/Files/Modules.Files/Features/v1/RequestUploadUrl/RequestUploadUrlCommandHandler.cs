@@ -1,19 +1,19 @@
 using System.Net;
-using FSH.Framework.Core.Context;
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Quota;
-using FSH.Framework.Shared.Quota;
-using FSH.Framework.Storage.Services;
-using FSH.Modules.Files.Contracts;
-using FSH.Modules.Files.Contracts.v1.Commands;
-using FSH.Modules.Files.Contracts.v1.DTOs;
-using FSH.Modules.Files.Data;
-using FSH.Modules.Files.Domain;
-using FSH.Modules.Files.Services;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Quota;
+using Boilerplate.BuildingBlocks.Shared.Quota;
+using Boilerplate.BuildingBlocks.Storage.Services;
+using Boilerplate.Modules.Files.Contracts;
+using Boilerplate.Modules.Files.Contracts.v1.Commands;
+using Boilerplate.Modules.Files.Contracts.v1.DTOs;
+using Boilerplate.Modules.Files.Data;
+using Boilerplate.Modules.Files.Domain;
+using Boilerplate.Modules.Files.Services;
 using Mediator;
 using Microsoft.Extensions.Options;
 
-namespace FSH.Modules.Files.Features.v1.RequestUploadUrl;
+namespace Boilerplate.Modules.Files.Features.v1.RequestUploadUrl;
 
 public sealed class RequestUploadUrlCommandHandler(
     FilesDbContext db,

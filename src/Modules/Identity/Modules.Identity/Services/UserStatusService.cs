@@ -1,19 +1,19 @@
 using System.Net;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Core.Context;
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Shared.Constants;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Auditing.Contracts;
-using FSH.Modules.Identity.Contracts.Services;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Constants;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Auditing.Contracts;
+using Boilerplate.Modules.Identity.Contracts.Services;
+using Boilerplate.Modules.Identity.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Identity.Services;
+namespace Boilerplate.Modules.Identity.Services;
 
 internal sealed class UserStatusService(
-    UserManager<FshUser> userManager,
+    UserManager<AppUser> userManager,
     IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor,
     ICurrentUser currentUser,
     IAuditClient auditClient) : IUserStatusService
@@ -173,8 +173,8 @@ internal sealed class UserStatusService(
 
     private sealed record ToggleStatusContext(
         Guid ActorId,
-        FshUser Actor,
-        FshUser TargetUser,
+        AppUser Actor,
+        AppUser TargetUser,
         bool ActivateUser,
         string? TenantId);
 }

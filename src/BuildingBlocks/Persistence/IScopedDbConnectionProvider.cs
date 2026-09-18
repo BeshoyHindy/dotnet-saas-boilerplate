@@ -1,6 +1,6 @@
 using System.Data.Common;
 
-namespace FSH.Framework.Persistence;
+namespace Boilerplate.BuildingBlocks.Persistence;
 
 /// <summary>
 /// One <see cref="DbConnection"/> per connection string per DI scope, shared by every DbContext in

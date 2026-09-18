@@ -1,6 +1,6 @@
 using Mediator;
 
-namespace FSH.Modules.Identity.Contracts.v1.Roles.UpdatePermissions;
+namespace Boilerplate.Modules.Identity.Contracts.v1.Roles.UpdatePermissions;
 
 public class UpdatePermissionsCommand : ICommand<string>
 {

@@ -1,6 +1,6 @@
 using System.Net;
-using FSH.Framework.Web.Origin;
-using FSH.Modules.Identity.Services;
+using Boilerplate.BuildingBlocks.Web.Origin;
+using Boilerplate.Modules.Identity.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using NSubstitute;

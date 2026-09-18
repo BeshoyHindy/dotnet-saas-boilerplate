@@ -1,6 +1,6 @@
 using Mediator;
 
-namespace FSH.Modules.Identity.Contracts.v1.Users.SetProfileImage;
+namespace Boilerplate.Modules.Identity.Contracts.v1.Users.SetProfileImage;
 
 /// <summary>
 /// Sets the authenticated user's avatar URL — typically a durable <c>publicUrl</c> returned

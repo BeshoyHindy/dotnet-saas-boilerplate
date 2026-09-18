@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Webhooks.Contracts.v1.DeleteWebhookSubscription;
+using Boilerplate.Modules.Webhooks.Contracts.v1.DeleteWebhookSubscription;
 
-namespace FSH.Modules.Webhooks.Features.v1.DeleteWebhookSubscription;
+namespace Boilerplate.Modules.Webhooks.Features.v1.DeleteWebhookSubscription;
 
 public sealed class DeleteWebhookSubscriptionCommandValidator : AbstractValidator<DeleteWebhookSubscriptionCommand>
 {

@@ -1,6 +1,6 @@
-using FSH.Framework.Web.Idempotency;
-using FSH.Framework.Web.RateLimiting;
-using FSH.Framework.Web.Security;
+using Boilerplate.BuildingBlocks.Web.Idempotency;
+using Boilerplate.BuildingBlocks.Web.RateLimiting;
+using Boilerplate.BuildingBlocks.Web.Security;
 
 namespace Framework.Tests.Web;
 

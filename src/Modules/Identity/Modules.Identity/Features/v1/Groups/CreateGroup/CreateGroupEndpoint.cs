@@ -1,14 +1,14 @@
-using FSH.Modules.Identity.Contracts.Authorization;
-using FSH.Framework.Shared.Identity.Authorization;
-using FSH.Modules.Identity.Contracts.DTOs;
-using FSH.Modules.Identity.Contracts.v1.Groups.CreateGroup;
+using Boilerplate.Modules.Identity.Contracts.Authorization;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
+using Boilerplate.Modules.Identity.Contracts.v1.Groups.CreateGroup;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Identity.Features.v1.Groups.CreateGroup;
+namespace Boilerplate.Modules.Identity.Features.v1.Groups.CreateGroup;
 
 public static class CreateGroupEndpoint
 {

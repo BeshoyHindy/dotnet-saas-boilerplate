@@ -1,8 +1,8 @@
-using FSH.Framework.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace FSH.Framework.Eventing.Inbox;
+namespace Boilerplate.BuildingBlocks.Eventing.Inbox;
 
 /// <summary>
 /// Inbox message to track processed integration events per handler for idempotent consumers.

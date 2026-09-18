@@ -1,6 +1,6 @@
-using FSH.Framework.Shared.Constants;
+using Boilerplate.BuildingBlocks.Shared.Constants;
 
-namespace FSH.Modules.Webhooks.Contracts.Authorization;
+namespace Boilerplate.Modules.Webhooks.Contracts.Authorization;
 
 public static class WebhooksPermissions
 {
@@ -13,7 +13,7 @@ public static class WebhooksPermissions
         public const string Test   = $"Permissions.{Resource}.Test";
     }
 
-    public static IReadOnlyList<FshPermission> All { get; } =
+    public static IReadOnlyList<AppPermission> All { get; } =
     [
         new("View Webhooks",   ActionConstants.View,   Subscriptions.Resource, IsBasic: true),
         new("Create Webhooks", ActionConstants.Create, Subscriptions.Resource),

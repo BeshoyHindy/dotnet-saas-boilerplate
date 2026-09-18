@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Catalog.Contracts.v1.Categories;
+using Boilerplate.Modules.Catalog.Contracts.v1.Categories;
 
-namespace FSH.Modules.Catalog.Features.v1.Categories.CreateCategory;
+namespace Boilerplate.Modules.Catalog.Features.v1.Categories.CreateCategory;
 
 public sealed class CreateCategoryCommandValidator : AbstractValidator<CreateCategoryCommand>
 {

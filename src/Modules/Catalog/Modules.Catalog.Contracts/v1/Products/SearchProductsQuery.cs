@@ -1,8 +1,8 @@
-using FSH.Framework.Shared.Persistence;
-using FSH.Modules.Catalog.Contracts.Dtos;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Catalog.Contracts.Dtos;
 using Mediator;
 
-namespace FSH.Modules.Catalog.Contracts.v1.Products;
+namespace Boilerplate.Modules.Catalog.Contracts.v1.Products;
 
 /// <summary>
 /// Search for products with pagination and sorting.

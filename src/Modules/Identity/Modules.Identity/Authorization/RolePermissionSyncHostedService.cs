@@ -1,21 +1,21 @@
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace FSH.Modules.Identity.Authorization;
+namespace Boilerplate.Modules.Identity.Authorization;
 
 /// <summary>
 /// Runs once on host startup: iterates every tenant and adds any permission claims that
-/// have been registered via <see cref="FSH.Framework.Shared.Constants.PermissionConstants"/>
+/// have been registered via <see cref="Boilerplate.BuildingBlocks.Shared.Constants.PermissionConstants"/>
 /// but are missing from the role claims table for that tenant. Idempotent and lightweight —
 /// only writes when there's something new, so it's safe to run unconditionally.
 /// </summary>
 /// <remarks>
 /// Implemented as a <see cref="BackgroundService"/> so it does not block host startup.
-/// In production, the tenant catalog is migrated by the standalone <c>FSH.Starter.DbMigrator</c>
+/// In production, the tenant catalog is migrated by the standalone <c>Boilerplate.DbMigrator</c>
 /// console application before the API process starts, so the tenant store is already
 /// populated when this service runs. The polling loop covers test environments and the
 /// brief window during local Aspire startup where catalog migration may overlap with

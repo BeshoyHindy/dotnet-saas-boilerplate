@@ -1,4 +1,4 @@
-namespace FSH.Framework.Persistence;
+namespace Boilerplate.BuildingBlocks.Persistence;
 
 /// <summary>
 /// Extension methods to apply specifications to <see cref="IQueryable{T}"/> instances.

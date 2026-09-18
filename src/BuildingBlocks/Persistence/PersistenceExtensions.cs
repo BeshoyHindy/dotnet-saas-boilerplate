@@ -1,5 +1,5 @@
-using FSH.Framework.Persistence.Inteceptors;
-using FSH.Framework.Shared.Persistence;
+using Boilerplate.BuildingBlocks.Persistence.Inteceptors;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
-namespace FSH.Framework.Persistence;
+namespace Boilerplate.BuildingBlocks.Persistence;
 
 /// <summary>
 /// Extension methods for configuring persistence services and database contexts.

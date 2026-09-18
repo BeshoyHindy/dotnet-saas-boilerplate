@@ -27,9 +27,9 @@ export type SeededUser = {
   permissions?: string[];
 };
 
-const ACCESS_KEY = "fsh.dashboard.accessToken";
-const REFRESH_KEY = "fsh.dashboard.refreshToken";
-const TENANT_KEY = "fsh.dashboard.tenant";
+const ACCESS_KEY = "boilerplate.dashboard.accessToken";
+const REFRESH_KEY = "boilerplate.dashboard.refreshToken";
+const TENANT_KEY = "boilerplate.dashboard.tenant";
 
 /**
  * Encode a minimal JWT (header.payload.signature) where every segment is

@@ -21,14 +21,14 @@ src/Modules/{Name}/
 project references. The runtime project references its Contracts project + the BuildingBlocks it needs;
 the Contracts project references `Mediator` + shared contracts.
 
-## Step 1 — `[FshModule]` is an ASSEMBLY attribute (not class-level)
+## Step 1 — `[AppModule]` is an ASSEMBLY attribute (not class-level)
 
 In `{Name}Module.cs`, above the namespace:
 
 ```csharp
-[assembly: FshModule(typeof(FSH.Modules.{Name}.{Name}Module), 900)]   // (Type, order)
+[assembly: AppModule(typeof(Boilerplate.Modules.{Name}.{Name}Module), 900)]   // (Type, order)
 
-namespace FSH.Modules.{Name};
+namespace Boilerplate.Modules.{Name};
 
 public sealed class {Name}Module : IModule
 {
@@ -98,21 +98,21 @@ public sealed class {Name}DbContext : BaseDbContext
 ## Step 4 — Solution + project references
 
 ```bash
-dotnet sln src/FSH.Starter.slnx add src/Modules/{Name}/Modules.{Name}/Modules.{Name}.csproj
-dotnet sln src/FSH.Starter.slnx add src/Modules/{Name}/Modules.{Name}.Contracts/Modules.{Name}.Contracts.csproj
+dotnet sln src/Boilerplate.slnx add src/Modules/{Name}/Modules.{Name}/Modules.{Name}.csproj
+dotnet sln src/Boilerplate.slnx add src/Modules/{Name}/Modules.{Name}.Contracts/Modules.{Name}.Contracts.csproj
 ```
 
-Add a `<ProjectReference>` to the runtime module from **both** `FSH.Starter.Api` and `FSH.Starter.DbMigrator`, and reference the runtime project from `FSH.Starter.Migrations.PostgreSQL`.
+Add a `<ProjectReference>` to the runtime module from **both** `Boilerplate.Api` and `Boilerplate.DbMigrator`, and reference the runtime project from `Boilerplate.Migrations.PostgreSQL`.
 
 ## Step 5 — Migrations folder
 
-Add a `{Name}/` folder in `src/Host/FSH.Starter.Migrations.PostgreSQL`, then create the initial migration (see **create-migration**) with `--context {Name}DbContext`.
+Add a `{Name}/` folder in `src/Host/Boilerplate.Migrations.PostgreSQL`, then create the initial migration (see **create-migration**) with `--context {Name}DbContext`.
 
 ## Step 6 — ⚠️ Register in ALL FOUR places (the footgun)
 
-Identical edits in **both** `FSH.Starter.Api/Program.cs` **and** `FSH.Starter.DbMigrator/Program.cs`:
+Identical edits in **both** `Boilerplate.Api/Program.cs` **and** `Boilerplate.DbMigrator/Program.cs`:
 
-1. Mediator `o.Assemblies` — add **two** markers: a Contracts type (e.g. `typeof(FSH.Modules.{Name}.Contracts.{Name}ContractsMarker)`) **and** the module type (`typeof({Name}Module)`).
+1. Mediator `o.Assemblies` — add **two** markers: a Contracts type (e.g. `typeof(Boilerplate.Modules.{Name}.Contracts.{Name}ContractsMarker)`) **and** the module type (`typeof({Name}Module)`).
 2. `moduleAssemblies` array — add `typeof({Name}Module).Assembly`.
 
 Miss the Mediator marker → handlers silently undiscovered. Miss the assembly entry → module never loads. Miss the DbMigrator pair → migrate/seed skips the module.
@@ -120,15 +120,15 @@ Miss the Mediator marker → handlers silently undiscovered. Miss the assembly e
 ## Step 7 — Verify
 
 ```bash
-dotnet build src/FSH.Starter.slnx                  # 0 warnings
+dotnet build src/Boilerplate.slnx                  # 0 warnings
 dotnet test src/Tests/Architecture.Tests           # boundary + tenant-isolation rules must pass
-dotnet test src/FSH.Starter.slnx
+dotnet test src/Boilerplate.slnx
 ```
 
 ## Checklist
 
 - [ ] Two projects (copied csproj), added to `.slnx`, referenced from Api + DbMigrator (+ Migrations)
-- [ ] `[assembly: FshModule(typeof({Name}Module), order)]` (assembly-level, positional)
+- [ ] `[assembly: AppModule(typeof({Name}Module), order)]` (assembly-level, positional)
 - [ ] `IModule`: `AddHeroDbContext<T>()`, `PermissionConstants.Register`, version-set group, eventing trio if needed
 - [ ] `{Name}DbContext : BaseDbContext`, 4-arg ctor, `base.OnModelCreating` last
 - [ ] `{Name}Permissions` in Contracts/Authorization

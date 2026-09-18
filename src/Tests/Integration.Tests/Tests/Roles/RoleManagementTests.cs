@@ -3,13 +3,13 @@ using Integration.Tests.Infrastructure.Extensions;
 
 namespace Integration.Tests.Tests.Roles;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class RoleManagementTests
 {
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public RoleManagementTests(FshWebApplicationFactory factory)
+    public RoleManagementTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

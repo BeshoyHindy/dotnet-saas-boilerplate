@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Auditing.Contracts.v1.GetExceptionAudits;
+using Boilerplate.Modules.Auditing.Contracts.v1.GetExceptionAudits;
 
-namespace FSH.Modules.Auditing.Features.v1.GetExceptionAudits;
+namespace Boilerplate.Modules.Auditing.Features.v1.GetExceptionAudits;
 
 public sealed class GetExceptionAuditsQueryValidator : AbstractValidator<GetExceptionAuditsQuery>
 {

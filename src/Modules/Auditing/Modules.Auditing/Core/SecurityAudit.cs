@@ -1,6 +1,6 @@
-using FSH.Modules.Auditing.Contracts;
+using Boilerplate.Modules.Auditing.Contracts;
 
-namespace FSH.Modules.Auditing;
+namespace Boilerplate.Modules.Auditing;
 
 public sealed class SecurityAudit : ISecurityAudit
 {

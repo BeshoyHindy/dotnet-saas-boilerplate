@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Identity.Contracts.v1.Groups.CreateGroup;
+using Boilerplate.Modules.Identity.Contracts.v1.Groups.CreateGroup;
 
-namespace FSH.Modules.Identity.Features.v1.Groups.CreateGroup;
+namespace Boilerplate.Modules.Identity.Features.v1.Groups.CreateGroup;
 
 public sealed class CreateGroupCommandValidator : AbstractValidator<CreateGroupCommand>
 {

@@ -1,12 +1,12 @@
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Webhooks.Contracts.v1.TestWebhookSubscription;
-using FSH.Modules.Webhooks.Data;
-using FSH.Modules.Webhooks.Services;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Webhooks.Contracts.v1.TestWebhookSubscription;
+using Boilerplate.Modules.Webhooks.Data;
+using Boilerplate.Modules.Webhooks.Services;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
-namespace FSH.Modules.Webhooks.Features.v1.TestWebhookSubscription;
+namespace Boilerplate.Modules.Webhooks.Features.v1.TestWebhookSubscription;
 
 public sealed class TestWebhookSubscriptionCommandHandler(
     WebhookDbContext dbContext,

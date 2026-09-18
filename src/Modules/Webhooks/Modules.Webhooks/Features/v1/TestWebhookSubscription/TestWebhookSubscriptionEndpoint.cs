@@ -1,12 +1,12 @@
-using FSH.Framework.Shared.Identity.Authorization;
-using FSH.Modules.Webhooks.Contracts.Authorization;
-using FSH.Modules.Webhooks.Contracts.v1.TestWebhookSubscription;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.Modules.Webhooks.Contracts.Authorization;
+using Boilerplate.Modules.Webhooks.Contracts.v1.TestWebhookSubscription;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Webhooks.Features.v1.TestWebhookSubscription;
+namespace Boilerplate.Modules.Webhooks.Features.v1.TestWebhookSubscription;
 
 public static class TestWebhookSubscriptionEndpoint
 {

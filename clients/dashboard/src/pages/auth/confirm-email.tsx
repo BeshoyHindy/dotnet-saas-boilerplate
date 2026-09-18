@@ -103,7 +103,7 @@ export function ConfirmEmailPage() {
       )}
 
       {status.kind === "success" && (
-        <div className="fsh-enter space-y-5 text-center">
+        <div className="app-enter space-y-5 text-center">
           <div className="grid place-items-center">
             <span
               aria-hidden
@@ -128,7 +128,7 @@ export function ConfirmEmailPage() {
       )}
 
       {status.kind === "error" && (
-        <div className="fsh-enter space-y-5 text-center">
+        <div className="app-enter space-y-5 text-center">
           <div className="grid place-items-center">
             <span
               aria-hidden

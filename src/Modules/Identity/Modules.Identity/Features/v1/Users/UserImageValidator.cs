@@ -1,8 +1,8 @@
 ﻿using FluentValidation;
-using FSH.Framework.Shared.Storage;
-using FSH.Framework.Storage;
+using Boilerplate.BuildingBlocks.Shared.Storage;
+using Boilerplate.BuildingBlocks.Storage;
 
-namespace FSH.Modules.Identity.Features.v1.Users;
+namespace Boilerplate.Modules.Identity.Features.v1.Users;
 
 public sealed class UserImageValidator : AbstractValidator<FileUploadRequest>
 {

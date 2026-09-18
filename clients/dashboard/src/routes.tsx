@@ -123,7 +123,7 @@ const ChatPage = lazyNamed(() => import("@/pages/chat/chat-page"), "ChatPage");
  */
 function RouteFallback() {
   return (
-    <div className={cn("space-y-6 fsh-enter")} role="status" aria-busy="true">
+    <div className={cn("space-y-6 app-enter")} role="status" aria-busy="true">
       <span className="sr-only">Loading…</span>
       <div className="space-y-2">
         <Skeleton className="h-3 w-24" />

@@ -6,7 +6,7 @@ import { mockJsonResponse, mockProblemDetails } from "../helpers/api-mocks";
 // (Navigate to "/") and the form never renders.
 //
 // The login form posts to /api/v1/identity/token/issue with the `tenant`
-// header + `X-FSH-App: admin`, and a body of { email, password } (the tenant
+// header + `X-Client-App: admin`, and a body of { email, password } (the tenant
 // rides the header, not the body). See src/auth/api.ts.
 
 const TOKEN_RESPONSE = {
@@ -17,13 +17,12 @@ const TOKEN_RESPONSE = {
 };
 
 test.describe("admin login", () => {
-  test("renders the FSH brand lockup + the welcome form", async ({ page }) => {
+  test("renders the Boilerplate brand lockup + the welcome form", async ({ page }) => {
     await page.goto("/login");
 
-    // Brand lockup: logo image, the fullstackhero wordmark, and the
-    // "Platform Admin" divider label that marks this as the operator app.
-    await expect(page.getByRole("img", { name: /fullstackhero/i }).first()).toBeVisible();
-    await expect(page.getByText("fullstackhero").first()).toBeVisible();
+    // Brand lockup: the text wordmark and the "Platform Admin" divider
+    // label that marks this as the operator app.
+    await expect(page.getByText("Boilerplate").first()).toBeVisible();
     await expect(page.getByText("Platform Admin").first()).toBeVisible();
 
     // Card heading.
@@ -60,8 +59,8 @@ test.describe("admin login", () => {
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     const req = await reqPromise;
 
-    // X-FSH-App marks this as the platform-admin client; tenant rides the header.
-    expect(req.headers()["x-fsh-app"]).toBe("admin");
+    // X-Client-App marks this as the platform-admin client; tenant rides the header.
+    expect(req.headers()["x-client-app"]).toBe("admin");
     expect(req.headers().tenant).toBe("root");
 
     const body = JSON.parse(req.postData() ?? "{}");

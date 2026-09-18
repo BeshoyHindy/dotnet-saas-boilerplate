@@ -61,7 +61,7 @@ export function AppearanceSettings() {
   }, []);
 
   return (
-    <div className="space-y-6 fsh-enter">
+    <div className="space-y-6 app-enter">
       {/* Theme */}
       <Card>
         <CardHeader>

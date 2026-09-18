@@ -1,4 +1,4 @@
-using FSH.Framework.Caching;
+using Boilerplate.BuildingBlocks.Caching;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

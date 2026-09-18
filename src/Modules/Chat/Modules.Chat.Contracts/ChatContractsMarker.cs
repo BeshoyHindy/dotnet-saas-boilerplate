@@ -1,4 +1,4 @@
-namespace FSH.Modules.Chat.Contracts;
+namespace Boilerplate.Modules.Chat.Contracts;
 
 /// <summary>
 /// Marker type referenced by <c>Program.cs::AddMediator(o => o.Assemblies = [...])</c> so the

@@ -11,7 +11,7 @@ import { SettingsSection } from "@/pages/settings/settings-layout";
  */
 export function NotificationsSettings() {
   return (
-    <div className="space-y-5 fsh-enter">
+    <div className="space-y-5 app-enter">
       <SettingsSection
         title="Notification preferences"
         icon={Bell}

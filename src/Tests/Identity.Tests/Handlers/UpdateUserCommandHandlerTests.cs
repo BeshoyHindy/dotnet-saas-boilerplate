@@ -1,7 +1,7 @@
 using AutoFixture;
-using FSH.Modules.Identity.Contracts.Services;
-using FSH.Modules.Identity.Contracts.v1.Users.UpdateUser;
-using FSH.Modules.Identity.Features.v1.Users.UpdateUser;
+using Boilerplate.Modules.Identity.Contracts.Services;
+using Boilerplate.Modules.Identity.Contracts.v1.Users.UpdateUser;
+using Boilerplate.Modules.Identity.Features.v1.Users.UpdateUser;
 using NSubstitute;
 using Shouldly;
 using Xunit;
@@ -83,7 +83,7 @@ public sealed class UpdateUserCommandHandlerTests
         // Arrange
         var command = _fixture.Create<UpdateUserCommand>();
         var expectedExceptionMessage = "Update failed";
-        _userService.UpdateAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<FSH.Framework.Shared.Storage.FileUploadRequest>(), Arg.Any<bool>())
+        _userService.UpdateAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Boilerplate.BuildingBlocks.Shared.Storage.FileUploadRequest>(), Arg.Any<bool>())
             .Returns(x => throw new InvalidOperationException(expectedExceptionMessage));
 
         // Act & Assert

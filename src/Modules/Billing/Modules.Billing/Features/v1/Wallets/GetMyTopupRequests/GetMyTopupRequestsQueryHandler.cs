@@ -1,15 +1,15 @@
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Framework.Shared.Persistence;
-using FSH.Modules.Billing.Contracts.Dtos;
-using FSH.Modules.Billing.Contracts.v1.Wallets;
-using FSH.Modules.Billing.Data;
-using FSH.Modules.Billing.Mappings;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Billing.Contracts.Dtos;
+using Boilerplate.Modules.Billing.Contracts.v1.Wallets;
+using Boilerplate.Modules.Billing.Data;
+using Boilerplate.Modules.Billing.Mappings;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Billing.Features.v1.Wallets.GetMyTopupRequests;
+namespace Boilerplate.Modules.Billing.Features.v1.Wallets.GetMyTopupRequests;
 
 public sealed class GetMyTopupRequestsQueryHandler(
     BillingDbContext dbContext,

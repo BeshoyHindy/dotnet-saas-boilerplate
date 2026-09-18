@@ -1,6 +1,6 @@
 ---
 name: testing-guide
-description: Write tests for an FSH feature — xUnit + Shouldly + NSubstitute + AutoFixture, with naming and AAA conventions. Use when adding unit/handler/validator/entity tests. Full rules in .agents/rules/testing.md + integration-testing.md.
+description: Write tests for an Boilerplate feature — xUnit + Shouldly + NSubstitute + AutoFixture, with naming and AAA conventions. Use when adding unit/handler/validator/entity tests. Full rules in .agents/rules/testing.md + integration-testing.md.
 ---
 
 # Testing Guide
@@ -102,5 +102,5 @@ for SignalR. All detailed in `.agents/rules/integration-testing.md`.
 ```bash
 dotnet test src/Tests/{X}.Tests
 dotnet test src/Tests/Architecture.Tests
-dotnet test src/FSH.Starter.slnx --collect "XPlat Code Coverage" --settings coverage.runsettings
+dotnet test src/Boilerplate.slnx --collect "XPlat Code Coverage" --settings coverage.runsettings
 ```

@@ -1,6 +1,6 @@
 using Mediator;
 
-namespace FSH.Modules.Catalog.Contracts.v1.Products;
+namespace Boilerplate.Modules.Catalog.Contracts.v1.Products;
 
 public sealed record AdjustProductStockCommand(
     Guid ProductId,

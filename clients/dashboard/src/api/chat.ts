@@ -1,6 +1,6 @@
 import { apiFetch } from "@/lib/api-client";
 
-// Mirrors FSH.Modules.Chat.Domain.ChannelType. The API serializes enums as
+// Mirrors Boilerplate.Modules.Chat.Domain.ChannelType. The API serializes enums as
 // their string name (global JsonStringEnumConverter).
 export const ChannelType = {
   DirectMessage: "DirectMessage",
@@ -9,7 +9,7 @@ export const ChannelType = {
 } as const;
 export type ChannelTypeValue = (typeof ChannelType)[keyof typeof ChannelType];
 
-// Mirrors FSH.Modules.Chat.Domain.ChannelMemberRole.
+// Mirrors Boilerplate.Modules.Chat.Domain.ChannelMemberRole.
 export const ChannelMemberRole = {
   Member: "Member",
   Admin: "Admin",

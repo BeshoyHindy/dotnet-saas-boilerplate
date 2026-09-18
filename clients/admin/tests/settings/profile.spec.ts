@@ -109,7 +109,7 @@ test.describe("settings · profile", () => {
       requiredHeaders: {},
       expiresAt: "2099-01-01T00:00:00Z",
     }, { method: "POST" });
-    // The presigned PUT goes straight to storage (no FSH content-type needed);
+    // The presigned PUT goes straight to storage (no Boilerplate content-type needed);
     // just answer 200 so the upload step resolves.
     await page.route("https://storage.example.test/presigned/**", (route) =>
       route.fulfill({ status: 200, body: "" }),

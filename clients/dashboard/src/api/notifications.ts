@@ -1,6 +1,6 @@
 import { apiFetch } from "@/lib/api-client";
 
-// Mirrors FSH.Modules.Notifications.Contracts.v1.DTOs.NotificationDto.
+// Mirrors Boilerplate.Modules.Notifications.Contracts.v1.DTOs.NotificationDto.
 export type NotificationDto = {
   id: string;
   type: string;

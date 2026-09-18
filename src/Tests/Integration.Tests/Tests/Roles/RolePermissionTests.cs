@@ -3,12 +3,12 @@ using Integration.Tests.Infrastructure.Extensions;
 
 namespace Integration.Tests.Tests.Roles;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class RolePermissionTests
 {
     private readonly AuthHelper _auth;
 
-    public RolePermissionTests(FshWebApplicationFactory factory)
+    public RolePermissionTests(AppWebApplicationFactory factory)
     {
         _auth = new AuthHelper(factory);
     }

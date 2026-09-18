@@ -1,17 +1,17 @@
-using FSH.Framework.Eventing.Abstractions;
-using FSH.Framework.Eventing.Inbox;
-using FSH.Framework.Eventing.InMemory;
-using FSH.Framework.Eventing.Outbox;
-using FSH.Framework.Eventing.Persistence;
-using FSH.Framework.Eventing.RabbitMq;
-using FSH.Framework.Eventing.Serialization;
-using FSH.Framework.Persistence;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
+using Boilerplate.BuildingBlocks.Eventing.Inbox;
+using Boilerplate.BuildingBlocks.Eventing.InMemory;
+using Boilerplate.BuildingBlocks.Eventing.Outbox;
+using Boilerplate.BuildingBlocks.Eventing.Persistence;
+using Boilerplate.BuildingBlocks.Eventing.RabbitMq;
+using Boilerplate.BuildingBlocks.Eventing.Serialization;
+using Boilerplate.BuildingBlocks.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Reflection;
 
-namespace FSH.Framework.Eventing;
+namespace Boilerplate.BuildingBlocks.Eventing;
 
 public static class ServiceCollectionExtensions
 {

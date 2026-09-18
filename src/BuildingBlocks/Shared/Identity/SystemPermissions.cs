@@ -1,4 +1,4 @@
-namespace FSH.Framework.Shared.Constants;
+namespace Boilerplate.BuildingBlocks.Shared.Constants;
 
 /// <summary>
 /// Cross-cutting platform permissions that don't belong to a specific business module.
@@ -36,7 +36,7 @@ public static class SystemPermissions
         public const string Users = $"{nameof(Platform)}.Users";
     }
 
-    public static IReadOnlyList<FshPermission> All { get; } =
+    public static IReadOnlyList<AppPermission> All { get; } =
     [
         new("View Hangfire",  ActionConstants.View, Hangfire.Resource,  IsBasic: true),
         new("View Dashboard", ActionConstants.View, Dashboard.Resource, IsBasic: true),

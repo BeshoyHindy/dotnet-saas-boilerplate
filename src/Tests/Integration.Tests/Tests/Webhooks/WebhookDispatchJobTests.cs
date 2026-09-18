@@ -1,9 +1,9 @@
 using System.Reflection;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Webhooks.Data;
-using FSH.Modules.Webhooks.Services;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Webhooks.Data;
+using Boilerplate.Modules.Webhooks.Services;
 using Hangfire;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
@@ -13,13 +13,13 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Integration.Tests.Tests.Webhooks;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class WebhookDispatchJobTests
 {
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public WebhookDispatchJobTests(FshWebApplicationFactory factory)
+    public WebhookDispatchJobTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

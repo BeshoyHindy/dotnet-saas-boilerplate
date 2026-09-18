@@ -1,12 +1,12 @@
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Billing.Contracts.Dtos;
-using FSH.Modules.Billing.Contracts.v1.Usage;
-using FSH.Modules.Billing.Services;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Billing.Contracts.Dtos;
+using Boilerplate.Modules.Billing.Contracts.v1.Usage;
+using Boilerplate.Modules.Billing.Services;
 using Mediator;
 
-namespace FSH.Modules.Billing.Features.v1.Usage.CaptureUsageSnapshots;
+namespace Boilerplate.Modules.Billing.Features.v1.Usage.CaptureUsageSnapshots;
 
 public sealed class CaptureUsageSnapshotsCommandHandler(
     IUsageReporter reporter,

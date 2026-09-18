@@ -1,6 +1,6 @@
-using FSH.Framework.Shared.Constants;
+using Boilerplate.BuildingBlocks.Shared.Constants;
 
-namespace FSH.Modules.Chat.Contracts.Authorization;
+namespace Boilerplate.Modules.Chat.Contracts.Authorization;
 
 /// <summary>
 /// Permission constants for the Chat module. Permission names follow the
@@ -25,7 +25,7 @@ public static class ChatPermissions
         public const string DeleteAny = $"Permissions.{Resource}.DeleteAny";
     }
 
-    public static IReadOnlyList<FshPermission> All { get; } =
+    public static IReadOnlyList<AppPermission> All { get; } =
     [
         new("View Chat Channels",   ActionConstants.View,   Channels.Resource, IsBasic: true),
         new("Create Chat Channels", ActionConstants.Create, Channels.Resource, IsBasic: true),

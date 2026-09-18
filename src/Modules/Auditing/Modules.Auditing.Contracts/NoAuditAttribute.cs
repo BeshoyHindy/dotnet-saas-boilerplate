@@ -1,4 +1,4 @@
-namespace FSH.Modules.Auditing.Contracts;
+namespace Boilerplate.Modules.Auditing.Contracts;
 
 /// <summary>
 /// Excludes an endpoint from HTTP audit capture. Apply to endpoints that

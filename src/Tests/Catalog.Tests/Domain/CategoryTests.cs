@@ -1,4 +1,4 @@
-using FSH.Modules.Catalog.Domain;
+using Boilerplate.Modules.Catalog.Domain;
 
 namespace Catalog.Tests.Domain;
 

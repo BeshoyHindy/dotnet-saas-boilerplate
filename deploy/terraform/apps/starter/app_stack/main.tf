@@ -487,7 +487,7 @@ resource "random_password" "hangfire" {
 
 resource "aws_secretsmanager_secret" "jwt_signing_key" {
   name        = "${var.environment}-jwt-signing-key"
-  description = "HMAC signing key for FSH API JWTs."
+  description = "HMAC signing key for Boilerplate API JWTs."
   tags        = local.common_tags
 }
 
@@ -498,7 +498,7 @@ resource "aws_secretsmanager_secret_version" "jwt_signing_key" {
 
 resource "aws_secretsmanager_secret" "hangfire_password" {
   name        = "${var.environment}-hangfire-password"
-  description = "Hangfire dashboard password for the FSH API."
+  description = "Hangfire dashboard password for the Boilerplate API."
   tags        = local.common_tags
 }
 
@@ -681,7 +681,7 @@ module "migrator" {
       # Generic-host migrator selects its env from DOTNET_ENVIRONMENT, not ASPNETCORE_ENVIRONMENT.
       DOTNET_ENVIRONMENT                  = local.aspnetcore_environment
       DatabaseOptions__Provider           = "POSTGRESQL"
-      DatabaseOptions__MigrationsAssembly = "FSH.Starter.Migrations.PostgreSQL"
+      DatabaseOptions__MigrationsAssembly = "Boilerplate.Migrations.PostgreSQL"
       HangfireOptions__Username           = var.hangfire_username
     },
     # Plain connection string only when NOT using a managed (Secrets Manager)

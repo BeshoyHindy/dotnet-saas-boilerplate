@@ -1,9 +1,9 @@
 using System.Security.Cryptography;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Files.Contracts.v1.DTOs;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Files.Contracts.v1.DTOs;
+using Boilerplate.Modules.Identity.Domain;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 using Microsoft.AspNetCore.Identity;
@@ -18,14 +18,14 @@ namespace Integration.Tests.Tests.Catalog;
 /// deleting an admin-uploaded product image. Mirrors the file-access-policy testing approach in
 /// <see cref="Chat.ChatChannelFileAccessTests"/>.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class ProductFileAccessPolicyTests
 {
     private const string FilesBasePath = "/api/v1/files";
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public ProductFileAccessPolicyTests(FshWebApplicationFactory factory)
+    public ProductFileAccessPolicyTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);
@@ -226,7 +226,7 @@ public sealed class ProductFileAccessPolicyTests
             .GetAsync(TestConstants.RootTenantId);
         scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>().MultiTenantContext =
             new MultiTenantContext<AppTenantInfo>(tenant);
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<FshUser>>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
         var user = await userManager.FindByIdAsync(registered.UserId);
         user.ShouldNotBeNull();
         if (!user!.EmailConfirmed)

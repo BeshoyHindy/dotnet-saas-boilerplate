@@ -1,6 +1,6 @@
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Identity.Contracts.DTOs;
-using FSH.Modules.Identity.Contracts.v1.Tokens.TokenGeneration;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
+using Boilerplate.Modules.Identity.Contracts.v1.Tokens.TokenGeneration;
 using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using System.ComponentModel;
 
-namespace FSH.Modules.Identity.Features.v1.Tokens.TokenGeneration;
+namespace Boilerplate.Modules.Identity.Features.v1.Tokens.TokenGeneration;
 
 public static class GenerateTokenEndpoint
 {
@@ -21,7 +21,7 @@ public static class GenerateTokenEndpoint
     /// belt-and-braces check; the dashboard client also rejects root-tenant tokens
     /// locally for a cleaner UX.
     /// </summary>
-    public const string AppHeader = "X-FSH-App";
+    public const string AppHeader = "X-Client-App";
     public const string AppAdmin = "admin";
     public const string AppDashboard = "dashboard";
 
@@ -52,7 +52,7 @@ public static class GenerateTokenEndpoint
             })
             .WithName("IssueJwtTokens")
             .WithSummary("Issue JWT access and refresh tokens")
-            .WithDescription("Submit credentials to receive a JWT access token and a refresh token. Provide the 'tenant' header to select the tenant context (defaults to 'root'). The 'X-FSH-App' header (admin|dashboard) is used to enforce the SuperAdmin / dashboard boundary.")
+            .WithDescription("Submit credentials to receive a JWT access token and a refresh token. Provide the 'tenant' header to select the tenant context (defaults to 'root'). The 'X-Client-App' header (admin|dashboard) is used to enforce the SuperAdmin / dashboard boundary.")
             .Produces<TokenResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)

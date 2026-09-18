@@ -1,3 +1,3 @@
-﻿namespace FSH.Modules.Identity.Contracts.v1.Users.RegisterUser;
+﻿namespace Boilerplate.Modules.Identity.Contracts.v1.Users.RegisterUser;
 
 public record RegisterUserResponse(string UserId);

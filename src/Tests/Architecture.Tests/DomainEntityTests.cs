@@ -1,4 +1,4 @@
-using FSH.Framework.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Domain;
 using NetArchTest.Rules;
 using Shouldly;
 using System.Reflection;

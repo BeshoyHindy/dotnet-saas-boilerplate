@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Chat.Contracts.v1.Queries;
+using Boilerplate.Modules.Chat.Contracts.v1.Queries;
 
-namespace FSH.Modules.Chat.Features.v1.Messages.ListChannelMessages;
+namespace Boilerplate.Modules.Chat.Features.v1.Messages.ListChannelMessages;
 
 public sealed class ListChannelMessagesQueryValidator : AbstractValidator<ListChannelMessagesQuery>
 {

@@ -1,13 +1,13 @@
 ---
 name: query-patterns
-description: Implement read queries — paginated lists, search/filter/sort, and single-entity fetches — the FSH way (DbContext LINQ + PagedResponse). Use when adding GET endpoints. See also add-feature.
+description: Implement read queries — paginated lists, search/filter/sort, and single-entity fetches — the Boilerplate way (DbContext LINQ + PagedResponse). Use when adding GET endpoints. See also add-feature.
 ---
 
 # Query Patterns
 
 The dominant pattern is **raw `IQueryable` on the module DbContext** (`AsNoTracking`) with manual
 pagination. There is **no generic repository** and **no `PaginatedListAsync`/`EntitiesByPaginationFilterSpec`/
-`PaginationFilter`**. Paged results are `PagedResponse<T>` (`FSH.Framework.Shared.Persistence`) — there is no `PagedList<T>`.
+`PaginationFilter`**. Paged results are `PagedResponse<T>` (`Boilerplate.BuildingBlocks.Shared.Persistence`) — there is no `PagedList<T>`.
 
 ## Paginated search query
 

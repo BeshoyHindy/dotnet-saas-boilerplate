@@ -1,13 +1,13 @@
-using FSH.Framework.Core.Context;
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Identity.Contracts.Services;
-using FSH.Modules.Identity.Contracts.v1.Groups.AddUsersToGroup;
-using FSH.Modules.Identity.Data;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Identity.Contracts.Services;
+using Boilerplate.Modules.Identity.Contracts.v1.Groups.AddUsersToGroup;
+using Boilerplate.Modules.Identity.Data;
+using Boilerplate.Modules.Identity.Domain;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Identity.Features.v1.Groups.AddUsersToGroup;
+namespace Boilerplate.Modules.Identity.Features.v1.Groups.AddUsersToGroup;
 
 public sealed class AddUsersToGroupCommandHandler : ICommandHandler<AddUsersToGroupCommand, AddUsersToGroupResponse>
 {

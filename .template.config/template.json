@@ -1,11 +1,10 @@
 {
     "$schema": "http://json.schemastore.org/template",
-    "author": "Mukesh Murugan",
+    "author": "Boilerplate",
     "classifications": [
         "WebAPI",
         "Modular Monolith",
         "Vertical Slice",
-        "Boilerplate",
         "ASP.NET Core",
         "Cloud",
         "Web",
@@ -16,11 +15,11 @@
         "language": "C#",
         "type": "solution"
     },
-    "identity": "FullStackHero.NET.StarterKit",
-    "name": "FullStackHero .NET Starter Kit",
+    "identity": "Boilerplate.Templates",
+    "name": "Modular .NET SaaS Starter",
     "description": "A production-ready full-stack starter: modular .NET 10 monolith (VSA, CQRS, multitenancy, Identity, Aspire) + two React 19 apps + Docker/Terraform.",
-    "shortName": "fsh",
-    "sourceName": "FSH.Starter",
+    "shortName": "saas",
+    "sourceName": "Boilerplate",
     "preferNameDirectory": true,
     "symbols": {
         "aspire": {
@@ -44,73 +43,47 @@
         "includeTools": {
             "type": "parameter",
             "datatype": "bool",
-            "description": "Internal: keep the fsh CLI project in the solution (FSH repo only).",
+            "description": "Internal: keep the CLI project in the solution (this repo only).",
             "defaultValue": "false"
         },
         "contactEmail": {
             "type": "parameter",
             "datatype": "string",
             "description": "Contact email written into OpenAPI metadata.",
-            "defaultValue": "noreply@example.com",
-            "replaces": "mukesh@codewithmukesh.com"
+            "defaultValue": "contact@example.com",
+            "replaces": "contact@example.com"
         },
         "contactUrl": {
             "type": "parameter",
             "datatype": "string",
             "description": "Contact / company URL written into OpenAPI metadata.",
-            "defaultValue": "https://example.com",
-            "replaces": "https://codewithmukesh.com"
+            "defaultValue": "https://example.com/contact",
+            "replaces": "https://example.com/contact"
         },
         "mailFrom": {
             "type": "parameter",
             "datatype": "string",
             "description": "Default 'from' address for outbound mail.",
             "defaultValue": "noreply@example.com",
-            "replaces": "mukesh@fullstackhero.net"
+            "replaces": "noreply@example.com"
         },
         "sendgridFrom": {
             "type": "generated",
             "generator": "constant",
             "parameters": { "value": "noreply@example.com" },
-            "replaces": "sendgrid@fullstackhero.net"
+            "replaces": "sendgrid@example.com"
         },
-        "nameUnderscore": {
-            "type": "derived",
-            "valueSource": "name",
-            "valueTransform": "underscoreForm",
-            "replaces": "FSH_Starter"
-        },
-        "issuerSlug": {
+        "lowerName": {
             "type": "derived",
             "valueSource": "name",
             "valueTransform": "kebabForm",
-            "replaces": "mukesh.murugan"
-        },
-        "displayBrand": {
-            "type": "derived",
-            "valueSource": "name",
-            "valueTransform": "displayForm",
-            "replaces": "FullStackHero"
-        },
-        "authorName": {
-            "type": "derived",
-            "valueSource": "name",
-            "valueTransform": "displayForm",
-            "replaces": "Mukesh Murugan"
-        },
-        "openApiTitle": {
-            "type": "derived",
-            "valueSource": "name",
-            "valueTransform": "displayForm",
-            "replaces": "FSH PlayGround"
+            "replaces": "boilerplate"
         }
     },
     "forms": {
         "lc": { "identifier": "lowerCaseInvariant" },
         "dashNorm": { "identifier": "replace", "pattern": "[^a-zA-Z0-9]+", "replacement": "-" },
-        "kebabForm": { "identifier": "chain", "steps": ["lc", "dashNorm"] },
-        "underscoreForm": { "identifier": "replace", "pattern": "\\.", "replacement": "_" },
-        "displayForm": { "identifier": "replace", "pattern": "[._-]+", "replacement": " " }
+        "kebabForm": { "identifier": "chain", "steps": ["lc", "dashNorm"] }
     },
     "sources": [
         {
@@ -162,7 +135,7 @@
                 {
                     "condition": "(!aspire)",
                     "exclude": [
-                        "src/Host/FSH.Starter.AppHost/**"
+                        "src/Host/Boilerplate.AppHost/**"
                     ]
                 },
                 {

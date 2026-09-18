@@ -10,9 +10,9 @@ import { expect, test, type Page } from "@playwright/test";
 // Before the fix the dashboard rendered as authenticated off the expired token
 // alone (isAuthenticated was gated on token presence, not `exp`).
 
-const ACCESS_KEY = "fsh.dashboard.accessToken";
-const REFRESH_KEY = "fsh.dashboard.refreshToken";
-const TENANT_KEY = "fsh.dashboard.tenant";
+const ACCESS_KEY = "boilerplate.dashboard.accessToken";
+const REFRESH_KEY = "boilerplate.dashboard.refreshToken";
+const TENANT_KEY = "boilerplate.dashboard.tenant";
 
 function fakeJwt(payload: Record<string, unknown>): string {
   const b64url = (obj: unknown) =>

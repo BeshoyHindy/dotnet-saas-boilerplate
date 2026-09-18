@@ -1,6 +1,6 @@
 ﻿using System.Security.Claims;
 
-namespace FSH.Framework.Core.Context;
+namespace Boilerplate.BuildingBlocks.Core.Context;
 
 /// <summary>
 /// Provides methods to initialize and set the current user context.

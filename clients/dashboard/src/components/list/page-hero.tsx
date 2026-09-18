@@ -37,7 +37,7 @@ export function PageHero({
   return (
     <section
       className={cn(
-        "fsh-enter fsh-enter-1 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] shadow-xs",
+        "app-enter app-enter-1 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] shadow-xs",
         className,
       )}
     >

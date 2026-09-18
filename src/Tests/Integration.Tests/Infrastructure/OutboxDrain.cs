@@ -1,5 +1,5 @@
-using FSH.Framework.Eventing.Outbox;
-using FSH.Framework.Eventing.Persistence;
+using Boilerplate.BuildingBlocks.Eventing.Outbox;
+using Boilerplate.BuildingBlocks.Eventing.Persistence;
 
 namespace Integration.Tests.Infrastructure;
 

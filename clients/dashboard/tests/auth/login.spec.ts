@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { mockJsonResponse, mockProblemDetails } from "../helpers/api-mocks";
 
-// The dashboard login page (rebuilt to the dentalOS card layout): FSH logo
+// The dashboard login page (rebuilt to the dentalOS card layout): Boilerplate logo
 // lockup + ".NET 10 Starter Kit" caption, tenant/email/password card, and a
 // demoMode-gated "Step into any role" picker that signs in instantly.
 
@@ -28,9 +28,9 @@ test.describe("login — page chrome", () => {
     await setConfig(page, true);
   });
 
-  test("renders the FSH logo lockup with the .NET 10 caption", async ({ page }) => {
+  test("renders the Boilerplate wordmark lockup with the .NET 10 caption", async ({ page }) => {
     await page.goto("/login");
-    await expect(page.getByRole("img", { name: /fullstackhero/i })).toBeVisible();
+    await expect(page.getByText("Boilerplate").first()).toBeVisible();
     await expect(page.getByText(/\.NET 10 Starter Kit/i)).toBeVisible();
     await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
     await expect(page.getByText(/sign in to your account/i)).toBeVisible();

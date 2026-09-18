@@ -47,7 +47,7 @@ waf_enable_logging                = true
 # S3
 ################################################################################
 
-app_s3_bucket_name        = "staging-fsh-app-bucket"
+app_s3_bucket_name        = "staging-boilerplate-app-bucket"
 app_s3_enable_public_read = false
 app_s3_enable_cloudfront  = true
 
@@ -55,8 +55,8 @@ app_s3_enable_cloudfront  = true
 # Frontend SPAs (S3 + CloudFront) — bucket names must be globally unique
 ################################################################################
 
-dashboard_s3_bucket_name = "staging-fsh-dashboard"
-admin_s3_bucket_name     = "staging-fsh-admin"
+dashboard_s3_bucket_name = "staging-boilerplate-dashboard"
+admin_s3_bucket_name     = "staging-boilerplate-admin"
 
 # Custom domains (ACM cert must be in us-east-1 for CloudFront):
 # dashboard_cloudfront_aliases         = ["app.staging.example.com"]
@@ -68,8 +68,8 @@ admin_s3_bucket_name     = "staging-fsh-admin"
 # Database
 ################################################################################
 
-db_name                        = "fshdb"
-db_username                    = "fshadmin"
+db_name                        = "boilerplatedb"
+db_username                    = "boilerplateadmin"
 db_manage_master_user_password = true
 db_instance_class              = "db.t4g.small"
 db_enable_performance_insights = true

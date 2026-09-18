@@ -11,12 +11,12 @@ namespace Integration.Tests.Tests.Groups;
 /// so these assert the intended behavior. Intra-tenant CRUD lives in
 /// <see cref="GroupCrudTests"/>.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class GroupTenantIsolationTests
 {
     private readonly AuthHelper _auth;
 
-    public GroupTenantIsolationTests(FshWebApplicationFactory factory)
+    public GroupTenantIsolationTests(AppWebApplicationFactory factory)
     {
         _auth = new AuthHelper(factory);
     }

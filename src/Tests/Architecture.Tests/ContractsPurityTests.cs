@@ -1,7 +1,7 @@
-using FSH.Modules.Auditing.Contracts;
-using FSH.Modules.Chat.Contracts;
-using FSH.Modules.Identity.Contracts;
-using FSH.Modules.Multitenancy.Contracts;
+using Boilerplate.Modules.Auditing.Contracts;
+using Boilerplate.Modules.Chat.Contracts;
+using Boilerplate.Modules.Identity.Contracts;
+using Boilerplate.Modules.Multitenancy.Contracts;
 using NetArchTest.Rules;
 using Shouldly;
 using System.Reflection;
@@ -87,18 +87,18 @@ public class ContractsPurityTests
     {
         string[] moduleImplementations =
         [
-            "FSH.Modules.Auditing.Features",
-            "FSH.Modules.Auditing.Data",
-            "FSH.Modules.Auditing.Persistence",
-            "FSH.Modules.Chat.Features",
-            "FSH.Modules.Chat.Data",
-            "FSH.Modules.Chat.Domain",
-            "FSH.Modules.Identity.Features",
-            "FSH.Modules.Identity.Data",
-            "FSH.Modules.Identity.Persistence",
-            "FSH.Modules.Multitenancy.Features",
-            "FSH.Modules.Multitenancy.Data",
-            "FSH.Modules.Multitenancy.Persistence"
+            "Boilerplate.Modules.Auditing.Features",
+            "Boilerplate.Modules.Auditing.Data",
+            "Boilerplate.Modules.Auditing.Persistence",
+            "Boilerplate.Modules.Chat.Features",
+            "Boilerplate.Modules.Chat.Data",
+            "Boilerplate.Modules.Chat.Domain",
+            "Boilerplate.Modules.Identity.Features",
+            "Boilerplate.Modules.Identity.Data",
+            "Boilerplate.Modules.Identity.Persistence",
+            "Boilerplate.Modules.Multitenancy.Features",
+            "Boilerplate.Modules.Multitenancy.Data",
+            "Boilerplate.Modules.Multitenancy.Persistence"
         ];
 
         foreach (var assembly in ContractsAssemblies)

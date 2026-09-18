@@ -1,5 +1,5 @@
 using System.Security.Cryptography;
-using FSH.Modules.Files.Contracts.v1.DTOs;
+using Boilerplate.Modules.Files.Contracts.v1.DTOs;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 
@@ -12,13 +12,13 @@ namespace Integration.Tests.Tests.Files;
 /// back intact by the presigned GET. Does not duplicate the existing finalize / soft-delete /
 /// visibility scenarios — it focuses on the download path and storage byte fidelity.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class StorageFlowTests
 {
     private const string FilesBasePath = "/api/v1/files";
     private readonly AuthHelper _auth;
 
-    public StorageFlowTests(FshWebApplicationFactory factory)
+    public StorageFlowTests(AppWebApplicationFactory factory)
     {
         _auth = new AuthHelper(factory);
     }

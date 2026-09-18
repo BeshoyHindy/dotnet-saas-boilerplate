@@ -1,8 +1,8 @@
-using FSH.Framework.Shared.Persistence;
-using FSH.Modules.Billing.Contracts.Dtos;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Billing.Contracts.Dtos;
 using Mediator;
 
-namespace FSH.Modules.Billing.Contracts.v1.Wallets;
+namespace Boilerplate.Modules.Billing.Contracts.v1.Wallets;
 
 public sealed record GetMyTopupRequestsQuery(
     TopupRequestStatus? Status = null,

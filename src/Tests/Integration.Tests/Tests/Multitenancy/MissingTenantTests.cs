@@ -4,12 +4,12 @@ namespace Integration.Tests.Tests.Multitenancy;
 
 // Regression for #1245: a missing required `tenant` header on anonymous tenant-scoped endpoints throws
 // BadHttpRequestException (400) during binding — must surface as 400, not fall through to a generic 500.
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class MissingTenantTests
 {
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
 
-    public MissingTenantTests(FshWebApplicationFactory factory)
+    public MissingTenantTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
     }

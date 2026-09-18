@@ -1,8 +1,8 @@
-using FSH.Framework.Shared.Persistence;
-using FSH.Modules.Multitenancy.Contracts.Dtos;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Multitenancy.Contracts.Dtos;
 using Mediator;
 
-namespace FSH.Modules.Multitenancy.Contracts.v1.GetTenants;
+namespace Boilerplate.Modules.Multitenancy.Contracts.v1.GetTenants;
 
 public sealed class GetTenantsQuery : IPagedQuery, IQuery<PagedResponse<TenantDto>>
 {

@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
-using FSH.Framework.Shared.Constants;
+using Boilerplate.BuildingBlocks.Shared.Constants;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -10,7 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace FSH.Framework.Web.RateLimiting;
+namespace Boilerplate.BuildingBlocks.Web.RateLimiting;
 
 public static class Extensions
 {

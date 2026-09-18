@@ -1,10 +1,10 @@
-using FSH.Modules.Billing.Contracts.Dtos;
-using FSH.Modules.Billing.Contracts.v1.Plans;
-using FSH.Modules.Billing.Data;
+using Boilerplate.Modules.Billing.Contracts.Dtos;
+using Boilerplate.Modules.Billing.Contracts.v1.Plans;
+using Boilerplate.Modules.Billing.Data;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Billing.Features.v1.Plans.GetPlans;
+namespace Boilerplate.Modules.Billing.Features.v1.Plans.GetPlans;
 
 public sealed class GetPlansQueryHandler(BillingDbContext dbContext)
     : IQueryHandler<GetPlansQuery, IReadOnlyList<BillingPlanDto>>

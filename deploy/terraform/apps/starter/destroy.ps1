@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Destroy the FullStackHero Starter Kit AWS stack for one environment.
+  Destroy the Boilerplate Starter Kit AWS stack for one environment.
 
 .EXAMPLE
   ./destroy.ps1 -Environment dev -Region us-east-1

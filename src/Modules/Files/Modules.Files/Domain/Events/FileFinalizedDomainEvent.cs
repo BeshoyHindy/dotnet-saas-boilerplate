@@ -1,7 +1,7 @@
-using FSH.Framework.Core.Domain;
-using FSH.Modules.Files.Contracts.v1.DTOs;
+using Boilerplate.BuildingBlocks.Core.Domain;
+using Boilerplate.Modules.Files.Contracts.v1.DTOs;
 
-namespace FSH.Modules.Files.Domain.Events;
+namespace Boilerplate.Modules.Files.Domain.Events;
 
 public sealed record FileFinalizedDomainEvent(
     Guid FileAssetId,
