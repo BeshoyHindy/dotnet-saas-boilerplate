@@ -9,7 +9,10 @@
     <!-- Pack default lives in Directory.Build.props (false; source-ownership model). -->
   </PropertyGroup>
   <ItemGroup>
-    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+    <!-- 8.0.0 carries GHSA-23fw-v26w-5fgq (via Microsoft.Build.Tasks.Git) with no 8.x fix. SourceLink now
+         versions with the SDK feature bands; global.json allows any 10.0.x band, so stay on the patched
+         10.0.1xx line, which the lowest permitted SDK can load. -->
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.112" />
   </ItemGroup>
   <ItemGroup Label="Aspire">
     <PackageVersion Include="Aspire.Hosting.JavaScript" Version="13.4.0" />
@@ -143,5 +146,9 @@
          AccessViolation). Transitive pinning is enabled, so this entry alone bumps it.
          Remove once the SignalR backplane package depends on a patched version itself. -->
     <PackageVersion Include="MessagePack" Version="2.5.301" />
+    <!-- Pulled transitively by Testcontainers 4.11.0; versions below 2026.0.0 fail NuGet audit
+         (NU1903, GHSA-mggc-4xg6-vcxf and GHSA-q939-rpr3-3284: ScpClient RCE / arbitrary file write).
+         Remove once Testcontainers depends on a patched version itself. -->
+    <PackageVersion Include="SSH.NET" Version="2026.0.0" />
   </ItemGroup>
 </Project>
