@@ -34,7 +34,7 @@ namespace Boilerplate.Modules.Files;
 /// <summary>
 /// Files module: presigned-URL file lifecycle (upload, finalize, serve, delete) shared across the
 /// kit's owning features (My Files, avatars, tenant logos, and any module that attaches files to
-/// its own entities). Module order 350 places it between Auditing (300) and Webhooks (400); owning
+/// its own entities). Module order 350 places it after Auditing (300); owning
 /// modules load later and register their <see cref="IFileAccessPolicy"/> implementations during
 /// their own ConfigureServices.
 /// </summary>
@@ -92,8 +92,8 @@ public sealed class FilesModule : IModule
         group.MapGetFileMetadataEndpoint();          // GET   /{id}
         group.MapDeleteFileEndpoint();               // DELETE /{id}
 
-        // Recurring Hangfire jobs (orphan + retention purges). Registration here matches the
-        // pattern Billing uses for MonthlyInvoiceJob.
+        // Recurring Hangfire jobs (orphan + retention purges), registered alongside the module's
+        // endpoints so the schedule ships with the module.
         var jobManager = endpoints.ServiceProvider.GetService<IRecurringJobManager>();
         if (jobManager is not null)
         {

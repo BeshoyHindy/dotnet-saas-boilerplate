@@ -1,14 +1,6 @@
-﻿using Boilerplate.BuildingBlocks.Shared.Quota;
-
 namespace Boilerplate.BuildingBlocks.Shared.Multitenancy;
 
 public interface IAppTenantInfo
 {
     string? ConnectionString { get; set; }
-
-    /// <summary>Plan name used to resolve default quota limits (falls back to <c>QuotaOptions.DefaultPlan</c> when null).</summary>
-    string? Plan { get; set; }
-
-    /// <summary>Per-tenant quota overrides. When a resource is present here the value wins over plan defaults.</summary>
-    Dictionary<QuotaResource, long> QuotaLimits { get; }
 }

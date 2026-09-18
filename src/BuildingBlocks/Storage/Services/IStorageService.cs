@@ -20,7 +20,7 @@ public interface IStorageService
 
     /// <summary>
     /// Returns the size in bytes of the object at <paramref name="path"/>, or 0 if it does not exist.
-    /// Used by quota metering to debit storage usage on delete without requiring callers to track sizes.
+    /// Lets callers account for storage usage on delete without having to track sizes themselves.
     /// </summary>
     Task<long> GetSizeAsync(string path, CancellationToken cancellationToken = default);
 

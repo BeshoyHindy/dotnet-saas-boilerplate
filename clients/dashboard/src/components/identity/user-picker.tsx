@@ -9,7 +9,7 @@ import { cn } from "@/lib/cn";
 /**
  * UserPicker — debounced typeahead over /identity/users/search. Replaces
  * raw GUID inputs for any "pick a user" affordance (ticket assignment,
- * webhook subscription targeting, etc.).
+ * role/group membership targeting, etc.).
  *
  * Behaviours:
  * - Selected user renders as a chip above the input, with a clear button.

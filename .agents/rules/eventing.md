@@ -68,7 +68,7 @@ Bus = `EventingOptions.Provider`: `"RabbitMQ"` → `RabbitMqEventBus` (durable t
 ## Gotchas
 
 - **Renaming/moving an integration event type breaks deserialization** — the outbox stores the assembly-qualified type name; `Type.GetType()` returns null → the message dead-letters. Keep event type names/namespaces stable, or migrate dead rows.
-- **Background handlers carry no HTTP/tenant context.** An open-generic or background handler that reads a tenant-filtered DbContext must restore Finbuckle context first via `IMultiTenantContextSetter` (see `WebhookFanoutHandler`, `modules/webhooks.md`).
+- **Background handlers carry no HTTP/tenant context.** An open-generic or background handler that reads a tenant-filtered DbContext must restore Finbuckle context first via `IMultiTenantContextSetter` (see `FinbuckleEventTenantScope`, `modules/multitenancy.md`).
 - In-memory bus runs handlers **synchronously in the publisher's scope** — keep handler work minimal; exceptions surface to the originating request (relevant for Notifications consuming other modules' events). Via the outbox that scope is the dispatcher's, not the request's.
 - Set `UseHostedServiceDispatcher=false` to drive the outbox via Hangfire instead of the hosted service.
 - A background publisher must set the tenant context **before** `AddAsync` — otherwise, with per-tenant databases, the row lands in the wrong one (see `TenantExpiryScanJob`).

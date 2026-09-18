@@ -10,9 +10,9 @@ for local orchestration with .NET Aspire.
 ## What's in the box
 
 - **Modules** (bounded contexts, each with a `.Contracts` project as its only public surface):
-  Identity, Multitenancy, Billing, Files, Webhooks, Auditing, Notifications.
+  Identity, Multitenancy, Files, Auditing, Notifications.
 - **BuildingBlocks**: core domain primitives, persistence, web pipeline, caching (HybridCache on
-  Valkey), eventing (outbox/inbox), jobs (Hangfire), storage (S3/MinIO), mailing, quotas.
+  Valkey), eventing (outbox/inbox), jobs (Hangfire), storage (S3/MinIO), mailing.
 - **Hosts**: `Boilerplate.Api` (composition root), `Boilerplate.DbMigrator` (one-shot migrate/seed —
   the API never migrates at startup), `Boilerplate.AppHost` (Aspire orchestrator).
 - **Clients**: `clients/admin` (operator console) and `clients/dashboard` (tenant app) — React 19 +

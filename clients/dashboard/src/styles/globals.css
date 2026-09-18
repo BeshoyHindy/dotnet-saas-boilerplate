@@ -430,7 +430,7 @@
      Page = top-of-page hero (list & detail).
      Section = nested section header inside a page (role-detail, etc.).
      Card = card-level title.
-     Stat = big numerals on stat cards / billing widgets.
+     Stat = big numerals on stat cards / KPI widgets.
      Tailwind v4 auto-generates `text-display-page` etc. utilities from
      these tokens. */
   --text-display-page:    1.5rem;        /* 24px */

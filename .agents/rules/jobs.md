@@ -23,7 +23,7 @@ recurringJobs.AddOrUpdate<PurgeOrphanedFilesJob>("files:purge-orphaned",
     j => j.RunAsync(CancellationToken.None), Cron.Hourly(), new() { TimeZone = TimeZoneInfo.Utc });
 ```
 
-Examples in the tree: `PurgeOrphanedFiles`/`PurgeDeletedFiles` (Files), `MonthlyInvoiceJob` (Billing), `AuditRetentionJob` (Auditing), `WebhookDispatchJob` (Webhooks).
+Examples in the tree: `PurgeOrphanedFiles`/`PurgeDeletedFiles` (Files), `AuditRetentionJob` (Auditing), `TenantExpiryScanJob` (Multitenancy).
 
 ## Dashboard & config
 

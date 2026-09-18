@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Boilerplate.Modules.Notifications.IntegrationEventHandlers;
 
-/// <summary>Emails the tenant admin that their subscription lapsed and the grace period is counting down.</summary>
+/// <summary>Emails the tenant admin that their account lapsed and the grace period is counting down.</summary>
 public sealed class TenantEnteredGraceEmailHandler(
     IMailService mailService,
     ILogger<TenantEnteredGraceEmailHandler> logger)
@@ -14,9 +14,9 @@ public sealed class TenantEnteredGraceEmailHandler(
     public async Task HandleAsync(TenantEnteredGraceIntegrationEvent @event, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(@event);
-        var (subject, body) = BillingEmailBodies.EnteredGrace(
-            @event.TenantName, @event.PlanKey, @event.ValidUpto, @event.GraceEndsUtc);
-        await BillingEmailSender.SendAsync(mailService, logger, @event.AdminEmail, subject, body, "entered-grace", ct)
+        var (subject, body) = TenantLifecycleEmailBodies.EnteredGrace(
+            @event.TenantName, @event.ValidUpto, @event.GraceEndsUtc);
+        await TenantLifecycleEmailSender.SendAsync(mailService, logger, @event.AdminEmail, subject, body, "entered-grace", ct)
             .ConfigureAwait(false);
     }
 }

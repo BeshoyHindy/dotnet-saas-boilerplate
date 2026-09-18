@@ -15,29 +15,6 @@ test.beforeEach(async ({ page }) => {
       body: JSON.stringify(paged([])),
     }),
   );
-  // The dialog loads active billing plans on open (to populate the plan picker
-  // and preselect the trial plan). Mock it so the query resolves cleanly — an
-  // unmocked call would 401 against a real dev backend and log the session out
-  // mid-test.
-  await page.route("**/api/v1/billing/plans**", (route) =>
-    route.fulfill({
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify([
-        {
-          id: "plan-free",
-          key: "free",
-          name: "Free",
-          currency: "USD",
-          monthlyBasePrice: 0,
-          overageRates: {},
-          isActive: true,
-          interval: "Monthly",
-          annualPrice: null,
-        },
-      ]),
-    }),
-  );
 });
 
 test.describe("tenant create dialog", () => {

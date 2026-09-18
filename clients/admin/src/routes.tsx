@@ -9,10 +9,8 @@ import { DashboardPage } from "@/pages/dashboard";
 import { NotFoundPage } from "@/pages/not-found";
 import {
   AuditingPermissions,
-  BillingPermissions,
   IdentityPermissions,
   MultitenancyPermissions,
-  WebhooksPermissions,
 } from "@/lib/permissions";
 
 // Lazy-loaded pages — each `import()` becomes its own bundle chunk so the
@@ -33,16 +31,9 @@ const UsersListPage = lazyNamed(() => import("@/pages/users/list"), "UsersListPa
 const UserDetailPage = lazyNamed(() => import("@/pages/users/detail"), "UserDetailPage");
 const RolesListPage = lazyNamed(() => import("@/pages/roles/list"), "RolesListPage");
 const RoleDetailPage = lazyNamed(() => import("@/pages/roles/detail"), "RoleDetailPage");
-const BillingLayout = lazyNamed(() => import("@/pages/billing/layout"), "BillingLayout");
-const PlansListPage = lazyNamed(() => import("@/pages/billing/plans-list"), "PlansListPage");
-const InvoicesListPage = lazyNamed(() => import("@/pages/billing/invoices-list"), "InvoicesListPage");
-const InvoiceDetailPage = lazyNamed(() => import("@/pages/billing/invoice-detail"), "InvoiceDetailPage");
-const TopupsListPage = lazyNamed(() => import("@/pages/billing/topups-list"), "TopupsListPage");
 const AuditsListPage = lazyNamed(() => import("@/pages/audits/list"), "AuditsListPage");
 const HealthPage = lazyNamed(() => import("@/pages/health/page"), "HealthPage");
 const ImpersonationListPage = lazyNamed(() => import("@/pages/impersonation/list"), "ImpersonationListPage");
-const WebhooksListPage = lazyNamed(() => import("@/pages/webhooks/list"), "WebhooksListPage");
-const WebhookDetailPage = lazyNamed(() => import("@/pages/webhooks/detail"), "WebhookDetailPage");
 const NotificationsInboxPage = lazyNamed(() => import("@/pages/notifications/inbox"), "NotificationsInboxPage");
 const SettingsLayout = lazyNamed(() => import("@/pages/settings/layout"), "SettingsLayout");
 const ProfileSettings = lazyNamed(() => import("@/pages/settings/profile"), "ProfileSettings");
@@ -153,23 +144,6 @@ export const router = createBrowserRouter([
             ),
           },
 
-          // Billing
-          {
-            path: "billing",
-            element: (
-              <RouteGuard perms={[BillingPermissions.View]}>
-                <BillingLayout />
-              </RouteGuard>
-            ),
-            children: [
-              { index: true, element: <Navigate to="/billing/invoices" replace /> },
-              { path: "plans", element: <PlansListPage /> },
-              { path: "invoices", element: <InvoicesListPage /> },
-              { path: "invoices/:invoiceId", element: <InvoiceDetailPage /> },
-              { path: "topups", element: <TopupsListPage /> },
-            ],
-          },
-
           // Impersonation
           {
             path: "impersonation",
@@ -193,25 +167,6 @@ export const router = createBrowserRouter([
           {
             path: "audits/:id",
             element: <Navigate to="/audits" replace />,
-          },
-
-          // Webhooks — list/detail both read subscriptions, which the server
-          // gates on Webhooks.View (granted to Basic by default).
-          {
-            path: "webhooks",
-            element: (
-              <RouteGuard perms={[WebhooksPermissions.Subscriptions.View]}>
-                <WebhooksListPage />
-              </RouteGuard>
-            ),
-          },
-          {
-            path: "webhooks/:id",
-            element: (
-              <RouteGuard perms={[WebhooksPermissions.Subscriptions.View]}>
-                <WebhookDetailPage />
-              </RouteGuard>
-            ),
           },
 
           // Notifications inbox — available to every signed-in user

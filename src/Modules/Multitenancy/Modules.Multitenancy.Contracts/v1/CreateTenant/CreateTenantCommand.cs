@@ -9,4 +9,4 @@ public sealed record CreateTenantCommand(
     string AdminEmail,
     string AdminPassword,
     string? Issuer,
-    string? PlanKey = null) : ICommand<CreateTenantCommandResponse>;
+    DateTime? ValidUpto = null) : ICommand<CreateTenantCommandResponse>;

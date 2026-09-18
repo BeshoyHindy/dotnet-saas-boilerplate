@@ -35,7 +35,7 @@ public sealed class TenantServiceRenewClockTests
             dbContext: null!,            // RenewAsync never touches the DbContext
             provisioningService: null!,  // RenewAsync never touches provisioning
             _clock,
-            Options.Create(new TenantBillingOptions()),
+            Options.Create(new TenantValidityOptions()),
             NullLogger<TenantService>.Instance);
     }
 
@@ -49,7 +49,6 @@ public sealed class TenantServiceRenewClockTests
         const string tenantId = "acme";
         var tenant = new AppTenantInfo(tenantId, "Acme", connectionString: null, adminEmail: "admin@acme.test")
         {
-            Plan = "pro",
             // Past relative to both the real clock and the fake clock, so periodStart must equal "now".
             ValidUpto = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc),
         };
@@ -57,12 +56,11 @@ public sealed class TenantServiceRenewClockTests
 
         var sut = CreateSut();
 
-        // Act: renew one monthly term.
-        var (periodStart, validUpto, planChanged) = await sut.RenewAsync(tenantId, "pro", termMonths: 1, CancellationToken.None);
+        // Act: renew one month.
+        var (periodStart, validUpto) = await sut.RenewAsync(tenantId, months: 1, CancellationToken.None);
 
         // Assert: stacking starts from the injected clock, not the system clock.
         periodStart.ShouldBe(fakeNow.UtcDateTime);
         validUpto.ShouldBe(fakeNow.UtcDateTime.AddMonths(1));
-        planChanged.ShouldBeFalse();
     }
 }

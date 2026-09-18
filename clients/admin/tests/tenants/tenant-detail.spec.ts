@@ -122,7 +122,7 @@ test.describe("tenant detail header + provisioning", () => {
 
     const main = page.getByRole("main");
     await expect(main.getByRole("button", { name: /deactivate tenant|activate tenant/i })).toHaveCount(0);
-    await expect(main.getByRole("button", { name: /renew \/ change plan/i })).toHaveCount(0);
+    await expect(main.getByRole("button", { name: /^renew$/i })).toHaveCount(0);
     await expect(main.getByRole("button", { name: /adjust validity/i })).toHaveCount(0);
   });
 

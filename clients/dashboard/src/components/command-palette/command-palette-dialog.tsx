@@ -12,7 +12,6 @@ import {
   Moon,
   Palette,
   Plus,
-  Receipt,
   ScrollText,
   Search,
   Settings as SettingsIcon,
@@ -149,15 +148,6 @@ export function CommandPaletteDialog({
             keywords: ["identity", "teams", "org"],
             perform: go("/identity/groups"),
             perm: "Permissions.Groups.Update",
-          },
-          {
-            id: "nav-invoices",
-            label: "Invoices",
-            hint: "Billing history",
-            Icon: Receipt,
-            keywords: ["billing", "payment"],
-            perform: go("/invoices"),
-            perm: "Permissions.Billing.View",
           },
           {
             id: "nav-health",

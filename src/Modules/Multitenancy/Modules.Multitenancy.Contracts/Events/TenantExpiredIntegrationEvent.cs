@@ -14,7 +14,6 @@ public sealed record TenantExpiredIntegrationEvent(
     string Source,
     string TenantName,
     string AdminEmail,
-    string? PlanKey,
     DateTime ValidUpto,
     DateTime GraceEndsUtc)
     : IIntegrationEvent;

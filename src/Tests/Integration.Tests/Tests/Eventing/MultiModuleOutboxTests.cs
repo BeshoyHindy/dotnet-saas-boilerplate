@@ -4,7 +4,7 @@ using Boilerplate.BuildingBlocks.Eventing.Inbox;
 using Boilerplate.BuildingBlocks.Eventing.Outbox;
 using Boilerplate.BuildingBlocks.Eventing.Persistence;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
-using Boilerplate.Modules.Billing.Contracts.Events;
+using Boilerplate.Modules.Files.Contracts.Events;
 using Boilerplate.Modules.Identity.Contracts.Events;
 using Integration.Tests.Infrastructure;
 
@@ -34,21 +34,21 @@ public sealed class MultiModuleOutboxTests
         var store = scope.ServiceProvider.GetRequiredService<IOutboxStore>();
         var context = scope.ServiceProvider.GetRequiredService<EventingDbContext>();
 
-        var billingEventId = Guid.CreateVersion7();
+        var filesEventId = Guid.CreateVersion7();
         var identityEventId = Guid.CreateVersion7();
 
-        // Billing first: under the old registration this is the publish that blew up with
-        // "relation billing.OutboxMessages does not exist" — or silently hijacked Identity's store.
-        await store.AddAsync(NewBillingEvent(billingEventId));
+        // Files first: under the old registration this is the publish that blew up with
+        // "relation files.OutboxMessages does not exist" — or silently hijacked Identity's store.
+        await store.AddAsync(NewFilesEvent(filesEventId));
         await store.AddAsync(NewIdentityEvent(identityEventId));
 
         var saved = await context.OutboxMessages
-            .Where(m => m.Id == billingEventId || m.Id == identityEventId)
+            .Where(m => m.Id == filesEventId || m.Id == identityEventId)
             .ToListAsync();
 
-        saved.Select(m => m.Id).ShouldBe([billingEventId, identityEventId], ignoreOrder: true);
+        saved.Select(m => m.Id).ShouldBe([filesEventId, identityEventId], ignoreOrder: true);
         saved.ShouldContain(
-            m => m.Type.Contains(nameof(InvoiceIssuedIntegrationEvent), StringComparison.Ordinal),
+            m => m.Type.Contains(nameof(FileFinalizedIntegrationEvent), StringComparison.Ordinal),
             "a non-Identity module's event must be persisted, not dropped");
         saved.ShouldAllBe(m => m.ProcessedOnUtc == null && !m.IsDead);
     }
@@ -80,7 +80,7 @@ public sealed class MultiModuleOutboxTests
             eventId,
             "MultiModuleOutboxTests",
             TestConstants.RootTenantId,
-            nameof(InvoiceIssuedIntegrationEvent));
+            nameof(FileFinalizedIntegrationEvent));
 
         (await inbox.HasProcessedAsync(eventId, "MultiModuleOutboxTests")).ShouldBeTrue();
         (await context.InboxMessages.CountAsync(m => m.Id == eventId)).ShouldBe(1);
@@ -97,19 +97,18 @@ public sealed class MultiModuleOutboxTests
         identity.Model.FindEntityType(typeof(InboxMessage)).ShouldBeNull();
     }
 
-    private static InvoiceIssuedIntegrationEvent NewBillingEvent(Guid id) => new(
+    private static FileFinalizedIntegrationEvent NewFilesEvent(Guid id) => new(
         id,
         DateTime.UtcNow,
         TestConstants.RootTenantId,
         $"corr-{id:N}",
-        "Billing",
+        "Files",
         Guid.CreateVersion7(),
-        "INV-1349",
-        42.00m,
-        "USD",
-        DateTime.UtcNow.AddDays(14),
-        2026,
-        8);
+        "outbox-1349",
+        Guid.CreateVersion7(),
+        "text/plain",
+        1024,
+        1);
 
     private static UserRegisteredIntegrationEvent NewIdentityEvent(Guid id) => new(
         id,

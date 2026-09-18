@@ -17,7 +17,6 @@
 		<ProjectReference Include="..\..\..\BuildingBlocks\Mailing\Boilerplate.BuildingBlocks.Mailing.csproj" />
 		<ProjectReference Include="..\Modules.Notifications.Contracts\Boilerplate.Modules.Notifications.Contracts.csproj" />
 		<ProjectReference Include="..\..\Multitenancy\Modules.Multitenancy.Contracts\Boilerplate.Modules.Multitenancy.Contracts.csproj" />
-		<ProjectReference Include="..\..\Billing\Modules.Billing.Contracts\Boilerplate.Modules.Billing.Contracts.csproj" />
 	</ItemGroup>
 
 </Project>

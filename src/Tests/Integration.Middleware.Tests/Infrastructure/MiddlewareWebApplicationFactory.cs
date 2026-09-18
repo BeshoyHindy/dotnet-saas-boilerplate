@@ -270,7 +270,7 @@ public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Prog
                 await tenantDbContext.SaveChangesAsync();
             }
 
-            // 3. Run all module migrations (identity, audit, webhook schemas)
+            // 3. Run all module migrations (identity, audit, files schemas)
             var setter = scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>();
             setter.MultiTenantContext = new MultiTenantContext<AppTenantInfo>(rootTenant);
 

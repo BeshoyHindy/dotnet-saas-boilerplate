@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Controller, useForm } from "react-hook-form";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -17,11 +17,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { createTenant } from "@/api/tenants";
-import { getPlans, planTermPrice } from "@/api/billing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Monogram } from "@/components/monogram";
-import { Field, Select, type SelectOption } from "@/components/list";
+import { Field } from "@/components/list";
 import {
   Dialog,
   DialogContent,
@@ -32,7 +31,7 @@ import {
 import { ApiRequestError } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 
-// ─── Schema (unchanged contract) ────────────────────────────────────────────
+// ─── Schema ──────────────────────────────────────────────────────────────────
 
 const TENANT_ID_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
 
@@ -52,20 +51,17 @@ const schema = z.object({
     .max(128, "Maximum 128 characters."),
   issuer: z.string().trim().min(2, "Required.").max(256),
   connectionString: z.string().trim().max(2048).optional(),
-  // Optional: preselected to the default plan when plans load; if left empty the
-  // server falls back to the configured trial plan.
-  planKey: z.string().trim().optional(),
+  // Optional: a `type="date"` input yields a `YYYY-MM-DD` string. Left empty,
+  // the server falls back to its own default validity window.
+  validUpto: z
+    .string()
+    .trim()
+    .optional()
+    .refine((v) => !v || !Number.isNaN(new Date(v).getTime()), "Enter a valid date.")
+    .refine((v) => !v || new Date(v).getTime() > Date.now(), "Must be in the future."),
 });
 
 type FormValues = z.infer<typeof schema>;
-
-function formatMoney(amount: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
-  } catch {
-    return `${amount.toFixed(2)} ${currency}`;
-  }
-}
 
 /** Derive a URL-safe slug from free text. Trailing/leading hyphens trimmed; capped to 64. */
 function slugify(input: string): string {
@@ -121,12 +117,12 @@ function AdornButton({
 function PreviewRail({
   name,
   slug,
-  planLabel,
+  validUntilLabel,
   email,
 }: {
   name: string;
   slug: string;
-  planLabel: string | null;
+  validUntilLabel: string | null;
   email: string;
 }) {
   const displayName = name.trim() || "New tenant";
@@ -173,7 +169,7 @@ function PreviewRail({
               className="size-1.5 rounded-full bg-[var(--color-primary)] ring-2 ring-[oklch(from_var(--color-primary)_l_c_h_/_0.18)]"
             />
             <span className="text-[12px] text-[var(--color-muted-foreground)]">
-              {planLabel ?? "Default plan"}
+              {validUntilLabel ? `Valid until ${validUntilLabel}` : "Default validity"}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -213,25 +209,9 @@ export function CreateTenantDialog({
   const [showPassword, setShowPassword] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
-  const plansQuery = useQuery({
-    queryKey: ["billing", "plans", "active"],
-    queryFn: () => getPlans(false),
-    enabled: open,
-  });
-
-  const planOptions: SelectOption[] = (plansQuery.data ?? []).map((p) => ({
-    value: p.key,
-    label: p.name,
-    hint: `${p.interval} · ${formatMoney(planTermPrice(p), p.currency)}`,
-  }));
-  // Prefer the conventional trial plan, else the first active plan.
-  const defaultPlanKey =
-    plansQuery.data?.find((p) => p.key === "free")?.key ?? plansQuery.data?.[0]?.key ?? "";
-
   const {
     register,
     handleSubmit,
-    control,
     reset,
     setValue,
     getValues,
@@ -246,7 +226,7 @@ export function CreateTenantDialog({
       adminPassword: "",
       issuer: "",
       connectionString: "",
-      planKey: "",
+      validUpto: "",
     },
   });
 
@@ -254,22 +234,12 @@ export function CreateTenantDialog({
   const name = watch("name");
   const idValue = watch("id");
   const adminEmail = watch("adminEmail");
-  const planKey = watch("planKey");
+  const validUpto = watch("validUpto");
 
   const idValid = TENANT_ID_RE.test((idValue ?? "").trim());
   const idTouched = (idValue ?? "").trim().length > 0;
 
-  const selectedPlan = plansQuery.data?.find((p) => p.key === planKey);
-  const planLabel = selectedPlan
-    ? `${selectedPlan.name} · ${formatMoney(planTermPrice(selectedPlan), selectedPlan.currency)}`
-    : null;
-
-  // Preselect the default/trial plan once plans load (without clobbering a choice).
-  useEffect(() => {
-    if (defaultPlanKey && !getValues("planKey")) {
-      setValue("planKey", defaultPlanKey);
-    }
-  }, [defaultPlanKey, getValues, setValue]);
+  const validUntilLabel = validUpto ? new Date(validUpto).toLocaleDateString() : null;
 
   // Auto-derive the identifier slug from the display name until the operator
   // unlocks the field for manual editing.
@@ -294,7 +264,7 @@ export function CreateTenantDialog({
         adminPassword: values.adminPassword,
         issuer: values.issuer,
         connectionString: values.connectionString?.trim() ? values.connectionString : null,
-        planKey: values.planKey?.trim() ? values.planKey : null,
+        validUpto: values.validUpto?.trim() ? new Date(values.validUpto).toISOString() : null,
       }),
     onSuccess: (result) => {
       toast.success(`Tenant ${result.id} created`, {
@@ -358,7 +328,7 @@ export function CreateTenantDialog({
           <PreviewRail
             name={name ?? ""}
             slug={idValue ?? ""}
-            planLabel={planLabel}
+            validUntilLabel={validUntilLabel}
             email={adminEmail ?? ""}
           />
 
@@ -491,37 +461,14 @@ export function CreateTenantDialog({
                 </div>
               </Field>
 
-              {/* Plan */}
+              {/* Valid until */}
               <Field
-                id="ct-plan"
-                label="Billing plan"
-                hint={
-                  plansQuery.isError
-                    ? "Could not load plans — the tenant will fall back to the default plan."
-                    : "Sets the first invoice and how long the tenant stays valid. Defaults to the trial plan."
-                }
-                error={errors.planKey?.message}
+                id="ct-validUpto"
+                label="Valid until"
+                hint="Optional. Leave blank to use the server's default validity window."
+                error={errors.validUpto?.message}
               >
-                <Controller
-                  control={control}
-                  name="planKey"
-                  render={({ field }) => (
-                    <Select
-                      id="ct-plan"
-                      value={field.value ?? ""}
-                      onValueChange={field.onChange}
-                      options={planOptions}
-                      emptyLabel={
-                        plansQuery.isLoading
-                          ? "Loading plans…"
-                          : planOptions.length === 0
-                            ? "No active plans"
-                            : undefined
-                      }
-                      disabled={plansQuery.isLoading || planOptions.length === 0}
-                    />
-                  )}
-                />
+                <Input id="ct-validUpto" type="date" {...register("validUpto")} />
               </Field>
 
               {/* Advanced disclosure — issuer + dedicated database */}

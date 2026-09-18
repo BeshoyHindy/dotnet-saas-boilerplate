@@ -43,16 +43,6 @@ const ConfirmEmailPage = lazyNamed(
 );
 const OverviewPage = lazyNamed(() => import("@/pages/overview"), "OverviewPage");
 const ActivityPage = lazyNamed(() => import("@/pages/activity"), "ActivityPage");
-const InvoicesPage = lazyNamed(() => import("@/pages/invoices"), "InvoicesPage");
-const InvoiceDetailPage = lazyNamed(
-  () => import("@/pages/invoice-detail"),
-  "InvoiceDetailPage",
-);
-const SubscriptionPage = lazyNamed(
-  () => import("@/pages/subscription"),
-  "SubscriptionPage",
-);
-const WalletPage = lazyNamed(() => import("@/pages/wallet"), "WalletPage");
 const NotFoundPage = lazyNamed(() => import("@/pages/not-found"), "NotFoundPage");
 const TenantDeactivatedPage = lazyNamed(
   () => import("@/pages/tenant-deactivated"),
@@ -187,10 +177,6 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: withSuspense(<OverviewPage />) },
           { path: "activity", element: withSuspense(<ActivityPage />) },
-          { path: "subscription", element: withSuspense(<SubscriptionPage />) },
-          { path: "wallet", element: withSuspense(<WalletPage />) },
-          { path: "invoices", element: withSuspense(<InvoicesPage />) },
-          { path: "invoices/:id", element: withSuspense(<InvoiceDetailPage />) },
           { path: "system/health", element: withSuspense(<HealthPage />) },
           { path: "system/audits", element: withSuspense(<AuditsPage />) },
           { path: "system/trash", element: withSuspense(<TrashPage />) },

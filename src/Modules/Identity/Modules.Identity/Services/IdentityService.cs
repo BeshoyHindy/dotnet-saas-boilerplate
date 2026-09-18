@@ -286,7 +286,7 @@ public sealed class IdentityService : IIdentityService
             throw new UnauthorizedException($"tenant {tenant.Id} is deactivated");
         }
 
-        // Honor the billing grace period: a lapsed tenant can still authenticate until
+        // Honor the tenant-validity grace period: a lapsed tenant can still authenticate until
         // ValidUpto + grace (matching the request-time guard in MultitenancyModule).
         if (_timeProvider.GetUtcNow().UtcDateTime > tenant.ValidUpto.AddDays(_gracePeriodDays))
         {

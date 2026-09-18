@@ -155,7 +155,7 @@ errors per request.
 
 1. Builds the same DI container the API does (every module's
    `ConfigureServices`), with web-only concerns (CORS, OpenAPI, jobs,
-   mailing, SSE, realtime, OpenTelemetry, quotas, idempotency)
+   mailing, SSE, realtime, OpenTelemetry, idempotency)
    disabled.
 2. Removes every `IHostedService` so background workers don't fight
    with the migrator.

@@ -1,6 +1,6 @@
 # Boilerplate — Dashboard
 
-Tenant-facing dashboard for the Boilerplate. Shows realtime telemetry over Server-Sent Events, current-period usage vs. plan limits (Recharts), and billing history.
+Tenant-facing dashboard for the Boilerplate. Shows realtime telemetry over Server-Sent Events and the tenant's validity window.
 
 Built with React 19, Vite 7, TypeScript, TanStack Query, React Router, Tailwind 4 + shadcn/ui, and Recharts. Standalone — not part of a pnpm workspace — so it plugs into .NET Aspire as a plain `ExecutableResource`.
 
@@ -56,14 +56,14 @@ The dev server proxies `/api`, `/openapi`, and `/scalar` to `VITE_API_BASE_URL` 
 
 ```
 src/
-├── api/                  # Typed API clients (billing, usage, subscription)
+├── api/                  # Typed API clients (tenants, audits, files, health, notifications)
 ├── auth/                 # JWT-backed auth (own localStorage prefix: boilerplate.dashboard.*)
 ├── components/
 │   ├── layout/           # Sidebar, Topbar, AppShell
 │   ├── sse/              # SseStatusBadge, LiveFeed
 │   └── ui/               # shadcn primitives
 ├── lib/                  # api-client, query-client, cn
-├── pages/                # Overview, Activity, Invoices, Login, NotFound
+├── pages/                # Overview, Activity, Login, NotFound
 ├── sse/
 │   ├── sse-api.ts        # POST /api/v1/sse/token
 │   └── sse-context.tsx   # SSE connection manager (fetch-based streaming)
@@ -88,8 +88,7 @@ The `SseProvider` in `src/sse/sse-context.tsx` is mounted inside `AppShell`, so 
 
 ### What the overview shows
 
-- **Usage this period** — current-month `UsageSnapshots` rendered as a bar chart of used vs. plan limit. Overage bars turn red.
-- **Subscription** — plan key, status, and validity window from `GET /billing/subscriptions/me`.
+- **Valid for** — the tenant's validity window (days left / grace / expired) from `GET /api/v1/tenants/me/status`.
 - **Live activity** — rolling feed of SSE events as the backend publishes them.
 
 ## Authentication flow

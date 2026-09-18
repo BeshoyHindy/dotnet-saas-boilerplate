@@ -2,21 +2,17 @@ import {
   Activity,
   Building2,
   LayoutDashboard,
-  Receipt,
   ScrollText,
   Settings,
   ShieldCheck,
   UserCog,
   UsersRound,
-  Webhook,
   type LucideIcon,
 } from "lucide-react";
 import {
   AuditingPermissions,
-  BillingPermissions,
   IdentityPermissions,
   MultitenancyPermissions,
-  WebhooksPermissions,
 } from "@/lib/permissions";
 
 /** A single nav destination — label, route, icon, optional perm guard. */
@@ -92,18 +88,6 @@ export const sections: NavSection[] = [
     caption: "Operations",
     icon: Activity,
     items: [
-      {
-        to: "/billing",
-        label: "Billing",
-        icon: Receipt,
-        perms: [BillingPermissions.View],
-      },
-      {
-        to: "/webhooks",
-        label: "Webhooks",
-        icon: Webhook,
-        perms: [WebhooksPermissions.Subscriptions.View],
-      },
       {
         to: "/audits",
         label: "Audits",
@@ -185,13 +169,6 @@ export const NAV_ITEMS: NavItem[] = [
     perms: [IdentityPermissions.Roles.View],
   },
   {
-    to: "/billing",
-    label: "Billing",
-    icon: Receipt,
-    matchPrefix: "/billing",
-    perms: [BillingPermissions.View],
-  },
-  {
     to: "/impersonation",
     label: "Impersonation",
     icon: UserCog,
@@ -204,13 +181,6 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ScrollText,
     matchPrefix: "/audits",
     perms: [AuditingPermissions.AuditTrails.View],
-  },
-  {
-    to: "/webhooks",
-    label: "Webhooks",
-    icon: Webhook,
-    matchPrefix: "/webhooks",
-    perms: [WebhooksPermissions.Subscriptions.View],
   },
   { to: "/health", label: "Health", icon: Activity, matchPrefix: "/health" },
 ];

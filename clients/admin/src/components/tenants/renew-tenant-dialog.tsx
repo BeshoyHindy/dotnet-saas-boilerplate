@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { renewTenant } from "@/api/tenants";
-import { getPlans, planTermPrice } from "@/api/billing";
 import { Button } from "@/components/ui/button";
-import { Field, Select, type SelectOption } from "@/components/list";
+import { Input } from "@/components/ui/input";
+import { Field } from "@/components/list";
 import {
   Dialog,
   DialogBody,
@@ -17,14 +17,6 @@ import {
 } from "@/components/ui/dialog";
 import { ApiRequestError } from "@/lib/api-client";
 
-function formatMoney(amount: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
-  } catch {
-    return `${amount.toFixed(2)} ${currency}`;
-  }
-}
-
 function formatDate(value?: string | null): string {
   if (!value) return "—";
   const d = new Date(value);
@@ -32,50 +24,40 @@ function formatDate(value?: string | null): string {
 }
 
 /**
- * Renew or change a tenant's plan. Renewing the same plan extends validity by one term; choosing a
- * different plan switches the tenant from the renewal forward. The server issues the term invoice.
+ * Renew a tenant's validity. Leave the term blank to use the server's default
+ * extension, or specify a number of months (1–120) to stack on top of the
+ * tenant's remaining time.
  */
 export function RenewTenantDialog({
   open,
   onOpenChange,
   tenantId,
-  currentPlanKey,
   validUpto,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tenantId: string;
-  currentPlanKey?: string | null;
   validUpto?: string;
 }) {
   const queryClient = useQueryClient();
-  const [planKey, setPlanKey] = useState<string>("");
+  const [months, setMonths] = useState<string>("");
 
-  const plansQuery = useQuery({
-    queryKey: ["billing", "plans", "active"],
-    queryFn: () => getPlans(false),
-    enabled: open,
-  });
-
-  // Default the selection to the tenant's current plan once plans (and the current key) are known.
+  // Reset the field each time the dialog opens.
   useEffect(() => {
-    if (!open) return;
-    if (currentPlanKey && !planKey) setPlanKey(currentPlanKey);
-  }, [open, currentPlanKey, planKey]);
+    if (open) setMonths("");
+  }, [open]);
 
-  const options: SelectOption[] = (plansQuery.data ?? []).map((p) => ({
-    value: p.key,
-    label: p.key === currentPlanKey ? `${p.name} (current)` : p.name,
-    hint: `${p.interval} · ${formatMoney(planTermPrice(p), p.currency)}`,
-  }));
+  const parsedMonths = months.trim() ? Number(months) : null;
+  const monthsInvalid =
+    parsedMonths !== null &&
+    (!Number.isFinite(parsedMonths) || parsedMonths < 1 || parsedMonths > 120);
 
   const mutation = useMutation({
-    mutationFn: (key: string) => renewTenant(tenantId, key || null),
+    mutationFn: (value: number | null) => renewTenant(tenantId, value),
     onSuccess: (result) => {
-      toast.success(
-        result.planChanged ? `Plan changed to ${result.planKey}` : "Tenant renewed",
-        { description: `Valid until ${formatDate(result.validUpto)}. A term invoice was issued.` },
-      );
+      toast.success("Tenant renewed", {
+        description: `Valid until ${formatDate(result.validUpto)}.`,
+      });
       queryClient.invalidateQueries({ queryKey: ["tenant", tenantId] });
       queryClient.invalidateQueries({ queryKey: ["tenants"] });
       onOpenChange(false);
@@ -88,8 +70,6 @@ export function RenewTenantDialog({
       toast.error("Renew failed", { description: detail });
     },
   });
-
-  const planChanged = !!planKey && planKey !== currentPlanKey;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -104,32 +84,30 @@ export function RenewTenantDialog({
             >
               <CalendarClock className="h-[18px] w-[18px]" />
             </span>
-            <DialogTitle className="text-[16px]">Renew subscription</DialogTitle>
+            <DialogTitle className="text-[16px]">Renew tenant</DialogTitle>
           </div>
           <DialogDescription className="mt-1">
-            Extend the tenant by one plan term (stacking on remaining time) or switch plans. Currently
-            valid until {formatDate(validUpto)}.
+            Extend the tenant's validity, stacking on any remaining time. Currently valid until{" "}
+            {formatDate(validUpto)}.
           </DialogDescription>
         </DialogHeader>
 
         <DialogBody className="space-y-4">
           <Field
-            id="renew-plan"
-            label="Plan"
-            required
-            hint={
-              planChanged
-                ? "Switching plans — the new plan applies from this renewal forward."
-                : "Renewing the current plan extends validity by one term."
-            }
+            id="renew-months"
+            label="Months"
+            hint="Optional. Leave blank to use the server's default extension. 1–120."
+            error={monthsInvalid ? "Enter a number of months between 1 and 120." : undefined}
           >
-            <Select
-              id="renew-plan"
-              value={planKey}
-              onValueChange={setPlanKey}
-              options={options}
-              emptyLabel={plansQuery.isLoading ? "Loading plans…" : options.length === 0 ? "No active plans" : undefined}
-              disabled={plansQuery.isLoading || options.length === 0}
+            <Input
+              id="renew-months"
+              type="number"
+              min={1}
+              max={120}
+              inputMode="numeric"
+              placeholder="Default"
+              value={months}
+              onChange={(e) => setMonths(e.target.value)}
             />
           </Field>
         </DialogBody>
@@ -138,8 +116,12 @@ export function RenewTenantDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={mutation.isPending}>
             Cancel
           </Button>
-          <Button type="button" onClick={() => mutation.mutate(planKey)} disabled={mutation.isPending || !planKey}>
-            {mutation.isPending ? "Renewing…" : planChanged ? "Change plan & renew" : "Renew"}
+          <Button
+            type="button"
+            onClick={() => mutation.mutate(parsedMonths)}
+            disabled={mutation.isPending || monthsInvalid}
+          >
+            {mutation.isPending ? "Renewing…" : "Renew"}
           </Button>
         </DialogFooter>
       </DialogContent>

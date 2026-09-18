@@ -7,8 +7,13 @@ namespace Boilerplate.Modules.Multitenancy.Features.v1.CreateTenant;
 
 public sealed class CreateTenantCommandValidator : AbstractValidator<CreateTenantCommand>
 {
-    public CreateTenantCommandValidator(ITenantService tenantService, IConnectionStringValidator connectionStringValidator)
+    public CreateTenantCommandValidator(
+        ITenantService tenantService,
+        IConnectionStringValidator connectionStringValidator,
+        TimeProvider timeProvider)
     {
+        ArgumentNullException.ThrowIfNull(timeProvider);
+
         RuleFor(t => t.Id).Cascade(CascadeMode.Stop)
             .NotEmpty()
             .MustAsync(async (id, ct) => !await tenantService.ExistsWithIdAsync(id, ct).ConfigureAwait(false))
@@ -34,11 +39,13 @@ public sealed class CreateTenantCommandValidator : AbstractValidator<CreateTenan
             .MinimumLength(8)
             .WithMessage("Admin password must be at least 8 characters.");
 
-        // Optional — null/empty falls back to the configured default plan. When supplied it must be a
-        // lowercase plan slug; existence is validated by GetPlanTerm in the handler.
-        RuleFor(t => t.PlanKey)
-            .Matches("^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$")
-            .When(t => !string.IsNullOrWhiteSpace(t.PlanKey))
-            .WithMessage("Plan key must be a lowercase slug (a-z, 0-9, hyphen).");
+        // Optional — null falls back to the configured default validity term. When supplied it must
+        // grant the tenant a window that is still open.
+        // Normalized as UTC, matching how TenantService stores the date.
+        RuleFor(t => t.ValidUpto)
+            .Must(validUpto => DateTime.SpecifyKind(validUpto!.Value, DateTimeKind.Utc)
+                > timeProvider.GetUtcNow().UtcDateTime)
+            .When(t => t.ValidUpto.HasValue)
+            .WithMessage("Valid upto must be in the future.");
     }
 }

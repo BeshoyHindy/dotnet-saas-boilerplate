@@ -7,7 +7,7 @@ namespace Boilerplate.BuildingBlocks.Core.Domain;
 /// <c>IsMultiTenant()</c> by <c>BaseDbContext.OnModelCreating</c>.
 ///
 /// Implement this only for rows that are genuinely shared across all
-/// tenants — platform billing plans, cross-tenant audit/impersonation
-/// records, system catalogs. The default is tenant-isolated.
+/// tenants — cross-tenant audit/impersonation records, system catalogs.
+/// The default is tenant-isolated.
 /// </summary>
 public interface IGlobalEntity { }

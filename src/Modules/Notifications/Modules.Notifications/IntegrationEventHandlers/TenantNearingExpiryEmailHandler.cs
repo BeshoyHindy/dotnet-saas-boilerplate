@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Boilerplate.Modules.Notifications.IntegrationEventHandlers;
 
-/// <summary>Emails the tenant admin that their subscription is nearing expiry.</summary>
+/// <summary>Emails the tenant admin that their account is nearing expiry.</summary>
 public sealed class TenantNearingExpiryEmailHandler(
     IMailService mailService,
     ILogger<TenantNearingExpiryEmailHandler> logger)
@@ -14,9 +14,9 @@ public sealed class TenantNearingExpiryEmailHandler(
     public async Task HandleAsync(TenantNearingExpiryIntegrationEvent @event, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(@event);
-        var (subject, body) = BillingEmailBodies.NearingExpiry(
-            @event.TenantName, @event.PlanKey, @event.ValidUpto, @event.DaysRemaining);
-        await BillingEmailSender.SendAsync(mailService, logger, @event.AdminEmail, subject, body, "nearing-expiry", ct)
+        var (subject, body) = TenantLifecycleEmailBodies.NearingExpiry(
+            @event.TenantName, @event.ValidUpto, @event.DaysRemaining);
+        await TenantLifecycleEmailSender.SendAsync(mailService, logger, @event.AdminEmail, subject, body, "nearing-expiry", ct)
             .ConfigureAwait(false);
     }
 }

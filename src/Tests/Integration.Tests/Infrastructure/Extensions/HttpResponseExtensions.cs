@@ -10,7 +10,7 @@ public static class HttpResponseExtensions
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
         // The API serializes enums as string names (global JsonStringEnumConverter); the converter
-        // also reads them back, so DTOs with enum fields (e.g. BillingPlanDto.Interval) deserialize.
+        // also reads them back, so DTOs with enum fields (e.g. AuditEnvelope.EventType) deserialize.
         Converters = { new JsonStringEnumConverter() }
     };
 

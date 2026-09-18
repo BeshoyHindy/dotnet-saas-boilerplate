@@ -3,8 +3,6 @@ using System.Net;
 using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.BuildingBlocks.Core.Exceptions;
 using Boilerplate.BuildingBlocks.Eventing.Abstractions;
-using Boilerplate.BuildingBlocks.Quota;
-using Boilerplate.BuildingBlocks.Shared.Quota;
 using Boilerplate.BuildingBlocks.Storage.Services;
 using Boilerplate.Modules.Files.Contracts.Events;
 using Boilerplate.Modules.Files.Contracts.v1.Commands;
@@ -22,7 +20,6 @@ public sealed class FinalizeUploadCommandHandler(
     FilesDbContext db,
     IStorageService storage,
     IFileScanner scanner,
-    IQuotaService quotas,
     IOutboxWriter outbox,
     ICurrentUser currentUser)
     : ICommandHandler<FinalizeUploadCommand, FileAssetDto>
@@ -76,9 +73,6 @@ public sealed class FinalizeUploadCommandHandler(
 
         var scanResult = await scanner.ScanAsync(asset.StorageKey, cancellationToken).ConfigureAwait(false);
         asset.MarkAvailable(head.SizeBytes, scanResult);
-
-        // Debit quota with the actual bytes. Refunded on hard purge by PurgeDeletedFilesJob.
-        await quotas.RecordAsync(tenantId, QuotaResource.StorageBytes, head.SizeBytes, cancellationToken).ConfigureAwait(false);
 
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 

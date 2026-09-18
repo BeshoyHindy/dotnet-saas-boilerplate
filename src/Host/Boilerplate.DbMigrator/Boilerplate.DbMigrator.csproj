@@ -34,13 +34,10 @@
     <ProjectReference Include="..\..\BuildingBlocks\Web\Boilerplate.BuildingBlocks.Web.csproj" />
     <ProjectReference Include="..\..\Modules\Auditing\Modules.Auditing\Boilerplate.Modules.Auditing.csproj" />
     <ProjectReference Include="..\..\Modules\Auditing\Modules.Auditing.Contracts\Boilerplate.Modules.Auditing.Contracts.csproj" />
-    <ProjectReference Include="..\..\Modules\Billing\Modules.Billing\Boilerplate.Modules.Billing.csproj" />
-    <ProjectReference Include="..\..\Modules\Billing\Modules.Billing.Contracts\Boilerplate.Modules.Billing.Contracts.csproj" />
     <ProjectReference Include="..\..\Modules\Files\Modules.Files\Boilerplate.Modules.Files.csproj" />
     <ProjectReference Include="..\..\Modules\Files\Modules.Files.Contracts\Boilerplate.Modules.Files.Contracts.csproj" />
     <ProjectReference Include="..\..\Modules\Identity\Modules.Identity\Boilerplate.Modules.Identity.csproj" />
     <ProjectReference Include="..\..\Modules\Multitenancy\Modules.Multitenancy\Boilerplate.Modules.Multitenancy.csproj" />
-    <ProjectReference Include="..\..\Modules\Webhooks\Modules.Webhooks\Boilerplate.Modules.Webhooks.csproj" />
     <ProjectReference Include="..\Boilerplate.Migrations.PostgreSQL\Boilerplate.Migrations.PostgreSQL.csproj" />
   </ItemGroup>
 

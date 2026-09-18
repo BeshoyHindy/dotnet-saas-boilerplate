@@ -9,9 +9,11 @@ public sealed class RenewTenantCommandValidator : AbstractValidator<RenewTenantC
     {
         RuleFor(t => t.TenantId).NotEmpty();
 
-        RuleFor(t => t.PlanKey)
-            .Matches("^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$")
-            .When(t => !string.IsNullOrWhiteSpace(t.PlanKey))
-            .WithMessage("Plan key must be a lowercase slug (a-z, 0-9, hyphen).");
+        // Optional — null falls back to the configured default term. 120 months (10 years) is the
+        // upper bound, past which the caller almost certainly meant something else.
+        RuleFor(t => t.Months)
+            .InclusiveBetween(1, 120)
+            .When(t => t.Months.HasValue)
+            .WithMessage("Months must be between 1 and 120.");
     }
 }

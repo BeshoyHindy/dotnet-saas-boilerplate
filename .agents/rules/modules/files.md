@@ -7,7 +7,7 @@ Presigned-URL file lifecycle (upload → finalize → serve → delete) shared b
 
 ## Gotchas
 
-- **Presigned flow** — never stream uploads through the API. RequestUploadUrl validates category/extension/size + quota **pre-check** and persists a `PendingUpload`; client uploads directly to storage; **FinalizeUpload debits the quota** (not at request time) and flips to Available/Quarantined.
+- **Presigned flow** — never stream uploads through the API. RequestUploadUrl validates category/extension/size and persists a `PendingUpload`; client uploads directly to storage; FinalizeUpload verifies the stored object against the declared size/content-type and flips to Available/Quarantined.
 - **`FileAccessPolicyRegistry`** resolves `IFileAccessPolicy` by **OwnerType** — case-insensitive, **closed by default** (unknown OwnerType → forbidden), **last-write-wins** on duplicates (intentional, for test substitution). Each owning module registers its own policy in its `ConfigureServices` (owning modules load after Files). Files ships `DefaultUploaderOnlyPolicy` for built-in OwnerTypes `"MyFiles"`/`"User"`.
 - `CanChangeVisibilityAsync` defaults to the delete rule (uploader-only); domain-bound files may override to forbid visibility flips.
 - Tenant scoping is implicit via `BaseDbContext` (no explicit `TenantId` on `FileAsset`).

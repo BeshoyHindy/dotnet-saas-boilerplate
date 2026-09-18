@@ -35,7 +35,6 @@ public sealed class TenantServiceStatusBoundaryTests
 
         var tenant = new AppTenantInfo(tenantId, "Acme", connectionString: null, adminEmail: "admin@acme.test")
         {
-            Plan = "pro",
             ValidUpto = ValidUpto,
         };
         _store.GetAsync(tenantId).Returns(tenant);
@@ -47,7 +46,7 @@ public sealed class TenantServiceStatusBoundaryTests
             dbContext: null!,
             provisioningService: null!,
             _clock,
-            Options.Create(new TenantBillingOptions { GracePeriodDays = GraceDays }),
+            Options.Create(new TenantValidityOptions { GracePeriodDays = GraceDays }),
             NullLogger<TenantService>.Instance);
 
         var status = await sut.GetStatusAsync(tenantId, CancellationToken.None);

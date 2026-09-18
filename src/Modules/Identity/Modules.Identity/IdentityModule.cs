@@ -2,7 +2,6 @@
 using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.BuildingBlocks.Eventing;
 using Boilerplate.BuildingBlocks.Persistence;
-using Boilerplate.BuildingBlocks.Quota;
 using Boilerplate.BuildingBlocks.Storage;
 using Boilerplate.BuildingBlocks.Storage.Local;
 using Boilerplate.BuildingBlocks.Storage.Services;
@@ -125,7 +124,7 @@ public class IdentityModule : IModule
         // Configure password policy options
         services.Configure<PasswordPolicyOptions>(builder.Configuration.GetSection("PasswordPolicy"));
 
-        // Tenant subscription grace period (shared "Billing" section) — used by the login expiry check.
+        // Tenant validity grace period (shared "TenantValidity" section) — used by the login expiry check.
         services.Configure<TenantGraceOptions>(builder.Configuration.GetSection(TenantGraceOptions.SectionName));
 
         // Register password history service
@@ -140,9 +139,6 @@ public class IdentityModule : IModule
 
         // Register group role service for group-derived permissions
         services.AddScoped<IGroupRoleService, GroupRoleService>();
-
-        // Quota gauge: reports live user count per tenant for the Users quota.
-        services.AddScoped<IQuotaGaugeProvider, UserCountQuotaGaugeProvider>();
 
         services.AddIdentity<AppUser, AppRole>(options =>
         {

@@ -10,8 +10,7 @@ namespace Boilerplate.Modules.Files.Jobs;
 
 /// <summary>
 /// Hourly purge of FileAsset rows stuck in PendingUpload past their UploadDeadline. Best-effort
-/// removal of any bytes that did make it to storage. No quota effect — those bytes were never
-/// debited.
+/// removal of any bytes that did make it to storage.
 /// </summary>
 public sealed class PurgeOrphanedFilesJob(
     FilesDbContext db,

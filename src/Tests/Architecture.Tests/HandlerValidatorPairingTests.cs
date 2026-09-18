@@ -15,9 +15,6 @@ public class HandlerValidatorPairingTests
     
     // Known missing validators (to be implemented)
     private static readonly string[] KnownMissingCommandHandlers = [
-        "Boilerplate.Modules.Billing.Features.v1.Invoices.VoidInvoice.VoidInvoiceCommandHandler",
-        "Boilerplate.Modules.Billing.Features.v1.Invoices.MarkInvoicePaid.MarkInvoicePaidCommandHandler",
-        "Boilerplate.Modules.Billing.Features.v1.Invoices.IssueInvoice.IssueInvoiceCommandHandler",
         "Boilerplate.Modules.Identity.Features.v1.TwoFactor.Enroll.EnrollTwoFactorCommandHandler",
         "Boilerplate.Modules.Identity.Features.v1.Impersonation.EndImpersonation.EndImpersonationCommandHandler",
         "Boilerplate.Modules.Multitenancy.Features.v1.TenantProvisioning.RetryTenantProvisioning.RetryTenantProvisioningCommandHandler",
@@ -25,8 +22,6 @@ public class HandlerValidatorPairingTests
     ];
 
     private static readonly string[] KnownMissingQueryHandlers = [
-        "Boilerplate.Modules.Billing.Features.v1.Invoices.GetMyInvoices.GetMyInvoicesQueryHandler",
-        "Boilerplate.Modules.Billing.Features.v1.Invoices.GetInvoices.GetInvoicesQueryHandler",
         "Boilerplate.Modules.Identity.Features.v1.Sessions.GetTenantSessions.GetTenantSessionsQueryHandler"
     ];
 

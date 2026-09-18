@@ -51,8 +51,8 @@ public sealed class MultitenancyModule : IModule
         Boilerplate.BuildingBlocks.Shared.Constants.PermissionConstants.Register(
             Boilerplate.Modules.Multitenancy.Contracts.Authorization.MultitenancyPermissions.All);
 
-        builder.Services.Configure<TenantBillingOptions>(
-            builder.Configuration.GetSection(TenantBillingOptions.SectionName));
+        builder.Services.Configure<TenantValidityOptions>(
+            builder.Configuration.GetSection(TenantValidityOptions.SectionName));
 
         builder.Services.AddScoped<ITenantService, TenantService>();
         builder.Services.AddScoped<ITenantThemeService, TenantThemeService>();
@@ -186,7 +186,7 @@ public sealed class MultitenancyModule : IModule
                     // Expiry is enforced on every request (not just at login) with a grace period:
                     // a tenant past ValidUpto still works until ValidUpto + grace, then is hard-blocked.
                     var graceDays = ctx.RequestServices
-                        .GetRequiredService<IOptions<TenantBillingOptions>>().Value.GracePeriodDays;
+                        .GetRequiredService<IOptions<TenantValidityOptions>>().Value.GracePeriodDays;
                     var nowUtc = ctx.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime;
                     var graceEndsUtc = tenant.ValidUpto.AddDays(graceDays);
                     if (nowUtc > graceEndsUtc)

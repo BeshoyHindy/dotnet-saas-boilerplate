@@ -13,5 +13,4 @@ public static class TestConstants
     public const string IdentityBasePath = "/api/v1/identity";
     public const string TenantsBasePath = "/api/v1/tenants";
     public const string AuditsBasePath = "/api/v1/audits";
-    public const string WebhooksBasePath = "/api/v1/webhooks";
 }

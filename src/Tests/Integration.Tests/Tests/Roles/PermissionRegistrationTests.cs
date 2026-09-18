@@ -1,6 +1,5 @@
 using Boilerplate.BuildingBlocks.Shared.Constants;
 using Boilerplate.Modules.Auditing.Contracts.Authorization;
-using Boilerplate.Modules.Billing.Contracts.Authorization;
 using Boilerplate.Modules.Files.Contracts.Authorization;
 using Boilerplate.Modules.Identity.Contracts.Authorization;
 using Boilerplate.Modules.Multitenancy.Contracts.Authorization;
@@ -36,7 +35,6 @@ public sealed class PermissionRegistrationTests
         AssertAllRegistered(registered, IdentityPermissions.All.Select(p => p.Name), nameof(IdentityPermissions));
         AssertAllRegistered(registered, MultitenancyPermissions.All.Select(p => p.Name), nameof(MultitenancyPermissions));
         AssertAllRegistered(registered, AuditingPermissions.All.Select(p => p.Name), nameof(AuditingPermissions));
-        AssertAllRegistered(registered, BillingPermissions.All.Select(p => p.Name), nameof(BillingPermissions));
         AssertAllRegistered(registered, FilesPermissions.All.Select(p => p.Name), nameof(FilesPermissions));
         AssertAllRegistered(registered, NotificationPermissions.All.Select(p => p.Name), nameof(NotificationPermissions));
         AssertAllRegistered(registered, SystemPermissions.All.Select(p => p.Name), nameof(SystemPermissions));
@@ -79,7 +77,7 @@ public sealed class PermissionRegistrationTests
 
         // Spot-check one perm from each module — covers the "new module added but seeding not run" case.
         permSet.ShouldContain(IdentityPermissions.Users.View);
-        permSet.ShouldContain(BillingPermissions.View);
+        permSet.ShouldContain(FilesPermissions.Upload);
         permSet.ShouldContain(AuditingPermissions.AuditTrails.View);
         permSet.ShouldContain(SystemPermissions.Dashboard.View);
 

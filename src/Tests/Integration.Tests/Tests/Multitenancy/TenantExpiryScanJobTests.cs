@@ -11,13 +11,11 @@ namespace Integration.Tests.Tests.Multitenancy;
 /// <summary>
 /// Coverage for the daily tenant-expiry notification pipeline: the scan job records a dedup notice and
 /// publishes the matching event (which emails the tenant admin), and re-running the scan does not
-/// re-notify the same state for the same validity period. Also covers the invoice-issued email.
+/// re-notify the same state for the same validity period.
 /// </summary>
 [Collection(AppCollectionDefinition.Name)]
 public sealed class TenantExpiryScanJobTests
 {
-    private const string BillingBasePath = "/api/v1/billing";
-
     private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
@@ -34,8 +32,7 @@ public sealed class TenantExpiryScanJobTests
         var unique = Guid.NewGuid().ToString("N")[..8];
         var tenantId = $"scan-{unique}";
         var adminEmail = $"scan-{unique}@tenant.com";
-        var planKey = await CreatePlanAsync(rootClient, $"scan-m-{unique}", 10m);
-        await CreateTenantAsync(rootClient, tenantId, adminEmail, planKey);
+        await CreateTenantAsync(rootClient, tenantId, adminEmail);
 
         // Lapse into the grace period (1 day past ValidUpto).
         var adjust = await rootClient.PostAsJsonAsync(
@@ -60,30 +57,6 @@ public sealed class TenantExpiryScanJobTests
             "the grace notice must email the tenant admin");
     }
 
-    [Fact]
-    public async Task InvoiceIssued_Should_Email_TenantAdmin_OnPaidPlan()
-    {
-        using var rootClient = await _auth.CreateRootAdminClientAsync();
-        var unique = Guid.NewGuid().ToString("N")[..8];
-        var tenantId = $"inv-{unique}";
-        var adminEmail = $"inv-{unique}@tenant.com";
-        var planKey = await CreatePlanAsync(rootClient, $"inv-m-{unique}", 19m);
-
-        var mail = (NoOpMailService)_factory.Services.GetRequiredService<IMailService>();
-        mail.Clear();
-
-        // Creating a tenant on a paid plan issues the subscription invoice, which emails the admin.
-        // Both hops are outbox-driven now — TenantSubscribed, then InvoiceIssued — so this takes
-        // two dispatch cycles rather than happening inside the create request.
-        await CreateTenantAsync(rootClient, tenantId, adminEmail, planKey);
-        await OutboxDrain.DrainAsync(_factory.Services);
-        await OutboxDrain.DrainAsync(_factory.Services);
-
-        mail.Sent.ShouldContain(
-            m => m.To.Contains(adminEmail) && m.Subject.Contains("Invoice", StringComparison.OrdinalIgnoreCase),
-            "issuing the subscription invoice must email the tenant admin");
-    }
-
     private async Task RunScanAsync()
     {
         using var scope = _factory.Services.CreateScope();
@@ -101,15 +74,7 @@ public sealed class TenantExpiryScanJobTests
         return await db.TenantExpiryNotices.CountAsync(x => x.TenantId == tenantId && x.NoticeType == noticeType);
     }
 
-    private static async Task<string> CreatePlanAsync(HttpClient client, string key, decimal monthlyBasePrice)
-    {
-        var resp = await client.PostAsJsonAsync($"{BillingBasePath}/plans",
-            new { key, name = $"Plan {key}", currency = "USD", monthlyBasePrice });
-        resp.StatusCode.ShouldBe(HttpStatusCode.OK, await resp.Content.ReadAsStringAsync());
-        return key;
-    }
-
-    private static async Task CreateTenantAsync(HttpClient rootClient, string tenantId, string adminEmail, string planKey)
+    private static async Task CreateTenantAsync(HttpClient rootClient, string tenantId, string adminEmail)
     {
         var response = await rootClient.PostAsJsonAsync(TestConstants.TenantsBasePath, new
         {
@@ -119,7 +84,6 @@ public sealed class TenantExpiryScanJobTests
             adminEmail,
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer",
-            planKey,
         });
         var body = await response.Content.ReadAsStringAsync();
         response.StatusCode.ShouldBe(HttpStatusCode.Created, $"Create tenant failed: {body}");
