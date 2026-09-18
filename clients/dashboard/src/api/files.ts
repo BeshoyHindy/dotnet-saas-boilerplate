@@ -1,5 +1,4 @@
-import { apiFetch } from "@/lib/api-client";
-import type { PagedResponse } from "@/api/catalog";
+import { apiFetch, type PagedResponse } from "@/lib/api-client";
 
 // Mirrors Boilerplate.Modules.Files.Contracts.v1.DTOs.Visibility. The API serializes enums as
 // their string name (global JsonStringEnumConverter).

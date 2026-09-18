@@ -3,7 +3,7 @@
 Tenant-facing application. Read `frontend/shared.md` first; this file is only the divergences.
 
 - **Port** 5174 · dev proxy target `https://localhost:7030` (HTTPS, with `ws: true` for the SignalR hub) · localStorage prefix `boilerplate.dashboard.*` · login header `X-Client-App: dashboard`.
-- **Env** (`src/env.ts`): `{ apiBase, defaultTenant, demoMode }`.
+- **Env** (`src/env.ts`): `{ apiBase, defaultTenant }`.
 - Dev-proxy is HTTPS on purpose: routing the bearer token through an HTTP→HTTPS 307 redirect stripped the `Authorization` header.
 
 ## No RHF/zod — hand-rolled forms
@@ -18,7 +18,7 @@ The JWT carries **only role names**. `auth-context.tsx` fetches the effective pe
 
 - Every route element is wrapped in `withSuspense(node)` (per-route skeleton fallback). No per-route permission guards.
 - `RealtimeProvider` **and** `SseProvider` are mounted inside `AppShell` (authenticated routes only), under a `CommandPaletteProvider` (cmdk).
-- SignalR provider pre-wires ~11 chat/notification events.
+- SignalR provider pre-wires the notification/presence events.
 - **SSE** (`src/sse/`, dashboard-only): two-step token — `POST /api/v1/sse/token`, then `GET /api/v1/sse/stream?token=<guid>` consumed via fetch streaming (`parseSseStream` async generator; EventSource can't send auth headers). **Two split contexts:** `useSseStatus()` (stable, for status dots) vs `useSseEvents()` (mutates per event) to avoid cascading re-renders; `useSse()` is the composite.
 
 ## Impersonation
@@ -27,7 +27,7 @@ The JWT carries **only role names**. `auth-context.tsx` fetches the effective pe
 
 ## Performance
 
-- `@tanstack/react-virtual` for long lists — use it for any large collection (chat history, big tables).
+- `@tanstack/react-virtual` for long lists — use it for any large collection (big tables, long feeds).
 - `cmdk` powers the command palette.
 
 ## Theme

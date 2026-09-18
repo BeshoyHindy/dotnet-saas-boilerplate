@@ -8,13 +8,6 @@
         "dotnet-ef"
       ],
       "rollForward": false
-    },
-    "boilerplate.cli": {
-      "version": "10.0.0-rc.1",
-      "commands": [
-        "boilerplate"
-      ],
-      "rollForward": false
     }
   }
 }

@@ -164,7 +164,6 @@ public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Prog
                 ["HangfireOptions:Password"] = "integration-test-hangfire-pwd",
                 ["HangfireOptions:Route"] = "/jobs",
                 ["PasswordPolicy:EnforcePasswordExpiry"] = "false",
-                ["Seed:DemoPassword"] = "Password123!",
                 ["Seed:DefaultAdminPassword"] = TestConstants.DefaultPassword,
 
                 // Middleware-test overrides: rate limiting ON, but only the "auth" policy should trip —

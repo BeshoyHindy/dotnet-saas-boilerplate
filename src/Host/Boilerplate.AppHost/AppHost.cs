@@ -91,18 +91,6 @@ var migrator = builder.AddProject<Projects.Boilerplate_DbMigrator>($"{appPrefix}
     .WithEnvironment("Seed__DefaultAdminPassword", "123Pa$$word!")
     .WithArgs("apply", "--seed");
 
-// Demo seeder (dev-only): provisions the acme/globex tenants + demo-login users via seed-demo. DOTNET_ENVIRONMENT=Development is required (console host ignores ASPNETCORE_ENVIRONMENT) or seed-demo refuses to run.
-var demoSeeder = builder.AddProject<Projects.Boilerplate_DbMigrator>($"{appPrefix}-demo-seeder")
-    .WithReference(postgres)
-    .WaitFor(postgres)
-    .WaitForCompletion(migrator)
-    .WithEnvironment("DOTNET_ENVIRONMENT", "Development")
-    .WithEnvironment("DatabaseOptions__Provider", "POSTGRESQL")
-    .WithEnvironment("DatabaseOptions__ConnectionString", postgres.Resource.ConnectionStringExpression)
-    .WithEnvironment("DatabaseOptions__MigrationsAssembly", "Boilerplate.Migrations.PostgreSQL")
-    .WithEnvironment("Seed__DemoPassword", "Password123!")
-    .WithArgs("seed-demo");
-
 // API Service
 var api = builder.AddProject<Projects.Boilerplate_Api>($"{appPrefix}-api")
     .WithReference(postgres)
@@ -110,7 +98,6 @@ var api = builder.AddProject<Projects.Boilerplate_Api>($"{appPrefix}-api")
     .WaitFor(redis)
     .WaitForCompletion(minioInit)
     .WaitForCompletion(migrator)
-    .WaitForCompletion(demoSeeder)
     .WithExternalHttpEndpoints()
     .WithEnvironment("DatabaseOptions__Provider", "POSTGRESQL")
     .WithEnvironment("DatabaseOptions__ConnectionString", apiPgConnection)

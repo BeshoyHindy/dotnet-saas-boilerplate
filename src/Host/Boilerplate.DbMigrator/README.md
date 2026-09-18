@@ -39,12 +39,6 @@ dotnet run --project src/Host/Boilerplate.DbMigrator -- apply --seed
 
 # Just the seed step (assumes schema is already current).
 dotnet run --project src/Host/Boilerplate.DbMigrator -- seed
-
-# Dev only — provision the demo tenants (acme, globex) with users,
-# custom roles, sample catalog, tickets, and chat. Hard-refuses outside
-# Development. Idempotent: safe to re-run.
-DOTNET_ENVIRONMENT=Development \
-  dotnet run --project src/Host/Boilerplate.DbMigrator -- seed-demo
 ```
 
 Exit codes: `0` on success, `1` on any failure (see logged exception).
@@ -128,23 +122,20 @@ schema OR data. The two convenient ways to run it locally are:
   dependency of the API, so the API never starts against an
   unmigrated database.
 - **Raw**: run the migrator once after pulling, before starting the
-  API. Add `seed-demo` for a populated dev environment:
+  API:
 
   ```bash
   # Schema only (every env)
   dotnet run --project src/Host/Boilerplate.DbMigrator -- apply
 
-  # Dev: also provision acme + globex with rich demo content
-  dotnet run --project src/Host/Boilerplate.DbMigrator -- seed-demo
-
   # Then start the API
   dotnet run --project src/Host/Boilerplate.Api
   ```
 
-`seed-demo` is the **only** way to get the demo tenants and their
-users / catalog / tickets / chat. Fresh tenants created via
-`POST /api/v1/tenants` come up with just a tenant admin user — no
-catalogue, no demo content. This matches production behaviour.
+The migrator seeds the root tenant and its admin/operator users only.
+Fresh tenants created via `POST /api/v1/tenants` come up with just a
+tenant admin user — no sample content. This matches production
+behaviour.
 
 ## API behavior when schema is behind
 

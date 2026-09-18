@@ -18,34 +18,16 @@ public class HandlerValidatorPairingTests
         "Boilerplate.Modules.Billing.Features.v1.Invoices.VoidInvoice.VoidInvoiceCommandHandler",
         "Boilerplate.Modules.Billing.Features.v1.Invoices.MarkInvoicePaid.MarkInvoicePaidCommandHandler",
         "Boilerplate.Modules.Billing.Features.v1.Invoices.IssueInvoice.IssueInvoiceCommandHandler",
-        "Boilerplate.Modules.Catalog.Features.v1.Products.RestoreProduct.RestoreProductCommandHandler",
-        "Boilerplate.Modules.Catalog.Features.v1.Products.DeleteProduct.DeleteProductCommandHandler",
-        "Boilerplate.Modules.Catalog.Features.v1.Categories.RestoreCategory.RestoreCategoryCommandHandler",
-        "Boilerplate.Modules.Catalog.Features.v1.Categories.DeleteCategory.DeleteCategoryCommandHandler",
-        "Boilerplate.Modules.Catalog.Features.v1.Brands.RestoreBrand.RestoreBrandCommandHandler",
-        "Boilerplate.Modules.Catalog.Features.v1.Brands.DeleteBrand.DeleteBrandCommandHandler",
         "Boilerplate.Modules.Identity.Features.v1.TwoFactor.Enroll.EnrollTwoFactorCommandHandler",
         "Boilerplate.Modules.Identity.Features.v1.Impersonation.EndImpersonation.EndImpersonationCommandHandler",
         "Boilerplate.Modules.Multitenancy.Features.v1.TenantProvisioning.RetryTenantProvisioning.RetryTenantProvisioningCommandHandler",
-        "Boilerplate.Modules.Multitenancy.Features.v1.ResetTenantTheme.ResetTenantThemeCommandHandler",
-        "Boilerplate.Modules.Tickets.Features.v1.Tickets.RestoreTicket.RestoreTicketCommandHandler",
-        "Boilerplate.Modules.Tickets.Features.v1.Tickets.ResolveTicket.ResolveTicketCommandHandler",
-        "Boilerplate.Modules.Tickets.Features.v1.Tickets.ReopenTicket.ReopenTicketCommandHandler",
-        "Boilerplate.Modules.Tickets.Features.v1.Tickets.AssignTicket.AssignTicketCommandHandler"
+        "Boilerplate.Modules.Multitenancy.Features.v1.ResetTenantTheme.ResetTenantThemeCommandHandler"
     ];
 
     private static readonly string[] KnownMissingQueryHandlers = [
         "Boilerplate.Modules.Billing.Features.v1.Invoices.GetMyInvoices.GetMyInvoicesQueryHandler",
         "Boilerplate.Modules.Billing.Features.v1.Invoices.GetInvoices.GetInvoicesQueryHandler",
-        "Boilerplate.Modules.Catalog.Features.v1.Products.SearchProducts.SearchProductsQueryHandler",
-        "Boilerplate.Modules.Catalog.Features.v1.Products.ListTrashedProducts.ListTrashedProductsQueryHandler",
-        "Boilerplate.Modules.Catalog.Features.v1.Categories.SearchCategories.SearchCategoriesQueryHandler",
-        "Boilerplate.Modules.Catalog.Features.v1.Categories.ListTrashedCategories.ListTrashedCategoriesQueryHandler",
-        "Boilerplate.Modules.Catalog.Features.v1.Brands.SearchBrands.SearchBrandsQueryHandler",
-        "Boilerplate.Modules.Catalog.Features.v1.Brands.ListTrashedBrands.ListTrashedBrandsQueryHandler",
-        "Boilerplate.Modules.Identity.Features.v1.Sessions.GetTenantSessions.GetTenantSessionsQueryHandler",
-        "Boilerplate.Modules.Tickets.Features.v1.Tickets.SearchTickets.SearchTicketsQueryHandler",
-        "Boilerplate.Modules.Tickets.Features.v1.Tickets.ListTrashedTickets.ListTrashedTicketsQueryHandler"
+        "Boilerplate.Modules.Identity.Features.v1.Sessions.GetTenantSessions.GetTenantSessionsQueryHandler"
     ];
 
     [Fact]

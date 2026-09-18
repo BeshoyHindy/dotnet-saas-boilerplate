@@ -9,7 +9,7 @@ public class FileAssetTests
     private static FileAsset NewPending(Visibility visibility = Visibility.Public) =>
         FileAsset.CreatePending(
             id: Guid.NewGuid(),
-            ownerType: "Product",
+            ownerType: "Document",
             ownerId: Guid.NewGuid(),
             originalFileName: "x.png",
             sanitizedFileName: "x.png",
@@ -52,7 +52,7 @@ public class FileAssetTests
     public void CreatePending_Should_RejectNegativeSize()
     {
         Should.Throw<ArgumentOutOfRangeException>(() =>
-            FileAsset.CreatePending(Guid.NewGuid(), "Product", null, "x.png", "x.png",
+            FileAsset.CreatePending(Guid.NewGuid(), "Document", null, "x.png", "x.png",
                 "image/png", -1, "k", Visibility.Public, "u", DateTimeOffset.UtcNow.AddMinutes(1)));
     }
 

@@ -10,14 +10,14 @@ for local orchestration with .NET Aspire.
 ## What's in the box
 
 - **Modules** (bounded contexts, each with a `.Contracts` project as its only public surface):
-  Identity, Multitenancy, Billing, Catalog, Tickets, Chat, Files, Webhooks, Auditing, Notifications.
+  Identity, Multitenancy, Billing, Files, Webhooks, Auditing, Notifications.
 - **BuildingBlocks**: core domain primitives, persistence, web pipeline, caching (HybridCache on
   Valkey), eventing (outbox/inbox), jobs (Hangfire), storage (S3/MinIO), mailing, quotas.
 - **Hosts**: `Boilerplate.Api` (composition root), `Boilerplate.DbMigrator` (one-shot migrate/seed —
   the API never migrates at startup), `Boilerplate.AppHost` (Aspire orchestrator).
 - **Clients**: `clients/admin` (operator console) and `clients/dashboard` (tenant app) — React 19 +
   Vite + TypeScript, TanStack Query, React Router, Radix + Tailwind, SignalR/SSE.
-- **Deploy**: Docker Compose (`deploy/docker`) and Terraform for AWS (`deploy/terraform`).
+- **Deploy**: Docker Compose (`deploy/docker`) and Dokploy (`deploy/dokploy`).
 
 ## Prerequisites
 
@@ -52,9 +52,8 @@ cd clients/dashboard && npm run test:e2e  # Playwright
 | `src/Modules/{Name}/` | Bounded contexts (runtime project + `.Contracts`) |
 | `src/Host/` | API, AppHost, DbMigrator, Migrations |
 | `src/Tests/` | Unit, architecture (NetArchTest) and integration (Testcontainers) tests |
-| `src/Tools/CLI` | Scaffolding CLI |
 | `clients/` | The two React apps |
-| `deploy/` | Docker Compose, Terraform, Dokploy |
+| `deploy/` | Docker Compose, Dokploy |
 | `docs/adr/` | Architecture decision records |
 
 ## Contributing

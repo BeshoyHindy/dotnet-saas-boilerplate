@@ -135,23 +135,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       };
       // Pre-register every known server event so subscribers added before any
       // payload arrives don't miss the first message.
-      for (const event of [
-        "ChatMessageCreated",
-        "ChatMessageEdited",
-        "ChatMessageDeleted",
-        "ChatMessagePinned",
-        "ChatMessageUnpinned",
-        "ChatChannelMemberAdded",
-        "ChatChannelMemberRemoved",
-        "ChatChannelMemberRead",
-        "ChatChannelAdded",
-        "ChatChannelRemoved",
-        "ChatChannelRead",
-        "ChatReactionChanged",
-        "ChatTypingStarted",
-        "PresenceChanged",
-        "NotificationCreated",
-      ]) {
+      for (const event of ["NotificationCreated"]) {
         wire(event);
       }
     };

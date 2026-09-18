@@ -102,7 +102,7 @@ public sealed class AuditableEntitySaveChangesInterceptor : SaveChangesIntercept
                 entry.Property(nameof(ISoftDeletable.DeletedBy)).CurrentValue = userId;
 
                 // A soft-delete cascades Deleted onto owned references; restore them to Unchanged or the
-                // generated UPDATE NULLs their columns (broke Product.Price/Money with a NOT NULL violation).
+                // generated UPDATE NULLs their columns (e.g. an owned Money value object, NOT NULL violation).
                 foreach (var reference in entry.References)
                 {
                     if (reference.TargetEntry is { } target

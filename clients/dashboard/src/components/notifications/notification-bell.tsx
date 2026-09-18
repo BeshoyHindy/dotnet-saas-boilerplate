@@ -211,7 +211,7 @@ function NotificationRow({
           : "hover:bg-[var(--color-accent)]",
       )}
     >
-      {/* Type icon chip — currently only chat.mention; switch when more types ship. */}
+      {/* Type icon chip — single icon for now; switch when more types ship. */}
       <span
         aria-hidden
         className={cn(

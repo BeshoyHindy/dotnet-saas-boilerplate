@@ -77,7 +77,7 @@ internal sealed class RolePermissionSyncHostedService(
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // Catalog DB likely not migrated yet — keep waiting.
+                // Tenant catalog DB likely not migrated yet — keep waiting.
                 if (logger.IsEnabled(LogLevel.Debug))
                 {
                     logger.LogDebug(ex, "Tenant store not ready yet; retrying in {Interval}", PollInterval);

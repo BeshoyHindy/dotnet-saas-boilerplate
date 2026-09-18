@@ -48,18 +48,17 @@
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<Description>A production-ready modular .NET starter for building multi-tenant SaaS applications.</Description>
 		<!--
-		  Distribution model = SOURCE OWNERSHIP. Only TWO packages ship to NuGet.org:
-		  Boilerplate.Templates (template, in templates/) and Boilerplate.CLI
-		  (src/Tools/CLI). The template scaffolds full, owned source; modules/framework
-		  are consumed via ProjectReference, never as binary NuGets. So pack is OFF by
-		  default here and explicitly re-enabled ONLY on the CLI. This prevents the 33
-		  module/framework projects from accidentally emitting orphan, mutually-
-		  unresolvable binary packages. CI (backend.yml) packs only those two projects.
+		  Distribution model = SOURCE OWNERSHIP. Nothing under src/ ships to NuGet.org;
+		  the only published package is Boilerplate.Templates (the template, in
+		  templates/). The template scaffolds full, owned source; modules/framework are
+		  consumed via ProjectReference, never as binary NuGets. So pack is OFF for every
+		  project here, which prevents the module/framework projects from accidentally
+		  emitting orphan, mutually-unresolvable binary packages.
 		-->
 		<IsPackable>false</IsPackable>
 	</PropertyGroup>
 
-	<!-- Reproducible, debuggable packages for the projects that DO ship (CLI). -->
+	<!-- Reproducible, debuggable packages, should any project under src/ opt back in. -->
 	<PropertyGroup Condition="'$(IsPackable)' == 'true'">
 		<Deterministic>true</Deterministic>
 		<ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>

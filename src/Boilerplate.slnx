@@ -21,14 +21,6 @@
     <Project Path="Modules/Billing/Modules.Billing.Contracts/Boilerplate.Modules.Billing.Contracts.csproj" />
     <Project Path="Modules/Billing/Modules.Billing/Boilerplate.Modules.Billing.csproj" />
   </Folder>
-  <Folder Name="/Modules/Catalog/">
-    <Project Path="Modules/Catalog/Modules.Catalog.Contracts/Boilerplate.Modules.Catalog.Contracts.csproj" />
-    <Project Path="Modules/Catalog/Modules.Catalog/Boilerplate.Modules.Catalog.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Chat/">
-    <Project Path="Modules/Chat/Modules.Chat.Contracts/Boilerplate.Modules.Chat.Contracts.csproj" />
-    <Project Path="Modules/Chat/Modules.Chat/Boilerplate.Modules.Chat.csproj" />
-  </Folder>
   <Folder Name="/Modules/Files/">
     <Project Path="Modules/Files/Modules.Files.Contracts/Boilerplate.Modules.Files.Contracts.csproj" />
     <Project Path="Modules/Files/Modules.Files/Boilerplate.Modules.Files.csproj" />
@@ -44,10 +36,6 @@
   <Folder Name="/Modules/Notifications/">
     <Project Path="Modules/Notifications/Modules.Notifications.Contracts/Boilerplate.Modules.Notifications.Contracts.csproj" />
     <Project Path="Modules/Notifications/Modules.Notifications/Boilerplate.Modules.Notifications.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Tickets/">
-    <Project Path="Modules/Tickets/Modules.Tickets.Contracts/Boilerplate.Modules.Tickets.Contracts.csproj" />
-    <Project Path="Modules/Tickets/Modules.Tickets/Boilerplate.Modules.Tickets.csproj" />
   </Folder>
   <Folder Name="/Modules/Webhooks/">
     <Project Path="Modules/Webhooks/Modules.Webhooks.Contracts/Boilerplate.Modules.Webhooks.Contracts.csproj" />
@@ -69,8 +57,6 @@
     <Project Path="Tests/Architecture.Tests/Boilerplate.Architecture.Tests.csproj" />
     <Project Path="Tests/Auditing.Tests/Boilerplate.Auditing.Tests.csproj" />
     <Project Path="Tests/Billing.Tests/Boilerplate.Billing.Tests.csproj" />
-    <Project Path="Tests/Catalog.Tests/Boilerplate.Catalog.Tests.csproj" />
-    <Project Path="Tests/Chat.Tests/Boilerplate.Chat.Tests.csproj" />
     <Project Path="Tests/Webhooks.Tests/Boilerplate.Webhooks.Tests.csproj" />
     <Project Path="Tests/Files.Tests/Boilerplate.Files.Tests.csproj" />
     <Project Path="Tests/Framework.Tests/Boilerplate.Framework.Tests.csproj" />
@@ -81,12 +67,6 @@
     <Project Path="Tests/Integration.Middleware.Tests/Boilerplate.Integration.Middleware.Tests.csproj" />
     <Project Path="Tests/Multitenancy.Tests/Boilerplate.Multitenancy.Tests.csproj" Id="985345a2-edb4-4ef9-9a1b-59b704f523b6" />
   </Folder>
-  <!--#if (includeTools) -->
-  <Folder Name="/Tools/">
-    <Project Path="Tools/CLI/Boilerplate.CLI.csproj" />
-  </Folder>
-  <!--#endif -->
-
   <Folder Name="/Solution Items/">
     <File Path="../.gitignore" />
     <File Path=".editorconfig" />

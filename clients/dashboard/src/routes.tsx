@@ -10,8 +10,8 @@ import { cn } from "@/lib/cn";
 // Lazy route boundaries
 //
 // Each route is split into its own bundle so first paint after login only
-// loads the chunk for the landing page (Overview). Catalog, Settings,
-// Login, Activity, etc. fetch on demand.
+// loads the chunk for the landing page (Overview). Settings, Login,
+// Activity, etc. fetch on demand.
 //
 // `lazyNamed` wraps a dynamic import that exports a *named* component
 // (we don't use default exports anywhere in this codebase). Returns a
@@ -53,13 +53,6 @@ const SubscriptionPage = lazyNamed(
   "SubscriptionPage",
 );
 const WalletPage = lazyNamed(() => import("@/pages/wallet"), "WalletPage");
-const BrandsPage = lazyNamed(() => import("@/pages/catalog/brands"), "BrandsPage");
-const CategoriesPage = lazyNamed(() => import("@/pages/catalog/categories"), "CategoriesPage");
-const ProductsPage = lazyNamed(() => import("@/pages/catalog/products"), "ProductsPage");
-const ProductDetailPage = lazyNamed(
-  () => import("@/pages/catalog/product-detail"),
-  "ProductDetailPage",
-);
 const NotFoundPage = lazyNamed(() => import("@/pages/not-found"), "NotFoundPage");
 const TenantDeactivatedPage = lazyNamed(
   () => import("@/pages/tenant-deactivated"),
@@ -90,11 +83,6 @@ const NotificationsSettings = lazyNamed(
 const ApiKeysSettings = lazyNamed(() => import("@/pages/settings/api-keys"), "ApiKeysSettings");
 const HealthPage = lazyNamed(() => import("@/pages/health"), "HealthPage");
 const AuditsPage = lazyNamed(() => import("@/pages/audits"), "AuditsPage");
-const TicketsPage = lazyNamed(() => import("@/pages/tickets/tickets"), "TicketsPage");
-const TicketDetailPage = lazyNamed(
-  () => import("@/pages/tickets/ticket-detail"),
-  "TicketDetailPage",
-);
 const TrashPage = lazyNamed(() => import("@/pages/system/trash"), "TrashPage");
 const SessionsPage = lazyNamed(() => import("@/pages/system/sessions"), "SessionsPage");
 const UsersPage = lazyNamed(() => import("@/pages/identity/users"), "UsersPage");
@@ -113,7 +101,6 @@ const GroupDetailPage = lazyNamed(
   "GroupDetailPage",
 );
 const MyFilesPage = lazyNamed(() => import("@/pages/files/my-files"), "MyFilesPage");
-const ChatPage = lazyNamed(() => import("@/pages/chat/chat-page"), "ChatPage");
 
 /**
  * RouteFallback — what shows while a lazy chunk is downloading. Mirrors
@@ -209,10 +196,6 @@ export const router = createBrowserRouter([
           { path: "system/trash", element: withSuspense(<TrashPage />) },
           { path: "system/sessions", element: withSuspense(<SessionsPage />) },
           { path: "files", element: withSuspense(<MyFilesPage />) },
-          { path: "chat", element: withSuspense(<ChatPage />) },
-          { path: "chat/:channelId", element: withSuspense(<ChatPage />) },
-          { path: "tickets", element: withSuspense(<TicketsPage />) },
-          { path: "tickets/:ticketId", element: withSuspense(<TicketDetailPage />) },
           { path: "identity", element: <Navigate to="/identity/users" replace /> },
           { path: "identity/users", element: withSuspense(<UsersPage />) },
           { path: "identity/users/:userId", element: withSuspense(<UserDetailPage />) },
@@ -220,14 +203,6 @@ export const router = createBrowserRouter([
           { path: "identity/roles/:roleId", element: withSuspense(<RoleDetailPage />) },
           { path: "identity/groups", element: withSuspense(<GroupsPage />) },
           { path: "identity/groups/:groupId", element: withSuspense(<GroupDetailPage />) },
-          { path: "catalog", element: <Navigate to="/catalog/brands" replace /> },
-          { path: "catalog/brands", element: withSuspense(<BrandsPage />) },
-          { path: "catalog/categories", element: withSuspense(<CategoriesPage />) },
-          { path: "catalog/products", element: withSuspense(<ProductsPage />) },
-          {
-            path: "catalog/products/:productId",
-            element: withSuspense(<ProductDetailPage />),
-          },
           {
             path: "settings",
             element: withSuspense(<SettingsLayout />),

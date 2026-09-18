@@ -10,9 +10,9 @@ public class FileAccessPolicyRegistryTests
     public void Resolve_Should_ReturnPolicy_When_Registered()
     {
         var p = Substitute.For<IFileAccessPolicy>();
-        p.OwnerType.Returns("Product");
+        p.OwnerType.Returns("Document");
         var reg = new FileAccessPolicyRegistry([p]);
-        reg.Resolve("Product").ShouldBe(p);
+        reg.Resolve("Document").ShouldBe(p);
     }
 
     [Fact]
@@ -35,11 +35,11 @@ public class FileAccessPolicyRegistryTests
     public void Resolve_Should_TakeLastWinsOnDuplicateOwnerType()
     {
         var first = Substitute.For<IFileAccessPolicy>();
-        first.OwnerType.Returns("Product");
+        first.OwnerType.Returns("Document");
         var second = Substitute.For<IFileAccessPolicy>();
-        second.OwnerType.Returns("Product");
+        second.OwnerType.Returns("Document");
 
         var reg = new FileAccessPolicyRegistry([first, second]);
-        reg.Resolve("Product").ShouldBe(second);
+        reg.Resolve("Document").ShouldBe(second);
     }
 }

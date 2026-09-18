@@ -16,7 +16,6 @@ test.beforeEach(async ({ page }) => {
       body: JSON.stringify({
         apiBase: "",
         defaultTenant: "root",
-        demoMode: false,
         inactivityIdleMs: IDLE_MS,
         inactivityWarningMs: WARNING_MS,
       }),

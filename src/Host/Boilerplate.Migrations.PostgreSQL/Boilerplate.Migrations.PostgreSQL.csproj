@@ -15,9 +15,6 @@
 	  <ProjectReference Include="..\..\Modules\Multitenancy\Modules.Multitenancy\Boilerplate.Modules.Multitenancy.csproj" />
 	  <ProjectReference Include="..\..\Modules\Webhooks\Modules.Webhooks\Boilerplate.Modules.Webhooks.csproj" />
 	  <ProjectReference Include="..\..\Modules\Billing\Modules.Billing\Boilerplate.Modules.Billing.csproj" />
-	  <ProjectReference Include="..\..\Modules\Catalog\Modules.Catalog\Boilerplate.Modules.Catalog.csproj" />
-	  <ProjectReference Include="..\..\Modules\Tickets\Modules.Tickets\Boilerplate.Modules.Tickets.csproj" />
-	  <ProjectReference Include="..\..\Modules\Chat\Modules.Chat\Boilerplate.Modules.Chat.csproj" />
 	  <ProjectReference Include="..\..\Modules\Notifications\Modules.Notifications\Boilerplate.Modules.Notifications.csproj" />
 	  <ProjectReference Include="..\..\Modules\Files\Modules.Files\Boilerplate.Modules.Files.csproj" />
 	</ItemGroup>
@@ -26,9 +23,6 @@
 	  <Folder Include="Audit\" />
 	  <Folder Include="MultiTenancy\" />
 	  <Folder Include="Billing\" />
-	  <Folder Include="Catalog\" />
-	  <Folder Include="Tickets\" />
-	  <Folder Include="Chat\" />
 	  <Folder Include="Notifications\" />
 	  <Folder Include="Files\" />
 	</ItemGroup>

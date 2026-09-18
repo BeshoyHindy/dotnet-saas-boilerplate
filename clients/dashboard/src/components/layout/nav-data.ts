@@ -2,17 +2,12 @@ import {
   Activity,
   CreditCard,
   FolderOpen,
-  FolderTree,
   HeartPulse,
   LayoutDashboard,
-  MessageCircle,
-  Package,
   Receipt,
   ScrollText,
   Settings,
   ShieldCheck,
-  Tags,
-  Ticket,
   Trash2,
   Users,
   UsersRound,
@@ -55,9 +50,8 @@ export type NavSection = {
 export const topNavTop: NavSpec[] = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
   // Each gate mirrors the permission the page's primary list endpoint enforces
-  // server-side (Chat → channels list, Files → /files/mine). Same convention
-  // as trash-permissions.ts: if the endpoint's permission changes, mirror it.
-  { to: "/chat", label: "Chat", icon: MessageCircle, perm: "Permissions.Chat.Channels.View" },
+  // server-side (Files → /files/mine). Same convention as trash-permissions.ts:
+  // if the endpoint's permission changes, mirror it.
   { to: "/files", label: "My Files", icon: FolderOpen, perm: "Permissions.Files.Upload" },
 ];
 
@@ -80,30 +74,12 @@ export const sections: NavSection[] = [
     ],
   },
   {
-    id: "catalog",
-    caption: "Catalog",
-    icon: Package,
-    items: [
-      { to: "/catalog/products", label: "Products", icon: Package, perm: "Permissions.Catalog.Products.View" },
-      { to: "/catalog/brands", label: "Brands", icon: Tags, perm: "Permissions.Catalog.Brands.View" },
-      { to: "/catalog/categories", label: "Categories", icon: FolderTree, perm: "Permissions.Catalog.Categories.View" },
-    ],
-  },
-  {
-    id: "helpdesk",
-    caption: "Helpdesk",
-    icon: Ticket,
-    items: [
-      { to: "/tickets", label: "Tickets", icon: Ticket, perm: "Permissions.Tickets.View" },
-    ],
-  },
-  {
     id: "identity",
     caption: "Identity",
     icon: Users,
     items: [
       // Gate the identity-management pages on a manage permission (not View): View Users/Roles/Groups
-      // are IsBasic so every member holds them (the chat/user picker relies on Users.View), but only
+      // are IsBasic so every member holds them (the user picker relies on Users.View), but only
       // managers should see these admin pages. Basic lacks the *.Update perms, so the items hide for them.
       { to: "/identity/users", label: "Users", icon: Users, perm: "Permissions.Users.Update" },
       { to: "/identity/roles", label: "Roles", icon: ShieldCheck, perm: "Permissions.Roles.Update" },
@@ -119,7 +95,7 @@ export const sections: NavSection[] = [
       { to: "/system/health", label: "Health", icon: HeartPulse },
       { to: "/system/audits", label: "Audit trail", icon: ScrollText, perm: "Permissions.AuditTrails.View" },
       { to: "/system/sessions", label: "Sessions", icon: Wifi, perm: "Permissions.Sessions.ViewAll" },
-      // Trash fronts five tabs, each gated on a different resource's restore /
+      // Trash fronts a set of tabs, each gated on a different resource's restore /
       // view-trash permission. Show the entry if the user can reach any tab; the
       // page hides the individual tabs they can't (see trash-permissions.ts).
       { to: "/system/trash", label: "Trash", icon: Trash2, anyPerm: ALL_TRASH_PERMISSIONS },

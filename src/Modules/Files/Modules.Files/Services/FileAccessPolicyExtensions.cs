@@ -6,7 +6,7 @@ namespace Boilerplate.Modules.Files.Services;
 /// <summary>
 /// DI sugar for owning modules to register their <see cref="IFileAccessPolicy"/> implementations.
 /// Usage in a module's <c>ConfigureServices</c>:
-/// <c>builder.Services.AddFileAccessPolicy&lt;ProductImagePolicy&gt;();</c>
+/// <c>builder.Services.AddFileAccessPolicy&lt;MyEntityFilePolicy&gt;();</c>
 /// </summary>
 public static class FileAccessPolicyExtensions
 {

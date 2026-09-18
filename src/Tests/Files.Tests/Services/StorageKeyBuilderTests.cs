@@ -11,16 +11,16 @@ public class StorageKeyBuilderTests
         var now = new DateTimeOffset(2026, 5, 12, 0, 0, 0, TimeSpan.Zero);
         var id = Guid.Parse("11111111-2222-3333-4444-555555555555");
 
-        var key = StorageKeyBuilder.Build("tenant-a", "Product", id, "shoe photo.png", now);
+        var key = StorageKeyBuilder.Build("tenant-a", "Document", id, "holiday photo.png", now);
 
-        key.ShouldBe("tenants/tenant-a/product/2026/05/11111111222233334444555555555555/shoe_photo.png");
+        key.ShouldBe("tenants/tenant-a/document/2026/05/11111111222233334444555555555555/holiday_photo.png");
     }
 
     [Fact]
     public void Build_Should_LowercaseOwnerType()
     {
-        var key = StorageKeyBuilder.Build("t", "TicketComment", Guid.NewGuid(), "x.pdf", DateTimeOffset.UtcNow);
-        key.ShouldContain("/ticketcomment/");
+        var key = StorageKeyBuilder.Build("t", "Document", Guid.NewGuid(), "x.pdf", DateTimeOffset.UtcNow);
+        key.ShouldContain("/document/");
     }
 
     [Fact]
@@ -48,6 +48,6 @@ public class StorageKeyBuilderTests
     public void Build_Should_RejectEmptyTenantId()
     {
         Should.Throw<ArgumentException>(
-            () => StorageKeyBuilder.Build("", "Product", Guid.NewGuid(), "x.png", DateTimeOffset.UtcNow));
+            () => StorageKeyBuilder.Build("", "Document", Guid.NewGuid(), "x.png", DateTimeOffset.UtcNow));
     }
 }

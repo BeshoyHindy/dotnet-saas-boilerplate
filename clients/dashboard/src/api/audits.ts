@@ -171,9 +171,9 @@ function toPascal(s: string): string {
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// Human-readable summaries — turn the terse `source` (e.g. "api.chat.ListMyChannels"
+// Human-readable summaries — turn the terse `source` (e.g. "api.identity.ListUsers"
 // or "IdentityDbContext") into a plain-English predicate so rows read like an
-// activity feed ("Ada · viewed chat channels") without opening the details.
+// activity feed ("Ada · viewed users") without opening the details.
 // The list DTO carries no field-level before/after, so entity changes summarize
 // at the record level; the detail drawer still shows the full payload.
 // ────────────────────────────────────────────────────────────────────────
@@ -196,7 +196,6 @@ const ACTION_OVERRIDES: Record<string, string> = {
   RefreshToken: "refreshed their session",
   SseToken: "connected to the live stream",
   GetUnreadNotificationCount: "checked notifications",
-  ListMyChannels: "opened chat",
 };
 
 function splitPascal(value: string): string[] {

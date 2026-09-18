@@ -34,7 +34,7 @@ test.describe("admin login", () => {
     await expect(page.getByLabel("Email")).toBeVisible();
     await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
 
-    // Submit (exact — the dev demo button also contains "Sign in") + forgot link.
+    // Submit + forgot link.
     await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Forgot?" })).toBeVisible();
   });
@@ -82,32 +82,5 @@ test.describe("admin login", () => {
 
     await expect(page.getByText("Invalid credentials.")).toBeVisible();
     await expect(page).toHaveURL(/\/login$/);
-  });
-
-  test("DEV demo dialog lists the superadmin account and signs in on pick", async ({ page }) => {
-    await mockJsonResponse(page, "**/api/v1/identity/token/issue", TOKEN_RESPONSE);
-    await page.goto("/login");
-
-    // The dev server runs in DEV, so the demo affordance is rendered. It now
-    // opens a dialog account picker (the old inline "callout" was replaced).
-    await page.getByRole("button", { name: "Sign in with a demo account" }).click();
-
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByText("superadmin@root.com")).toBeVisible();
-
-    // Picking the account fills the creds and signs in instantly — assert the
-    // resulting token/issue POST carries the demo email + tenant header.
-    const reqPromise = page.waitForRequest(
-      (r) =>
-        r.url().includes("/api/v1/identity/token/issue") && r.method() === "POST",
-      { timeout: 5_000 },
-    );
-    await dialog.getByRole("button", { name: /SuperAdmin/ }).click();
-    const req = await reqPromise;
-
-    const body = JSON.parse(req.postData() ?? "{}");
-    expect(body.email).toBe("superadmin@root.com");
-    expect(req.headers().tenant).toBe("root");
   });
 });
