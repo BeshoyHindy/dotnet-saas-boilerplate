@@ -3,7 +3,6 @@ using Boilerplate.BuildingBlocks.Eventing.Inbox;
 using Boilerplate.BuildingBlocks.Eventing.InMemory;
 using Boilerplate.BuildingBlocks.Eventing.Outbox;
 using Boilerplate.BuildingBlocks.Eventing.Persistence;
-using Boilerplate.BuildingBlocks.Eventing.RabbitMq;
 using Boilerplate.BuildingBlocks.Eventing.Serialization;
 using Boilerplate.BuildingBlocks.Persistence;
 using Microsoft.Extensions.Configuration;
@@ -38,19 +37,11 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IEventingDrainTargetProvider, SingleDatabaseDrainTargetProvider>();
         services.TryAddSingleton<IEventingDrainScope, NullEventingDrainScope>();
 
-        // Register event bus based on configured provider
         var options = configuration.GetSection(nameof(EventingOptions)).Get<EventingOptions>() ?? new EventingOptions();
 
-        if (string.Equals(options.Provider, "RabbitMQ", StringComparison.OrdinalIgnoreCase))
-        {
-            services.AddOptions<RabbitMqOptions>().BindConfiguration("EventingOptions:RabbitMQ");
-            services.AddSingleton<IEventBus, RabbitMqEventBus>();
-        }
-        else
-        {
-            // Default to InMemory
-            services.AddSingleton<IEventBus, InMemoryEventBus>();
-        }
+        // The monolith's bus is in-process: handlers run in the same host, and cross-process
+        // delivery is the outbox/inbox pair's job (ADR-0003 dropped the RabbitMQ provider).
+        services.AddSingleton<IEventBus, InMemoryEventBus>();
 
         // Register outbox dispatcher hosted service if enabled
         if (options.UseHostedServiceDispatcher)

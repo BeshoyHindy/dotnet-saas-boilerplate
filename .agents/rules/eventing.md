@@ -63,7 +63,7 @@ services.AddIntegrationEventHandlers(typeof(MyModule).Assembly);        // scans
 
 There is no per-module store registration — `AddEventingForDbContext<T>` was removed in #1349. A module publishes by injecting `IOutboxWriter`; nothing else is needed.
 
-Bus = `EventingOptions.Provider`: `"RabbitMQ"` → `RabbitMqEventBus` (durable topic exchange); else `InMemoryEventBus` (default).
+Bus = `InMemoryEventBus`, always. ADR-0003 dropped the RabbitMQ provider (and `EventingOptions.Provider` with it): the monolith runs handlers in-process and the outbox/inbox pair provides the durability a broker would.
 
 ## Gotchas
 

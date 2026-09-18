@@ -129,9 +129,6 @@
   <ItemGroup Label="AWS">
     <PackageVersion Include="AWSSDK.S3" Version="4.0.23.4" />
   </ItemGroup>
-  <ItemGroup Label="Messaging">
-    <PackageVersion Include="RabbitMQ.Client" Version="7.2.1" />
-  </ItemGroup>
   <ItemGroup Label="Transitive security pins">
     <!-- Pulled transitively by Microsoft.AspNetCore.SignalR.StackExchangeRedis; versions
          below 2.5.301 fail NuGet audit (NU1903, GHSA-hv8m-jj95-wg3x: LZ4 decompression

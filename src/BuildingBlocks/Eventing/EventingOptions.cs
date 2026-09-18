@@ -6,11 +6,6 @@ namespace Boilerplate.BuildingBlocks.Eventing;
 public sealed class EventingOptions
 {
     /// <summary>
-    /// Provider for the event bus implementation. Supported: "InMemory", "RabbitMQ".
-    /// </summary>
-    public string Provider { get; set; } = "InMemory";
-
-    /// <summary>
     /// Batch size for outbox dispatching.
     /// </summary>
     public int OutboxBatchSize { get; set; } = 100;
