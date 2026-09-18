@@ -97,7 +97,7 @@ public class BuildingBlocksIndependenceTests
 
             foreach (string include in references)
             {
-                string referencedName = GetReferencedProjectName(include);
+                string referencedName = ProjectReferences.GetReferencedProjectName(include);
 
                 // Check if it references a Modules project
                 if (referencedName.StartsWith("Boilerplate.Modules.", StringComparison.OrdinalIgnoreCase))
@@ -239,14 +239,9 @@ public class BuildingBlocksIndependenceTests
         }
     }
 
-    // ProjectReference paths use Windows separators (..\Core\Boilerplate.BuildingBlocks.Core.csproj), but GetFileNameWithoutExtension only
-    // splits on '\' on Windows — normalize to '/' first so Linux CI also gets the bare project name.
-    private static string GetReferencedProjectName(string includePath) =>
-        Path.GetFileNameWithoutExtension(includePath.Replace('\\', '/'));
-
     // The layering rules above are written in short BuildingBlock names ("Core",
     // "Shared"); project/assembly names carry the `Boilerplate.BuildingBlocks.` prefix.
     private static string GetShortBuildingBlockName(string includePath) =>
-        GetReferencedProjectName(includePath)
+        ProjectReferences.GetReferencedProjectName(includePath)
             .Replace("Boilerplate.BuildingBlocks.", string.Empty, StringComparison.Ordinal);
 }

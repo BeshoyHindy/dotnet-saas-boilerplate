@@ -32,7 +32,7 @@ public class ModuleArchitectureTests
 
             foreach (string include in references)
             {
-                string referencedName = Path.GetFileNameWithoutExtension(include);
+                string referencedName = ProjectReferences.GetReferencedProjectName(include);
 
                 bool isModuleRuntime = referencedName.StartsWith("Boilerplate.Modules.", StringComparison.OrdinalIgnoreCase)
                                        && !referencedName.EndsWith(".Contracts", StringComparison.OrdinalIgnoreCase);
