@@ -11,3 +11,7 @@ Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-
 ### Domain docs
 
 Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### Branching
+
+Gitflow (ADR-0007). Branch from `develop` as `feature/<slug>` (agents: `sandcastle/issue-<n>`) and open pull requests against `develop`. `main` receives only `release/*` and `hotfix/*` merges, each tagged `vX.Y.Z`. Never commit directly to `main` or `develop`.
