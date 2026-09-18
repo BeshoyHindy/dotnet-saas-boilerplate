@@ -16,6 +16,22 @@
 
 import { defineConfig } from "./.sandcastle/config.mts";
 
+// The issue listing, as GraphQL rather than `gh issue list --json`.
+//
+// This repo expresses "A blocks B" through GitHub's NATIVE issue dependencies,
+// and `gh issue list` cannot report them at all; the REST summary can, but only
+// one issue per request. GraphQL's `blockedBy` connection returns every edge —
+// with each blocker's state, so closed ones can be dropped — in the SAME round
+// trip as the issues, which is why both listings below are built from it.
+//
+// `{owner}` / `{repo}` are gh's own placeholders, resolved from the checkout's
+// remote, so the query names no repository. `labels` and `states` do the
+// filtering server-side, exactly as the `--label`/`--state` flags used to.
+const issueListQuery = (fields: string): string =>
+  `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){` +
+  `issues(first:100,states:OPEN,labels:["ready-for-agent"]){nodes{${fields} ` +
+  `blockedBy(first:50){nodes{number state}}}}}}`;
+
 // Model catalog — swap models by editing `models` below; never hardcode an id
 // at a call site. Every phase runs on Claude Code, which is baked into
 // `.sandcastle/Dockerfile` and authenticates with CLAUDE_CODE_OAUTH_TOKEN /
@@ -44,27 +60,33 @@ export default defineConfig({
     label: "ready-for-agent",
 
     // The host-side listing behind `--dry-run`. Run WITHOUT a shell, so keep it
-    // to plain `gh` arguments — no pipes, no `--jq`.
+    // to plain `gh` arguments — no pipes, no `--jq`: the raw GraphQL response
+    // is parsed (and its closed blockers dropped) by `.sandcastle/dry-run.mts`.
     listArgs: [
-      "issue",
-      "list",
-      "--state",
-      "open",
-      "--label",
-      "ready-for-agent",
-      "--limit",
-      "100",
-      "--json",
-      "number,title",
+      "api",
+      "graphql",
+      "-F",
+      "owner={owner}",
+      "-F",
+      "name={repo}",
+      "-f",
+      `query=${issueListQuery("number title")}`,
     ],
 
     // The planner's own query, executed inside its prompt. Bodies and comments
     // are what dependency reasoning needs, and they are far too large for the
     // console, so this one is deliberately richer than the dry-run listing.
+    // `--jq` flattens the connections and keeps only the OPEN blockers, so each
+    // issue reaches the prompt with a plain `blockedBy: [<issue numbers>]`.
     plannerListCommand:
-      "gh issue list --state open --label ready-for-agent --limit 100 " +
-      "--json number,title,body,labels,comments " +
-      "--jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'",
+      "gh api graphql -F owner='{owner}' -F name='{repo}' -f query='" +
+      issueListQuery(
+        "number title body labels(first:20){nodes{name}} " +
+        "comments(first:100){nodes{body}}",
+      ) +
+      "' --jq '[.data.repository.issues.nodes[] | {number, title, body, " +
+      "labels: [.labels.nodes[].name], comments: [.comments.nodes[].body], " +
+      `blockedBy: [.blockedBy.nodes[] | select(.state == "OPEN") | .number]}]'`,
 
     closeComment: "Completed by Sandcastle",
   },

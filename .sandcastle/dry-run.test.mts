@@ -5,6 +5,7 @@ import { resolveLimits, type SandcastleConfig } from "./config.mts";
 import {
   isDryRun,
   listAgentIssues,
+  parseIssueListing,
   renderDryRun,
   type CommandExec,
 } from "./dry-run.mts";
@@ -15,8 +16,8 @@ const config: SandcastleConfig = {
   project: { name: "Acme" },
   issues: {
     label: "agent-ready",
-    listArgs: ["issue", "list", "--state", "open", "--label", "agent-ready", "--json", "number,title"],
-    plannerListCommand: "gh issue list --state open --label agent-ready",
+    listArgs: ["api", "graphql", "-f", "query=query{issues{number title blockedBy}}"],
+    plannerListCommand: "gh api graphql -f query=query{issues{number title blockedBy}}",
     closeComment: "Completed by Sandcastle",
   },
   git: { integrationBranch: "trunk", branchPrefix: "agent/issue-" },
@@ -88,6 +89,10 @@ const ghReturning =
     return stdout;
   };
 
+/** A GraphQL issues connection, as `gh api graphql` prints it. */
+const listing = (nodes: ReadonlyArray<Record<string, unknown>>): string =>
+  JSON.stringify({ data: { repository: { issues: { nodes } } } });
+
 test("passes the configured query straight to gh, with no shell in between", () => {
   const seen: Array<{ file: string; args: readonly string[] }> = [];
 
@@ -99,10 +104,13 @@ test("passes the configured query straight to gh, with no shell in between", () 
 test("parses the issues gh reports", () => {
   const query = listAgentIssues(
     config.issues.listArgs,
-    ghReturning(JSON.stringify([{ number: 4, title: "Port the pipeline", labels: [] }])),
+    ghReturning(listing([{ number: 4, title: "Port the pipeline", blockedBy: { nodes: [] } }])),
   );
 
-  assert.deepEqual(query, { ok: true, issues: [{ number: 4, title: "Port the pipeline" }] });
+  assert.deepEqual(query, {
+    ok: true,
+    issues: [{ number: 4, title: "Port the pipeline", blockedBy: [] }],
+  });
 });
 
 test("an empty list is a legitimate answer, not a failure", () => {
@@ -139,6 +147,72 @@ test("output that is not an issue array is reported as such", () => {
     assert.equal(query.ok, false, stdout);
     assert.match(query.ok === false ? query.error : "", pattern);
   }
+});
+
+// --- parseIssueListing: native blocking edges ------------------------------
+
+test("an issue's OPEN blockers are kept and its closed ones dropped", () => {
+  const query = parseIssueListing(
+    listing([
+      {
+        number: 6,
+        title: "Prune the packages",
+        blockedBy: {
+          nodes: [
+            { number: 5, state: "OPEN" },
+            { number: 4, state: "CLOSED" },
+          ],
+        },
+      },
+    ]),
+  );
+
+  assert.deepEqual(query, {
+    ok: true,
+    issues: [{ number: 6, title: "Prune the packages", blockedBy: [5] }],
+  });
+});
+
+test("an issue with no dependency edges at all is unblocked", () => {
+  const query = parseIssueListing(
+    listing([{ number: 33, title: "Add a gate", blockedBy: { nodes: [] } }]),
+  );
+
+  assert.deepEqual(query, {
+    ok: true,
+    issues: [{ number: 33, title: "Add a gate", blockedBy: [] }],
+  });
+});
+
+// Fail-closed: a query that stopped returning blocker edges would otherwise
+// report the whole backlog as unblocked and queue issues whose prerequisites
+// have not landed.
+test("a listing without blocker edges is reported, not read as unblocked", () => {
+  const query = parseIssueListing(listing([{ number: 6, title: "Prune the packages" }]));
+
+  assert.equal(query.ok, false);
+  assert.match(query.ok === false ? query.error : "", /blockedBy/);
+});
+
+test("a blocker without a number and a state is reported, never skipped", () => {
+  for (const blockedBy of [
+    { nodes: [{ state: "OPEN" }] },
+    { nodes: [{ number: 5 }] },
+    { nodes: "5" },
+  ]) {
+    const query = parseIssueListing(listing([{ number: 6, title: "Prune", blockedBy }]));
+    assert.equal(query.ok, false, JSON.stringify(blockedBy));
+    assert.match(query.ok === false ? query.error : "", /blocker/);
+  }
+});
+
+test("a GraphQL error envelope is reported, not read as an empty backlog", () => {
+  const query = parseIssueListing(
+    JSON.stringify({ errors: [{ message: "Field 'blockedBy' doesn't exist on type 'Issue'" }] }),
+  );
+
+  assert.equal(query.ok, false);
+  assert.match(query.ok === false ? query.error : "", /blockedBy' doesn't exist/);
 });
 
 // --- renderDryRun ----------------------------------------------------------
@@ -188,14 +262,28 @@ test("the report lists the open issues and the branch each would get", () => {
   const report = renderDryRun(config, limits, {
     ok: true,
     issues: [
-      { number: 4, title: "Port the pipeline" },
-      { number: 9, title: "Add a gate" },
+      { number: 4, title: "Port the pipeline", blockedBy: [] },
+      { number: 9, title: "Add a gate", blockedBy: [] },
     ],
   });
 
   assert.match(report, /#4 Port the pipeline → agent\/issue-4/);
   assert.match(report, /#9 Add a gate → agent\/issue-9/);
   assert.match(report, /2 issue\(s\) visible/);
+});
+
+test("the report marks each issue blocked or unblocked and names the blockers", () => {
+  const report = renderDryRun(config, limits, {
+    ok: true,
+    issues: [
+      { number: 4, title: "Port the pipeline", blockedBy: [] },
+      { number: 9, title: "Add a gate", blockedBy: [4, 7] },
+    ],
+  });
+
+  assert.match(report, /#4 Port the pipeline → agent\/issue-4 · unblocked/);
+  assert.match(report, /#9 Add a gate → agent\/issue-9 · BLOCKED by #4, #7/);
+  assert.match(report, /2 issue\(s\) visible, 1 unblocked/);
 });
 
 test("no open issues is spelt out as such", () => {
