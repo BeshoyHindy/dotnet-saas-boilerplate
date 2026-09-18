@@ -74,24 +74,24 @@ jobs:
           restore-keys: ${{ runner.os }}-nuget-
 
       - name: Restore
-        run: dotnet restore src/FSH.Starter.slnx
+        run: dotnet restore src/Boilerplate.slnx
 
       - name: Build
-        run: dotnet build src/FSH.Starter.slnx -c Release --no-restore -warnaserror
+        run: dotnet build src/Boilerplate.slnx -c Release --no-restore -warnaserror
 
       # Gate on DIRECT vulnerable packages (the ones we control). Transitive
       # advisories are surfaced but not blocking — they often can't be fixed
       # without an upstream bump.
       - name: Audit dependencies for known vulnerabilities
         run: |
-          if dotnet list src/FSH.Starter.slnx package --vulnerable 2>&1 | tee vuln-direct.txt | grep -q 'has the following vulnerable'; then
+          if dotnet list src/Boilerplate.slnx package --vulnerable 2>&1 | tee vuln-direct.txt | grep -q 'has the following vulnerable'; then
             echo "::error::Direct package(s) with known vulnerabilities detected — see log."
             cat vuln-direct.txt
             exit 1
           fi
           echo "No direct vulnerable packages."
           echo "::group::Transitive advisories (informational)"
-          dotnet list src/FSH.Starter.slnx package --vulnerable --include-transitive 2>&1 | tee vuln-transitive.txt || true
+          dotnet list src/Boilerplate.slnx package --vulnerable --include-transitive 2>&1 | tee vuln-transitive.txt || true
           echo "::endgroup::"
 
       - name: Run unit tests with coverage
@@ -143,7 +143,7 @@ jobs:
           restore-keys: ${{ runner.os }}-nuget-
 
       - name: Restore
-        run: dotnet restore src/FSH.Starter.slnx
+        run: dotnet restore src/Boilerplate.slnx
 
       # Integration tests build a host with WebApplicationFactory + Testcontainers.
       # Middleware tests live in a separate assembly (own process) because a 2nd
@@ -185,7 +185,7 @@ jobs:
         image: postgres:17-alpine
         env:
           POSTGRES_PASSWORD: migrator_smoke_pwd
-          POSTGRES_DB: fsh_migrator_smoke
+          POSTGRES_DB: boilerplate_migrator_smoke
         ports:
           - 5432:5432
         options: >-
@@ -212,19 +212,19 @@ jobs:
 
       - name: Publish DbMigrator container (local daemon)
         run: |
-          dotnet publish src/Host/FSH.Starter.DbMigrator/FSH.Starter.DbMigrator.csproj \
+          dotnet publish src/Host/Boilerplate.DbMigrator/Boilerplate.DbMigrator.csproj \
             -c Release -r linux-x64 \
             /t:PublishContainer \
-            -p:ContainerRepository=fsh-db-migrator \
+            -p:ContainerRepository=boilerplate-db-migrator \
             -p:ContainerImageTags=smoke
 
       - name: Run DbMigrator against ephemeral Postgres
         run: |
           docker run --rm --network host \
             -e DatabaseOptions__Provider=POSTGRESQL \
-            -e DatabaseOptions__ConnectionString="Host=localhost;Port=5432;Database=fsh_migrator_smoke;Username=postgres;Password=migrator_smoke_pwd" \
-            -e DatabaseOptions__MigrationsAssembly=FSH.Starter.Migrations.PostgreSQL \
-            fsh-db-migrator:smoke apply --catalog-only \
+            -e DatabaseOptions__ConnectionString="Host=localhost;Port=5432;Database=boilerplate_migrator_smoke;Username=postgres;Password=migrator_smoke_pwd" \
+            -e DatabaseOptions__MigrationsAssembly=Boilerplate.Migrations.PostgreSQL \
+            boilerplate-db-migrator:smoke apply --catalog-only \
             | tee migrator.log
           grep -q "finished successfully" migrator.log
 
@@ -311,20 +311,20 @@ jobs:
 
       - name: Publish API container image
         run: |
-          dotnet publish src/Host/FSH.Starter.Api/FSH.Starter.Api.csproj \
+          dotnet publish src/Host/Boilerplate.Api/Boilerplate.Api.csproj \
             -c Release -r linux-x64 \
             /t:PublishContainer \
             -p:ContainerRegistry=ghcr.io \
-            -p:ContainerRepository=${{ github.repository_owner }}/fsh-api \
+            -p:ContainerRepository=${{ github.repository_owner }}/boilerplate-api \
             -p:ContainerImageTags='"dev-${{ github.sha }};dev-latest"'
 
       - name: Publish DbMigrator container image
         run: |
-          dotnet publish src/Host/FSH.Starter.DbMigrator/FSH.Starter.DbMigrator.csproj \
+          dotnet publish src/Host/Boilerplate.DbMigrator/Boilerplate.DbMigrator.csproj \
             -c Release -r linux-x64 \
             /t:PublishContainer \
             -p:ContainerRegistry=ghcr.io \
-            -p:ContainerRepository=${{ github.repository_owner }}/fsh-db-migrator \
+            -p:ContainerRepository=${{ github.repository_owner }}/boilerplate-db-migrator \
             -p:ContainerImageTags='"dev-${{ github.sha }};dev-latest"'
 
   publish-release:
@@ -366,22 +366,22 @@ jobs:
 
       - name: Restore and Build with version
         run: |
-          dotnet restore src/FSH.Starter.slnx
-          dotnet build src/FSH.Starter.slnx -c Release --no-restore -p:Version=${{ steps.version.outputs.version }}
+          dotnet restore src/Boilerplate.slnx
+          dotnet build src/Boilerplate.slnx -c Release --no-restore -p:Version=${{ steps.version.outputs.version }}
 
       # Distribution model is source-ownership: consumers get the FULL source via the
-      # `dotnet new fsh` template (below), NOT per-module/BuildingBlocks NuGet packages.
-      # Only two artifacts publish to NuGet — the `fsh` global CLI tool and the template.
+      # `dotnet new saas` template (below), NOT per-module/BuildingBlocks NuGet packages.
+      # Only two artifacts publish to NuGet — the `boilerplate` global CLI tool and the template.
       # (The previous per-module packs were incomplete — 4 of 10 modules — and contradicted
       # the locked source-ownership model, so they were removed.)
       - name: Pack CLI Tool
-        run: dotnet pack src/Tools/CLI/FSH.CLI.csproj -c Release --no-build -o ./nupkgs -p:PackageVersion=${{ steps.version.outputs.version }}
+        run: dotnet pack src/Tools/CLI/Boilerplate.CLI.csproj -c Release --no-build -o ./nupkgs -p:PackageVersion=${{ steps.version.outputs.version }}
 
       # The dotnet new template package — the primary distribution artifact. Packs the
       # repo (with its root .template.config) so consumers can `dotnet new install` then
-      # `dotnet new fsh -n MyApp`. Scaffolded output is fully owned, detached source.
+      # `dotnet new saas -n MyApp`. Scaffolded output is fully owned, detached source.
       - name: Pack Template
-        run: dotnet pack templates/FullStackHero.NET.StarterKit.csproj -c Release -o ./nupkgs -p:PackageVersion=${{ steps.version.outputs.version }}
+        run: dotnet pack templates/Boilerplate.Templates.csproj -c Release -o ./nupkgs -p:PackageVersion=${{ steps.version.outputs.version }}
 
       - name: Push to NuGet.org
         run: dotnet nuget push "./nupkgs/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
@@ -395,20 +395,20 @@ jobs:
 
       - name: Build and push API container
         run: |
-          dotnet publish src/Host/FSH.Starter.Api/FSH.Starter.Api.csproj \
+          dotnet publish src/Host/Boilerplate.Api/Boilerplate.Api.csproj \
             -c Release -r linux-x64 \
             /t:PublishContainer \
             -p:ContainerRegistry=ghcr.io \
-            -p:ContainerRepository=${{ github.repository_owner }}/fsh-api \
+            -p:ContainerRepository=${{ github.repository_owner }}/boilerplate-api \
             -p:ContainerImageTags='"${{ steps.version.outputs.version }};latest"'
 
       - name: Build and push DbMigrator container
         run: |
-          dotnet publish src/Host/FSH.Starter.DbMigrator/FSH.Starter.DbMigrator.csproj \
+          dotnet publish src/Host/Boilerplate.DbMigrator/Boilerplate.DbMigrator.csproj \
             -c Release -r linux-x64 \
             /t:PublishContainer \
             -p:ContainerRegistry=ghcr.io \
-            -p:ContainerRepository=${{ github.repository_owner }}/fsh-db-migrator \
+            -p:ContainerRepository=${{ github.repository_owner }}/boilerplate-db-migrator \
             -p:ContainerImageTags='"${{ steps.version.outputs.version }};latest"'
 
   # Single required status check. Always runs (even when the heavy jobs are

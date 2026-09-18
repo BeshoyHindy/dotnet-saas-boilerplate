@@ -1,10 +1,10 @@
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Chat.Contracts.v1.Commands;
-using FSH.Modules.Chat.Data;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Chat.Contracts.v1.Commands;
+using Boilerplate.Modules.Chat.Data;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Chat.Features.v1.Channels.RestoreChannel;
+namespace Boilerplate.Modules.Chat.Features.v1.Channels.RestoreChannel;
 
 public sealed class RestoreChannelCommandHandler(ChatDbContext db)
     : ICommandHandler<RestoreChannelCommand, Unit>

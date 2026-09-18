@@ -1,4 +1,4 @@
-namespace FSH.Modules.Multitenancy.Provisioning;
+namespace Boilerplate.Modules.Multitenancy.Provisioning;
 
 public enum TenantProvisioningStepName
 {

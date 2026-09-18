@@ -1,11 +1,11 @@
-using FSH.Framework.Shared.Constants;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Identity.Contracts.DTOs;
-using FSH.Modules.Identity.Contracts.v1.Permissions.GetPermissionCatalog;
+using Boilerplate.BuildingBlocks.Shared.Constants;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
+using Boilerplate.Modules.Identity.Contracts.v1.Permissions.GetPermissionCatalog;
 using Finbuckle.MultiTenant.Abstractions;
 using Mediator;
 
-namespace FSH.Modules.Identity.Features.v1.Permissions.GetPermissionCatalog;
+namespace Boilerplate.Modules.Identity.Features.v1.Permissions.GetPermissionCatalog;
 
 public sealed class GetPermissionCatalogQueryHandler(
     IMultiTenantContextAccessor<AppTenantInfo> tenantAccessor)

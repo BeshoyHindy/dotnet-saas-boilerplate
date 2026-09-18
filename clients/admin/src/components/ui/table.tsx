@@ -2,7 +2,7 @@ import * as React from "react";
 import { cn } from "@/lib/cn";
 
 /**
- * Table — FSH unified design tokens. Mono uppercase headers with wide
+ * Table — Boilerplate unified design tokens. Mono uppercase headers with wide
  * tracking, hairline row borders, hover row tinted in the accent surface.
  */
 export const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(

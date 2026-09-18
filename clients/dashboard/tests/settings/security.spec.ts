@@ -138,7 +138,7 @@ test.describe("settings/security — two-factor enroll (disabled → enabled)", 
   test("clicking enable triggers POST /2fa/enroll and reveals the QR + manual key", async ({ page }) => {
     await mockJsonResponse(page, "**/api/v1/identity/2fa/enroll", {
       sharedKey: "ABCD-EFGH-IJKL-MNOP",
-      authenticatorUri: "otpauth://totp/FSH:alice?secret=ABCDEFGHIJKLMNOP&issuer=FSH",
+      authenticatorUri: "otpauth://totp/Boilerplate:alice?secret=ABCDEFGHIJKLMNOP&issuer=Boilerplate",
     });
 
     await page.goto("/settings/security");
@@ -153,7 +153,7 @@ test.describe("settings/security — two-factor enroll (disabled → enabled)", 
   test("submitting the 6-digit code enables 2FA and refetches profile", async ({ page }) => {
     await mockJsonResponse(page, "**/api/v1/identity/2fa/enroll", {
       sharedKey: "ABCD-EFGH-IJKL-MNOP",
-      authenticatorUri: "otpauth://totp/FSH:alice?secret=AAAAAA",
+      authenticatorUri: "otpauth://totp/Boilerplate:alice?secret=AAAAAA",
     });
     await mockJsonResponse(page, "**/api/v1/identity/2fa/verify", { success: true });
 
@@ -179,7 +179,7 @@ test.describe("settings/security — two-factor enroll (disabled → enabled)", 
   test("disabled 'Confirm' button until 6+ characters entered", async ({ page }) => {
     await mockJsonResponse(page, "**/api/v1/identity/2fa/enroll", {
       sharedKey: "ABCD",
-      authenticatorUri: "otpauth://totp/FSH:alice?secret=AAAAAA",
+      authenticatorUri: "otpauth://totp/Boilerplate:alice?secret=AAAAAA",
     });
 
     await page.goto("/settings/security");

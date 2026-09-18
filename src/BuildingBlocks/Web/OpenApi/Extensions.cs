@@ -5,7 +5,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 
-namespace FSH.Framework.Web.OpenApi;
+namespace Boilerplate.BuildingBlocks.Web.OpenApi;
 
 public static class Extensions
 {
@@ -27,11 +27,11 @@ public static class Extensions
             .Validate(o => !string.IsNullOrWhiteSpace(o.Description), "OpenApi:Description is required.")
             .ValidateOnStart();
 
-        var fshOptions = configuration.GetSection(nameof(OpenApiOptions)).Get<OpenApiOptions>();
+        var appOptions = configuration.GetSection(nameof(OpenApiOptions)).Get<OpenApiOptions>();
 
         // One OpenAPI document per API version. Asp.Versioning's GroupNameFormat "'v'VVV" groups
         // endpoints as "v1", "v2", …; each AddOpenApi(groupName) includes only that group's endpoints.
-        var versions = fshOptions?.Versions is { Length: > 0 } ? fshOptions.Versions : ["v1"];
+        var versions = appOptions?.Versions is { Length: > 0 } ? appOptions.Versions : ["v1"];
         foreach (var version in versions)
         {
             services.AddOpenApi(version, options =>
@@ -79,7 +79,7 @@ public static class Extensions
         {
             var configuration = app.Configuration;
             options
-                .WithTitle(configuration["OpenApi:Title"] ?? "FSH API")
+                .WithTitle(configuration["OpenApi:Title"] ?? "Boilerplate API")
                 .WithTheme(Scalar.AspNetCore.ScalarTheme.Alternate)
                 .EnableDarkMode()
                 .HideModels()

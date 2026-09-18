@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Billing.Contracts.v1.Plans;
+using Boilerplate.Modules.Billing.Contracts.v1.Plans;
 
-namespace FSH.Modules.Billing.Features.v1.Plans.CreatePlan;
+namespace Boilerplate.Modules.Billing.Features.v1.Plans.CreatePlan;
 
 public sealed class CreatePlanCommandValidator : AbstractValidator<CreatePlanCommand>
 {

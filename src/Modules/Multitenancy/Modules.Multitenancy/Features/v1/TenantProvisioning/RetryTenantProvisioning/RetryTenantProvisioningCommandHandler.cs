@@ -1,9 +1,9 @@
-using FSH.Modules.Multitenancy.Contracts.Dtos;
-using FSH.Modules.Multitenancy.Contracts.v1.TenantProvisioning;
-using FSH.Modules.Multitenancy.Provisioning;
+using Boilerplate.Modules.Multitenancy.Contracts.Dtos;
+using Boilerplate.Modules.Multitenancy.Contracts.v1.TenantProvisioning;
+using Boilerplate.Modules.Multitenancy.Provisioning;
 using Mediator;
 
-namespace FSH.Modules.Multitenancy.Features.v1.TenantProvisioning.RetryTenantProvisioning;
+namespace Boilerplate.Modules.Multitenancy.Features.v1.TenantProvisioning.RetryTenantProvisioning;
 
 public sealed class RetryTenantProvisioningCommandHandler(ITenantProvisioningService provisioningService)
     : ICommandHandler<RetryTenantProvisioningCommand, TenantProvisioningStatusDto>

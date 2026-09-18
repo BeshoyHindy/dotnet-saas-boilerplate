@@ -1,8 +1,8 @@
-using FSH.Modules.Tickets.Domain;
+using Boilerplate.Modules.Tickets.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace FSH.Modules.Tickets.Data.Configurations;
+namespace Boilerplate.Modules.Tickets.Data.Configurations;
 
 public sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
 {

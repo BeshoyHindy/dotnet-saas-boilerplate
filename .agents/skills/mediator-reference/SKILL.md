@@ -1,13 +1,13 @@
 ---
 name: mediator-reference
-description: CQRS interface reference for FSH. This project uses the Mediator source generator, NOT MediatR. Reference when implementing commands, queries, and handlers.
+description: CQRS interface reference for Boilerplate. This project uses the Mediator source generator, NOT MediatR. Reference when implementing commands, queries, and handlers.
 user-invocable: false
 ---
 
 # Mediator Reference
 
-⚠️ **FSH uses the `Mediator` source-generator package (`using Mediator;`), NOT `MediatR`.** Different
-interfaces — MediatR types won't compile. The CQRS interfaces below are the library's own (no FSH wrapper).
+⚠️ **Boilerplate uses the `Mediator` source-generator package (`using Mediator;`), NOT `MediatR`.** Different
+interfaces — MediatR types won't compile. The CQRS interfaces below are the library's own (no Boilerplate wrapper).
 
 ## Interfaces
 
@@ -44,8 +44,8 @@ interface name matches MediatR's — that part is fine).
 
 The source generator only scans assemblies listed in `o.Assemblies`, and that list exists in **two host
 files**. A new module needs **two markers** (a Contracts type **and** the module type) added to the Mediator
-list **plus** an entry in the `moduleAssemblies` array — in **both** `FSH.Starter.Api/Program.cs` **and**
-`FSH.Starter.DbMigrator/Program.cs`:
+list **plus** an entry in the `moduleAssemblies` array — in **both** `Boilerplate.Api/Program.cs` **and**
+`Boilerplate.DbMigrator/Program.cs`:
 
 ```csharp
 builder.Services.AddMediator(o =>
@@ -53,8 +53,8 @@ builder.Services.AddMediator(o =>
     o.ServiceLifetime = ServiceLifetime.Scoped;
     o.Assemblies = [
         /* … */
-        typeof(FSH.Modules.{X}.Contracts.{X}ContractsMarker),   // Contracts assembly
-        typeof(FSH.Modules.{X}.{X}Module)];                     // runtime assembly
+        typeof(Boilerplate.Modules.{X}.Contracts.{X}ContractsMarker),   // Contracts assembly
+        typeof(Boilerplate.Modules.{X}.{X}Module)];                     // runtime assembly
 });
 ```
 

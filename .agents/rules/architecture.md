@@ -37,12 +37,12 @@ Module support folders: `Domain/`, `Data/`, `Services/`, `Events/`, `Authorizati
 
 ## IModule registration
 
-Each module implements `IModule`, declared via an **assembly-level** `[FshModule]` attribute (positional `(Type moduleType, int order = 0)`) — **not** a class-level `[FshModule(Order = n)]`:
+Each module implements `IModule`, declared via an **assembly-level** `[AppModule]` attribute (positional `(Type moduleType, int order = 0)`) — **not** a class-level `[AppModule(Order = n)]`:
 
 ```csharp
-[assembly: FshModule(typeof(FSH.Modules.Identity.IdentityModule), 1)]   // above the namespace
+[assembly: AppModule(typeof(Boilerplate.Modules.Identity.IdentityModule), 1)]   // above the namespace
 
-namespace FSH.Modules.Identity;
+namespace Boilerplate.Modules.Identity;
 
 public sealed class IdentityModule : IModule
 {
@@ -52,7 +52,7 @@ public sealed class IdentityModule : IModule
 }
 ```
 
-`ModuleLoader.AddModules` (`src/BuildingBlocks/Web/Modules/ModuleLoader.cs`) discovers `[FshModule]` attributes, orders by `Order` then name, instantiates each, and calls `ConfigureServices`. Endpoints map under `api/v{version:apiVersion}/{module}`.
+`ModuleLoader.AddModules` (`src/BuildingBlocks/Web/Modules/ModuleLoader.cs`) discovers `[AppModule]` attributes, orders by `Order` then name, instantiates each, and calls `ConfigureServices`. Endpoints map under `api/v{version:apiVersion}/{module}`.
 
 ## ⚠️ The four-place registration footgun
 
@@ -60,10 +60,10 @@ Adding a module requires editing **four** lists. Miss one and it fails *silently
 
 | Place | File | Symptom if missed |
 |---|---|---|
-| Mediator `o.Assemblies` (two markers: Contracts type **and** module type) | `src/Host/FSH.Starter.Api/Program.cs` | Handlers silently undiscovered |
-| `moduleAssemblies` array | `src/Host/FSH.Starter.Api/Program.cs` | Module never loaded |
-| Mediator assemblies (same pair) | `src/Host/FSH.Starter.DbMigrator/Program.cs` | Migrate/seed misses the module |
-| module assemblies array | `src/Host/FSH.Starter.DbMigrator/Program.cs` | Migrate/seed misses the module |
+| Mediator `o.Assemblies` (two markers: Contracts type **and** module type) | `src/Host/Boilerplate.Api/Program.cs` | Handlers silently undiscovered |
+| `moduleAssemblies` array | `src/Host/Boilerplate.Api/Program.cs` | Module never loaded |
+| Mediator assemblies (same pair) | `src/Host/Boilerplate.DbMigrator/Program.cs` | Migrate/seed misses the module |
+| module assemblies array | `src/Host/Boilerplate.DbMigrator/Program.cs` | Migrate/seed misses the module |
 
 After wiring, the fastest sanity check is: build, hit the endpoint, confirm the handler runs.
 
@@ -92,7 +92,7 @@ No global mutable static collections enumerated under concurrency. `Audit` (Audi
 
 ## Configuration & options
 
-- `appsettings.json` (+ `.Development`/`.Production`) live in `src/Host/FSH.Starter.Api/`. DbMigrator links the same files.
+- `appsettings.json` (+ `.Development`/`.Production`) live in `src/Host/Boilerplate.Api/`. DbMigrator links the same files.
 - Bind config with the Options pattern: `AddOptions<T>().BindConfiguration(nameof(T))`, section name == type name (e.g. `JwtOptions`, `DatabaseOptions`, `CachingOptions`, `CorsOptions`, `QuotaOptions`, `RateLimitingOptions`; **storage section is `Storage`**, not `StorageOptions`). Add `.ValidateDataAnnotations().ValidateOnStart()` for fail-fast.
 - Validate critical options via `IValidatableObject` — `JwtOptions` requires `SigningKey` ≥32 chars and **rejects placeholder strings containing `"replace-with"`**; `DatabaseOptions` rejects empty connection strings.
 - **Production fail-fast** (`Program.cs`, before service registration): missing `DatabaseOptions:ConnectionString`, `CachingOptions:Redis`, or `JwtOptions:SigningKey` throws. Dev secrets via `dotnet user-secrets` (AppHost has a `UserSecretsId`); MinIO creds are Aspire secret parameters.

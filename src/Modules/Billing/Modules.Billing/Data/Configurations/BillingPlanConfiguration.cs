@@ -1,11 +1,11 @@
 using System.Text.Json;
-using FSH.Framework.Shared.Quota;
-using FSH.Modules.Billing.Domain;
+using Boilerplate.BuildingBlocks.Shared.Quota;
+using Boilerplate.Modules.Billing.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace FSH.Modules.Billing.Data.Configurations;
+namespace Boilerplate.Modules.Billing.Data.Configurations;
 
 public sealed class BillingPlanConfiguration : IEntityTypeConfiguration<BillingPlan>
 {

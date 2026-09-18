@@ -217,7 +217,7 @@ function StatCard({
   const body = (
     <div
       className={cn(
-        "fsh-enter group/stat flex h-full items-start gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] px-4 py-3.5 shadow-xs",
+        "app-enter group/stat flex h-full items-start gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] px-4 py-3.5 shadow-xs",
         "transition-colors duration-200 hover:border-[var(--color-border-strong)]",
       )}
       style={{ animationDelay: `${index * 50}ms` }}
@@ -771,7 +771,7 @@ function LiveFeedBody({ events }: { events: SseEvent[] }) {
 // picks a plan; users can also opt out per-tenant via localStorage.
 // ────────────────────────────────────────────────────────────────────────
 
-const FIRST_RUN_DISMISSED_KEY = "fsh.firstrun.dismissed";
+const FIRST_RUN_DISMISSED_KEY = "boilerplate.firstrun.dismissed";
 
 function dismissedKeyFor(tenantId: string | undefined): string {
   return `${FIRST_RUN_DISMISSED_KEY}:${tenantId ?? "_default"}`;
@@ -851,7 +851,7 @@ function FirstRunPanel({
   return (
     <section
       aria-labelledby="firstrun-heading"
-      className="fsh-enter relative overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] shadow-xs"
+      className="app-enter relative overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] shadow-xs"
     >
       <button
         type="button"
@@ -881,7 +881,7 @@ function FirstRunPanel({
           {SETUP_TILES.map((tile, idx) => (
             <li
               key={tile.to}
-              className="fsh-enter"
+              className="app-enter"
               style={{ animationDelay: `${80 + idx * 60}ms` }}
             >
               <SetupTile spec={tile} />
@@ -1108,7 +1108,7 @@ export function OverviewPage() {
       {/* ── Editorial greeting header ───────────────────────────────────
           Direct text — no card chrome. Small caption above (date + tenant),
           big greeting below, action buttons on the right. */}
-      <header className="fsh-enter flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+      <header className="app-enter flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             {dateCaption} · {tenantLabel}

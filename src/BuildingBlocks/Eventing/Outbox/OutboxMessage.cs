@@ -1,8 +1,8 @@
-using FSH.Framework.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace FSH.Framework.Eventing.Outbox;
+namespace Boilerplate.BuildingBlocks.Eventing.Outbox;
 
 /// <summary>
 /// Outbox message entity used to persist integration events alongside domain changes.

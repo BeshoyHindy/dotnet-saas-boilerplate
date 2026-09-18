@@ -5,11 +5,11 @@ using Microsoft.Extensions.Options;
 using System;
 using AspNetCorsOptions = Microsoft.AspNetCore.Cors.Infrastructure.CorsOptions;
 
-namespace FSH.Framework.Web.Cors;
+namespace Boilerplate.BuildingBlocks.Web.Cors;
 
 public static class Extensions
 {
-    private const string PolicyName = "FSHCorsPolicy";
+    private const string PolicyName = "AppCorsPolicy";
 
     public static IServiceCollection AddHeroCors(
         this IServiceCollection services,

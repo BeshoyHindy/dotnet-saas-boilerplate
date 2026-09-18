@@ -1,10 +1,10 @@
 using System.ComponentModel;
 using System.Security.Cryptography;
-using FSH.CLI.Infrastructure;
+using Boilerplate.CLI.Infrastructure;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
-namespace FSH.CLI.Commands;
+namespace Boilerplate.CLI.Commands;
 
 public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
 {
@@ -61,7 +61,7 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
         string? validationError = ProjectNameValidator.Validate(name);
         if (validationError is not null)
         {
-            AnsiConsole.MarkupLine($"[{FshConstants.ErrorColor}]{validationError.EscapeMarkup()}[/]");
+            AnsiConsole.MarkupLine($"[{AppConstants.ErrorColor}]{validationError.EscapeMarkup()}[/]");
             return 1;
         }
 
@@ -74,11 +74,11 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
         // 2. Check for existing directory
         if (Directory.Exists(output) && Directory.EnumerateFileSystemEntries(output).Any())
         {
-            AnsiConsole.MarkupLine($"[{FshConstants.WarningColor}]Directory '{output}' already exists and is not empty.[/]");
+            AnsiConsole.MarkupLine($"[{AppConstants.WarningColor}]Directory '{output}' already exists and is not empty.[/]");
 
             if (settings.NonInteractive)
             {
-                AnsiConsole.MarkupLine($"[{FshConstants.ErrorColor}]Use --output to specify a different directory, or delete the existing one.[/]");
+                AnsiConsole.MarkupLine($"[{AppConstants.ErrorColor}]Use --output to specify a different directory, or delete the existing one.[/]");
                 return 1;
             }
 
@@ -93,7 +93,7 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
 
         if (settings.DryRun)
         {
-            AnsiConsole.MarkupLine($"[{FshConstants.DimColor}]Dry run — no files were created.[/]");
+            AnsiConsole.MarkupLine($"[{AppConstants.DimColor}]Dry run — no files were created.[/]");
             return 0;
         }
 
@@ -105,7 +105,7 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
         int result = await ScaffoldProjectAsync(name, aspire, frontend, output, cancellationToken).ConfigureAwait(false);
         if (result != 0)
         {
-            AnsiConsole.MarkupLine($"[{FshConstants.ErrorColor}]Scaffolding failed. Check the output above for errors.[/]");
+            AnsiConsole.MarkupLine($"[{AppConstants.ErrorColor}]Scaffolding failed. Check the output above for errors.[/]");
             return 1;
         }
 
@@ -136,8 +136,8 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
 
     private static void PrintBanner()
     {
-        AnsiConsole.Write(new FigletText("fsh").Color(Color.DodgerBlue1));
-        AnsiConsole.MarkupLine("[bold]FullStackHero .NET Starter Kit[/]");
+        AnsiConsole.Write(new FigletText("boilerplate").Color(Color.DodgerBlue1));
+        AnsiConsole.MarkupLine("[bold]Boilerplate[/]");
         AnsiConsole.WriteLine();
     }
 
@@ -146,9 +146,9 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
         if (settings.Name is not null) return settings.Name;
 
         if (settings.NonInteractive)
-            throw new InvalidOperationException("Project name is required in non-interactive mode. Pass it as: fsh new <name>");
+            throw new InvalidOperationException("Project name is required in non-interactive mode. Pass it as: boilerplate new <name>");
 
-        return await new TextPrompt<string>($"[{FshConstants.AccentColor}]Project name:[/]")
+        return await new TextPrompt<string>($"[{AppConstants.AccentColor}]Project name:[/]")
             .Validate(input =>
             {
                 string? error = ProjectNameValidator.Validate(input);
@@ -164,7 +164,7 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
         if (settings.NoAspire) return false;
         if (settings.NonInteractive) return true;
 
-        return await new ConfirmationPrompt($"[{FshConstants.AccentColor}]Include .NET Aspire AppHost?[/]")
+        return await new ConfirmationPrompt($"[{AppConstants.AccentColor}]Include .NET Aspire AppHost?[/]")
             { DefaultValue = true }
             .ShowAsync(AnsiConsole.Console, cancellationToken).ConfigureAwait(false);
     }
@@ -174,7 +174,7 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
         if (settings.NoFrontend) return false;
         if (settings.NonInteractive) return true;
 
-        return await new ConfirmationPrompt($"[{FshConstants.AccentColor}]Include the React admin + dashboard apps?[/]")
+        return await new ConfirmationPrompt($"[{AppConstants.AccentColor}]Include the React admin + dashboard apps?[/]")
             { DefaultValue = true }
             .ShowAsync(AnsiConsole.Console, cancellationToken).ConfigureAwait(false);
     }
@@ -185,9 +185,9 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
 
         string mode = dryRun ? " [yellow](dry run)[/]" : "";
         AnsiConsole.MarkupLine($"[bold]Creating project:[/] {name.EscapeMarkup()}{mode}");
-        AnsiConsole.MarkupLine($"  [{FshConstants.DimColor}]Aspire:[/]    {(aspire ? "yes" : "no")}");
-        AnsiConsole.MarkupLine($"  [{FshConstants.DimColor}]Frontend:[/]  {(frontend ? "yes (admin + dashboard)" : "no")}");
-        AnsiConsole.MarkupLine($"  [{FshConstants.DimColor}]Output:[/]    {output.EscapeMarkup()}");
+        AnsiConsole.MarkupLine($"  [{AppConstants.DimColor}]Aspire:[/]    {(aspire ? "yes" : "no")}");
+        AnsiConsole.MarkupLine($"  [{AppConstants.DimColor}]Frontend:[/]  {(frontend ? "yes (admin + dashboard)" : "no")}");
+        AnsiConsole.MarkupLine($"  [{AppConstants.DimColor}]Output:[/]    {output.EscapeMarkup()}");
         AnsiConsole.WriteLine();
     }
 
@@ -196,28 +196,28 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
         // Check if the template is already available. dotnet new list may return
         // non-zero due to workload warnings, so check stdout content regardless.
         (_, string listOutput) = await ProcessRunner.CaptureAsync(
-            "dotnet", $"new list {FshConstants.TemplateShortName}",
+            "dotnet", $"new list {AppConstants.TemplateShortName}",
             cancellationToken).ConfigureAwait(false);
 
-        bool installed = listOutput.Contains(FshConstants.TemplateShortName, StringComparison.OrdinalIgnoreCase)
-            && listOutput.Contains("FullStackHero", StringComparison.OrdinalIgnoreCase);
+        bool installed = listOutput.Contains(AppConstants.TemplateShortName, StringComparison.OrdinalIgnoreCase)
+            && listOutput.Contains("Boilerplate", StringComparison.OrdinalIgnoreCase);
 
         if (installed) return true;
 
-        AnsiConsole.MarkupLine($"[{FshConstants.WarningColor}]FSH template not found. Installing...[/]");
+        AnsiConsole.MarkupLine($"[{AppConstants.WarningColor}]Boilerplate template not found. Installing...[/]");
         await ProcessRunner.RunAsync(
-            "dotnet", $"new install {FshConstants.TemplatePackageId}",
+            "dotnet", $"new install {AppConstants.TemplatePackageId}",
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
         // Verify it actually installed (ignore exit code — workload warnings cause non-zero)
         (_, string verifyOutput) = await ProcessRunner.CaptureAsync(
-            "dotnet", $"new list {FshConstants.TemplateShortName}",
+            "dotnet", $"new list {AppConstants.TemplateShortName}",
             cancellationToken).ConfigureAwait(false);
 
-        bool nowInstalled = verifyOutput.Contains("FullStackHero", StringComparison.OrdinalIgnoreCase);
+        bool nowInstalled = verifyOutput.Contains("Boilerplate", StringComparison.OrdinalIgnoreCase);
         if (!nowInstalled)
         {
-            AnsiConsole.MarkupLine($"[{FshConstants.ErrorColor}]Failed to install template. Run manually:[/] dotnet new install {FshConstants.TemplatePackageId}");
+            AnsiConsole.MarkupLine($"[{AppConstants.ErrorColor}]Failed to install template. Run manually:[/] dotnet new install {AppConstants.TemplatePackageId}");
         }
 
         return nowInstalled;
@@ -228,12 +228,12 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
     {
         return await AnsiConsole.Status()
             .Spinner(Spinner.Known.Dots)
-            .SpinnerStyle(Style.Parse(FshConstants.AccentColor))
+            .SpinnerStyle(Style.Parse(AppConstants.AccentColor))
             .StartAsync("Scaffolding project...", async _ =>
             {
                 string aspireFlag = aspire ? "true" : "false";
                 string frontendFlag = frontend ? "true" : "false";
-                string args = $"new {FshConstants.TemplateShortName} -n {name} -o \"{output}\" --aspire {aspireFlag} --frontend {frontendFlag} --force";
+                string args = $"new {AppConstants.TemplateShortName} -n {name} -o \"{output}\" --aspire {aspireFlag} --frontend {frontendFlag} --force";
                 await ProcessRunner.RunAsync("dotnet", args, showOutput: false, cancellationToken: cancellationToken)
                     .ConfigureAwait(false);
 
@@ -258,7 +258,7 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
 
         await AnsiConsole.Status()
             .Spinner(Spinner.Known.Dots)
-            .SpinnerStyle(Style.Parse(FshConstants.AccentColor))
+            .SpinnerStyle(Style.Parse(AppConstants.AccentColor))
             .StartAsync("Initializing git repository...", async _ =>
             {
                 await ProcessRunner.RunAsync("git", "init", output, showOutput: false, cancellationToken: cancellationToken)
@@ -269,7 +269,7 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
                     .ConfigureAwait(false);
                 await ProcessRunner.RunAsync("git", "add -A", output, showOutput: false, cancellationToken: cancellationToken)
                     .ConfigureAwait(false);
-                await ProcessRunner.RunAsync("git", "commit -m \"Initial project from FullStackHero .NET Starter Kit\"", output, showOutput: false, cancellationToken: cancellationToken)
+                await ProcessRunner.RunAsync("git", "commit -m \"Initial project from Boilerplate\"", output, showOutput: false, cancellationToken: cancellationToken)
                     .ConfigureAwait(false);
             }).ConfigureAwait(false);
     }
@@ -283,7 +283,7 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
 
             await AnsiConsole.Status()
                 .Spinner(Spinner.Known.Dots)
-                .SpinnerStyle(Style.Parse(FshConstants.AccentColor))
+                .SpinnerStyle(Style.Parse(AppConstants.AccentColor))
                 .StartAsync($"Installing {app} dependencies (npm install)...", async _ =>
                 {
                     try
@@ -291,11 +291,11 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
                         int code = await RunNpmAsync("install --no-audit --no-fund", appDir, cancellationToken)
                             .ConfigureAwait(false);
                         if (code != 0)
-                            AnsiConsole.MarkupLine($"[{FshConstants.WarningColor}]npm install failed for clients/{app}. Run it manually before 'npm run dev'.[/]");
+                            AnsiConsole.MarkupLine($"[{AppConstants.WarningColor}]npm install failed for clients/{app}. Run it manually before 'npm run dev'.[/]");
                     }
                     catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or FileNotFoundException)
                     {
-                        AnsiConsole.MarkupLine($"[{FshConstants.WarningColor}]npm not found — skipped clients/{app}. Install Node.js, then run 'npm install' there.[/]");
+                        AnsiConsole.MarkupLine($"[{AppConstants.WarningColor}]npm not found — skipped clients/{app}. Install Node.js, then run 'npm install' there.[/]");
                     }
                 }).ConfigureAwait(false);
         }
@@ -317,7 +317,7 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
         string appsettingsDev = Path.Combine(output, "src", "Host", $"{name}.Api", "appsettings.Development.json");
         if (!File.Exists(appsettingsDev)) return;
 
-        const string placeholder = "fsh-dev-only-do-not-use-in-prod-32+chars-min";
+        const string placeholder = "boilerplate-dev-only-do-not-use-in-prod-32+chars-min";
         string content = File.ReadAllText(appsettingsDev);
         if (!content.Contains(placeholder, StringComparison.Ordinal)) return;
 
@@ -345,9 +345,9 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
             ["MINIO_ROOT_USER"] = "minioadmin",
             ["MINIO_ROOT_PASSWORD"] = GenerateSecret(24),
             // Local-working defaults: the compose stack publishes these host ports.
-            ["FSH_API_URL"] = "http://localhost:8080",
-            ["FSH_ADMIN_URL"] = "http://localhost:8081",
-            ["FSH_DASHBOARD_URL"] = "http://localhost:8082"
+            ["APP_API_URL"] = "http://localhost:8080",
+            ["APP_ADMIN_URL"] = "http://localhost:8081",
+            ["APP_DASHBOARD_URL"] = "http://localhost:8082"
         };
 
         string[] lines = File.ReadAllLines(examplePath);
@@ -399,15 +399,15 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
         try
         {
             string? latest = await NuGetClient.GetLatestVersionAsync(
-                FshConstants.CliPackageId, cancellationToken).ConfigureAwait(false);
+                AppConstants.CliPackageId, cancellationToken).ConfigureAwait(false);
 
             string currentVersion = typeof(NewCommand).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
 
             if (VersionComparer.IsNewer(latest, currentVersion))
             {
                 AnsiConsole.WriteLine();
-                AnsiConsole.MarkupLine($"[{FshConstants.WarningColor}]A newer version of FSH CLI is available: {latest} (current: {currentVersion})[/]");
-                AnsiConsole.MarkupLine($"[{FshConstants.DimColor}]Run 'fsh update' to upgrade.[/]");
+                AnsiConsole.MarkupLine($"[{AppConstants.WarningColor}]A newer version of Boilerplate CLI is available: {latest} (current: {currentVersion})[/]");
+                AnsiConsole.MarkupLine($"[{AppConstants.DimColor}]Run 'boilerplate update' to upgrade.[/]");
             }
         }
         catch
@@ -419,22 +419,22 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
     private static void PrintNextSteps(string name, bool aspire, bool frontend, bool skipInstall, bool dockerEnvReady)
     {
         AnsiConsole.WriteLine();
-        AnsiConsole.Write(new Rule($"[{FshConstants.SuccessColor}]Project created successfully![/]").RuleStyle(FshConstants.SuccessColor));
+        AnsiConsole.Write(new Rule($"[{AppConstants.SuccessColor}]Project created successfully![/]").RuleStyle(AppConstants.SuccessColor));
         AnsiConsole.WriteLine();
 
         string runProject = aspire
             ? $"src/Host/{name}.AppHost"
             : $"src/Host/{name}.Api";
 
-        var tree = new Tree($"[bold {FshConstants.AccentColor}]Next Steps[/]");
+        var tree = new Tree($"[bold {AppConstants.AccentColor}]Next Steps[/]");
         tree.AddNode($"[bold]cd[/] {name.EscapeMarkup()}");
         tree.AddNode($"[bold]dotnet run[/] --project {runProject.EscapeMarkup()}");
 
         if (aspire)
         {
-            tree.AddNode($"[{FshConstants.DimColor}]Aspire dashboard:[/] https://localhost:{FshConstants.AspireDashboardPort}");
+            tree.AddNode($"[{AppConstants.DimColor}]Aspire dashboard:[/] https://localhost:{AppConstants.AspireDashboardPort}");
             if (frontend)
-                tree.AddNode($"[{FshConstants.DimColor}]Aspire launches the admin + dashboard apps automatically.[/]");
+                tree.AddNode($"[{AppConstants.DimColor}]Aspire launches the admin + dashboard apps automatically.[/]");
         }
         else if (frontend)
         {
@@ -443,15 +443,15 @@ public sealed class NewCommand : AsyncCommand<NewCommand.Settings>
         }
 
         if (frontend && skipInstall)
-            tree.AddNode($"[{FshConstants.WarningColor}]Run 'npm install' in clients/admin and clients/dashboard first.[/]");
+            tree.AddNode($"[{AppConstants.WarningColor}]Run 'npm install' in clients/admin and clients/dashboard first.[/]");
 
-        tree.AddNode($"[{FshConstants.DimColor}]API docs:[/]         https://localhost:{FshConstants.ApiHttpsPort}/scalar");
-        tree.AddNode($"[{FshConstants.DimColor}]Health check:[/]     https://localhost:{FshConstants.ApiHttpsPort}/health/live");
+        tree.AddNode($"[{AppConstants.DimColor}]API docs:[/]         https://localhost:{AppConstants.ApiHttpsPort}/scalar");
+        tree.AddNode($"[{AppConstants.DimColor}]Health check:[/]     https://localhost:{AppConstants.ApiHttpsPort}/health/live");
 
         if (dockerEnvReady)
-            tree.AddNode($"[{FshConstants.DimColor}]Self-host:[/]        cd deploy/docker && docker compose up -d --build  [{FshConstants.DimColor}](secrets pre-generated in .env)[/]");
+            tree.AddNode($"[{AppConstants.DimColor}]Self-host:[/]        cd deploy/docker && docker compose up -d --build  [{AppConstants.DimColor}](secrets pre-generated in .env)[/]");
 
-        tree.AddNode($"[{FshConstants.DimColor}]Documentation:[/]    {FshConstants.DocsUrl}");
+        tree.AddNode($"[{AppConstants.DimColor}]Documentation:[/]    {AppConstants.DocsUrl}");
 
         AnsiConsole.Write(tree);
         AnsiConsole.WriteLine();

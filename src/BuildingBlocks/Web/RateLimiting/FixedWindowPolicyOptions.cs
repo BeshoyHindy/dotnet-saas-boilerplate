@@ -1,4 +1,4 @@
-namespace FSH.Framework.Web.RateLimiting;
+namespace Boilerplate.BuildingBlocks.Web.RateLimiting;
 
 public sealed class FixedWindowPolicyOptions
 {

@@ -1,16 +1,16 @@
 using System.Collections.ObjectModel;
-using FSH.Framework.Core.Context;
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Storage.Services;
-using FSH.Modules.Files.Contracts.v1.DTOs;
-using FSH.Modules.Files.Contracts.v1.Queries;
-using FSH.Modules.Files.Data;
-using FSH.Modules.Files.Domain;
-using FSH.Modules.Files.Features.v1.Internal;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Storage.Services;
+using Boilerplate.Modules.Files.Contracts.v1.DTOs;
+using Boilerplate.Modules.Files.Contracts.v1.Queries;
+using Boilerplate.Modules.Files.Data;
+using Boilerplate.Modules.Files.Domain;
+using Boilerplate.Modules.Files.Features.v1.Internal;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Files.Features.v1.ListMyFiles;
+namespace Boilerplate.Modules.Files.Features.v1.ListMyFiles;
 
 public sealed class ListMyFilesQueryHandler(
     FilesDbContext db,

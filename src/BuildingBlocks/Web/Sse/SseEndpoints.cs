@@ -1,9 +1,9 @@
-using FSH.Framework.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Context;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Framework.Web.Sse;
+namespace Boilerplate.BuildingBlocks.Web.Sse;
 
 public static class SseEndpoints
 {

@@ -1,0 +1,64 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Boilerplate.DbMigrator</RootNamespace>
+    <AssemblyName>Boilerplate.DbMigrator</AssemblyName>
+    <IsPackable>false</IsPackable>
+
+    <!-- Container configuration — published as a one-shot job image used as
+         the migrate step in a Kubernetes Job / Helm pre-install hook / Aspire
+         dependency. Same base image as the API for parity. Image is built via
+         `dotnet publish /t:PublishContainer` — no PublishProfile needed (the
+         legacy "DefaultContainer" profile auto-populates ContainerImageTag
+         from $(Version), colliding with ContainerImageTags). -->
+    <ContainerUser>1654</ContainerUser>
+    <ContainerFamily>noble</ContainerFamily>
+    <ContainerRepository>boilerplate-db-migrator</ContainerRepository>
+
+    <!-- This is an internal operator-facing CLI — no localization, all
+         operator messages are literal strings. CA1303 (use resource tables
+         for user-facing strings) is the wrong rule for this project. -->
+    <NoWarn>$(NoWarn);CA1303</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Mediator.Abstractions" />
+    <PackageReference Include="Mediator.SourceGenerator">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\BuildingBlocks\Web\Boilerplate.BuildingBlocks.Web.csproj" />
+    <ProjectReference Include="..\..\Modules\Auditing\Modules.Auditing\Boilerplate.Modules.Auditing.csproj" />
+    <ProjectReference Include="..\..\Modules\Auditing\Modules.Auditing.Contracts\Boilerplate.Modules.Auditing.Contracts.csproj" />
+    <ProjectReference Include="..\..\Modules\Billing\Modules.Billing\Boilerplate.Modules.Billing.csproj" />
+    <ProjectReference Include="..\..\Modules\Billing\Modules.Billing.Contracts\Boilerplate.Modules.Billing.Contracts.csproj" />
+    <ProjectReference Include="..\..\Modules\Catalog\Modules.Catalog\Boilerplate.Modules.Catalog.csproj" />
+    <ProjectReference Include="..\..\Modules\Catalog\Modules.Catalog.Contracts\Boilerplate.Modules.Catalog.Contracts.csproj" />
+    <ProjectReference Include="..\..\Modules\Chat\Modules.Chat\Boilerplate.Modules.Chat.csproj" />
+    <ProjectReference Include="..\..\Modules\Chat\Modules.Chat.Contracts\Boilerplate.Modules.Chat.Contracts.csproj" />
+    <ProjectReference Include="..\..\Modules\Files\Modules.Files\Boilerplate.Modules.Files.csproj" />
+    <ProjectReference Include="..\..\Modules\Files\Modules.Files.Contracts\Boilerplate.Modules.Files.Contracts.csproj" />
+    <ProjectReference Include="..\..\Modules\Identity\Modules.Identity\Boilerplate.Modules.Identity.csproj" />
+    <ProjectReference Include="..\..\Modules\Multitenancy\Modules.Multitenancy\Boilerplate.Modules.Multitenancy.csproj" />
+    <ProjectReference Include="..\..\Modules\Tickets\Modules.Tickets\Boilerplate.Modules.Tickets.csproj" />
+    <ProjectReference Include="..\..\Modules\Tickets\Modules.Tickets.Contracts\Boilerplate.Modules.Tickets.Contracts.csproj" />
+    <ProjectReference Include="..\..\Modules\Webhooks\Modules.Webhooks\Boilerplate.Modules.Webhooks.csproj" />
+    <ProjectReference Include="..\Boilerplate.Migrations.PostgreSQL\Boilerplate.Migrations.PostgreSQL.csproj" />
+  </ItemGroup>
+
+  <!-- Share configuration with the API so connection strings + tenant options
+       stay in lock-step. Production deployments override via env vars. -->
+  <ItemGroup>
+    <None Include="..\Boilerplate.Api\appsettings.json"
+          Link="appsettings.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Boilerplate.Api\appsettings.Development.json"
+          Link="appsettings.Development.json"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

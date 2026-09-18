@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<RootNamespace>Boilerplate.Modules.Files</RootNamespace>
+		<AssemblyName>Boilerplate.Modules.Files</AssemblyName>
+		<NoWarn>$(NoWarn);CA1031;CA1812;CA1859;CA1002;CA2227;S3267</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\..\BuildingBlocks\Persistence\Boilerplate.BuildingBlocks.Persistence.csproj" />
+		<ProjectReference Include="..\..\..\BuildingBlocks\Storage\Boilerplate.BuildingBlocks.Storage.csproj" />
+		<ProjectReference Include="..\..\..\BuildingBlocks\Web\Boilerplate.BuildingBlocks.Web.csproj" />
+		<ProjectReference Include="..\..\..\BuildingBlocks\Jobs\Boilerplate.BuildingBlocks.Jobs.csproj" />
+		<ProjectReference Include="..\Modules.Files.Contracts\Boilerplate.Modules.Files.Contracts.csproj" />
+	</ItemGroup>
+
+</Project>

@@ -1,4 +1,4 @@
-﻿namespace FSH.Framework.Persistence;
+﻿namespace Boilerplate.BuildingBlocks.Persistence;
 
 /// <summary>
 /// Interface for validating database connection strings.

@@ -1,10 +1,10 @@
-using FSH.Modules.Webhooks.Contracts.v1.CreateWebhookSubscription;
-using FSH.Modules.Webhooks.Data;
-using FSH.Modules.Webhooks.Domain;
-using FSH.Modules.Webhooks.Services;
+using Boilerplate.Modules.Webhooks.Contracts.v1.CreateWebhookSubscription;
+using Boilerplate.Modules.Webhooks.Data;
+using Boilerplate.Modules.Webhooks.Domain;
+using Boilerplate.Modules.Webhooks.Services;
 using Mediator;
 
-namespace FSH.Modules.Webhooks.Features.v1.CreateWebhookSubscription;
+namespace Boilerplate.Modules.Webhooks.Features.v1.CreateWebhookSubscription;
 
 public sealed class CreateWebhookSubscriptionCommandHandler(
     WebhookDbContext dbContext,

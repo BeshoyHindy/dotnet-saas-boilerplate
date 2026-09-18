@@ -1,4 +1,4 @@
-﻿namespace FSH.Modules.Identity;
+﻿namespace Boilerplate.Modules.Identity;
 
 public static class AuthenticationConstants
 {

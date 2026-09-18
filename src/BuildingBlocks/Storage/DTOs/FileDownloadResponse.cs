@@ -1,4 +1,4 @@
-namespace FSH.Framework.Storage.DTOs;
+namespace Boilerplate.BuildingBlocks.Storage.DTOs;
 
 public sealed class FileDownloadResponse
 {

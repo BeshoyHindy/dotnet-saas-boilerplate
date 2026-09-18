@@ -1,7 +1,7 @@
-using FSH.Modules.Auditing.Contracts;
+using Boilerplate.Modules.Auditing.Contracts;
 using System.Diagnostics;
 
-namespace FSH.Modules.Auditing;
+namespace Boilerplate.Modules.Auditing;
 
 /// <summary>
 /// Fluent entry-point to create and publish audit events.

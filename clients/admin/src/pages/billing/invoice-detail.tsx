@@ -372,7 +372,7 @@ function LineItemRow({
 }) {
   return (
     <li
-      className="fsh-enter grid grid-cols-[1fr_auto] items-baseline gap-x-6 border-b border-[var(--color-border)] last:border-b-0 px-5 py-3"
+      className="app-enter grid grid-cols-[1fr_auto] items-baseline gap-x-6 border-b border-[var(--color-border)] last:border-b-0 px-5 py-3"
       style={{ animationDelay: `${Math.min(delayIndex, 6) * 30}ms` }}
     >
       <div className="min-w-0">

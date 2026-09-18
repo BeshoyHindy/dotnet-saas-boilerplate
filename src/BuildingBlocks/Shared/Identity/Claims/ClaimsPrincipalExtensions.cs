@@ -1,7 +1,7 @@
-﻿using FSH.Framework.Shared.Constants;
+﻿using Boilerplate.BuildingBlocks.Shared.Constants;
 using System.Security.Claims;
 
-namespace FSH.Framework.Shared.Identity.Claims;
+namespace Boilerplate.BuildingBlocks.Shared.Identity.Claims;
 
 public static class ClaimsPrincipalExtensions
 {

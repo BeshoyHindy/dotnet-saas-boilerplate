@@ -10,7 +10,7 @@ namespace Integration.Tests.Tests.Multitenancy;
 /// extends validity by one plan term (stacking on remaining time), switches plan when a different
 /// key is supplied, route/body mismatch and empty-tenant validation, and root-only authorization.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class RenewTenantTests
 {
     private const string BillingBasePath = "/api/v1/billing";
@@ -21,10 +21,10 @@ public sealed class RenewTenantTests
         PropertyNameCaseInsensitive = true,
     };
 
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public RenewTenantTests(FshWebApplicationFactory factory)
+    public RenewTenantTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

@@ -1,4 +1,4 @@
-namespace FSH.Modules.Files.Contracts.v1.DTOs;
+namespace Boilerplate.Modules.Files.Contracts.v1.DTOs;
 
 /// <summary>
 /// Wire shape returned by every Files-module read endpoint.

@@ -9,13 +9,13 @@ namespace Integration.Tests.Tests.Auditing;
 /// async, so each happy-path test first polls the list endpoint for a real row
 /// and then queries by its concrete Id / CorrelationId / TraceId.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class AuditQueryByKeyTests
 {
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public AuditQueryByKeyTests(FshWebApplicationFactory factory)
+    public AuditQueryByKeyTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

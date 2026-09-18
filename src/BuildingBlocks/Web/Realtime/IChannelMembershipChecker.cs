@@ -1,4 +1,4 @@
-namespace FSH.Framework.Web.Realtime;
+namespace Boilerplate.BuildingBlocks.Web.Realtime;
 
 /// <summary>
 /// Realtime hub asks this whether a user may broadcast or receive on a given channel. Implemented

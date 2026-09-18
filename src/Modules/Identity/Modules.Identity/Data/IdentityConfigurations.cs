@@ -1,14 +1,14 @@
 using Finbuckle.MultiTenant.EntityFrameworkCore.Extensions;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.Modules.Identity.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace FSH.Modules.Identity.Data;
+namespace Boilerplate.Modules.Identity.Data;
 
-public class ApplicationUserConfig : IEntityTypeConfiguration<FshUser>
+public class ApplicationUserConfig : IEntityTypeConfiguration<AppUser>
 {
-    public void Configure(EntityTypeBuilder<FshUser> builder)
+    public void Configure(EntityTypeBuilder<AppUser> builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
@@ -22,9 +22,9 @@ public class ApplicationUserConfig : IEntityTypeConfiguration<FshUser>
     }
 }
 
-public class ApplicationRoleConfig : IEntityTypeConfiguration<FshRole>
+public class ApplicationRoleConfig : IEntityTypeConfiguration<AppRole>
 {
-    public void Configure(EntityTypeBuilder<FshRole> builder)
+    public void Configure(EntityTypeBuilder<AppRole> builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
@@ -35,9 +35,9 @@ public class ApplicationRoleConfig : IEntityTypeConfiguration<FshRole>
     }
 }
 
-public class ApplicationRoleClaimConfig : IEntityTypeConfiguration<FshRoleClaim>
+public class ApplicationRoleClaimConfig : IEntityTypeConfiguration<AppRoleClaim>
 {
-    public void Configure(EntityTypeBuilder<FshRoleClaim> builder)
+    public void Configure(EntityTypeBuilder<AppRoleClaim> builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
 

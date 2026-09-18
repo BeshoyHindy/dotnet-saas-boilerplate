@@ -1,8 +1,8 @@
 using System.Collections.ObjectModel;
-using FSH.Modules.Chat.Contracts.v1.DTOs;
+using Boilerplate.Modules.Chat.Contracts.v1.DTOs;
 using Mediator;
 
-namespace FSH.Modules.Chat.Contracts.v1.Queries;
+namespace Boilerplate.Modules.Chat.Contracts.v1.Queries;
 
 /// <summary>
 /// All currently-pinned messages in a channel, ordered by PinnedAtUtc desc.

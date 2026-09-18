@@ -1,11 +1,11 @@
 using System.Net;
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Catalog.Contracts.v1.Categories;
-using FSH.Modules.Catalog.Data;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Catalog.Contracts.v1.Categories;
+using Boilerplate.Modules.Catalog.Data;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Catalog.Features.v1.Categories.DeleteCategory;
+namespace Boilerplate.Modules.Catalog.Features.v1.Categories.DeleteCategory;
 
 public sealed class DeleteCategoryCommandHandler(CatalogDbContext dbContext)
     : ICommandHandler<DeleteCategoryCommand, Unit>

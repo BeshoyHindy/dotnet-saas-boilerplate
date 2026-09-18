@@ -1,5 +1,5 @@
-using FSH.Framework.Persistence;
-using FSH.Framework.Shared.Persistence;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
 
 namespace Framework.Tests.Persistence;
 

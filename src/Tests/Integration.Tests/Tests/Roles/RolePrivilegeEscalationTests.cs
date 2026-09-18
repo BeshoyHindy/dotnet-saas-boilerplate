@@ -1,4 +1,4 @@
-using FSH.Modules.Identity.Contracts.Authorization;
+using Boilerplate.Modules.Identity.Contracts.Authorization;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 
@@ -12,7 +12,7 @@ namespace Integration.Tests.Tests.Roles;
 /// persisted and the caller could escalate to operating on every tenant. These tests encode that
 /// exact attack and the root-operator's legitimate counterpart.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class RolePrivilegeEscalationTests
 {
     // A real IsRoot permission (MultitenancyPermissions.Tenants.Update — flagged IsRoot: true).
@@ -21,7 +21,7 @@ public sealed class RolePrivilegeEscalationTests
 
     private readonly AuthHelper _auth;
 
-    public RolePrivilegeEscalationTests(FshWebApplicationFactory factory)
+    public RolePrivilegeEscalationTests(AppWebApplicationFactory factory)
     {
         _auth = new AuthHelper(factory);
     }

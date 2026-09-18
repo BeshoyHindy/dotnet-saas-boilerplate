@@ -1,5 +1,5 @@
-using FSH.Modules.Auditing.Contracts;
-using FSH.Modules.Auditing.Contracts.Dtos;
+using Boilerplate.Modules.Auditing.Contracts;
+using Boilerplate.Modules.Auditing.Contracts.Dtos;
 using Integration.Tests.Infrastructure;
 
 namespace Integration.Tests.Tests.Auditing;
@@ -12,12 +12,12 @@ namespace Integration.Tests.Tests.Auditing;
 /// which the AuditHttpMiddleware records as an Api-area Exception event at
 /// Error severity before the global handler maps it to 404).
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class AuditExceptionAndFilterTests
 {
     private readonly AuthHelper _auth;
 
-    public AuditExceptionAndFilterTests(FshWebApplicationFactory factory)
+    public AuditExceptionAndFilterTests(AppWebApplicationFactory factory)
     {
         _auth = new AuthHelper(factory);
     }

@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Webhooks.Contracts.v1.GetWebhookDeliveries;
+using Boilerplate.Modules.Webhooks.Contracts.v1.GetWebhookDeliveries;
 
-namespace FSH.Modules.Webhooks.Features.v1.GetWebhookDeliveries;
+namespace Boilerplate.Modules.Webhooks.Features.v1.GetWebhookDeliveries;
 
 public sealed class GetWebhookDeliveriesQueryValidator : AbstractValidator<GetWebhookDeliveriesQuery>
 {

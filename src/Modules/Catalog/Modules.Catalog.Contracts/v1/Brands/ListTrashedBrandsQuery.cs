@@ -1,8 +1,8 @@
-using FSH.Framework.Shared.Persistence;
-using FSH.Modules.Catalog.Contracts.Dtos;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Catalog.Contracts.Dtos;
 using Mediator;
 
-namespace FSH.Modules.Catalog.Contracts.v1.Brands;
+namespace Boilerplate.Modules.Catalog.Contracts.v1.Brands;
 
 /// <summary>
 /// Lists soft-deleted brands. Bypasses the global IsDeleted query filter.

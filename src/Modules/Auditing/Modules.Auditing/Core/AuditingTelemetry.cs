@@ -1,6 +1,6 @@
 using System.Diagnostics.Metrics;
 
-namespace FSH.Modules.Auditing;
+namespace Boilerplate.Modules.Auditing;
 
 /// <summary>
 /// OpenTelemetry instruments for the auditing pipeline. Exposed as static
@@ -10,13 +10,13 @@ namespace FSH.Modules.Auditing;
 /// </summary>
 public static class AuditingTelemetry
 {
-    public const string MeterName = "FSH.Modules.Auditing";
+    public const string MeterName = "Boilerplate.Modules.Auditing";
 
     internal static readonly Meter Meter = new(MeterName);
 
     /// <summary>Successful publish to the channel (excluding drops).</summary>
     internal static readonly Counter<long> Published = Meter.CreateCounter<long>(
-        "fsh.audit.published",
+        "boilerplate.audit.published",
         unit: "{event}",
         description: "Number of audit events accepted by the channel publisher.");
 
@@ -26,13 +26,13 @@ public static class AuditingTelemetry
     /// non-zero rate over minutes is a signal that the sink can't keep up.
     /// </summary>
     internal static readonly Counter<long> Dropped = Meter.CreateCounter<long>(
-        "fsh.audit.dropped",
+        "boilerplate.audit.dropped",
         unit: "{event}",
         description: "Number of audit events dropped due to channel saturation.");
 
     /// <summary>Successful sink batch flush.</summary>
     internal static readonly Counter<long> Flushed = Meter.CreateCounter<long>(
-        "fsh.audit.flushed",
+        "boilerplate.audit.flushed",
         unit: "{event}",
         description: "Number of audit events successfully written by the sink.");
 
@@ -42,7 +42,7 @@ public static class AuditingTelemetry
     /// also increments).
     /// </summary>
     internal static readonly Counter<long> FlushFailed = Meter.CreateCounter<long>(
-        "fsh.audit.flush_failed",
+        "boilerplate.audit.flush_failed",
         unit: "{batch}",
         description: "Number of audit sink batches that failed to write.");
 
@@ -51,13 +51,13 @@ public static class AuditingTelemetry
     /// log. Should always alarm at threshold = 1.
     /// </summary>
     internal static readonly Counter<long> DeadLettered = Meter.CreateCounter<long>(
-        "fsh.audit.dead_lettered",
+        "boilerplate.audit.dead_lettered",
         unit: "{event}",
         description: "Number of audit events written to the dead-letter sink after retries exhausted.");
 
     /// <summary>End-to-end sink flush latency including retries.</summary>
     internal static readonly Histogram<double> FlushDurationMs = Meter.CreateHistogram<double>(
-        "fsh.audit.flush.duration",
+        "boilerplate.audit.flush.duration",
         unit: "ms",
         description: "Sink flush duration including retries.");
 }

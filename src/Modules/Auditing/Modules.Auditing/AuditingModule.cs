@@ -1,15 +1,15 @@
 using Asp.Versioning;
-using FSH.Framework.Persistence;
-using FSH.Framework.Web.Modules;
-using FSH.Modules.Auditing.Contracts;
-using FSH.Modules.Auditing.Features.v1.GetAuditById;
-using FSH.Modules.Auditing.Features.v1.GetAudits;
-using FSH.Modules.Auditing.Features.v1.GetAuditsByCorrelation;
-using FSH.Modules.Auditing.Features.v1.GetAuditsByTrace;
-using FSH.Modules.Auditing.Features.v1.GetAuditSummary;
-using FSH.Modules.Auditing.Features.v1.GetExceptionAudits;
-using FSH.Modules.Auditing.Features.v1.GetSecurityAudits;
-using FSH.Modules.Auditing.Persistence;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Web.Modules;
+using Boilerplate.Modules.Auditing.Contracts;
+using Boilerplate.Modules.Auditing.Features.v1.GetAuditById;
+using Boilerplate.Modules.Auditing.Features.v1.GetAudits;
+using Boilerplate.Modules.Auditing.Features.v1.GetAuditsByCorrelation;
+using Boilerplate.Modules.Auditing.Features.v1.GetAuditsByTrace;
+using Boilerplate.Modules.Auditing.Features.v1.GetAuditSummary;
+using Boilerplate.Modules.Auditing.Features.v1.GetExceptionAudits;
+using Boilerplate.Modules.Auditing.Features.v1.GetSecurityAudits;
+using Boilerplate.Modules.Auditing.Persistence;
 using Hangfire;
 using Hangfire.Common;
 using Microsoft.AspNetCore.Builder;
@@ -22,7 +22,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 
-namespace FSH.Modules.Auditing;
+namespace Boilerplate.Modules.Auditing;
 
 public class AuditingModule : IModule
 {
@@ -30,8 +30,8 @@ public class AuditingModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        FSH.Framework.Shared.Constants.PermissionConstants.Register(
-            FSH.Modules.Auditing.Contracts.Authorization.AuditingPermissions.All);
+        Boilerplate.BuildingBlocks.Shared.Constants.PermissionConstants.Register(
+            Boilerplate.Modules.Auditing.Contracts.Authorization.AuditingPermissions.All);
 
         var httpOpts = builder.Configuration.GetSection("Auditing").Get<AuditHttpOptions>() ?? new AuditHttpOptions();
         builder.Services.AddSingleton(httpOpts);

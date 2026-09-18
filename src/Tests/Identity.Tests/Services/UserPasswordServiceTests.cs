@@ -1,11 +1,11 @@
 using System.Linq.Expressions;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Jobs.Services;
-using FSH.Framework.Mailing;
-using FSH.Framework.Mailing.Services;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Identity.Domain;
-using FSH.Modules.Identity.Services;
+using Boilerplate.BuildingBlocks.Jobs.Services;
+using Boilerplate.BuildingBlocks.Mailing;
+using Boilerplate.BuildingBlocks.Mailing.Services;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Identity.Domain;
+using Boilerplate.Modules.Identity.Services;
 using Microsoft.AspNetCore.Identity;
 using NSubstitute;
 
@@ -19,15 +19,15 @@ public sealed class UserPasswordServiceTests
 {
     private const string TenantId = "codefi";
 
-    private readonly UserManager<FshUser> _userManager;
+    private readonly UserManager<AppUser> _userManager;
     private readonly IJobService _jobService;
     private readonly IMailService _mailService;
     private readonly IMultiTenantContextAccessor<AppTenantInfo> _tenantAccessor;
 
     public UserPasswordServiceTests()
     {
-        _userManager = Substitute.For<UserManager<FshUser>>(
-            Substitute.For<IUserStore<FshUser>>(), null, null, null, null, null, null, null, null);
+        _userManager = Substitute.For<UserManager<AppUser>>(
+            Substitute.For<IUserStore<AppUser>>(), null, null, null, null, null, null, null, null);
         _jobService = Substitute.For<IJobService>();
         _mailService = Substitute.For<IMailService>();
         _tenantAccessor = Substitute.For<IMultiTenantContextAccessor<AppTenantInfo>>();
@@ -62,7 +62,7 @@ public sealed class UserPasswordServiceTests
         // Arrange — trailing slash on the origin (as Uri.ToString() produces for a host-only URL) and an
         // email with reserved characters ('+', '@') to exercise all three defects at once.
         const string email = "marcelo+reset@codefi.com.br";
-        var user = new FshUser { Email = email, UserName = email };
+        var user = new AppUser { Email = email, UserName = email };
         _userManager.FindByEmailAsync(email).Returns(user);
         _userManager.GeneratePasswordResetTokenAsync(user).Returns("raw-token");
 
@@ -87,7 +87,7 @@ public sealed class UserPasswordServiceTests
     public async Task ForgotPasswordAsync_Should_NotEnqueueMail_When_UserIsUnknown()
     {
         // Arrange — anti-enumeration: unknown user silently no-ops (no mail), still a 200 upstream.
-        _userManager.FindByEmailAsync(Arg.Any<string>()).Returns((FshUser?)null);
+        _userManager.FindByEmailAsync(Arg.Any<string>()).Returns((AppUser?)null);
         var sut = CreateSut();
 
         // Act

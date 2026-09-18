@@ -1,6 +1,6 @@
-using FSH.Framework.Eventing.Abstractions;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
 
-namespace FSH.Modules.Multitenancy.Contracts.Events;
+namespace Boilerplate.Modules.Multitenancy.Contracts.Events;
 
 /// <summary>
 /// Raised when a tenant is renewed (and possibly switched to a different plan). The Billing module

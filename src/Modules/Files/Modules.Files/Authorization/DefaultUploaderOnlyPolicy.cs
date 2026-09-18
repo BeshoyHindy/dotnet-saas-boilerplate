@@ -1,6 +1,6 @@
-using FSH.Modules.Files.Contracts;
+using Boilerplate.Modules.Files.Contracts;
 
-namespace FSH.Modules.Files.Authorization;
+namespace Boilerplate.Modules.Files.Authorization;
 
 /// <summary>
 /// Default policy used for the built-in <c>MyFiles</c> and <c>User</c> owner types.

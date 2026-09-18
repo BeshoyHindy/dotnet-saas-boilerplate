@@ -1,10 +1,10 @@
-using FSH.Framework.Eventing.Abstractions;
-using FSH.Modules.Billing.Data;
-using FSH.Modules.Billing.Services;
-using FSH.Modules.Multitenancy.Contracts.Events;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
+using Boilerplate.Modules.Billing.Data;
+using Boilerplate.Modules.Billing.Services;
+using Boilerplate.Modules.Multitenancy.Contracts.Events;
 using Microsoft.Extensions.Logging;
 
-namespace FSH.Modules.Billing.IntegrationEventHandlers;
+namespace Boilerplate.Modules.Billing.IntegrationEventHandlers;
 
 /// <summary>
 /// Reacts to a tenant being created + subscribed to a plan: starts the active subscription and issues

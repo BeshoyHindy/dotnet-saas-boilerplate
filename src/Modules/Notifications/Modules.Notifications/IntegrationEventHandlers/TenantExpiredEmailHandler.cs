@@ -1,9 +1,9 @@
-using FSH.Framework.Eventing.Abstractions;
-using FSH.Framework.Mailing.Services;
-using FSH.Modules.Multitenancy.Contracts.Events;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
+using Boilerplate.BuildingBlocks.Mailing.Services;
+using Boilerplate.Modules.Multitenancy.Contracts.Events;
 using Microsoft.Extensions.Logging;
 
-namespace FSH.Modules.Notifications.IntegrationEventHandlers;
+namespace Boilerplate.Modules.Notifications.IntegrationEventHandlers;
 
 /// <summary>Emails the tenant admin that their subscription expired and access is suspended.</summary>
 public sealed class TenantExpiredEmailHandler(

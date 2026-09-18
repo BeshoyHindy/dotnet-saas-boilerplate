@@ -1,7 +1,7 @@
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 using Integration.Tests.Tests.Sessions;
-using UserRoleDto = FSH.Modules.Identity.Contracts.DTOs.UserRoleDto;
+using UserRoleDto = Boilerplate.Modules.Identity.Contracts.DTOs.UserRoleDto;
 
 namespace Integration.Tests.Tests.Users;
 
@@ -9,13 +9,13 @@ namespace Integration.Tests.Tests.Users;
 /// Covers the user read surface: GetUserRoles, GetUserGroups, and SearchUsers
 /// (filtering, sorting, paging, authz).
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class UserQueryTests
 {
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public UserQueryTests(FshWebApplicationFactory factory)
+    public UserQueryTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

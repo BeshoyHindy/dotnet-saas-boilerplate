@@ -1,5 +1,5 @@
-using FSH.Framework.Eventing.Abstractions;
-using FSH.Framework.Eventing.Serialization;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
+using Boilerplate.BuildingBlocks.Eventing.Serialization;
 
 namespace Framework.Tests.Eventing;
 

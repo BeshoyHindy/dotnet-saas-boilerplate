@@ -50,7 +50,7 @@ public class CircularReferenceTests
         }
 
         var moduleProjects = Directory
-            .GetFiles(modulesRoot, "Modules.*.csproj", SearchOption.AllDirectories)
+            .GetFiles(modulesRoot, "Boilerplate.Modules.*.csproj", SearchOption.AllDirectories)
             .Where(p => !p.Contains("obj", StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
@@ -60,7 +60,7 @@ public class CircularReferenceTests
         {
             string projectName = Path.GetFileNameWithoutExtension(projectPath);
             var dependencies = GetProjectReferences(projectPath)
-                .Where(d => d.StartsWith("Modules.", StringComparison.OrdinalIgnoreCase))
+                .Where(d => d.StartsWith("Boilerplate.Modules.", StringComparison.OrdinalIgnoreCase))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             dependencyGraph[projectName] = dependencies;
         }

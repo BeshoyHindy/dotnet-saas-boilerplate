@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace FSH.Modules.Notifications.IntegrationEventHandlers;
+namespace Boilerplate.Modules.Notifications.IntegrationEventHandlers;
 
 /// <summary>
 /// Builds the subject + HTML body for tenant billing emails. Plain interpolated HTML (the framework

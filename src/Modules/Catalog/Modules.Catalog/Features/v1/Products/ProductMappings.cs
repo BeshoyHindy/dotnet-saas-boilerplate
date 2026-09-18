@@ -1,7 +1,7 @@
-using FSH.Modules.Catalog.Contracts.Dtos;
-using FSH.Modules.Catalog.Domain;
+using Boilerplate.Modules.Catalog.Contracts.Dtos;
+using Boilerplate.Modules.Catalog.Domain;
 
-namespace FSH.Modules.Catalog.Features.v1.Products;
+namespace Boilerplate.Modules.Catalog.Features.v1.Products;
 
 internal static class ProductMappings
 {

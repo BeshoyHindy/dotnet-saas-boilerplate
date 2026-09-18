@@ -2,13 +2,13 @@ using Integration.Tests.Infrastructure;
 
 namespace Integration.Tests.Tests.Auditing;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class AuditTrailTests
 {
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public AuditTrailTests(FshWebApplicationFactory factory)
+    public AuditTrailTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

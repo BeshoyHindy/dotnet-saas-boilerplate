@@ -1,8 +1,8 @@
 using FluentValidation;
-using FSH.Framework.Web.Validation;
-using FSH.Modules.Multitenancy.Contracts.v1.GetTenants;
+using Boilerplate.BuildingBlocks.Web.Validation;
+using Boilerplate.Modules.Multitenancy.Contracts.v1.GetTenants;
 
-namespace FSH.Modules.Multitenancy.Features.v1.GetTenants;
+namespace Boilerplate.Modules.Multitenancy.Features.v1.GetTenants;
 
 public sealed class GetTenantsQueryValidator : AbstractValidator<GetTenantsQuery>
 {

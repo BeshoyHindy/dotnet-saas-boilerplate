@@ -13,7 +13,7 @@ namespace Integration.Tests.Tests.Multitenancy;
 /// can't connect). Retry must then start a fresh provisioning attempt with a new
 /// correlation id. Also covers authentication and the not-found path.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class RetryTenantProvisioningTests
 {
     private static readonly JsonSerializerOptions Json = new()
@@ -25,12 +25,12 @@ public sealed class RetryTenantProvisioningTests
     // Syntactically valid Postgres connection string pointing at a dead endpoint with a
     // short timeout so the Migrations step fails fast instead of hanging the test.
     private const string UnreachableConnectionString =
-        "Host=127.0.0.1;Port=59999;Database=fsh_unreachable;Username=nope;Password=nope;Timeout=2;Command Timeout=2";
+        "Host=127.0.0.1;Port=59999;Database=boilerplate_unreachable;Username=nope;Password=nope;Timeout=2;Command Timeout=2";
 
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public RetryTenantProvisioningTests(FshWebApplicationFactory factory)
+    public RetryTenantProvisioningTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

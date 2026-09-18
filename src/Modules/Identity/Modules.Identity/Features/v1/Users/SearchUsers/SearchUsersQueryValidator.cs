@@ -1,8 +1,8 @@
 using FluentValidation;
-using FSH.Framework.Web.Validation;
-using FSH.Modules.Identity.Contracts.v1.Users.SearchUsers;
+using Boilerplate.BuildingBlocks.Web.Validation;
+using Boilerplate.Modules.Identity.Contracts.v1.Users.SearchUsers;
 
-namespace FSH.Modules.Identity.Features.v1.Users.SearchUsers;
+namespace Boilerplate.Modules.Identity.Features.v1.Users.SearchUsers;
 
 public sealed class SearchUsersQueryValidator : AbstractValidator<SearchUsersQuery>
 {

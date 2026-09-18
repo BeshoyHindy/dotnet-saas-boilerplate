@@ -1,8 +1,8 @@
 using FluentValidation;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Multitenancy.Contracts.v1.AdjustTenantValidity;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Multitenancy.Contracts.v1.AdjustTenantValidity;
 
-namespace FSH.Modules.Multitenancy.Features.v1.AdjustTenantValidity;
+namespace Boilerplate.Modules.Multitenancy.Features.v1.AdjustTenantValidity;
 
 public sealed class AdjustTenantValidityCommandValidator : AbstractValidator<AdjustTenantValidityCommand>
 {

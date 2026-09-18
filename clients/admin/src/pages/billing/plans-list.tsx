@@ -137,7 +137,7 @@ export function PlansListPage() {
             {plans.map((plan, i) => (
               <li
                 key={plan.id}
-                className="fsh-enter grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-1 border-b border-[var(--color-border)] last:border-b-0 px-5 py-4 transition-colors hover:bg-[var(--color-muted)]"
+                className="app-enter grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-1 border-b border-[var(--color-border)] last:border-b-0 px-5 py-4 transition-colors hover:bg-[var(--color-muted)]"
                 style={{ animationDelay: `${Math.min(i, 6) * 30}ms` }}
               >
                 {/* Identity column */}

@@ -1,23 +1,23 @@
 using Finbuckle.MultiTenant.Abstractions;
 using Finbuckle.MultiTenant.Identity.EntityFrameworkCore;
-using FSH.Framework.Persistence;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Framework.Shared.Persistence;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Identity.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
-namespace FSH.Modules.Identity.Data;
+namespace Boilerplate.Modules.Identity.Data;
 
-public class IdentityDbContext : MultiTenantIdentityDbContext<FshUser,
-    FshRole,
+public class IdentityDbContext : MultiTenantIdentityDbContext<AppUser,
+    AppRole,
     string,
     IdentityUserClaim<string>,
     IdentityUserRole<string>,
     IdentityUserLogin<string>,
-    FshRoleClaim,
+    AppRoleClaim,
     IdentityUserToken<string>,
     IdentityUserPasskey<string>>
 {

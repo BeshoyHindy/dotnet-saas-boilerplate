@@ -1,12 +1,12 @@
 using System.Net;
-using FSH.Framework.Core.Context;
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Tickets.Contracts.v1.Tickets;
-using FSH.Modules.Tickets.Data;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Tickets.Contracts.v1.Tickets;
+using Boilerplate.Modules.Tickets.Data;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Tickets.Features.v1.Tickets.AddTicketComment;
+namespace Boilerplate.Modules.Tickets.Features.v1.Tickets.AddTicketComment;
 
 public sealed class AddTicketCommentCommandHandler(
     TicketsDbContext dbContext,

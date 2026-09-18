@@ -1,6 +1,6 @@
-using FSH.Framework.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Domain;
 
-namespace FSH.Modules.Chat.Domain;
+namespace Boilerplate.Modules.Chat.Domain;
 
 public sealed class MessageAttachment : BaseEntity<Guid>
 {

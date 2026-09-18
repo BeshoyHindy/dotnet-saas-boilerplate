@@ -1,11 +1,11 @@
-using FSH.Framework.Core.Context;
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Notifications.Contracts.v1.Commands;
-using FSH.Modules.Notifications.Data;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Notifications.Contracts.v1.Commands;
+using Boilerplate.Modules.Notifications.Data;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Notifications.Features.v1.MarkAllNotificationsRead;
+namespace Boilerplate.Modules.Notifications.Features.v1.MarkAllNotificationsRead;
 
 public sealed class MarkAllNotificationsReadCommandHandler(
     NotificationsDbContext db,

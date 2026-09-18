@@ -1,4 +1,4 @@
-﻿namespace FSH.Framework.Web.Origin;
+﻿namespace Boilerplate.BuildingBlocks.Web.Origin;
 
 public sealed class OriginOptions
 {

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<RootNamespace>Boilerplate.Modules.Chat.Contracts</RootNamespace>
+		<AssemblyName>Boilerplate.Modules.Chat.Contracts</AssemblyName>
+		<NoWarn>$(NoWarn);S2094</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Mediator.Abstractions" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\..\BuildingBlocks\Shared\Boilerplate.BuildingBlocks.Shared.csproj" />
+		<ProjectReference Include="..\..\..\BuildingBlocks\Eventing.Abstractions\Boilerplate.BuildingBlocks.Eventing.Abstractions.csproj" />
+	</ItemGroup>
+
+</Project>

@@ -1,4 +1,4 @@
-using FSH.Framework.Eventing;
+using Boilerplate.BuildingBlocks.Eventing;
 using Shouldly;
 using Xunit;
 

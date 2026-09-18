@@ -1,10 +1,10 @@
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Billing.Contracts.v1.Plans;
-using FSH.Modules.Billing.Data;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Billing.Contracts.v1.Plans;
+using Boilerplate.Modules.Billing.Data;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Billing.Features.v1.Plans.UpdatePlan;
+namespace Boilerplate.Modules.Billing.Features.v1.Plans.UpdatePlan;
 
 public sealed class UpdatePlanCommandHandler(BillingDbContext dbContext)
     : ICommandHandler<UpdatePlanCommand, Guid>

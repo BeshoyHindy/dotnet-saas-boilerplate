@@ -1,6 +1,6 @@
-using FSH.Framework.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Domain;
 
-namespace FSH.Modules.Webhooks.Domain;
+namespace Boilerplate.Modules.Webhooks.Domain;
 
 public sealed class WebhookSubscription : BaseEntity<Guid>
 {

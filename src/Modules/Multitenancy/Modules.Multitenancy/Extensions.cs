@@ -1,11 +1,11 @@
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
 using Finbuckle.MultiTenant.AspNetCore.Extensions;
-using FSH.Modules.Multitenancy.Data;
+using Boilerplate.Modules.Multitenancy.Data;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FSH.Modules.Multitenancy;
+namespace Boilerplate.Modules.Multitenancy;
 
 public static class Extensions
 {

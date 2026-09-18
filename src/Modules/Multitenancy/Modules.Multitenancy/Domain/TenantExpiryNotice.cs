@@ -1,4 +1,4 @@
-namespace FSH.Modules.Multitenancy.Domain;
+namespace Boilerplate.Modules.Multitenancy.Domain;
 
 /// <summary>
 /// Dedup ledger for expiry notifications. The daily scan records one row per

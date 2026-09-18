@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Builder;
 
-namespace FSH.Framework.Shared.Identity.Authorization;
+namespace Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
 
 public static class EndpointExtensions
 {

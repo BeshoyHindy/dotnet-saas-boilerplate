@@ -1,4 +1,4 @@
-namespace FSH.Framework.Shared.Auditing;
+namespace Boilerplate.BuildingBlocks.Shared.Auditing;
 
 /// <summary>
 /// Well-known <c>HttpContext.Items</c> keys for cross-cutting middleware signals that the audit
@@ -8,5 +8,5 @@ namespace FSH.Framework.Shared.Auditing;
 public static class HttpContextItemKeys
 {
     /// <summary>Set to <c>true</c> when a request was rejected by quota enforcement (HTTP 429).</summary>
-    public const string QuotaRejected = "fsh.audit.quota-rejected";
+    public const string QuotaRejected = "boilerplate.audit.quota-rejected";
 }

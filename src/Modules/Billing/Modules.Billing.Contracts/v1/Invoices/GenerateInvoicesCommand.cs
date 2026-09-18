@@ -1,6 +1,6 @@
 using Mediator;
 
-namespace FSH.Modules.Billing.Contracts.v1.Invoices;
+namespace Boilerplate.Modules.Billing.Contracts.v1.Invoices;
 
 /// <summary>
 /// Admin-triggered invoice generation for a specific billing period across all active tenants.

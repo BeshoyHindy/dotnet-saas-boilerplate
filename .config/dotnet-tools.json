@@ -9,10 +9,10 @@
       ],
       "rollForward": false
     },
-    "fullstackhero.cli": {
+    "boilerplate.cli": {
       "version": "10.0.0-rc.1",
       "commands": [
-        "fsh"
+        "boilerplate"
       ],
       "rollForward": false
     }

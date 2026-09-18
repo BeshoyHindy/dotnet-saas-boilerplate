@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Hosting;
 
-namespace FSH.Framework.Web.Modules;
+namespace Boilerplate.BuildingBlocks.Web.Modules;
 
 public interface IModule
 {

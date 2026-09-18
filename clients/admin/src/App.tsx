@@ -30,7 +30,7 @@ export function App() {
               <RouterProvider router={router} />
             </Suspense>
           </RealtimeProvider>
-          <FshToaster />
+          <AppToaster />
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>
@@ -43,9 +43,9 @@ export function App() {
  * the foreground so it stays readable on the near-black dark surface. Theme is
  * sourced from the in-app ThemeProvider (not sonner's "system") so the toast
  * tracks the console's own light/dark toggle, not the OS preference. All
- * surface styling lives in globals.css under the `.fsh-toast` selectors.
+ * surface styling lives in globals.css under the `.app-toast` selectors.
  */
-function FshToaster() {
+function AppToaster() {
   const { theme } = useTheme();
   return (
     <Toaster
@@ -56,21 +56,21 @@ function FshToaster() {
       expand
       visibleToasts={4}
       icons={{
-        success: <CheckCircle2 className="fsh-toast-glyph" strokeWidth={2.25} />,
-        error: <AlertCircle className="fsh-toast-glyph" strokeWidth={2.25} />,
-        warning: <AlertTriangle className="fsh-toast-glyph" strokeWidth={2.25} />,
-        info: <Info className="fsh-toast-glyph" strokeWidth={2.25} />,
-        loading: <Loader2 className="fsh-toast-glyph fsh-toast-glyph-spin" strokeWidth={2.25} />,
+        success: <CheckCircle2 className="app-toast-glyph" strokeWidth={2.25} />,
+        error: <AlertCircle className="app-toast-glyph" strokeWidth={2.25} />,
+        warning: <AlertTriangle className="app-toast-glyph" strokeWidth={2.25} />,
+        info: <Info className="app-toast-glyph" strokeWidth={2.25} />,
+        loading: <Loader2 className="app-toast-glyph app-toast-glyph-spin" strokeWidth={2.25} />,
       }}
       toastOptions={{
         duration: 4200,
         classNames: {
-          toast: "fsh-toast",
-          title: "fsh-toast-title",
-          description: "fsh-toast-description",
-          closeButton: "fsh-toast-close",
-          actionButton: "fsh-toast-action",
-          cancelButton: "fsh-toast-cancel",
+          toast: "app-toast",
+          title: "app-toast-title",
+          description: "app-toast-description",
+          closeButton: "app-toast-close",
+          actionButton: "app-toast-action",
+          cancelButton: "app-toast-cancel",
         },
       }}
     />

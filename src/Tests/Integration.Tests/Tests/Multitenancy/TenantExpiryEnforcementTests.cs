@@ -1,7 +1,7 @@
 using System.Globalization;
 using Finbuckle.MultiTenant.Abstractions;
 using Finbuckle.MultiTenant.Stores;
-using FSH.Framework.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Integration.Tests.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -13,13 +13,13 @@ namespace Integration.Tests.Tests.Multitenancy;
 /// dunning), while a tenant past <c>ValidUpto + grace</c> is hard-blocked with 403 — mirroring the
 /// deactivation guard. Grace defaults to 7 days.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class TenantExpiryEnforcementTests
 {
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public TenantExpiryEnforcementTests(FshWebApplicationFactory factory)
+    public TenantExpiryEnforcementTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

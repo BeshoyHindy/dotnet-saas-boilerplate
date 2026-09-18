@@ -1,8 +1,8 @@
-using FSH.Modules.Auditing.Contracts;
-using FSH.Modules.Auditing.Contracts.Dtos;
+using Boilerplate.Modules.Auditing.Contracts;
+using Boilerplate.Modules.Auditing.Contracts.Dtos;
 using Mediator;
 
-namespace FSH.Modules.Auditing.Contracts.v1.GetExceptionAudits;
+namespace Boilerplate.Modules.Auditing.Contracts.v1.GetExceptionAudits;
 
 public sealed class GetExceptionAuditsQuery : IQuery<IReadOnlyList<AuditSummaryDto>>
 {

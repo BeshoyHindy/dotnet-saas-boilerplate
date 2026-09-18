@@ -1,6 +1,6 @@
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Shared.Identity.Claims;
-using FSH.Modules.Identity.Contracts.v1.Users.UpdateUser;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Identity.Claims;
+using Boilerplate.Modules.Identity.Contracts.v1.Users.UpdateUser;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using System.Security.Claims;
 
-namespace FSH.Modules.Identity.Features.v1.Users.UpdateUser;
+namespace Boilerplate.Modules.Identity.Features.v1.Users.UpdateUser;
 
 public static class UpdateUserEndpoint
 {

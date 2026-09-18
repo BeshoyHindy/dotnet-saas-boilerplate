@@ -1,7 +1,7 @@
-using FSH.Framework.Mailing.Services;
-using FSH.Modules.Multitenancy.Data;
-using FSH.Modules.Multitenancy.Domain;
-using FSH.Modules.Multitenancy.Services;
+using Boilerplate.BuildingBlocks.Mailing.Services;
+using Boilerplate.Modules.Multitenancy.Data;
+using Boilerplate.Modules.Multitenancy.Domain;
+using Boilerplate.Modules.Multitenancy.Services;
 using Integration.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,15 +13,15 @@ namespace Integration.Tests.Tests.Multitenancy;
 /// publishes the matching event (which emails the tenant admin), and re-running the scan does not
 /// re-notify the same state for the same validity period. Also covers the invoice-issued email.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class TenantExpiryScanJobTests
 {
     private const string BillingBasePath = "/api/v1/billing";
 
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public TenantExpiryScanJobTests(FshWebApplicationFactory factory)
+    public TenantExpiryScanJobTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

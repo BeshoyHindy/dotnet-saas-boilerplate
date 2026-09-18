@@ -1,7 +1,7 @@
 import { apiFetch } from "@/lib/api-client";
 import type { PagedResponse } from "@/api/catalog";
 
-// Mirrors FSH.Modules.Files.Contracts.v1.DTOs.Visibility. The API serializes enums as
+// Mirrors Boilerplate.Modules.Files.Contracts.v1.DTOs.Visibility. The API serializes enums as
 // their string name (global JsonStringEnumConverter).
 export const Visibility = {
   Public: "Public",
@@ -9,7 +9,7 @@ export const Visibility = {
 } as const;
 export type VisibilityValue = (typeof Visibility)[keyof typeof Visibility];
 
-// Mirrors FSH.Modules.Files.Domain.FileAssetStatus.
+// Mirrors Boilerplate.Modules.Files.Domain.FileAssetStatus.
 export const FileAssetStatus = {
   PendingUpload: "PendingUpload",
   Available: "Available",
@@ -17,7 +17,7 @@ export const FileAssetStatus = {
 } as const;
 export type FileAssetStatusValue = (typeof FileAssetStatus)[keyof typeof FileAssetStatus];
 
-// Mirrors FSH.Modules.Files.Contracts.v1.DTOs.FileAssetDto.
+// Mirrors Boilerplate.Modules.Files.Contracts.v1.DTOs.FileAssetDto.
 export type FileAssetDto = {
   id: string;
   ownerType: string;

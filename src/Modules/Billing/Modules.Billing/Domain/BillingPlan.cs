@@ -1,8 +1,8 @@
-using FSH.Framework.Core.Domain;
-using FSH.Framework.Shared.Quota;
-using FSH.Modules.Billing.Contracts;
+using Boilerplate.BuildingBlocks.Core.Domain;
+using Boilerplate.BuildingBlocks.Shared.Quota;
+using Boilerplate.Modules.Billing.Contracts;
 
-namespace FSH.Modules.Billing.Domain;
+namespace Boilerplate.Modules.Billing.Domain;
 
 /// <summary>
 /// Priced side of a tenant plan. The plan key matches the key used by quota configuration so a

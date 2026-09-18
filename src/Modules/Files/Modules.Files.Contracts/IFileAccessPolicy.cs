@@ -1,4 +1,4 @@
-namespace FSH.Modules.Files.Contracts;
+namespace Boilerplate.Modules.Files.Contracts;
 
 /// <summary>
 /// Per-OwnerType authorization for FileAssets. Each owning module (Catalog, Tickets, ...) registers

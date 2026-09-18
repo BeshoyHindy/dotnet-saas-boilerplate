@@ -1,4 +1,4 @@
-﻿namespace FSH.Framework.Core.Common;
+﻿namespace Boilerplate.BuildingBlocks.Core.Common;
 
 /// <summary>
 /// Constants for commonly used query string parameter names.

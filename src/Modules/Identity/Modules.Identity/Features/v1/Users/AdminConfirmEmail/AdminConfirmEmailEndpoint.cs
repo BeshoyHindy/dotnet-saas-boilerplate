@@ -1,13 +1,13 @@
-using FSH.Framework.Shared.Identity.Authorization;
-using FSH.Modules.Identity.Contracts.Authorization;
-using FSH.Modules.Identity.Contracts.v1.Users.AdminConfirmEmail;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.Modules.Identity.Contracts.Authorization;
+using Boilerplate.Modules.Identity.Contracts.v1.Users.AdminConfirmEmail;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Identity.Features.v1.Users.AdminConfirmEmail;
+namespace Boilerplate.Modules.Identity.Features.v1.Users.AdminConfirmEmail;
 
 public static class AdminConfirmEmailEndpoint
 {

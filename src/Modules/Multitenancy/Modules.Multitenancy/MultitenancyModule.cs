@@ -5,29 +5,29 @@ using Finbuckle.MultiTenant.AspNetCore.Extensions;
 using Finbuckle.MultiTenant.EntityFrameworkCore.Stores;
 using Finbuckle.MultiTenant.Extensions;
 using Finbuckle.MultiTenant.Stores;
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Eventing.Abstractions;
-using FSH.Framework.Persistence;
-using FSH.Framework.Shared.Constants;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Framework.Web.Modules;
-using FSH.Modules.Multitenancy.Contracts;
-using FSH.Modules.Multitenancy.Data;
-using FSH.Modules.Multitenancy.Features.v1.AdjustTenantValidity;
-using FSH.Modules.Multitenancy.Features.v1.ChangeTenantActivation;
-using FSH.Modules.Multitenancy.Features.v1.CreateTenant;
-using FSH.Modules.Multitenancy.Features.v1.GetMyTenantStatus;
-using FSH.Modules.Multitenancy.Features.v1.GetTenantMigrations;
-using FSH.Modules.Multitenancy.Features.v1.GetTenants;
-using FSH.Modules.Multitenancy.Features.v1.GetTenantStatus;
-using FSH.Modules.Multitenancy.Features.v1.GetTenantTheme;
-using FSH.Modules.Multitenancy.Features.v1.ResetTenantTheme;
-using FSH.Modules.Multitenancy.Features.v1.TenantProvisioning.GetTenantProvisioningStatus;
-using FSH.Modules.Multitenancy.Features.v1.TenantProvisioning.RetryTenantProvisioning;
-using FSH.Modules.Multitenancy.Features.v1.RenewTenant;
-using FSH.Modules.Multitenancy.Features.v1.UpdateTenantTheme;
-using FSH.Modules.Multitenancy.Provisioning;
-using FSH.Modules.Multitenancy.Services;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Constants;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Web.Modules;
+using Boilerplate.Modules.Multitenancy.Contracts;
+using Boilerplate.Modules.Multitenancy.Data;
+using Boilerplate.Modules.Multitenancy.Features.v1.AdjustTenantValidity;
+using Boilerplate.Modules.Multitenancy.Features.v1.ChangeTenantActivation;
+using Boilerplate.Modules.Multitenancy.Features.v1.CreateTenant;
+using Boilerplate.Modules.Multitenancy.Features.v1.GetMyTenantStatus;
+using Boilerplate.Modules.Multitenancy.Features.v1.GetTenantMigrations;
+using Boilerplate.Modules.Multitenancy.Features.v1.GetTenants;
+using Boilerplate.Modules.Multitenancy.Features.v1.GetTenantStatus;
+using Boilerplate.Modules.Multitenancy.Features.v1.GetTenantTheme;
+using Boilerplate.Modules.Multitenancy.Features.v1.ResetTenantTheme;
+using Boilerplate.Modules.Multitenancy.Features.v1.TenantProvisioning.GetTenantProvisioningStatus;
+using Boilerplate.Modules.Multitenancy.Features.v1.TenantProvisioning.RetryTenantProvisioning;
+using Boilerplate.Modules.Multitenancy.Features.v1.RenewTenant;
+using Boilerplate.Modules.Multitenancy.Features.v1.UpdateTenantTheme;
+using Boilerplate.Modules.Multitenancy.Provisioning;
+using Boilerplate.Modules.Multitenancy.Services;
 using Hangfire;
 using Hangfire.Common;
 using Microsoft.AspNetCore.Builder;
@@ -40,7 +40,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using System.Security.Claims;
 
-namespace FSH.Modules.Multitenancy;
+namespace Boilerplate.Modules.Multitenancy;
 
 public sealed class MultitenancyModule : IModule
 {
@@ -48,8 +48,8 @@ public sealed class MultitenancyModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        FSH.Framework.Shared.Constants.PermissionConstants.Register(
-            FSH.Modules.Multitenancy.Contracts.Authorization.MultitenancyPermissions.All);
+        Boilerplate.BuildingBlocks.Shared.Constants.PermissionConstants.Register(
+            Boilerplate.Modules.Multitenancy.Contracts.Authorization.MultitenancyPermissions.All);
 
         builder.Services.Configure<TenantBillingOptions>(
             builder.Configuration.GetSection(TenantBillingOptions.SectionName));
@@ -64,7 +64,7 @@ public sealed class MultitenancyModule : IModule
         // Singleton — the buffer survives the request scope that calls Store(...)
         // so the background Hangfire-scheduled seed scope can still TryConsume(...).
         builder.Services.AddSingleton<
-            FSH.Framework.Shared.Multitenancy.ITenantInitialPasswordBuffer,
+            Boilerplate.BuildingBlocks.Shared.Multitenancy.ITenantInitialPasswordBuffer,
             Services.TenantInitialPasswordBuffer>();
 
         builder.Services.AddHeroDbContext<TenantDbContext>();

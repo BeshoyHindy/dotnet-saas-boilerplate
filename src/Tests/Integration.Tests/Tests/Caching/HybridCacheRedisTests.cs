@@ -1,5 +1,5 @@
 using System.ComponentModel;
-using FSH.Framework.Caching;
+using Boilerplate.BuildingBlocks.Caching;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Configuration;

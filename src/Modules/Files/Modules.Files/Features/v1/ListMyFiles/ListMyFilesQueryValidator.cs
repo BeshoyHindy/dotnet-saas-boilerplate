@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Files.Contracts.v1.Queries;
+using Boilerplate.Modules.Files.Contracts.v1.Queries;
 
-namespace FSH.Modules.Files.Features.v1.ListMyFiles;
+namespace Boilerplate.Modules.Files.Features.v1.ListMyFiles;
 
 public sealed class ListMyFilesQueryValidator : AbstractValidator<ListMyFilesQuery>
 {

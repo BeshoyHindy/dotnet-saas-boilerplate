@@ -1,4 +1,4 @@
-namespace FSH.Modules.Billing.Contracts.Dtos;
+namespace Boilerplate.Modules.Billing.Contracts.Dtos;
 
 public sealed record SubscriptionDto(
     Guid Id,

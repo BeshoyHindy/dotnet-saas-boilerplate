@@ -1,4 +1,4 @@
-namespace FSH.Framework.Eventing;
+namespace Boilerplate.BuildingBlocks.Eventing;
 
 /// <summary>
 /// Configuration options for the eventing building block.

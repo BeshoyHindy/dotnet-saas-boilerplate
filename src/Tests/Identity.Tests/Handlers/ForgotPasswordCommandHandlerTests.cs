@@ -1,8 +1,8 @@
 using AutoFixture;
-using FSH.Framework.Web.Origin;
-using FSH.Modules.Identity.Contracts.Services;
-using FSH.Modules.Identity.Contracts.v1.Users.ForgotPassword;
-using FSH.Modules.Identity.Features.v1.Users.ForgotPassword;
+using Boilerplate.BuildingBlocks.Web.Origin;
+using Boilerplate.Modules.Identity.Contracts.Services;
+using Boilerplate.Modules.Identity.Contracts.v1.Users.ForgotPassword;
+using Boilerplate.Modules.Identity.Features.v1.Users.ForgotPassword;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using Shouldly;

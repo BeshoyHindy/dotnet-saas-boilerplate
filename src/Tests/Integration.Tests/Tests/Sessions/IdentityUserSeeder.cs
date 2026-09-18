@@ -1,7 +1,7 @@
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Identity.Domain;
 using Integration.Tests.Infrastructure;
 using Microsoft.AspNetCore.Identity;
 
@@ -25,7 +25,7 @@ internal static class IdentityUserSeeder
     /// NOT the admin-only Sessions.ViewAll / Sessions.RevokeAll).
     /// </summary>
     public static async Task<SeededUser> CreateLoginableUserAsync(
-        FshWebApplicationFactory factory,
+        AppWebApplicationFactory factory,
         HttpClient adminClient,
         string prefix,
         string tenant = TestConstants.RootTenantId)
@@ -57,7 +57,7 @@ internal static class IdentityUserSeeder
         scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()
             .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenantInfo);
 
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<FshUser>>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
         var user = await userManager.FindByEmailAsync(email);
         user.ShouldNotBeNull();
         var token = await userManager.GenerateEmailConfirmationTokenAsync(user!);

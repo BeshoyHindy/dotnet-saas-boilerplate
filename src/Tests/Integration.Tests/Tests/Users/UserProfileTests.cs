@@ -9,13 +9,13 @@ namespace Integration.Tests.Tests.Users;
 /// SetProfileImage (PUT /profile/image). Both force the target id to the
 /// authenticated user, so any signed-in user may edit their own profile.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class UserProfileTests
 {
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public UserProfileTests(FshWebApplicationFactory factory)
+    public UserProfileTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

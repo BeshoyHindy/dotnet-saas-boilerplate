@@ -1,5 +1,5 @@
 using System.Net;
-using FSH.Framework.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
 
 namespace Framework.Tests.Core;
 

@@ -1,15 +1,15 @@
-const ACCESS_KEY = "fsh.dashboard.accessToken";
-const REFRESH_KEY = "fsh.dashboard.refreshToken";
-const TENANT_KEY = "fsh.dashboard.tenant";
-const PERMS_KEY = "fsh.dashboard.permissions";
+const ACCESS_KEY = "boilerplate.dashboard.accessToken";
+const REFRESH_KEY = "boilerplate.dashboard.refreshToken";
+const TENANT_KEY = "boilerplate.dashboard.tenant";
+const PERMS_KEY = "boilerplate.dashboard.permissions";
 
 // Impersonation stash. While an operator is impersonating another user,
 // the live token store holds the impersonation tokens; the operator's
 // original tokens sit under these keys so the End flow can fall back to
 // them locally if the server-side End call fails (e.g. network down).
-const STASH_ACCESS_KEY = "fsh.dashboard.impersonation.actorAccessToken";
-const STASH_REFRESH_KEY = "fsh.dashboard.impersonation.actorRefreshToken";
-const STASH_TENANT_KEY = "fsh.dashboard.impersonation.actorTenant";
+const STASH_ACCESS_KEY = "boilerplate.dashboard.impersonation.actorAccessToken";
+const STASH_REFRESH_KEY = "boilerplate.dashboard.impersonation.actorRefreshToken";
+const STASH_TENANT_KEY = "boilerplate.dashboard.impersonation.actorTenant";
 
 type Listener = () => void;
 

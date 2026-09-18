@@ -1,4 +1,4 @@
-namespace FSH.Framework.Eventing.Abstractions;
+namespace Boilerplate.BuildingBlocks.Eventing.Abstractions;
 
 /// <summary>
 /// Establishes the ambient tenant context for the duration of an integration-event

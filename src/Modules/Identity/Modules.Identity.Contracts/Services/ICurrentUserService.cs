@@ -1,7 +1,7 @@
-using FSH.Framework.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Context;
 using System.Security.Claims;
 
-namespace FSH.Modules.Identity.Contracts.Services;
+namespace Boilerplate.Modules.Identity.Contracts.Services;
 
 /// <summary>
 /// Service interface for managing the current user context.

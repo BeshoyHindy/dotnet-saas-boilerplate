@@ -1,6 +1,6 @@
 using Mediator;
 
-namespace FSH.Modules.Identity.Contracts.v1.TwoFactor;
+namespace Boilerplate.Modules.Identity.Contracts.v1.TwoFactor;
 
 /// <summary>
 /// Verify the 6-digit TOTP code from the user's authenticator app. On success, two-factor

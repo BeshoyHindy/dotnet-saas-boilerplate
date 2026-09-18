@@ -1,6 +1,6 @@
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Files.Contracts.v1.DTOs;
-using FSH.Modules.Files.Domain;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Files.Contracts.v1.DTOs;
+using Boilerplate.Modules.Files.Domain;
 
 namespace Files.Tests.Domain;
 

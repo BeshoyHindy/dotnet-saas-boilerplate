@@ -1,5 +1,5 @@
-using FSH.Modules.Identity.Contracts.v1.Groups.UpdateGroup;
-using FSH.Modules.Identity.Features.v1.Groups.UpdateGroup;
+using Boilerplate.Modules.Identity.Contracts.v1.Groups.UpdateGroup;
+using Boilerplate.Modules.Identity.Features.v1.Groups.UpdateGroup;
 
 namespace Identity.Tests.Validators;
 

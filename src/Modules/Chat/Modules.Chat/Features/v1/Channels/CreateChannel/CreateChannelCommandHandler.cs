@@ -1,11 +1,11 @@
-using FSH.Framework.Core.Context;
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Chat.Contracts.v1.Commands;
-using FSH.Modules.Chat.Data;
-using FSH.Modules.Chat.Domain;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Chat.Contracts.v1.Commands;
+using Boilerplate.Modules.Chat.Data;
+using Boilerplate.Modules.Chat.Domain;
 using Mediator;
 
-namespace FSH.Modules.Chat.Features.v1.Channels.CreateChannel;
+namespace Boilerplate.Modules.Chat.Features.v1.Channels.CreateChannel;
 
 public sealed class CreateChannelCommandHandler(
     ChatDbContext db,

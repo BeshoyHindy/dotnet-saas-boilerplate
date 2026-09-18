@@ -62,7 +62,7 @@ export function EntityDetailHero({
   return (
     <div
       className={cn(
-        "fsh-enter overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-card)]",
+        "app-enter overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-card)]",
         "shadow-xs",
         "mb-5",
         className,

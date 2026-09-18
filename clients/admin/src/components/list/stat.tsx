@@ -59,13 +59,13 @@ type StatStripProps = {
 
 /**
  * StatStrip — responsive grid container for Stat tiles with the
- * standard fsh-enter-2 stagger.
+ * standard app-enter-2 stagger.
  */
 export function StatStrip({ cols = 3, children, className }: StatStripProps) {
   return (
     <div
       className={cn(
-        "fsh-enter fsh-enter-2 grid grid-cols-1 gap-3",
+        "app-enter app-enter-2 grid grid-cols-1 gap-3",
         cols === 2 && "sm:grid-cols-2",
         cols === 3 && "sm:grid-cols-3",
         cols === 4 && "sm:grid-cols-2 xl:grid-cols-4",

@@ -1,4 +1,4 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("Files.Tests")]
-[assembly: InternalsVisibleTo("Integration.Tests")]
+[assembly: InternalsVisibleTo("Boilerplate.Files.Tests")]
+[assembly: InternalsVisibleTo("Boilerplate.Integration.Tests")]

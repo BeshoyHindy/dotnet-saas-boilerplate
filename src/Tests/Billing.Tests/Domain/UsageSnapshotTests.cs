@@ -1,5 +1,5 @@
-using FSH.Framework.Shared.Quota;
-using FSH.Modules.Billing.Domain;
+using Boilerplate.BuildingBlocks.Shared.Quota;
+using Boilerplate.Modules.Billing.Domain;
 
 namespace Billing.Tests.Domain;
 

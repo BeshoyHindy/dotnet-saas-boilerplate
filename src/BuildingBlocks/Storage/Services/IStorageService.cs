@@ -1,7 +1,7 @@
-using FSH.Framework.Shared.Storage;
-using FSH.Framework.Storage.DTOs;
+using Boilerplate.BuildingBlocks.Shared.Storage;
+using Boilerplate.BuildingBlocks.Storage.DTOs;
 
-namespace FSH.Framework.Storage.Services;
+namespace Boilerplate.BuildingBlocks.Storage.Services;
 
 public interface IStorageService
 {

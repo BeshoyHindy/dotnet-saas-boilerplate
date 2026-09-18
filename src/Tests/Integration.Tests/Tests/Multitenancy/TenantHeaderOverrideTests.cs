@@ -16,7 +16,7 @@ namespace Integration.Tests.Tests.Multitenancy;
 /// These tests pin the contract enforced by the RootOperatorHeaderOverride
 /// delegate strategy in <c>MultitenancyModule</c>.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class TenantHeaderOverrideTests : IAsyncLifetime
 {
     private static readonly JsonSerializerOptions Json = new()
@@ -25,7 +25,7 @@ public sealed class TenantHeaderOverrideTests : IAsyncLifetime
         PropertyNameCaseInsensitive = true,
     };
 
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
     private string _tenantA = default!;
@@ -33,7 +33,7 @@ public sealed class TenantHeaderOverrideTests : IAsyncLifetime
     private string _tenantB = default!;
     private string _tenantBAdminEmail = default!;
 
-    public TenantHeaderOverrideTests(FshWebApplicationFactory factory)
+    public TenantHeaderOverrideTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

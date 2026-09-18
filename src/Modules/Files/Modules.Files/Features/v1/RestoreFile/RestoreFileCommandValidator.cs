@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Files.Contracts.v1.Commands;
+using Boilerplate.Modules.Files.Contracts.v1.Commands;
 
-namespace FSH.Modules.Files.Features.v1.RestoreFile;
+namespace Boilerplate.Modules.Files.Features.v1.RestoreFile;
 
 public sealed class RestoreFileCommandValidator : AbstractValidator<RestoreFileCommand>
 {

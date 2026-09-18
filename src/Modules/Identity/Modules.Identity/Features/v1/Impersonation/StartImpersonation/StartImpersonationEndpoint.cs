@@ -1,7 +1,7 @@
-using FSH.Modules.Identity.Contracts.Authorization;
-using FSH.Framework.Shared.Identity.Authorization;
-using FSH.Modules.Identity.Contracts.v1.Impersonation;
-using FSH.Modules.Identity.Contracts.v1.Impersonation.StartImpersonation;
+using Boilerplate.Modules.Identity.Contracts.Authorization;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.Modules.Identity.Contracts.v1.Impersonation;
+using Boilerplate.Modules.Identity.Contracts.v1.Impersonation.StartImpersonation;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Identity.Features.v1.Impersonation.StartImpersonation;
+namespace Boilerplate.Modules.Identity.Features.v1.Impersonation.StartImpersonation;
 
 public static class StartImpersonationEndpoint
 {

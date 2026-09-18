@@ -1,13 +1,13 @@
-using FSH.Framework.Quota;
-using FSH.Framework.Shared.Quota;
-using FSH.Framework.Storage.Services;
-using FSH.Modules.Files.Data;
+using Boilerplate.BuildingBlocks.Quota;
+using Boilerplate.BuildingBlocks.Shared.Quota;
+using Boilerplate.BuildingBlocks.Storage.Services;
+using Boilerplate.Modules.Files.Data;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace FSH.Modules.Files.Jobs;
+namespace Boilerplate.Modules.Files.Jobs;
 
 /// <summary>
 /// Daily purge of soft-deleted FileAsset rows past the retention window. Hard-deletes the row,

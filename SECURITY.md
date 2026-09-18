@@ -2,13 +2,12 @@
 
 ## Supported versions
 
-This is a starter kit. Only the current `main` branch receives security fixes from upstream. Forks, downstream projects, and tagged releases are owned by their maintainers — pull fixes in on your own cadence.
+This is a starter kit. Only the current `main` branch receives security fixes. Forks, downstream projects, and tagged releases are owned by their maintainers — pull fixes in on your own cadence.
 
 ## Reporting a vulnerability
 
-**Do not open a public issue.** Use GitHub's private vulnerability reporting:
-
-<https://github.com/fullstackhero/dotnet-starter-kit/security/advisories/new>
+**Do not open a public issue.** Use GitHub's private vulnerability reporting on this repository
+(Security → Report a vulnerability).
 
 Please include:
 
@@ -27,9 +26,9 @@ Fixes ship as a patched commit on `main` plus a GitHub Security Advisory. Report
 
 ## Scope
 
-In scope: `src/` (BuildingBlocks, Modules, Host), default `appsettings.*.json`, the `FullStackHero.CLI`, and the `clients/` apps.
+In scope: `src/` (BuildingBlocks, Modules, Host), default `appsettings.*.json`, the CLI in `src/Tools/CLI`, and the `clients/` apps.
 
-Out of scope: third-party NuGet/npm packages (report upstream), the docs site, and issues in downstream forks (contact that fork's maintainer).
+Out of scope: third-party NuGet/npm packages (report upstream) and issues in downstream forks (contact that fork's maintainer).
 
 ## Production hardening
 

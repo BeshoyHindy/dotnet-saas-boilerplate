@@ -1,4 +1,4 @@
-namespace FSH.Framework.Web.Realtime;
+namespace Boilerplate.BuildingBlocks.Web.Realtime;
 
 /// <summary>
 /// In-memory presence tracker — keeps a connection-count per user id so the

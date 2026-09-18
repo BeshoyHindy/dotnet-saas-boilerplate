@@ -1,8 +1,8 @@
 using System.Diagnostics;
-using FSH.Framework.Caching.Telemetry;
+using Boilerplate.BuildingBlocks.Caching.Telemetry;
 using Microsoft.Extensions.Caching.Hybrid;
 
-namespace FSH.Framework.Caching;
+namespace Boilerplate.BuildingBlocks.Caching;
 
 /// <summary>
 /// <see cref="HybridCache"/> decorator that records OpenTelemetry metrics and spans for every
@@ -38,7 +38,7 @@ internal sealed class ObservableHybridCache : HybridCache
         using var activity = CachingTelemetry.ActivitySource.StartActivity(
             "cache.get_or_create",
             ActivityKind.Internal);
-        activity?.SetTag("cache.system", "fsh.hybrid");
+        activity?.SetTag("cache.system", "boilerplate.hybrid");
         activity?.SetTag("cache.key", key);
 
         // Wrap the factory so we can record hit/miss and factory duration without allocating a
@@ -99,7 +99,7 @@ internal sealed class ObservableHybridCache : HybridCache
         using var activity = CachingTelemetry.ActivitySource.StartActivity(
             "cache.set",
             ActivityKind.Internal);
-        activity?.SetTag("cache.system", "fsh.hybrid");
+        activity?.SetTag("cache.system", "boilerplate.hybrid");
         activity?.SetTag("cache.key", key);
 
         return _inner.SetAsync(key, value, options, tags, cancellationToken);
@@ -110,7 +110,7 @@ internal sealed class ObservableHybridCache : HybridCache
         using var activity = CachingTelemetry.ActivitySource.StartActivity(
             "cache.remove",
             ActivityKind.Internal);
-        activity?.SetTag("cache.system", "fsh.hybrid");
+        activity?.SetTag("cache.system", "boilerplate.hybrid");
         activity?.SetTag("cache.key", key);
         CachingTelemetry.Invalidations.Add(1);
 
@@ -128,7 +128,7 @@ internal sealed class ObservableHybridCache : HybridCache
         using var activity = CachingTelemetry.ActivitySource.StartActivity(
             "cache.remove_by_tag",
             ActivityKind.Internal);
-        activity?.SetTag("cache.system", "fsh.hybrid");
+        activity?.SetTag("cache.system", "boilerplate.hybrid");
         activity?.SetTag("cache.tag", tag);
         CachingTelemetry.Invalidations.Add(1);
 

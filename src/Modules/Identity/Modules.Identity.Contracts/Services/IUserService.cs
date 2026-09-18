@@ -1,8 +1,8 @@
-﻿using FSH.Framework.Shared.Storage;
-using FSH.Modules.Identity.Contracts.DTOs;
+﻿using Boilerplate.BuildingBlocks.Shared.Storage;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
 using System.Security.Claims;
 
-namespace FSH.Modules.Identity.Contracts.Services;
+namespace Boilerplate.Modules.Identity.Contracts.Services;
 
 public interface IUserService
 {

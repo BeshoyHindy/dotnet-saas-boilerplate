@@ -1,6 +1,6 @@
-using FSH.Framework.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Domain;
 
-namespace FSH.Modules.Identity.Domain;
+namespace Boilerplate.Modules.Identity.Domain;
 
 public class Group : IAuditableEntity, ISoftDeletable
 {

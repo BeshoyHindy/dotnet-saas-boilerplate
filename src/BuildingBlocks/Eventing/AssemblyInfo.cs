@@ -1,3 +1,3 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("Framework.Tests")]
+[assembly: InternalsVisibleTo("Boilerplate.Framework.Tests")]

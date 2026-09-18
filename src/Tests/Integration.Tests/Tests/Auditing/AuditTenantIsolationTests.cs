@@ -2,12 +2,12 @@ using Integration.Tests.Infrastructure;
 
 namespace Integration.Tests.Tests.Auditing;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class AuditTenantIsolationTests
 {
     private readonly AuthHelper _auth;
 
-    public AuditTenantIsolationTests(FshWebApplicationFactory factory)
+    public AuditTenantIsolationTests(AppWebApplicationFactory factory)
     {
         _auth = new AuthHelper(factory);
     }

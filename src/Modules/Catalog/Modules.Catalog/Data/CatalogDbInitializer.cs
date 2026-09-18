@@ -1,8 +1,8 @@
-using FSH.Framework.Persistence;
+using Boilerplate.BuildingBlocks.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-namespace FSH.Modules.Catalog.Data;
+namespace Boilerplate.Modules.Catalog.Data;
 
 public sealed class CatalogDbInitializer(
     CatalogDbContext dbContext,

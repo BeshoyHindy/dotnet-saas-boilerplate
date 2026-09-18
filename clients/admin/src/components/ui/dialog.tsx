@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 /**
- * Dialog primitives — Radix-based, styled to the FSH design system.
+ * Dialog primitives — Radix-based, styled to the Boilerplate design system.
  * Usage:
  *   <Dialog open={open} onOpenChange={setOpen}>
  *     <DialogContent>
@@ -36,7 +36,7 @@ export const DialogOverlay = React.forwardRef<
     data-slot="dialog-overlay"
     className={cn(
       "fixed inset-0 z-50 bg-[oklch(0_0_0_/_0.4)] backdrop-blur-[6px]",
-      "data-[state=open]:animate-fsh-overlay-in data-[state=closed]:animate-fsh-overlay-out",
+      "data-[state=open]:animate-app-overlay-in data-[state=closed]:animate-app-overlay-out",
       className,
     )}
     {...props}
@@ -74,7 +74,7 @@ export const DialogContent = React.forwardRef<
           sizeClass[size],
           "rounded-xl border border-[var(--color-border)] bg-[var(--color-card)]",
           "shadow-xl outline-none",
-          "data-[state=open]:animate-fsh-dialog-in data-[state=closed]:animate-fsh-dialog-out",
+          "data-[state=open]:animate-app-dialog-in data-[state=closed]:animate-app-dialog-out",
           className,
         )}
         {...props}
@@ -158,10 +158,10 @@ export function DialogBody({ className, ...props }: React.HTMLAttributes<HTMLDiv
 type SheetSide = "left" | "right" | "top" | "bottom";
 
 const sheetSideClasses: Record<SheetSide, string> = {
-  left: "inset-y-0 left-0 h-full w-[min(20rem,85vw)] border-r data-[state=open]:animate-fsh-sheet-in-left data-[state=closed]:animate-fsh-sheet-out-left",
-  right: "inset-y-0 right-0 h-full w-[min(20rem,85vw)] border-l data-[state=open]:animate-fsh-sheet-in-right data-[state=closed]:animate-fsh-sheet-out-right",
-  top: "inset-x-0 top-0 w-full max-h-[85vh] border-b data-[state=open]:animate-fsh-sheet-in-top data-[state=closed]:animate-fsh-sheet-out-top",
-  bottom: "inset-x-0 bottom-0 w-full max-h-[85vh] border-t data-[state=open]:animate-fsh-sheet-in-bottom data-[state=closed]:animate-fsh-sheet-out-bottom",
+  left: "inset-y-0 left-0 h-full w-[min(20rem,85vw)] border-r data-[state=open]:animate-app-sheet-in-left data-[state=closed]:animate-app-sheet-out-left",
+  right: "inset-y-0 right-0 h-full w-[min(20rem,85vw)] border-l data-[state=open]:animate-app-sheet-in-right data-[state=closed]:animate-app-sheet-out-right",
+  top: "inset-x-0 top-0 w-full max-h-[85vh] border-b data-[state=open]:animate-app-sheet-in-top data-[state=closed]:animate-app-sheet-out-top",
+  bottom: "inset-x-0 bottom-0 w-full max-h-[85vh] border-t data-[state=open]:animate-app-sheet-in-bottom data-[state=closed]:animate-app-sheet-out-bottom",
 };
 
 export const SheetContent = React.forwardRef<

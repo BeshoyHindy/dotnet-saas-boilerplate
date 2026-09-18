@@ -1,6 +1,6 @@
 using Mediator;
 
-namespace FSH.Modules.Billing.Contracts.v1.Wallets;
+namespace Boilerplate.Modules.Billing.Contracts.v1.Wallets;
 
 /// <summary>
 /// Operator command — rejects a Pending top-up request. Returns the request id.

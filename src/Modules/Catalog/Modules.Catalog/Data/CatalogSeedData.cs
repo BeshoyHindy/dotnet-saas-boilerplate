@@ -1,7 +1,7 @@
-using FSH.Framework.Core.Domain;
-using FSH.Modules.Catalog.Domain;
+using Boilerplate.BuildingBlocks.Core.Domain;
+using Boilerplate.Modules.Catalog.Domain;
 
-namespace FSH.Modules.Catalog.Data;
+namespace Boilerplate.Modules.Catalog.Data;
 
 /// <summary>
 /// Demo seed data for the Catalog module — a small "what a catalogue looks like"

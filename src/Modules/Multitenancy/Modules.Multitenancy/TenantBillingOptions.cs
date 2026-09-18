@@ -1,4 +1,4 @@
-namespace FSH.Modules.Multitenancy;
+namespace Boilerplate.Modules.Multitenancy;
 
 /// <summary>
 /// Tenant-lifecycle billing knobs (config section <c>"Billing"</c>): the plan a tenant falls back to

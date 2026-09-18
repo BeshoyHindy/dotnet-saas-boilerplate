@@ -1,11 +1,11 @@
 using System.Text.Json;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Framework.Shared.Quota;
-using FSH.Modules.Billing.Contracts.Dtos;
-using FSH.Modules.Billing.Data;
-using FSH.Modules.Billing.Domain;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Quota;
+using Boilerplate.Modules.Billing.Contracts.Dtos;
+using Boilerplate.Modules.Billing.Data;
+using Boilerplate.Modules.Billing.Domain;
 using Integration.Tests.Infrastructure;
 
 namespace Integration.Tests.Tests.Billing;
@@ -19,7 +19,7 @@ namespace Integration.Tests.Tests.Billing;
 /// via the DbContext so each test owns a unique (tenant, period) island and never collides on the
 /// ux_usage_snapshots_tenant_period_resource unique index.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class UsageSnapshotQueryTests
 {
     private const string BillingBasePath = "/api/v1/billing";
@@ -35,10 +35,10 @@ public sealed class UsageSnapshotQueryTests
     // counter hands each test a private period window away from other Billing tests' ranges.
     private static int s_periodCounter;
 
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public UsageSnapshotQueryTests(FshWebApplicationFactory factory)
+    public UsageSnapshotQueryTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);
@@ -319,7 +319,7 @@ public sealed class UsageSnapshotQueryTests
             new MultiTenantContext<AppTenantInfo>(tenant);
 
         var userManager = scope.ServiceProvider
-            .GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<FSH.Modules.Identity.Domain.FshUser>>();
+            .GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<Boilerplate.Modules.Identity.Domain.AppUser>>();
         var user = await userManager.FindByIdAsync(userId);
         user.ShouldNotBeNull();
         if (!user!.EmailConfirmed)

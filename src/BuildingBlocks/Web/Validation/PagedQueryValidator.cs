@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Framework.Shared.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
 
-namespace FSH.Framework.Web.Validation;
+namespace Boilerplate.BuildingBlocks.Web.Validation;
 
 /// <summary>
 /// Shared validator for types implementing IPagedQuery.

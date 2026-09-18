@@ -1,11 +1,11 @@
-using FSH.Framework.Quota;
-using FSH.Framework.Shared.Quota;
-using FSH.Modules.Identity.Data;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.BuildingBlocks.Quota;
+using Boilerplate.BuildingBlocks.Shared.Quota;
+using Boilerplate.Modules.Identity.Data;
+using Boilerplate.Modules.Identity.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Identity.Services;
+namespace Boilerplate.Modules.Identity.Services;
 
 /// <summary>
 /// Reports the live user count for a tenant as a quota gauge. Uses the tenant-scoped
@@ -15,9 +15,9 @@ namespace FSH.Modules.Identity.Services;
 /// </summary>
 internal sealed class UserCountQuotaGaugeProvider : IQuotaGaugeProvider
 {
-    private readonly UserManager<FshUser> _userManager;
+    private readonly UserManager<AppUser> _userManager;
 
-    public UserCountQuotaGaugeProvider(UserManager<FshUser> userManager)
+    public UserCountQuotaGaugeProvider(UserManager<AppUser> userManager)
     {
         ArgumentNullException.ThrowIfNull(userManager);
         _userManager = userManager;

@@ -1,4 +1,4 @@
-namespace FSH.Modules.Webhooks.Contracts.Dtos;
+namespace Boilerplate.Modules.Webhooks.Contracts.Dtos;
 
 public sealed class WebhookDeliveryDto
 {

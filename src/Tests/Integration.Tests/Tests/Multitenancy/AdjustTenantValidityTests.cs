@@ -10,7 +10,7 @@ namespace Integration.Tests.Tests.Multitenancy;
 /// sets <c>ValidUpto</c> to an explicit date with no billing side-effect (no new invoice / subscription),
 /// allows backdating (immediate expiry) unlike renewal, and is root-only.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class AdjustTenantValidityTests
 {
     private const string BillingBasePath = "/api/v1/billing";
@@ -21,10 +21,10 @@ public sealed class AdjustTenantValidityTests
         PropertyNameCaseInsensitive = true,
     };
 
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public AdjustTenantValidityTests(FshWebApplicationFactory factory)
+    public AdjustTenantValidityTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

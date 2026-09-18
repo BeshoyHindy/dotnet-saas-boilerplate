@@ -150,7 +150,7 @@ export function SecuritySettings() {
         : null;
 
   return (
-    <div className="space-y-6 fsh-enter">
+    <div className="space-y-6 app-enter">
       <PasswordCard />
       <TwoFactorCard enabled={twoFactorEnabled} loading={profileQuery.isLoading} />
 
@@ -209,7 +209,7 @@ export function SecuritySettings() {
                   <li
                     key={s.id}
                     className={cn(
-                      "fsh-enter group/row flex items-center justify-between gap-4",
+                      "app-enter group/row flex items-center justify-between gap-4",
                       "border-t border-[var(--color-border)] px-6 py-4 first:border-t-0",
                       "transition-colors",
                       !s.isActive && "opacity-60",

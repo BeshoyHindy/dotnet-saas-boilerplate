@@ -1,6 +1,6 @@
-using FSH.Modules.Files.Contracts;
+using Boilerplate.Modules.Files.Contracts;
 
-namespace FSH.Modules.Files.Services;
+namespace Boilerplate.Modules.Files.Services;
 
 /// <summary>
 /// Resolves an <see cref="IFileAccessPolicy"/> for a given OwnerType. Owning modules register their

@@ -3,12 +3,12 @@ using Integration.Tests.Infrastructure.Extensions;
 
 namespace Integration.Tests.Tests.Users;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class SelfRegistrationTests
 {
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
 
-    public SelfRegistrationTests(FshWebApplicationFactory factory)
+    public SelfRegistrationTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
     }

@@ -1,4 +1,4 @@
-using FSH.Framework.Eventing.Inbox;
+using Boilerplate.BuildingBlocks.Eventing.Inbox;
 using Shouldly;
 using Xunit;
 

@@ -2,13 +2,13 @@ using Integration.Tests.Infrastructure;
 
 namespace Integration.Tests.Tests.Authorization;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class PermissionEnforcementTests
 {
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public PermissionEnforcementTests(FshWebApplicationFactory factory)
+    public PermissionEnforcementTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

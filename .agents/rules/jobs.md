@@ -33,4 +33,4 @@ Examples in the tree: `PurgeOrphanedFiles`/`PurgeDeletedFiles` (Files), `Monthly
 
 - Jobs run on the server with **no HTTP/tenant context** — restore Finbuckle tenant context inside the job (fresh scope + `IMultiTenantContextSetter`) before touching a tenant-filtered DbContext.
 - The DbMigrator registers `NoOpJobService` whose methods **throw** — surfaces any accidental enqueue during migration. Don't enqueue from migration/seed paths.
-- A job class is a normal DI-resolved type (scope-per-job via `FshJobActivator`); inject what you need.
+- A job class is a normal DI-resolved type (scope-per-job via `AppJobActivator`); inject what you need.

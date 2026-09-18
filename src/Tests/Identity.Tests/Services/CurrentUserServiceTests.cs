@@ -1,6 +1,6 @@
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Shared.Constants;
-using FSH.Modules.Identity.Services;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Constants;
+using Boilerplate.Modules.Identity.Services;
 using System.Security.Claims;
 
 namespace Identity.Tests.Services;

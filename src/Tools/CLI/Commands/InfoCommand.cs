@@ -1,9 +1,9 @@
 using System.Reflection;
-using FSH.CLI.Infrastructure;
+using Boilerplate.CLI.Infrastructure;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
-namespace FSH.CLI.Commands;
+namespace Boilerplate.CLI.Commands;
 
 public sealed class InfoCommand : AsyncCommand
 {
@@ -14,7 +14,7 @@ public sealed class InfoCommand : AsyncCommand
             ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)
             ?? "unknown";
 
-        AnsiConsole.MarkupLine($"[bold {FshConstants.AccentColor}]FullStackHero .NET Starter Kit CLI[/]");
+        AnsiConsole.MarkupLine($"[bold {AppConstants.AccentColor}]Boilerplate CLI[/]");
         AnsiConsole.WriteLine();
 
         var table = new Table()
@@ -26,9 +26,9 @@ public sealed class InfoCommand : AsyncCommand
         table.AddRow("CLI Version", $"[bold]{currentVersion.EscapeMarkup()}[/]");
 
         // Run NuGet + template checks in parallel
-        Task<string?> latestCliTask = NuGetClient.GetLatestVersionAsync(FshConstants.CliPackageId, cancellationToken);
+        Task<string?> latestCliTask = NuGetClient.GetLatestVersionAsync(AppConstants.CliPackageId, cancellationToken);
         Task<string?> templateVersionTask = NuGetClient.GetInstalledTemplateVersionAsync(cancellationToken);
-        Task<string?> latestTemplateTask = NuGetClient.GetLatestVersionAsync(FshConstants.TemplatePackageId, cancellationToken);
+        Task<string?> latestTemplateTask = NuGetClient.GetLatestVersionAsync(AppConstants.TemplatePackageId, cancellationToken);
         Task<(bool, string)> sdkTask = ProcessRunner.CaptureAsync("dotnet", "--version", cancellationToken);
 
         await Task.WhenAll(latestCliTask, templateVersionTask, latestTemplateTask, sdkTask).ConfigureAwait(false);
@@ -43,18 +43,18 @@ public sealed class InfoCommand : AsyncCommand
         {
             bool updateAvailable = VersionComparer.IsNewer(latestCli, currentVersion);
             table.AddRow("Latest CLI", updateAvailable
-                ? $"[{FshConstants.WarningColor}]{latestCli} (update available — run 'fsh update')[/]"
-                : $"[{FshConstants.SuccessColor}]{latestCli} (up to date)[/]");
+                ? $"[{AppConstants.WarningColor}]{latestCli} (update available — run 'boilerplate update')[/]"
+                : $"[{AppConstants.SuccessColor}]{latestCli} (up to date)[/]");
         }
         else
         {
-            table.AddRow("Latest CLI", $"[{FshConstants.DimColor}]could not check[/]");
+            table.AddRow("Latest CLI", $"[{AppConstants.DimColor}]could not check[/]");
         }
 
         // Template version
         string templateDisplay;
         if (templateVersion is null)
-            templateDisplay = $"[{FshConstants.DimColor}]not installed[/]";
+            templateDisplay = $"[{AppConstants.DimColor}]not installed[/]";
         else
             templateDisplay = char.IsDigit(templateVersion[0]) ? $"v{templateVersion}" : templateVersion;
         table.AddRow("Template", templateDisplay);
@@ -63,8 +63,8 @@ public sealed class InfoCommand : AsyncCommand
         {
             bool updateAvailable = VersionComparer.IsNewer(latestTemplate, templateVersion);
             table.AddRow("Latest Template", updateAvailable
-                ? $"[{FshConstants.WarningColor}]{latestTemplate} (update available)[/]"
-                : $"[{FshConstants.SuccessColor}]{latestTemplate} (up to date)[/]");
+                ? $"[{AppConstants.WarningColor}]{latestTemplate} (update available)[/]"
+                : $"[{AppConstants.SuccessColor}]{latestTemplate} (up to date)[/]");
         }
 
         // .NET SDK
@@ -74,8 +74,8 @@ public sealed class InfoCommand : AsyncCommand
         }
 
         // Links
-        table.AddRow("Documentation", $"[link={FshConstants.DocsUrl}]{FshConstants.DocsUrl}[/]");
-        table.AddRow("Release Notes", $"[link={FshConstants.ReleaseNotesUrl}]{FshConstants.ReleaseNotesUrl}[/]");
+        table.AddRow("Documentation", $"[link={AppConstants.DocsUrl}]{AppConstants.DocsUrl}[/]");
+        table.AddRow("Release Notes", $"[link={AppConstants.ReleaseNotesUrl}]{AppConstants.ReleaseNotesUrl}[/]");
 
         AnsiConsole.Write(table);
         AnsiConsole.WriteLine();

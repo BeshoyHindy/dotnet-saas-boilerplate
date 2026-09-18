@@ -88,7 +88,7 @@ export function WebhooksListPage() {
         title="Webhooks"
         total={data?.totalCount ?? null}
         unit="subscription"
-        description="Subscribe HTTP endpoints to domain events. Payloads are signed with HMAC-SHA256 using the secret you provide — verify the X-FSH-Signature header on your side before trusting the body."
+        description="Subscribe HTTP endpoints to domain events. Payloads are signed with HMAC-SHA256 using the secret you provide — verify the X-Webhook-Signature header on your side before trusting the body."
       >
         <Button
           variant="outline"

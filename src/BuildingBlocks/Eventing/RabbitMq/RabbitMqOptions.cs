@@ -1,4 +1,4 @@
-namespace FSH.Framework.Eventing.RabbitMq;
+namespace Boilerplate.BuildingBlocks.Eventing.RabbitMq;
 
 /// <summary>
 /// Configuration options for RabbitMQ event bus.
@@ -31,14 +31,14 @@ public sealed class RabbitMqOptions
     public string VirtualHost { get; set; } = "/";
 
     /// <summary>
-    /// Exchange name for publishing events. Default is "fsh.events".
+    /// Exchange name for publishing events. Default is "boilerplate.events".
     /// </summary>
-    public string ExchangeName { get; set; } = "fsh.events";
+    public string ExchangeName { get; set; } = "boilerplate.events";
 
     /// <summary>
-    /// Queue name prefix for consuming events. Default is "fsh".
+    /// Queue name prefix for consuming events. Default is "boilerplate".
     /// </summary>
-    public string QueuePrefix { get; set; } = "fsh";
+    public string QueuePrefix { get; set; } = "boilerplate";
 
     /// <summary>
     /// Enable SSL/TLS connection. Default is false.

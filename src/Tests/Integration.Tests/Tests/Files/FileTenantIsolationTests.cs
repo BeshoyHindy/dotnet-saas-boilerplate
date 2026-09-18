@@ -1,5 +1,5 @@
 using System.Security.Cryptography;
-using FSH.Modules.Files.Contracts.v1.DTOs;
+using Boilerplate.Modules.Files.Contracts.v1.DTOs;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 
@@ -12,13 +12,13 @@ namespace Integration.Tests.Tests.Files;
 /// tests stand up a second tenant (root + provisioned tenant) and assert that tenant B can neither
 /// read metadata nor mint a download URL for a file uploaded in tenant A (root).
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class FileTenantIsolationTests
 {
     private const string FilesBasePath = "/api/v1/files";
     private readonly AuthHelper _auth;
 
-    public FileTenantIsolationTests(FshWebApplicationFactory factory)
+    public FileTenantIsolationTests(AppWebApplicationFactory factory)
     {
         _auth = new AuthHelper(factory);
     }

@@ -1,6 +1,6 @@
-using FSH.Framework.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Domain;
 
-namespace FSH.Modules.Catalog.Domain;
+namespace Boilerplate.Modules.Catalog.Domain;
 
 /// <summary>
 /// A product image. Owned by <see cref="Product"/> (cascade-deleted with the parent).

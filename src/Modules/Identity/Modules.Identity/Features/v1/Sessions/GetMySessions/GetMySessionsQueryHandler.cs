@@ -1,10 +1,10 @@
-using FSH.Framework.Core.Context;
-using FSH.Modules.Identity.Contracts.DTOs;
-using FSH.Modules.Identity.Contracts.Services;
-using FSH.Modules.Identity.Contracts.v1.Sessions.GetMySessions;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
+using Boilerplate.Modules.Identity.Contracts.Services;
+using Boilerplate.Modules.Identity.Contracts.v1.Sessions.GetMySessions;
 using Mediator;
 
-namespace FSH.Modules.Identity.Features.v1.Sessions.GetMySessions;
+namespace Boilerplate.Modules.Identity.Features.v1.Sessions.GetMySessions;
 
 public sealed class GetMySessionsQueryHandler : IQueryHandler<GetMySessionsQuery, List<UserSessionDto>>
 {

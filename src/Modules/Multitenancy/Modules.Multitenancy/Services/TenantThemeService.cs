@@ -1,20 +1,20 @@
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Caching;
-using FSH.Framework.Core.Context;
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Framework.Shared.Storage;
-using FSH.Framework.Storage;
-using FSH.Framework.Storage.Services;
-using FSH.Modules.Multitenancy.Contracts;
-using FSH.Modules.Multitenancy.Contracts.Dtos;
-using FSH.Modules.Multitenancy.Data;
-using FSH.Modules.Multitenancy.Domain;
+using Boilerplate.BuildingBlocks.Caching;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Storage;
+using Boilerplate.BuildingBlocks.Storage;
+using Boilerplate.BuildingBlocks.Storage.Services;
+using Boilerplate.Modules.Multitenancy.Contracts;
+using Boilerplate.Modules.Multitenancy.Contracts.Dtos;
+using Boilerplate.Modules.Multitenancy.Data;
+using Boilerplate.Modules.Multitenancy.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 
-namespace FSH.Modules.Multitenancy.Services;
+namespace Boilerplate.Modules.Multitenancy.Services;
 
 public sealed class TenantThemeService : ITenantThemeService
 {

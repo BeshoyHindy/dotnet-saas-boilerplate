@@ -1,5 +1,5 @@
-using FSH.Modules.Billing.Contracts;
-using FSH.Modules.Billing.Domain;
+using Boilerplate.Modules.Billing.Contracts;
+using Boilerplate.Modules.Billing.Domain;
 using Shouldly;
 using Xunit;
 

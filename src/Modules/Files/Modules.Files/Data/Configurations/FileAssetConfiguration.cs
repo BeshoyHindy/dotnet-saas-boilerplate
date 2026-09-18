@@ -1,8 +1,8 @@
-using FSH.Modules.Files.Domain;
+using Boilerplate.Modules.Files.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace FSH.Modules.Files.Data.Configurations;
+namespace Boilerplate.Modules.Files.Data.Configurations;
 
 public sealed class FileAssetConfiguration : IEntityTypeConfiguration<FileAsset>
 {

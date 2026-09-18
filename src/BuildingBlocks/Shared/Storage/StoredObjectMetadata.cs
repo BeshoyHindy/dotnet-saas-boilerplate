@@ -1,4 +1,4 @@
-namespace FSH.Framework.Shared.Storage;
+namespace Boilerplate.BuildingBlocks.Shared.Storage;
 
 /// <summary>
 /// Metadata returned by a HEAD against an object in storage. Used by the Files module on finalize

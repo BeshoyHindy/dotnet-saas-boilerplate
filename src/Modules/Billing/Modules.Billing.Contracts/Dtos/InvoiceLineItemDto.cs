@@ -1,6 +1,6 @@
-using FSH.Framework.Shared.Quota;
+using Boilerplate.BuildingBlocks.Shared.Quota;
 
-namespace FSH.Modules.Billing.Contracts.Dtos;
+namespace Boilerplate.Modules.Billing.Contracts.Dtos;
 
 public sealed record InvoiceLineItemDto(
     Guid Id,

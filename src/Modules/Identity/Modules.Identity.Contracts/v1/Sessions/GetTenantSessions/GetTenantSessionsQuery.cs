@@ -1,8 +1,8 @@
-using FSH.Framework.Shared.Persistence;
-using FSH.Modules.Identity.Contracts.DTOs;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
 using Mediator;
 
-namespace FSH.Modules.Identity.Contracts.v1.Sessions.GetTenantSessions;
+namespace Boilerplate.Modules.Identity.Contracts.v1.Sessions.GetTenantSessions;
 
 /// <summary>
 /// Returns all sessions across the current tenant, paged and optionally

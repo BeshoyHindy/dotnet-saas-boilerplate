@@ -1,12 +1,12 @@
-using FSH.Framework.Shared.Persistence;
-using FSH.Modules.Tickets.Contracts.Dtos;
-using FSH.Modules.Tickets.Contracts.v1.Tickets;
-using FSH.Modules.Tickets.Data;
-using FSH.Modules.Tickets.Domain;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Tickets.Contracts.Dtos;
+using Boilerplate.Modules.Tickets.Contracts.v1.Tickets;
+using Boilerplate.Modules.Tickets.Data;
+using Boilerplate.Modules.Tickets.Domain;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Tickets.Features.v1.Tickets.SearchTickets;
+namespace Boilerplate.Modules.Tickets.Features.v1.Tickets.SearchTickets;
 
 public sealed class SearchTicketsQueryHandler(TicketsDbContext dbContext)
     : IQueryHandler<SearchTicketsQuery, PagedResponse<TicketDto>>

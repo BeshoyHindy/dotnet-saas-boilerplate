@@ -1,9 +1,9 @@
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Multitenancy.Domain;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Multitenancy.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace FSH.Modules.Multitenancy.Data.Configurations;
+namespace Boilerplate.Modules.Multitenancy.Data.Configurations;
 
 public sealed class TenantExpiryNoticeConfiguration : IEntityTypeConfiguration<TenantExpiryNotice>
 {

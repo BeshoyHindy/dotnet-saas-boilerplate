@@ -1,4 +1,4 @@
-namespace FSH.Modules.Notifications.Contracts;
+namespace Boilerplate.Modules.Notifications.Contracts;
 
 /// <summary>
 /// Marker referenced by <c>Program.cs::AddMediator(o => o.Assemblies = [...])</c> so the

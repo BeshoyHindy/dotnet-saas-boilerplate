@@ -305,7 +305,7 @@ export function InvoicesListPage() {
                     type="button"
                     onClick={() => navigate(`/billing/invoices/${inv.id}`)}
                     className={cn(
-                      "fsh-enter grid w-full grid-cols-[1fr_auto] items-center gap-x-6 gap-y-1 px-6 py-4 text-left transition-colors hover:bg-[var(--color-muted)] cursor-pointer",
+                      "app-enter grid w-full grid-cols-[1fr_auto] items-center gap-x-6 gap-y-1 px-6 py-4 text-left transition-colors hover:bg-[var(--color-muted)] cursor-pointer",
                     )}
                     style={{ animationDelay: `${Math.min(i, 8) * 25}ms` }}
                   >

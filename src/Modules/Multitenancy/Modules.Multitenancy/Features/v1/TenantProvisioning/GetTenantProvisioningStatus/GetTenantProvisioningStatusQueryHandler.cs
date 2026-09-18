@@ -1,9 +1,9 @@
-using FSH.Modules.Multitenancy.Contracts.Dtos;
-using FSH.Modules.Multitenancy.Contracts.v1.TenantProvisioning;
-using FSH.Modules.Multitenancy.Provisioning;
+using Boilerplate.Modules.Multitenancy.Contracts.Dtos;
+using Boilerplate.Modules.Multitenancy.Contracts.v1.TenantProvisioning;
+using Boilerplate.Modules.Multitenancy.Provisioning;
 using Mediator;
 
-namespace FSH.Modules.Multitenancy.Features.v1.TenantProvisioning.GetTenantProvisioningStatus;
+namespace Boilerplate.Modules.Multitenancy.Features.v1.TenantProvisioning.GetTenantProvisioningStatus;
 
 public sealed class GetTenantProvisioningStatusQueryHandler(ITenantProvisioningService provisioningService)
     : IQueryHandler<GetTenantProvisioningStatusQuery, TenantProvisioningStatusDto>

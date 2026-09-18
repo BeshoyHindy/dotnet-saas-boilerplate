@@ -1,12 +1,12 @@
-using FSH.Framework.Persistence;
-using FSH.Modules.Auditing.Contracts;
-using FSH.Modules.Auditing.Persistence;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.Modules.Auditing.Contracts;
+using Boilerplate.Modules.Auditing.Persistence;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
-namespace FSH.Modules.Auditing;
+namespace Boilerplate.Modules.Auditing;
 
 public static class ServiceCollectionExtensions
 {

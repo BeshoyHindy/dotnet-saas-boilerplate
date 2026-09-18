@@ -1,11 +1,11 @@
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Eventing.Abstractions;
-using FSH.Framework.Mailing.Services;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Billing.Contracts.Events;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
+using Boilerplate.BuildingBlocks.Mailing.Services;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Billing.Contracts.Events;
 using Microsoft.Extensions.Logging;
 
-namespace FSH.Modules.Notifications.IntegrationEventHandlers;
+namespace Boilerplate.Modules.Notifications.IntegrationEventHandlers;
 
 /// <summary>Emails the tenant admin when an invoice is issued. Resolves the admin email from the tenant
 /// store (the event only carries the tenant id).</summary>

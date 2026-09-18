@@ -1,4 +1,4 @@
-// Admin demo accounts — mirrors src/Host/FSH.Starter.Api/DevSeeding (keep in sync).
+// Admin demo accounts — mirrors src/Host/Boilerplate.Api/DevSeeding (keep in sync).
 // Static — no API call — because the login page is unauthenticated and the
 // API can't safely advertise credentials. Admin only surfaces the root /
 // operator superadmin; tenant-level demo users live in the dashboard app.

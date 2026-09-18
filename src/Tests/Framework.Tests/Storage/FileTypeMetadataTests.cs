@@ -1,4 +1,4 @@
-using FSH.Framework.Storage;
+using Boilerplate.BuildingBlocks.Storage;
 
 namespace Framework.Tests.Storage;
 

@@ -1,17 +1,17 @@
 using Asp.Versioning;
-using FSH.Framework.Persistence;
-using FSH.Framework.Shared.Constants;
-using FSH.Framework.Web.HttpResilience;
-using FSH.Framework.Web.Modules;
-using FSH.Modules.Webhooks.Contracts.Authorization;
-using FSH.Modules.Webhooks.Data;
-using FSH.Modules.Webhooks.Features.v1.CreateWebhookSubscription;
-using FSH.Modules.Webhooks.Features.v1.DeleteWebhookSubscription;
-using FSH.Modules.Webhooks.Features.v1.GetWebhookDeliveries;
-using FSH.Modules.Webhooks.Features.v1.GetWebhookSubscriptions;
-using FSH.Modules.Webhooks.Features.v1.TestWebhookSubscription;
-using FSH.Framework.Eventing.Abstractions;
-using FSH.Modules.Webhooks.Services;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Constants;
+using Boilerplate.BuildingBlocks.Web.HttpResilience;
+using Boilerplate.BuildingBlocks.Web.Modules;
+using Boilerplate.Modules.Webhooks.Contracts.Authorization;
+using Boilerplate.Modules.Webhooks.Data;
+using Boilerplate.Modules.Webhooks.Features.v1.CreateWebhookSubscription;
+using Boilerplate.Modules.Webhooks.Features.v1.DeleteWebhookSubscription;
+using Boilerplate.Modules.Webhooks.Features.v1.GetWebhookDeliveries;
+using Boilerplate.Modules.Webhooks.Features.v1.GetWebhookSubscriptions;
+using Boilerplate.Modules.Webhooks.Features.v1.TestWebhookSubscription;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
+using Boilerplate.Modules.Webhooks.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -21,9 +21,9 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using System.Net.Http;
 
-[assembly: FshModule(typeof(FSH.Modules.Webhooks.WebhooksModule), 400)]
+[assembly: AppModule(typeof(Boilerplate.Modules.Webhooks.WebhooksModule), 400)]
 
-namespace FSH.Modules.Webhooks;
+namespace Boilerplate.Modules.Webhooks;
 
 public sealed class WebhooksModule : IModule
 {

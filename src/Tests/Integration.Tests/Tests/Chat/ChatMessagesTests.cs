@@ -1,16 +1,16 @@
-using FSH.Modules.Chat.Contracts.v1.DTOs;
+using Boilerplate.Modules.Chat.Contracts.v1.DTOs;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 
 namespace Integration.Tests.Tests.Chat;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class ChatMessagesTests
 {
     private const string ChatBasePath = "/api/v1/chat";
     private readonly AuthHelper _auth;
 
-    public ChatMessagesTests(FshWebApplicationFactory factory)
+    public ChatMessagesTests(AppWebApplicationFactory factory)
     {
         _auth = new AuthHelper(factory);
     }

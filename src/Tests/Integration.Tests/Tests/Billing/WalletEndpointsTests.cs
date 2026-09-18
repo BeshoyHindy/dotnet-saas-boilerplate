@@ -1,8 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using FSH.Framework.Shared.Persistence;
-using FSH.Modules.Billing.Contracts;
-using FSH.Modules.Billing.Contracts.Dtos;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Billing.Contracts;
+using Boilerplate.Modules.Billing.Contracts.Dtos;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 
@@ -17,7 +17,7 @@ namespace Integration.Tests.Tests.Billing;
 /// Cross-tenant isolation: a request created under Tenant A must NOT appear in Tenant B's
 /// /wallet/topup-requests/me response.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class WalletEndpointsTests
 {
     private const string BillingBasePath = "/api/v1/billing";
@@ -29,10 +29,10 @@ public sealed class WalletEndpointsTests
         Converters = { new JsonStringEnumConverter() }
     };
 
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public WalletEndpointsTests(FshWebApplicationFactory factory)
+    public WalletEndpointsTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

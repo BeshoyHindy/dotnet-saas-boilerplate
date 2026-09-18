@@ -1,11 +1,11 @@
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Constants;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Catalog.Contracts.Authorization;
-using FSH.Modules.Identity.Authorization;
-using FSH.Modules.Identity.Data;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.BuildingBlocks.Shared.Constants;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Catalog.Contracts.Authorization;
+using Boilerplate.Modules.Identity.Authorization;
+using Boilerplate.Modules.Identity.Data;
+using Boilerplate.Modules.Identity.Domain;
 using Integration.Tests.Infrastructure;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -20,12 +20,12 @@ namespace Integration.Tests.Tests.Catalog;
 /// for already-provisioned tenants in production. This is the path that produced
 /// 401s in dev when the Catalog module was added.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class RolePermissionSyncerTests
 {
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
 
-    public RolePermissionSyncerTests(FshWebApplicationFactory factory)
+    public RolePermissionSyncerTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
     }
@@ -101,7 +101,7 @@ public sealed class RolePermissionSyncerTests
         scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()
             .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
 
-        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<FshRole>>();
+        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<AppRole>>();
         var role = await roleManager.Roles.SingleAsync(r => r.Name == roleName);
 
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
@@ -123,7 +123,7 @@ public sealed class RolePermissionSyncerTests
         scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()
             .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
 
-        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<FshRole>>();
+        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<AppRole>>();
         var role = await roleManager.Roles.SingleAsync(r => r.Name == roleName);
 
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();

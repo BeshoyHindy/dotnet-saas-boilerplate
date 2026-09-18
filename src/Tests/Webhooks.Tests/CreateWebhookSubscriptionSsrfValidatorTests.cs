@@ -1,7 +1,7 @@
 using System.Net;
-using FSH.Modules.Webhooks.Contracts.v1.CreateWebhookSubscription;
-using FSH.Modules.Webhooks.Features.v1.CreateWebhookSubscription;
-using FSH.Modules.Webhooks.Services;
+using Boilerplate.Modules.Webhooks.Contracts.v1.CreateWebhookSubscription;
+using Boilerplate.Modules.Webhooks.Features.v1.CreateWebhookSubscription;
+using Boilerplate.Modules.Webhooks.Services;
 
 namespace Webhooks.Tests;
 

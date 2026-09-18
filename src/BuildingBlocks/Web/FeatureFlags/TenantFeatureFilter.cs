@@ -1,10 +1,10 @@
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.FeatureManagement;
 
-namespace FSH.Framework.Web.FeatureFlags;
+namespace Boilerplate.BuildingBlocks.Web.FeatureFlags;
 
 /// <summary>
 /// A feature filter that enables/disables features based on the current tenant.

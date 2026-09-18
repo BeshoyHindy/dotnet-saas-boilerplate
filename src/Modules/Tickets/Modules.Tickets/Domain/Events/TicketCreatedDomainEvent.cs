@@ -1,7 +1,7 @@
-using FSH.Framework.Core.Domain;
-using FSH.Modules.Tickets.Contracts.Dtos;
+using Boilerplate.BuildingBlocks.Core.Domain;
+using Boilerplate.Modules.Tickets.Contracts.Dtos;
 
-namespace FSH.Modules.Tickets.Domain.Events;
+namespace Boilerplate.Modules.Tickets.Domain.Events;
 
 public sealed record TicketCreatedDomainEvent(
     Guid TicketId,

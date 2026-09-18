@@ -1,8 +1,8 @@
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Quota;
+using Boilerplate.BuildingBlocks.Shared.Quota;
 using System.Diagnostics.CodeAnalysis;
 
-namespace FSH.Framework.Shared.Multitenancy;
+namespace Boilerplate.BuildingBlocks.Shared.Multitenancy;
 
 public class AppTenantInfo : TenantInfo, IAppTenantInfo
 {

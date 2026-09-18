@@ -1,6 +1,6 @@
-using FSH.Framework.Eventing.Abstractions;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
 
-namespace FSH.Modules.Identity.Contracts.Events;
+namespace Boilerplate.Modules.Identity.Contracts.Events;
 
 /// <summary>
 /// Integration event raised when a JWT token is generated for a user.

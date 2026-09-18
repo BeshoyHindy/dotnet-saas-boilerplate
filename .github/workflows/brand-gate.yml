@@ -1,0 +1,31 @@
+name: Brand Gate
+
+# ADR-0001: the upstream MIT copyright line in LICENSE is the only permitted
+# upstream reference. This job runs on EVERY pull request (no path filters —
+# a brand token can land in any file type), plus on pushes to the long-lived
+# branches so the trunk state is always known good.
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  brand-gate:
+    name: No upstream brand references
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Run brand gate
+        run: bash scripts/brand-gate.sh

@@ -1,6 +1,6 @@
-using FSH.Framework.Shared.Constants;
+using Boilerplate.BuildingBlocks.Shared.Constants;
 
-namespace FSH.Modules.Tickets.Contracts.Authorization;
+namespace Boilerplate.Modules.Tickets.Contracts.Authorization;
 
 public static class TicketsPermissions
 {
@@ -19,7 +19,7 @@ public static class TicketsPermissions
         public const string Comment  = $"Permissions.{Resource}.Comment";
     }
 
-    public static IReadOnlyList<FshPermission> All { get; } =
+    public static IReadOnlyList<AppPermission> All { get; } =
     [
         new("View Tickets",    ActionConstants.View,   Tickets.Resource, IsBasic: true),
         new("Create Tickets",  ActionConstants.Create, Tickets.Resource),

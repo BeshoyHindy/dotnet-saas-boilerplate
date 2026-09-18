@@ -1,8 +1,8 @@
 using FluentValidation;
-using FSH.Modules.Webhooks.Contracts.v1.CreateWebhookSubscription;
-using FSH.Modules.Webhooks.Services;
+using Boilerplate.Modules.Webhooks.Contracts.v1.CreateWebhookSubscription;
+using Boilerplate.Modules.Webhooks.Services;
 
-namespace FSH.Modules.Webhooks.Features.v1.CreateWebhookSubscription;
+namespace Boilerplate.Modules.Webhooks.Features.v1.CreateWebhookSubscription;
 
 public sealed class CreateWebhookSubscriptionCommandValidator : AbstractValidator<CreateWebhookSubscriptionCommand>
 {

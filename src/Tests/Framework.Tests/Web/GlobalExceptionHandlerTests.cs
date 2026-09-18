@@ -1,5 +1,5 @@
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Web.Exceptions;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Web.Exceptions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Net;

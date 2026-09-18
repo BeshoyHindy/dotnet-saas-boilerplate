@@ -4,7 +4,7 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 /**
- * Dropdown primitives — Radix-based, styled to the FSH design system.
+ * Dropdown primitives — Radix-based, styled to the Boilerplate design system.
  * Trigger transitions are driven by [data-state] attributes Radix sets
  * on the content, paired with the dialog-in/out keyframes from
  * globals.css. Content uses the gradient-border + frosted treatment so
@@ -31,7 +31,7 @@ export const DropdownMenuContent = React.forwardRef<
         "rounded-lg border border-[var(--color-border)] bg-[var(--color-popover)] p-1",
         "text-[var(--color-popover-foreground)] shadow-md",
         "origin-[var(--radix-dropdown-menu-content-transform-origin)]",
-        "data-[state=open]:animate-fsh-dialog-in data-[state=closed]:animate-fsh-dialog-out",
+        "data-[state=open]:animate-app-dialog-in data-[state=closed]:animate-app-dialog-out",
         className,
       )}
       {...props}

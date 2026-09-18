@@ -80,17 +80,12 @@ export function ConfirmEmailPage() {
       </div>
 
       {/* Card column */}
-      <div className="relative z-10 w-full max-w-[420px] fsh-enter fsh-enter-1">
+      <div className="relative z-10 w-full max-w-[420px] app-enter app-enter-1">
         {/* Brand lockup */}
         <div className="mb-8 flex flex-col items-center">
           <div className="flex items-center gap-2.5">
-            <img
-              src="/logo-fullstackhero.png"
-              alt="fullstackhero"
-              className="size-9 object-contain"
-            />
             <span className="font-display text-[26px] font-semibold tracking-tight text-[var(--color-foreground)]">
-              fullstack<span className="text-[var(--color-primary)]">hero</span>
+              Boilerplate
             </span>
           </div>
           <div className="mt-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-[oklch(from_var(--color-muted-foreground)_l_c_h_/_0.7)]">
@@ -126,7 +121,7 @@ export function ConfirmEmailPage() {
             )}
 
             {status.kind === "success" && (
-              <div className="fsh-enter space-y-5 text-center">
+              <div className="app-enter space-y-5 text-center">
                 <div className="grid place-items-center">
                   <span
                     aria-hidden
@@ -154,7 +149,7 @@ export function ConfirmEmailPage() {
             )}
 
             {status.kind === "error" && (
-              <div className="fsh-enter space-y-5 text-center">
+              <div className="app-enter space-y-5 text-center">
                 <div className="grid place-items-center">
                   <span
                     aria-hidden

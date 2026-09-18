@@ -1,4 +1,4 @@
-namespace FSH.Modules.Auditing.Contracts;
+namespace Boilerplate.Modules.Auditing.Contracts;
 
 /// <summary>
 /// Retention windows applied by the daily audit purge job. Each event type

@@ -1,8 +1,8 @@
 using System.Collections.ObjectModel;
-using FSH.Modules.Notifications.Contracts.v1.DTOs;
+using Boilerplate.Modules.Notifications.Contracts.v1.DTOs;
 using Mediator;
 
-namespace FSH.Modules.Notifications.Contracts.v1.Queries;
+namespace Boilerplate.Modules.Notifications.Contracts.v1.Queries;
 
 /// <summary>
 /// Inbox list scoped to the caller. <paramref name="UnreadOnly"/> filters to <c>ReadAtUtc IS NULL</c>;

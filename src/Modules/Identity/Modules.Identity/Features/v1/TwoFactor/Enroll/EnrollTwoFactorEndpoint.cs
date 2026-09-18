@@ -1,12 +1,12 @@
-using FSH.Modules.Identity.Contracts.DTOs;
-using FSH.Modules.Identity.Contracts.v1.TwoFactor;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
+using Boilerplate.Modules.Identity.Contracts.v1.TwoFactor;
 using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Identity.Features.v1.TwoFactor.Enroll;
+namespace Boilerplate.Modules.Identity.Features.v1.TwoFactor.Enroll;
 
 public static class EnrollTwoFactorEndpoint
 {

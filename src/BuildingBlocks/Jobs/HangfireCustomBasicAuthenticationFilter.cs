@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Primitives;
 using System.Net.Http.Headers;
 
-namespace FSH.Framework.Jobs;
+namespace Boilerplate.BuildingBlocks.Jobs;
 
 public sealed class HangfireCustomBasicAuthenticationFilter : IDashboardAuthorizationFilter
 {

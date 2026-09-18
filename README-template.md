@@ -1,8 +1,7 @@
-# FSH.Starter
+# Boilerplate
 
-Your application, generated from the **FSH .NET Starter Kit** — a production-ready modular
-.NET 10 monolith with two React 19 apps, multitenancy, identity, background jobs, and
-cloud-native deploy.
+Your application — a production-ready modular .NET 10 monolith with two React 19 apps,
+multitenancy, identity, background jobs, and cloud-native deploy.
 
 You **own all of this source**. There are no framework NuGet packages to track or upgrade —
 the shared code lives in `src/BuildingBlocks` and is yours to change.
@@ -18,7 +17,7 @@ the shared code lives in `src/BuildingBlocks` and is yours to change.
 ### Everything at once (recommended) — .NET Aspire
 
 ```bash
-dotnet run --project src/Host/FSH.Starter.AppHost
+dotnet run --project src/Host/Boilerplate.AppHost
 ```
 
 Aspire starts Postgres, Redis, and MinIO, runs database migrations, then launches the API
@@ -34,7 +33,7 @@ Aspire starts Postgres, Redis, and MinIO, runs database migrations, then launche
 ### Backend only
 
 ```bash
-dotnet run --project src/Host/FSH.Starter.Api      # needs external Postgres + Redis
+dotnet run --project src/Host/Boilerplate.Api      # needs external Postgres + Redis
 ```
 
 ### Frontend only (against a running API)
@@ -54,10 +53,10 @@ src/
   Modules/             Bounded contexts: Identity, Multitenancy, Auditing, Billing,
                        Catalog, Chat, Files, Notifications, Tickets, Webhooks
   Host/
-    FSH.Starter.Api/                    API composition root
-    FSH.Starter.AppHost/                .NET Aspire orchestrator
-    FSH.Starter.DbMigrator/             One-shot migrate / seed runner
-    FSH.Starter.Migrations.PostgreSQL/  EF Core migrations
+    Boilerplate.Api/                    API composition root
+    Boilerplate.AppHost/                .NET Aspire orchestrator
+    Boilerplate.DbMigrator/             One-shot migrate / seed runner
+    Boilerplate.Migrations.PostgreSQL/  EF Core migrations
   Tests/               Unit, integration (Testcontainers), and architecture tests
 clients/
   admin/               Operator console (React 19 + Vite + Tailwind)
@@ -72,20 +71,20 @@ deploy/
 Migrations run automatically under Aspire. To apply them yourself:
 
 ```bash
-dotnet run --project src/Host/FSH.Starter.DbMigrator -- apply --seed
+dotnet run --project src/Host/Boilerplate.DbMigrator -- apply --seed
 ```
 
 ## Make it yours — first-run checklist
 
 This project shipped with sensible defaults. Before production:
 
-- [ ] **Secrets** — set strong values in `deploy/docker/.env` (the `fsh` CLI generates these
-      for you; otherwise `cp deploy/docker/.env.example deploy/docker/.env` and fill them in).
+- [ ] **Secrets** — set strong values in `deploy/docker/.env` (the CLI generates these for you;
+      otherwise `cp deploy/docker/.env.example deploy/docker/.env` and fill them in).
       Never commit `.env`.
-- [ ] **Logo** — replace `clients/admin/public/logo-fullstackhero.png` and
-      `clients/dashboard/public/logo-fullstackhero.png` with your own.
+- [ ] **Branding** — the clients render a plain text wordmark; swap it (and add a logo under
+      `clients/*/public/`) in `clients/*/src/components/**` for your own identity.
 - [ ] **Mail** — configure SMTP / SendGrid under `MailOptions` in
-      `src/Host/FSH.Starter.Api/appsettings.json`.
+      `src/Host/Boilerplate.Api/appsettings.json`.
 - [ ] **OpenAPI contact** — update `OpenApiOptions.Contact` in `appsettings.json`.
 - [ ] **Container registry & infra** — set your registry and review bucket / database names
       in `deploy/terraform/apps/starter/**/variables.tf` and `terraform.tfvars`.
@@ -94,7 +93,7 @@ This project shipped with sensible defaults. Before production:
 
 ```bash
 cd deploy/docker
-# .env is generated for you by the fsh CLI; otherwise: cp .env.example .env && edit
+# .env is generated for you by the CLI; otherwise: cp .env.example .env && edit
 docker compose up -d --build
 ```
 
@@ -111,10 +110,10 @@ Sign in to the admin console as `admin@root.com` using the `SEED_ADMIN_PASSWORD`
 ## Running tests
 
 ```bash
-dotnet test src/FSH.Starter.slnx       # integration tests require Docker
+dotnet test src/Boilerplate.slnx       # integration tests require Docker
 ```
 
 ## Learn more
 
-- [FSH Documentation](https://fullstackhero.net)
-- [Source & issues](https://github.com/fullstackhero/dotnet-starter-kit)
+- Architecture decision records live in `docs/adr/`.
+- Agent- and contributor-facing conventions live in `AGENTS.md` and `.agents/`.

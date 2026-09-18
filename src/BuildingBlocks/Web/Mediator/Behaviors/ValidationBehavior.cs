@@ -2,7 +2,7 @@
 using FluentValidation.Results;
 using Mediator;
 
-namespace FSH.Framework.Web.Mediator.Behaviors;
+namespace Boilerplate.BuildingBlocks.Web.Mediator.Behaviors;
 
 public sealed class ValidationBehavior<TMessage, TResponse> : IPipelineBehavior<TMessage, TResponse>
     where TMessage : IMessage

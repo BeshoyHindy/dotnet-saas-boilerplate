@@ -1,8 +1,8 @@
 using System.Collections.ObjectModel;
-using FSH.Modules.Chat.Contracts.v1.DTOs;
+using Boilerplate.Modules.Chat.Contracts.v1.DTOs;
 using Mediator;
 
-namespace FSH.Modules.Chat.Contracts.v1.Queries;
+namespace Boilerplate.Modules.Chat.Contracts.v1.Queries;
 
 /// <summary>
 /// Cursor-paged thread replies (a.k.a. messages whose <c>ParentMessageId</c> equals

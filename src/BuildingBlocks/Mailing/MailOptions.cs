@@ -1,4 +1,4 @@
-﻿namespace FSH.Framework.Mailing;
+﻿namespace Boilerplate.BuildingBlocks.Mailing;
 
 public sealed class MailOptions
 {

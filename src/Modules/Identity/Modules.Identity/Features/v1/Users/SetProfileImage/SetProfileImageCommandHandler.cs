@@ -1,10 +1,10 @@
-using FSH.Framework.Core.Context;
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Identity.Contracts.Services;
-using FSH.Modules.Identity.Contracts.v1.Users.SetProfileImage;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Identity.Contracts.Services;
+using Boilerplate.Modules.Identity.Contracts.v1.Users.SetProfileImage;
 using Mediator;
 
-namespace FSH.Modules.Identity.Features.v1.Users.SetProfileImage;
+namespace Boilerplate.Modules.Identity.Features.v1.Users.SetProfileImage;
 
 public sealed class SetProfileImageCommandHandler(
     IUserProfileService profileService,

@@ -128,7 +128,7 @@ function InvoiceHeader({ invoice }: { invoice: InvoiceDto }) {
   };
 
   return (
-    <div className="fsh-enter overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] shadow-xs">
+    <div className="app-enter overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] shadow-xs">
       <div
         aria-hidden
         className="h-1 w-full"

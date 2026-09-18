@@ -1,10 +1,10 @@
 using System.Net;
-using FSH.Framework.Core.Domain;
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Files.Contracts.v1.DTOs;
-using FSH.Modules.Files.Domain.Events;
+using Boilerplate.BuildingBlocks.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Files.Contracts.v1.DTOs;
+using Boilerplate.Modules.Files.Domain.Events;
 
-namespace FSH.Modules.Files.Domain;
+namespace Boilerplate.Modules.Files.Domain;
 
 /// <summary>
 /// A file asset tracked by the Files module. Owns a presigned upload lifecycle (PendingUpload →

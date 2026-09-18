@@ -1,4 +1,4 @@
-using FSH.Modules.Catalog.Contracts.Dtos;
+using Boilerplate.Modules.Catalog.Contracts.Dtos;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 
@@ -10,12 +10,12 @@ namespace Integration.Tests.Tests.Catalog;
 /// category to a non-existent id (each guarded only when the FK actually changes), and renaming a
 /// product into another live product's slug (the post-Update unique-slug conflict check).
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class UpdateProductBranchTests
 {
     private readonly AuthHelper _auth;
 
-    public UpdateProductBranchTests(FshWebApplicationFactory factory)
+    public UpdateProductBranchTests(AppWebApplicationFactory factory)
     {
         _auth = new AuthHelper(factory);
     }

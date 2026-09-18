@@ -12,13 +12,13 @@ public class HostArchitectureTests
         // Assemblies / namespaces that represent host applications.
         string[] hostNamespaces =
         {
-            "FSH.Starter.Api"
+            "Boilerplate.Api"
         };
 
         var result = Types
             .InCurrentDomain()
             .That()
-            .ResideInNamespace("FSH.Modules")
+            .ResideInNamespace("Boilerplate.Modules")
             .Should()
             .NotHaveDependencyOnAny(hostNamespaces)
             .GetResult();
@@ -37,21 +37,23 @@ public class HostArchitectureTests
         // but should not directly reference feature or data-layer namespaces.
         string[] forbiddenNamespaces =
         {
-            "FSH.Modules.Auditing.Features",
-            "FSH.Modules.Auditing.Data",
-            "FSH.Modules.Chat.Features",
-            "FSH.Modules.Chat.Data",
-            "FSH.Modules.Chat.Domain",
-            "FSH.Modules.Identity.Features",
-            "FSH.Modules.Identity.Data",
-            "FSH.Modules.Multitenancy.Features",
-            "FSH.Modules.Multitenancy.Data"
+            "Boilerplate.Modules.Auditing.Features",
+            "Boilerplate.Modules.Auditing.Data",
+            "Boilerplate.Modules.Chat.Features",
+            "Boilerplate.Modules.Chat.Data",
+            "Boilerplate.Modules.Chat.Domain",
+            "Boilerplate.Modules.Identity.Features",
+            "Boilerplate.Modules.Identity.Data",
+            "Boilerplate.Modules.Multitenancy.Features",
+            "Boilerplate.Modules.Multitenancy.Data"
         };
 
+        // Host namespaces only — `Boilerplate` alone is the shared root of every
+        // assembly in the solution, so it must be narrowed to the host projects.
         var hostResult = Types
             .InCurrentDomain()
             .That()
-            .ResideInNamespace("FSH.Starter")
+            .ResideInNamespaceMatching(@"^Boilerplate\.(Api|AppHost|DbMigrator|Migrations)\b")
             .Should()
             .NotHaveDependencyOnAny(forbiddenNamespaces)
             .GetResult();

@@ -1,6 +1,6 @@
-using FSH.Framework.Eventing;
-using FSH.Framework.Eventing.Inbox;
-using FSH.Framework.Eventing.Outbox;
+using Boilerplate.BuildingBlocks.Eventing;
+using Boilerplate.BuildingBlocks.Eventing.Inbox;
+using Boilerplate.BuildingBlocks.Eventing.Outbox;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
@@ -22,7 +22,7 @@ public class EventingRegistrationTests
             {
                 ["DatabaseOptions:Provider"] = "postgresql",
                 ["DatabaseOptions:ConnectionString"] = "Host=arch;Database=arch;Username=arch;Password=arch",
-                ["DatabaseOptions:MigrationsAssembly"] = "FSH.Starter.Migrations.PostgreSQL",
+                ["DatabaseOptions:MigrationsAssembly"] = "Boilerplate.Migrations.PostgreSQL",
             })
             .Build();
     }

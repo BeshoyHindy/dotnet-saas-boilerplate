@@ -1,9 +1,9 @@
-using FSH.Framework.Eventing.Abstractions;
-using FSH.Framework.Eventing.Telemetry;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
+using Boilerplate.BuildingBlocks.Eventing.Telemetry;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace FSH.Framework.Eventing.Outbox;
+namespace Boilerplate.BuildingBlocks.Eventing.Outbox;
 
 /// <summary>
 /// Dispatches outbox messages via the configured event bus.

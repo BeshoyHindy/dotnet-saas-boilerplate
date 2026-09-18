@@ -1,12 +1,12 @@
-using FSH.Modules.Auditing;
-using FSH.Modules.Identity;
-using FSH.Modules.Multitenancy;
+using Boilerplate.Modules.Auditing;
+using Boilerplate.Modules.Identity;
+using Boilerplate.Modules.Multitenancy;
 using System.Reflection;
 
 namespace Generic.Tests.Architecture;
 
 /// <summary>
-/// Discovers all FSH module assemblies for use in generic architecture tests.
+/// Discovers all Boilerplate module assemblies for use in generic architecture tests.
 /// </summary>
 internal static class ModuleAssemblyDiscovery
 {
@@ -26,7 +26,7 @@ internal static class ModuleAssemblyDiscovery
             .Where(a =>
             {
                 var name = a.GetName().Name ?? string.Empty;
-                return name.StartsWith("FSH.Modules.", StringComparison.Ordinal)
+                return name.StartsWith("Boilerplate.Modules.", StringComparison.Ordinal)
                        && !name.EndsWith(".Contracts", StringComparison.Ordinal);
             })
             .OrderBy(a => a.GetName().Name, StringComparer.Ordinal)

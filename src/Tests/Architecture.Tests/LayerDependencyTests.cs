@@ -1,4 +1,4 @@
-using FSH.Framework.Core;
+using Boilerplate.BuildingBlocks.Core;
 using NetArchTest.Rules;
 using Shouldly;
 using System.Reflection;
@@ -14,7 +14,7 @@ public class LayerDependencyTests
 {
     private static readonly Assembly[] ModuleAssemblies = ModuleAssemblyDiscovery.GetModuleAssemblies();
 
-    private static readonly Assembly CoreAssembly = typeof(IFshCore).Assembly;
+    private static readonly Assembly CoreAssembly = typeof(IAppCore).Assembly;
 
     [Fact]
     public void Core_Should_Not_Depend_On_EntityFramework()

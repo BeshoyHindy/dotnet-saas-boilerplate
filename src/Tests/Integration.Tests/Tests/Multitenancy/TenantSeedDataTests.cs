@@ -2,12 +2,12 @@ using Integration.Tests.Infrastructure;
 
 namespace Integration.Tests.Tests.Multitenancy;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class TenantSeedDataTests
 {
     private readonly AuthHelper _auth;
 
-    public TenantSeedDataTests(FshWebApplicationFactory factory)
+    public TenantSeedDataTests(AppWebApplicationFactory factory)
     {
         _auth = new AuthHelper(factory);
     }

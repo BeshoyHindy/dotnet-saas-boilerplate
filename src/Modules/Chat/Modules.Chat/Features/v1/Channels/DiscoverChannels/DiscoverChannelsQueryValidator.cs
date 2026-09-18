@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Chat.Contracts.v1.Queries;
+using Boilerplate.Modules.Chat.Contracts.v1.Queries;
 
-namespace FSH.Modules.Chat.Features.v1.Channels.DiscoverChannels;
+namespace Boilerplate.Modules.Chat.Features.v1.Channels.DiscoverChannels;
 
 public sealed class DiscoverChannelsQueryValidator : AbstractValidator<DiscoverChannelsQuery>
 {

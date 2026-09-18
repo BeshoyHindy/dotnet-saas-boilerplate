@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Http;
 using System.Text;
 using System.Text.Json;
 
-namespace FSH.Modules.Auditing;
+namespace Boilerplate.Modules.Auditing;
 
 internal static class HttpBodyReader
 {

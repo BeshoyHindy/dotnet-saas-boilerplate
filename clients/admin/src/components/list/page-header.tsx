@@ -28,7 +28,7 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <div className={cn("space-y-6 fsh-enter", className)}>
+    <div className={cn("space-y-6 app-enter", className)}>
       <SectionRule crumbs={crumbs} trailing={trailing} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">

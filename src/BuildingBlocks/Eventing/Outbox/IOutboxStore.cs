@@ -1,6 +1,6 @@
-using FSH.Framework.Eventing.Abstractions;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
 
-namespace FSH.Framework.Eventing.Outbox;
+namespace Boilerplate.BuildingBlocks.Eventing.Outbox;
 
 /// <summary>
 /// Abstraction for persisting and reading outbox messages. Modules only ever need the publish

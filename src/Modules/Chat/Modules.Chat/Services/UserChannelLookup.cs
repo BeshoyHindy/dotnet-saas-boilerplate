@@ -1,8 +1,8 @@
-using FSH.Framework.Web.Realtime;
-using FSH.Modules.Chat.Data;
+using Boilerplate.BuildingBlocks.Web.Realtime;
+using Boilerplate.Modules.Chat.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Chat.Services;
+namespace Boilerplate.Modules.Chat.Services;
 
 /// <summary>
 /// Returns the channel ids the user is currently a member of. AppHub calls this on

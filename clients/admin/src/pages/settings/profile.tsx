@@ -58,7 +58,7 @@ export function ProfileSettings() {
     "Account";
 
   return (
-    <div className="space-y-5 fsh-enter">
+    <div className="space-y-5 app-enter">
       {/* Avatar — presigned upload via ImageInput, no base64 data: URLs */}
       <SettingsSection
         title="Avatar"

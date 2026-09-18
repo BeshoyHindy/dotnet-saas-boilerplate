@@ -1,12 +1,12 @@
-using FSH.Framework.Shared.Identity.Authorization;
-using FSH.Modules.Files.Contracts.Authorization;
-using FSH.Modules.Files.Contracts.v1.Commands;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.Modules.Files.Contracts.Authorization;
+using Boilerplate.Modules.Files.Contracts.v1.Commands;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Files.Features.v1.DeleteFile;
+namespace Boilerplate.Modules.Files.Features.v1.DeleteFile;
 
 public static class DeleteFileEndpoint
 {

@@ -1,12 +1,12 @@
-using FSH.Framework.Shared.Storage;
-using FSH.Framework.Storage.DTOs;
-using FSH.Framework.Storage.Services;
+using Boilerplate.BuildingBlocks.Shared.Storage;
+using Boilerplate.BuildingBlocks.Storage.DTOs;
+using Boilerplate.BuildingBlocks.Storage.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.StaticFiles;
 using System.Text.RegularExpressions;
 using System.Threading;
 
-namespace FSH.Framework.Storage.Local;
+namespace Boilerplate.BuildingBlocks.Storage.Local;
 
 public sealed partial class LocalStorageService : IStorageService
 {

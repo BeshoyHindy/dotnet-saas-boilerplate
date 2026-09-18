@@ -1,20 +1,20 @@
-using FSH.Modules.Identity.Contracts.DTOs;
-using FSH.Modules.Identity.Contracts.Services;
-using FSH.Modules.Identity.Data;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
+using Boilerplate.Modules.Identity.Contracts.Services;
+using Boilerplate.Modules.Identity.Data;
+using Boilerplate.Modules.Identity.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 
-namespace FSH.Modules.Identity.Services;
+namespace Boilerplate.Modules.Identity.Services;
 
 internal sealed class PasswordExpiryService : IPasswordExpiryService
 {
-    private readonly UserManager<FshUser> _userManager;
+    private readonly UserManager<AppUser> _userManager;
     private readonly PasswordPolicyOptions _passwordPolicyOptions;
     private readonly TimeProvider _timeProvider;
 
     public PasswordExpiryService(
-        UserManager<FshUser> userManager,
+        UserManager<AppUser> userManager,
         IOptions<PasswordPolicyOptions> passwordPolicyOptions,
         TimeProvider timeProvider)
     {
@@ -83,8 +83,8 @@ internal sealed class PasswordExpiryService : IPasswordExpiryService
         }
     }
 
-    // Internal helpers that work with FshUser directly
-    private bool IsPasswordExpired(FshUser user)
+    // Internal helpers that work with AppUser directly
+    private bool IsPasswordExpired(AppUser user)
     {
         if (!_passwordPolicyOptions.EnforcePasswordExpiry)
         {
@@ -95,7 +95,7 @@ internal sealed class PasswordExpiryService : IPasswordExpiryService
         return _timeProvider.GetUtcNow().UtcDateTime > expiryDate;
     }
 
-    private int GetDaysUntilExpiry(FshUser user)
+    private int GetDaysUntilExpiry(AppUser user)
     {
         if (!_passwordPolicyOptions.EnforcePasswordExpiry)
         {
@@ -107,7 +107,7 @@ internal sealed class PasswordExpiryService : IPasswordExpiryService
         return daysUntilExpiry;
     }
 
-    private bool IsPasswordExpiringWithinWarningPeriod(FshUser user)
+    private bool IsPasswordExpiringWithinWarningPeriod(AppUser user)
     {
         if (!_passwordPolicyOptions.EnforcePasswordExpiry)
         {
@@ -118,7 +118,7 @@ internal sealed class PasswordExpiryService : IPasswordExpiryService
         return daysUntilExpiry >= 0 && daysUntilExpiry <= _passwordPolicyOptions.PasswordExpiryWarningDays;
     }
 
-    private PasswordExpiryStatusDto GetPasswordExpiryStatus(FshUser user)
+    private PasswordExpiryStatusDto GetPasswordExpiryStatus(AppUser user)
     {
         var expiryDate = user.LastPasswordChangeDate.AddDays(_passwordPolicyOptions.PasswordExpiryDays);
         var daysUntilExpiry = GetDaysUntilExpiry(user);

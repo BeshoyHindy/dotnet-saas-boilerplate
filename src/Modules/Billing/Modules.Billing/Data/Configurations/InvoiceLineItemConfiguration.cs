@@ -1,8 +1,8 @@
-using FSH.Modules.Billing.Domain;
+using Boilerplate.Modules.Billing.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace FSH.Modules.Billing.Data.Configurations;
+namespace Boilerplate.Modules.Billing.Data.Configurations;
 
 public sealed class InvoiceLineItemConfiguration : IEntityTypeConfiguration<InvoiceLineItem>
 {

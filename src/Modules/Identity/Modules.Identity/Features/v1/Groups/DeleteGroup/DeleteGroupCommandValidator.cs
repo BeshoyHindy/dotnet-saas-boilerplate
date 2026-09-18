@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Identity.Contracts.v1.Groups.DeleteGroup;
+using Boilerplate.Modules.Identity.Contracts.v1.Groups.DeleteGroup;
 
-namespace FSH.Modules.Identity.Features.v1.Groups.DeleteGroup;
+namespace Boilerplate.Modules.Identity.Features.v1.Groups.DeleteGroup;
 
 public sealed class DeleteGroupCommandValidator : AbstractValidator<DeleteGroupCommand>
 {

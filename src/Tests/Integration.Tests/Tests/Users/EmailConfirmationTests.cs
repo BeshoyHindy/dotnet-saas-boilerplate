@@ -1,27 +1,27 @@
 using Integration.Tests.Infrastructure;
-using FSH.Modules.Identity.Contracts.v1.Users.RegisterUser;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.Modules.Identity.Contracts.v1.Users.RegisterUser;
+using Boilerplate.Modules.Identity.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net.Http.Json;
 using System.Net;
 using Shouldly;
 using Xunit;
-using FSH.Modules.Identity.Contracts.v1.Users.ConfirmEmail;
+using Boilerplate.Modules.Identity.Contracts.v1.Users.ConfirmEmail;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Microsoft.AspNetCore.WebUtilities;
 using System.Text;
 
 namespace Integration.Tests.Tests.Users;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class EmailConfirmationTests
 {
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
 
-    public EmailConfirmationTests(FshWebApplicationFactory factory)
+    public EmailConfirmationTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
     }
@@ -36,9 +36,9 @@ public sealed class EmailConfirmationTests
         var tenant = await scope.ServiceProvider.GetRequiredService<IMultiTenantStore<AppTenantInfo>>().GetAsync(TestConstants.RootTenantId);
         scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>().MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
 
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<FshUser>>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
         var email = $"newuser_{Guid.NewGuid()}@test.com";
-        var user = new FshUser
+        var user = new AppUser
         {
             FirstName = "Test",
             LastName = "User",
@@ -68,7 +68,7 @@ public sealed class EmailConfirmationTests
         using var assertScope = _factory.Services.CreateScope();
         var assertTenant = await assertScope.ServiceProvider.GetRequiredService<IMultiTenantStore<AppTenantInfo>>().GetAsync(TestConstants.RootTenantId);
         assertScope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>().MultiTenantContext = new MultiTenantContext<AppTenantInfo>(assertTenant);
-        var assertUserManager = assertScope.ServiceProvider.GetRequiredService<UserManager<FshUser>>();
+        var assertUserManager = assertScope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
         
         var updatedUser = await assertUserManager.FindByIdAsync(user.Id.ToString());
         updatedUser.ShouldNotBeNull();
@@ -85,9 +85,9 @@ public sealed class EmailConfirmationTests
         var tenant = await scope.ServiceProvider.GetRequiredService<IMultiTenantStore<AppTenantInfo>>().GetAsync(TestConstants.RootTenantId);
         scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>().MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
 
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<FshUser>>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
         var email = $"invalid_{Guid.NewGuid()}@test.com";
-        var user = new FshUser
+        var user = new AppUser
         {
             FirstName = "Invalid",
             LastName = "Token",

@@ -1,6 +1,6 @@
-using FSH.Modules.Identity.Contracts.v1.Impersonation;
+using Boilerplate.Modules.Identity.Contracts.v1.Impersonation;
 
-namespace FSH.Modules.Identity.Contracts.Services;
+namespace Boilerplate.Modules.Identity.Contracts.Services;
 
 /// <summary>
 /// Source of truth for impersonation grant lifecycle (issued → ended/revoked).

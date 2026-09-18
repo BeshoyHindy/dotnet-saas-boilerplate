@@ -474,8 +474,8 @@ variable "alarm_email_addresses" {
 
 variable "container_registry" {
   type        = string
-  description = "Container registry URL (e.g., ghcr.io/fullstackhero)."
-  default     = "ghcr.io/fullstackhero"
+  description = "Container registry URL (e.g., ghcr.io/boilerplate)."
+  default     = "ghcr.io/boilerplate"
 }
 
 variable "container_image_tag" {
@@ -491,13 +491,13 @@ variable "container_image_tag" {
 variable "api_image_name" {
   type        = string
   description = "API container image name (without registry or tag)."
-  default     = "fsh-api"
+  default     = "boilerplate-api"
 }
 
 variable "migrator_image_name" {
   type        = string
   description = "DbMigrator container image name (without registry or tag)."
-  default     = "fsh-db-migrator"
+  default     = "boilerplate-db-migrator"
 }
 
 ################################################################################

@@ -2,7 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
 
-namespace FSH.Framework.Web.HttpResilience;
+namespace Boilerplate.BuildingBlocks.Web.HttpResilience;
 
 public static class Extensions
 {

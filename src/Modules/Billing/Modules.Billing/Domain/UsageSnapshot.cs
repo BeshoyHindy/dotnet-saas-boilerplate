@@ -1,7 +1,7 @@
-using FSH.Framework.Core.Domain;
-using FSH.Framework.Shared.Quota;
+using Boilerplate.BuildingBlocks.Core.Domain;
+using Boilerplate.BuildingBlocks.Shared.Quota;
 
-namespace FSH.Modules.Billing.Domain;
+namespace Boilerplate.Modules.Billing.Domain;
 
 /// <summary>
 /// Frozen record of a tenant's usage for a single resource in a billing period. Sourced from

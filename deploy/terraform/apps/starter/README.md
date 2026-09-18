@@ -1,6 +1,6 @@
 # Starter App Stack
 
-Terraform root config for the FullStackHero Starter Kit on AWS. Composes the
+Terraform root config for the Boilerplate Starter Kit on AWS. Composes the
 shared modules in `../../modules`.
 
 What it provisions:

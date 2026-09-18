@@ -1,7 +1,7 @@
-using FSH.Modules.Billing.Contracts.Dtos;
+using Boilerplate.Modules.Billing.Contracts.Dtos;
 using Mediator;
 
-namespace FSH.Modules.Billing.Contracts.v1.Usage;
+namespace Boilerplate.Modules.Billing.Contracts.v1.Usage;
 
 /// <summary>
 /// Ops command that captures one usage snapshot per <c>QuotaResource</c> for a tenant + period.

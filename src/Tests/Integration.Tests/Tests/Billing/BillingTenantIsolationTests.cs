@@ -3,12 +3,12 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Framework.Shared.Quota;
-using FSH.Modules.Billing.Contracts;
-using FSH.Modules.Billing.Contracts.Dtos;
-using FSH.Modules.Billing.Data;
-using FSH.Modules.Billing.Domain;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Quota;
+using Boilerplate.Modules.Billing.Contracts;
+using Boilerplate.Modules.Billing.Contracts.Dtos;
+using Boilerplate.Modules.Billing.Data;
+using Boilerplate.Modules.Billing.Domain;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 
@@ -24,7 +24,7 @@ namespace Integration.Tests.Tests.Billing;
 /// Tenant A is <c>root</c> (the owner). Tenant A's admin creates a fresh tenant B, waits for
 /// provisioning, and authenticates as B's admin. B then attempts the cross-tenant fetches.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class BillingTenantIsolationTests
 {
     private const string BillingBasePath = "/api/v1/billing";
@@ -41,10 +41,10 @@ public sealed class BillingTenantIsolationTests
     // at 2090 to stay clear of that class's 2080-based range.
     private static int s_periodCounter;
 
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public BillingTenantIsolationTests(FshWebApplicationFactory factory)
+    public BillingTenantIsolationTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);
@@ -439,7 +439,7 @@ public sealed class BillingTenantIsolationTests
         var tenant = await scope.ServiceProvider.GetRequiredService<IMultiTenantStore<AppTenantInfo>>().GetAsync(tenantId);
         scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>().MultiTenantContext =
             new MultiTenantContext<AppTenantInfo>(tenant);
-        var billing = scope.ServiceProvider.GetRequiredService<FSH.Modules.Billing.Services.IBillingService>();
+        var billing = scope.ServiceProvider.GetRequiredService<Boilerplate.Modules.Billing.Services.IBillingService>();
         return await billing.GenerateInvoiceForPeriodAsync(tenantId, year, month);
     }
 

@@ -1,4 +1,4 @@
-namespace FSH.Modules.Identity;
+namespace Boilerplate.Modules.Identity;
 
 /// <summary>
 /// Login-side view of the tenant billing grace period (config section <c>"Billing"</c>). A tenant

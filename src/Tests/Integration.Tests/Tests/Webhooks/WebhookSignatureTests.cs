@@ -2,8 +2,8 @@ using System.Security.Cryptography;
 using System.Text;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Webhooks.Services;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Webhooks.Services;
 using Integration.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -23,16 +23,16 @@ namespace Integration.Tests.Tests.Webhooks;
 /// added. The resilience pipeline registered by the module stays intact; only the socket transport is
 /// replaced. We then recompute HMAC over the EXACT bytes the server transmitted and compare.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class WebhookSignatureTests
 {
     private const string SignatureHeader = "X-Webhook-Signature";
     private const string EventHeader = "X-Webhook-Event";
 
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public WebhookSignatureTests(FshWebApplicationFactory factory)
+    public WebhookSignatureTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

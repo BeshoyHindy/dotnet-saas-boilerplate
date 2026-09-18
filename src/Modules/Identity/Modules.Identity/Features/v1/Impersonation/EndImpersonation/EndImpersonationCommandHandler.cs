@@ -1,16 +1,16 @@
-using FSH.Framework.Core.Context;
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Shared.Constants;
-using FSH.Modules.Auditing.Contracts;
-using FSH.Modules.Identity.Contracts.DTOs;
-using FSH.Modules.Identity.Contracts.Services;
-using FSH.Modules.Identity.Contracts.v1.Impersonation.EndImpersonation;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Constants;
+using Boilerplate.Modules.Auditing.Contracts;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
+using Boilerplate.Modules.Identity.Contracts.Services;
+using Boilerplate.Modules.Identity.Contracts.v1.Impersonation.EndImpersonation;
 using Mediator;
 using Microsoft.Extensions.Logging;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 
-namespace FSH.Modules.Identity.Features.v1.Impersonation.EndImpersonation;
+namespace Boilerplate.Modules.Identity.Features.v1.Impersonation.EndImpersonation;
 
 public sealed class EndImpersonationCommandHandler
     : ICommandHandler<EndImpersonationCommand, TokenResponse>

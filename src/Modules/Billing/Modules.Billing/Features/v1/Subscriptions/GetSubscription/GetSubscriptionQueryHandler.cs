@@ -1,13 +1,13 @@
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Billing.Contracts.Dtos;
-using FSH.Modules.Billing.Contracts.v1.Subscriptions;
-using FSH.Modules.Billing.Data;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Billing.Contracts.Dtos;
+using Boilerplate.Modules.Billing.Contracts.v1.Subscriptions;
+using Boilerplate.Modules.Billing.Data;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Billing.Features.v1.Subscriptions.GetSubscription;
+namespace Boilerplate.Modules.Billing.Features.v1.Subscriptions.GetSubscription;
 
 public sealed class GetSubscriptionQueryHandler(
     BillingDbContext dbContext,

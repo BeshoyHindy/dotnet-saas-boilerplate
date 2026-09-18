@@ -1,12 +1,12 @@
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Identity.Contracts.v1.Users.ForgotPassword;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Identity.Contracts.v1.Users.ForgotPassword;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Identity.Features.v1.Users.ForgotPassword;
+namespace Boilerplate.Modules.Identity.Features.v1.Users.ForgotPassword;
 
 public static class ForgotPasswordEndpoint
 {

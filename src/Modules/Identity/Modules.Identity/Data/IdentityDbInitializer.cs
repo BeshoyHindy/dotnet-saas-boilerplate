@@ -1,20 +1,20 @@
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Persistence;
-using FSH.Framework.Shared.Constants;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Identity.Domain;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Constants;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Identity.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
-namespace FSH.Modules.Identity.Data;
+namespace Boilerplate.Modules.Identity.Data;
 
 internal sealed class IdentityDbInitializer(
     ILogger<IdentityDbInitializer> logger,
     IdentityDbContext context,
-    RoleManager<FshRole> roleManager,
-    UserManager<FshUser> userManager,
+    RoleManager<AppRole> roleManager,
+    UserManager<AppUser> userManager,
     TimeProvider timeProvider,
     IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor,
     ITenantInitialPasswordBuffer passwordBuffer,
@@ -44,10 +44,10 @@ internal sealed class IdentityDbInitializer(
         foreach (string roleName in RoleConstants.DefaultRoles)
         {
             if (await roleManager.Roles.SingleOrDefaultAsync(r => r.Name == roleName, cancellationToken)
-                is not FshRole role)
+                is not AppRole role)
             {
                 // create role
-                role = new FshRole(roleName, $"{roleName} Role for {multiTenantContextAccessor.MultiTenantContext.TenantInfo?.Id} Tenant");
+                role = new AppRole(roleName, $"{roleName} Role for {multiTenantContextAccessor.MultiTenantContext.TenantInfo?.Id} Tenant");
                 await roleManager.CreateAsync(role);
             }
 
@@ -68,12 +68,12 @@ internal sealed class IdentityDbInitializer(
         }
     }
 
-    private async Task AssignPermissionsToRoleAsync(IdentityDbContext dbContext, IReadOnlyList<FshPermission> permissions, FshRole role, CancellationToken cancellationToken = default)
+    private async Task AssignPermissionsToRoleAsync(IdentityDbContext dbContext, IReadOnlyList<AppPermission> permissions, AppRole role, CancellationToken cancellationToken = default)
     {
         var currentClaims = await roleManager.GetClaimsAsync(role);
         var newClaims = permissions
             .Where(permission => !currentClaims.Any(c => c.Type == ClaimConstants.Permission && c.Value == permission.Name))
-            .Select(permission => new FshRoleClaim
+            .Select(permission => new AppRoleClaim
             {
                 RoleId = role.Id,
                 ClaimType = ClaimConstants.Permission,
@@ -183,10 +183,10 @@ internal sealed class IdentityDbInitializer(
         }
 
         if (await userManager.Users.FirstOrDefaultAsync(u => u.Email == multiTenantContextAccessor.MultiTenantContext.TenantInfo!.AdminEmail, cancellationToken)
-            is not FshUser adminUser)
+            is not AppUser adminUser)
         {
             string adminUserName = $"{multiTenantContextAccessor.MultiTenantContext.TenantInfo?.Id.Trim()}.{RoleConstants.Admin}".ToUpperInvariant();
-            adminUser = new FshUser
+            adminUser = new AppUser
             {
                 FirstName = multiTenantContextAccessor.MultiTenantContext.TenantInfo?.Id.Trim().ToUpperInvariant(),
                 LastName = RoleConstants.Admin,
@@ -208,7 +208,7 @@ internal sealed class IdentityDbInitializer(
                 logger.LogInformation("Seeding Default Admin User for '{TenantId}' Tenant.", multiTenantContextAccessor.MultiTenantContext.TenantInfo?.Id);
             }
             var initialPassword = ResolveInitialAdminPassword(multiTenantContextAccessor.MultiTenantContext.TenantInfo!.Id!);
-            var password = new PasswordHasher<FshUser>();
+            var password = new PasswordHasher<AppUser>();
             adminUser.PasswordHash = password.HashPassword(adminUser, initialPassword);
             // MUST check IdentityResult: a silent failure (password-policy reject, transient DB error)
             // would mark provisioning "Completed" with no admin user; throwing makes it a retryable Failed.

@@ -1,4 +1,4 @@
-namespace FSH.Modules.Chat.Contracts.v1.DTOs;
+namespace Boilerplate.Modules.Chat.Contracts.v1.DTOs;
 
 public sealed record ChannelMemberDto(
     Guid Id,

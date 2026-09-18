@@ -1,7 +1,7 @@
-using FSH.Framework.Core.Domain;
-using FSH.Modules.Chat.Domain.Events;
+using Boilerplate.BuildingBlocks.Core.Domain;
+using Boilerplate.Modules.Chat.Domain.Events;
 
-namespace FSH.Modules.Chat.Domain;
+namespace Boilerplate.Modules.Chat.Domain;
 
 /// <summary>
 /// A single chat message. NOT <c>ISoftDeletable</c> — soft delete is just a <see cref="DeletedAtUtc"/>

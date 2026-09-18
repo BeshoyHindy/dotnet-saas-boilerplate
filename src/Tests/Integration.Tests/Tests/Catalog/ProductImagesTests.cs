@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
-using FSH.Modules.Catalog.Contracts.Dtos;
-using FSH.Modules.Catalog.Contracts.v1.Products;
-using FSH.Modules.Files.Contracts.v1.DTOs;
+using Boilerplate.Modules.Catalog.Contracts.Dtos;
+using Boilerplate.Modules.Catalog.Contracts.v1.Products;
+using Boilerplate.Modules.Files.Contracts.v1.DTOs;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 
@@ -11,13 +11,13 @@ namespace Integration.Tests.Tests.Catalog;
 /// Reproduces the 500 reported on POST /api/v1/catalog/products/{id}/images and locks in the
 /// expected happy path: upload via Files → attach to product → product reflects the new image.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class ProductImagesTests
 {
     private const string FilesBasePath = "/api/v1/files";
     private readonly AuthHelper _auth;
 
-    public ProductImagesTests(FshWebApplicationFactory factory)
+    public ProductImagesTests(AppWebApplicationFactory factory)
     {
         _auth = new AuthHelper(factory);
     }

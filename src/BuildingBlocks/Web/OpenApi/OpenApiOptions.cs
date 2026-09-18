@@ -1,4 +1,4 @@
-﻿namespace FSH.Framework.Web.OpenApi;
+﻿namespace Boilerplate.BuildingBlocks.Web.OpenApi;
 
 public sealed class OpenApiOptions
 {

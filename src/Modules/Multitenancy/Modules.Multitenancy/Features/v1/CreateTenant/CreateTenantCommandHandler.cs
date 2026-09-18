@@ -1,14 +1,14 @@
-using FSH.Framework.Eventing.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Modules.Billing.Contracts.v1.Plans;
-using FSH.Modules.Multitenancy.Contracts;
-using FSH.Modules.Multitenancy.Contracts.Events;
-using FSH.Modules.Multitenancy.Contracts.v1.CreateTenant;
-using FSH.Modules.Multitenancy.Provisioning;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Billing.Contracts.v1.Plans;
+using Boilerplate.Modules.Multitenancy.Contracts;
+using Boilerplate.Modules.Multitenancy.Contracts.Events;
+using Boilerplate.Modules.Multitenancy.Contracts.v1.CreateTenant;
+using Boilerplate.Modules.Multitenancy.Provisioning;
 using Mediator;
 using Microsoft.Extensions.Options;
 
-namespace FSH.Modules.Multitenancy.Features.v1.CreateTenant;
+namespace Boilerplate.Modules.Multitenancy.Features.v1.CreateTenant;
 
 public sealed class CreateTenantCommandHandler(
     ITenantService tenantService,

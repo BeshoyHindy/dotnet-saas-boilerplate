@@ -1,6 +1,6 @@
 # Architecture Tests
 
-This folder contains solution-wide architecture tests for the FullStackHero .NET 10 Starter Kit. The goal is to automatically enforce layering, dependency, and naming rules as the codebase evolves.
+This folder contains solution-wide architecture tests for the Boilerplate .NET 10 Starter Kit. The goal is to automatically enforce layering, dependency, and naming rules as the codebase evolves.
 
 ## Project
 
@@ -10,13 +10,13 @@ This folder contains solution-wide architecture tests for the FullStackHero .NET
 ## What Is Covered
 
 - **Module dependencies**: module runtime projects (`Modules.*`) cannot reference other modules' runtime projects directly; only their own runtime, contracts, and building blocks are allowed (validated via csproj inspection).
-- **Feature layering**: feature types under `Modules.*.Features.v{version}` are checked with NetArchTest to depend only on allowed layers (System/Microsoft, `FSH.Framework.*`, their module, and module contracts).
+- **Feature layering**: feature types under `Modules.*.Features.v{version}` are checked with NetArchTest to depend only on allowed layers (System/Microsoft, `Boilerplate.BuildingBlocks.*`, their module, and module contracts).
 - **Host boundaries**: module code must not depend on host applications, and hosts must not depend directly on module feature or data internals.
 - **Namespace conventions**: selected areas (for example, `BuildingBlocks/Core/Domain`) must declare namespaces that reflect the folder structure.
 
 ## Running the Tests
 
-- Run all tests (including architecture tests): `dotnet test src/FSH.Starter.slnx`.
+- Run all tests (including architecture tests): `dotnet test src/Boilerplate.slnx`.
 - Architecture tests are lightweight and rely only on project and file structure; they do not require any external services or databases.
 
 ## Extending the Rules

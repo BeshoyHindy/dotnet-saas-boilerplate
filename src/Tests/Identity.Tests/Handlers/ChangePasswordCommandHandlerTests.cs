@@ -1,8 +1,8 @@
 using AutoFixture;
-using FSH.Framework.Core.Context;
-using FSH.Modules.Identity.Contracts.Services;
-using FSH.Modules.Identity.Contracts.v1.Users.ChangePassword;
-using FSH.Modules.Identity.Features.v1.Users.ChangePassword;
+using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.Modules.Identity.Contracts.Services;
+using Boilerplate.Modules.Identity.Contracts.v1.Users.ChangePassword;
+using Boilerplate.Modules.Identity.Features.v1.Users.ChangePassword;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 

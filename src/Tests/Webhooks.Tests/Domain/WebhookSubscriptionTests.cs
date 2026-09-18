@@ -1,4 +1,4 @@
-using FSH.Modules.Webhooks.Domain;
+using Boilerplate.Modules.Webhooks.Domain;
 
 namespace Webhooks.Tests.Domain;
 

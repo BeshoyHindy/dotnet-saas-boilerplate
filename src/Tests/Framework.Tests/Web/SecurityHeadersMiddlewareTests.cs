@@ -1,4 +1,4 @@
-using FSH.Framework.Web.Security;
+using Boilerplate.BuildingBlocks.Web.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 

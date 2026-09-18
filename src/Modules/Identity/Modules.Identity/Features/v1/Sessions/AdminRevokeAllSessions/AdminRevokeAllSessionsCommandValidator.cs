@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Identity.Contracts.v1.Sessions.AdminRevokeAllSessions;
+using Boilerplate.Modules.Identity.Contracts.v1.Sessions.AdminRevokeAllSessions;
 
-namespace FSH.Modules.Identity.Features.v1.Sessions.AdminRevokeAllSessions;
+namespace Boilerplate.Modules.Identity.Features.v1.Sessions.AdminRevokeAllSessions;
 
 public sealed class AdminRevokeAllSessionsCommandValidator : AbstractValidator<AdminRevokeAllSessionsCommand>
 {

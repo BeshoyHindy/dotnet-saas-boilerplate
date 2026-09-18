@@ -1,10 +1,10 @@
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Catalog.Contracts.v1.Products;
-using FSH.Modules.Catalog.Data;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Catalog.Contracts.v1.Products;
+using Boilerplate.Modules.Catalog.Data;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Catalog.Features.v1.Products.DeleteProduct;
+namespace Boilerplate.Modules.Catalog.Features.v1.Products.DeleteProduct;
 
 public sealed class DeleteProductCommandHandler(CatalogDbContext dbContext)
     : ICommandHandler<DeleteProductCommand, Unit>

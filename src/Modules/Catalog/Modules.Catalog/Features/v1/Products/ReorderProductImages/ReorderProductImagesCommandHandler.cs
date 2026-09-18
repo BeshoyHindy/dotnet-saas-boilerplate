@@ -1,10 +1,10 @@
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Catalog.Contracts.v1.Products.ReorderProductImages;
-using FSH.Modules.Catalog.Data;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Catalog.Contracts.v1.Products.ReorderProductImages;
+using Boilerplate.Modules.Catalog.Data;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Catalog.Features.v1.Products.ReorderProductImages;
+namespace Boilerplate.Modules.Catalog.Features.v1.Products.ReorderProductImages;
 
 public sealed class ReorderProductImagesCommandHandler(CatalogDbContext dbContext)
     : ICommandHandler<ReorderProductImagesCommand, Unit>

@@ -1,28 +1,28 @@
-# fullstackhero — production docker-compose.
+# boilerplate — production docker-compose.
 # Run from this directory:
 #   cp .env.example .env && $EDITOR .env
 #   docker compose up -d --build
 #
 # Operator owns the edge (TLS / subdomain routing). This file publishes
-# only the FSH services on host ports; the data plane (postgres/redis/
+# only the Boilerplate services on host ports; the data plane (postgres/redis/
 # minio) stays compose-internal unless you uncomment their ports blocks.
 
-name: fsh
+name: boilerplate
 
 services:
   postgres:
     image: postgres:18-alpine
-    container_name: fsh-postgres
+    container_name: boilerplate-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: fsh
-      POSTGRES_USER: fsh
+      POSTGRES_DB: boilerplate
+      POSTGRES_USER: boilerplate
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U fsh -d fsh"]
+      test: ["CMD-SHELL", "pg_isready -U boilerplate -d boilerplate"]
       interval: 5s
       timeout: 3s
       retries: 12
@@ -32,7 +32,7 @@ services:
 
   redis:
     image: valkey/valkey:9.1.0-alpine
-    container_name: fsh-redis
+    container_name: boilerplate-redis
     restart: unless-stopped
     command:
       - valkey-server
@@ -55,7 +55,7 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: fsh-minio
+    container_name: boilerplate-minio
     restart: unless-stopped
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
@@ -80,7 +80,7 @@ services:
   # public bucket.
   minio-init:
     image: minio/mc:latest
-    container_name: fsh-minio-init
+    container_name: boilerplate-minio-init
     restart: "no"
     depends_on:
       minio: { condition: service_healthy }
@@ -92,20 +92,20 @@ services:
       - -c
       - |
         mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
-        mc mb --ignore-existing local/fsh
+        mc mb --ignore-existing local/boilerplate
 
   migrator:
     build:
       context: ../..
-      dockerfile: src/Host/FSH.Starter.DbMigrator/Dockerfile
-    image: fsh/dbmigrator:local
-    container_name: fsh-migrator
+      dockerfile: src/Host/Boilerplate.DbMigrator/Dockerfile
+    image: boilerplate/dbmigrator:local
+    container_name: boilerplate-migrator
     restart: "no"
     depends_on:
       postgres: { condition: service_healthy }
     environment:
       DOTNET_ENVIRONMENT: Production
-      DatabaseOptions__ConnectionString: Host=postgres;Database=fsh;Username=fsh;Password=${POSTGRES_PASSWORD}
+      DatabaseOptions__ConnectionString: Host=postgres;Database=boilerplate;Username=boilerplate;Password=${POSTGRES_PASSWORD}
       CachingOptions__Redis: redis,password=${REDIS_PASSWORD}
       JwtOptions__SigningKey: ${JWT_SIGNING_KEY:?JWT_SIGNING_KEY is required}
       Seed__DefaultAdminPassword: ${SEED_ADMIN_PASSWORD:?SEED_ADMIN_PASSWORD is required}
@@ -114,9 +114,9 @@ services:
   api:
     build:
       context: ../..
-      dockerfile: src/Host/FSH.Starter.Api/Dockerfile
-    image: fsh/api:local
-    container_name: fsh-api
+      dockerfile: src/Host/Boilerplate.Api/Dockerfile
+    image: boilerplate/api:local
+    container_name: boilerplate-api
     restart: unless-stopped
     depends_on:
       postgres:   { condition: service_healthy }
@@ -127,7 +127,7 @@ services:
     environment:
       DOTNET_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
-      DatabaseOptions__ConnectionString: Host=postgres;Database=fsh;Username=fsh;Password=${POSTGRES_PASSWORD}
+      DatabaseOptions__ConnectionString: Host=postgres;Database=boilerplate;Username=boilerplate;Password=${POSTGRES_PASSWORD}
       CachingOptions__Redis: redis,password=${REDIS_PASSWORD}
       JwtOptions__SigningKey: ${JWT_SIGNING_KEY}
       Seed__DefaultAdminPassword: ${SEED_ADMIN_PASSWORD}
@@ -135,45 +135,45 @@ services:
       Storage__S3__ServiceUrl: http://minio:9000
       Storage__S3__AccessKey: ${MINIO_ROOT_USER}
       Storage__S3__SecretKey: ${MINIO_ROOT_PASSWORD}
-      Storage__S3__Bucket: fsh
+      Storage__S3__Bucket: boilerplate
       Storage__S3__ForcePathStyle: "true"
       AllowedHosts: "*"
       HangfireOptions__UserName: ${HANGFIRE_USERNAME:?HANGFIRE_USERNAME is required}
       HangfireOptions__Password: ${HANGFIRE_PASSWORD:?HANGFIRE_PASSWORD is required}
-      CorsOptions__AllowedOrigins__0: ${FSH_ADMIN_URL:?FSH_ADMIN_URL is required}
-      CorsOptions__AllowedOrigins__1: ${FSH_DASHBOARD_URL:?FSH_DASHBOARD_URL is required}
+      CorsOptions__AllowedOrigins__0: ${APP_ADMIN_URL:?APP_ADMIN_URL is required}
+      CorsOptions__AllowedOrigins__1: ${APP_DASHBOARD_URL:?APP_DASHBOARD_URL is required}
       OpenTelemetryOptions__Exporter__Otlp__Endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     ports:
-      - "${FSH_API_PORT:-8080}:8080"
+      - "${APP_API_PORT:-8080}:8080"
 
   admin:
     build:
       context: ../../clients/admin
-    image: fsh/admin:local
-    container_name: fsh-admin
+    image: boilerplate/admin:local
+    container_name: boilerplate-admin
     restart: unless-stopped
     depends_on:
       migrator: { condition: service_completed_successfully }
     environment:
-      FSH_API_URL: ${FSH_API_URL:?FSH_API_URL is required}
-      FSH_DASHBOARD_URL: ${FSH_DASHBOARD_URL}
-      FSH_DEFAULT_TENANT: ${FSH_DEFAULT_TENANT:-root}
+      APP_API_URL: ${APP_API_URL:?APP_API_URL is required}
+      APP_DASHBOARD_URL: ${APP_DASHBOARD_URL}
+      APP_DEFAULT_TENANT: ${APP_DEFAULT_TENANT:-root}
     ports:
-      - "${FSH_ADMIN_PORT:-8081}:80"
+      - "${APP_ADMIN_PORT:-8081}:80"
 
   dashboard:
     build:
       context: ../../clients/dashboard
-    image: fsh/dashboard:local
-    container_name: fsh-dashboard
+    image: boilerplate/dashboard:local
+    container_name: boilerplate-dashboard
     restart: unless-stopped
     depends_on:
       migrator: { condition: service_completed_successfully }
     environment:
-      FSH_API_URL: ${FSH_API_URL}
-      FSH_DEFAULT_TENANT: ${FSH_DEFAULT_TENANT:-root}
+      APP_API_URL: ${APP_API_URL}
+      APP_DEFAULT_TENANT: ${APP_DEFAULT_TENANT:-root}
     ports:
-      - "${FSH_DASHBOARD_PORT:-8082}:80"
+      - "${APP_DASHBOARD_PORT:-8082}:80"
 
 volumes:
   pg_data:

@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 
-namespace FSH.Framework.Web.Realtime;
+namespace Boilerplate.BuildingBlocks.Web.Realtime;
 
 /// <summary>
 /// Single shared SignalR hub for app-wide realtime: chat messages, typing indicators, presence,

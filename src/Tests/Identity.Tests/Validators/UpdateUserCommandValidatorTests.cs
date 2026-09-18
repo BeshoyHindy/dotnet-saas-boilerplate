@@ -1,5 +1,5 @@
-using FSH.Modules.Identity.Contracts.v1.Users.UpdateUser;
-using FSH.Modules.Identity.Features.v1.Users.UpdateUser;
+using Boilerplate.Modules.Identity.Contracts.v1.Users.UpdateUser;
+using Boilerplate.Modules.Identity.Features.v1.Users.UpdateUser;
 using Shouldly;
 using Xunit;
 
@@ -80,7 +80,7 @@ public sealed class UpdateUserCommandValidatorTests
         { 
             Id = "user-123", 
             DeleteCurrentImage = true, 
-            Image = new FSH.Framework.Shared.Storage.FileUploadRequest { FileName = "test.png", Data = [0] } 
+            Image = new Boilerplate.BuildingBlocks.Shared.Storage.FileUploadRequest { FileName = "test.png", Data = [0] } 
         };
 
         // Act

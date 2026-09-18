@@ -1,4 +1,4 @@
-namespace FSH.Modules.Chat.Services;
+namespace Boilerplate.Modules.Chat.Services;
 
 /// <summary>
 /// Resolves a batch of <c>@username</c> mentions to user ids. Returns a map keyed by the

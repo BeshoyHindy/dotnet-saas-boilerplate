@@ -1,6 +1,6 @@
-using FSH.Framework.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Context;
 
-namespace FSH.Modules.Identity.Contracts.Services;
+namespace Boilerplate.Modules.Identity.Contracts.Services;
 
 /// <summary>
 /// Service interface for accessing HTTP request context information.

@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Spectre.Console;
 
-namespace FSH.CLI.Infrastructure;
+namespace Boilerplate.CLI.Infrastructure;
 
 /// <summary>
 /// Shared process execution with cancellation, timeout, and output streaming.
@@ -37,11 +37,11 @@ internal static class ProcessRunner
         });
 
         Task outputTask = showOutput
-            ? StreamOutputAsync(process.StandardOutput, FshConstants.DimColor)
+            ? StreamOutputAsync(process.StandardOutput, AppConstants.DimColor)
             : process.StandardOutput.ReadToEndAsync(cancellationToken);
 
         Task errorTask = showOutput
-            ? StreamOutputAsync(process.StandardError, FshConstants.ErrorColor)
+            ? StreamOutputAsync(process.StandardError, AppConstants.ErrorColor)
             : process.StandardError.ReadToEndAsync(cancellationToken);
 
         await Task.WhenAll(outputTask, errorTask).ConfigureAwait(false);

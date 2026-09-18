@@ -1,10 +1,10 @@
-using FSH.Modules.Files.Contracts.v1.Queries;
+using Boilerplate.Modules.Files.Contracts.v1.Queries;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Files.Features.v1.GetFileDownloadUrl;
+namespace Boilerplate.Modules.Files.Features.v1.GetFileDownloadUrl;
 
 public static class GetFileDownloadUrlEndpoint
 {

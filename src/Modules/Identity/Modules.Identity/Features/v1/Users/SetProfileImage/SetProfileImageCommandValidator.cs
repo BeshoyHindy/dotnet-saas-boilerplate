@@ -1,7 +1,7 @@
 using FluentValidation;
-using FSH.Modules.Identity.Contracts.v1.Users.SetProfileImage;
+using Boilerplate.Modules.Identity.Contracts.v1.Users.SetProfileImage;
 
-namespace FSH.Modules.Identity.Features.v1.Users.SetProfileImage;
+namespace Boilerplate.Modules.Identity.Features.v1.Users.SetProfileImage;
 
 public sealed class SetProfileImageCommandValidator : AbstractValidator<SetProfileImageCommand>
 {

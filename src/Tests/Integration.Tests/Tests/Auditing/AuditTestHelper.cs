@@ -1,7 +1,7 @@
 using System.Text.Json;
-using FSH.Modules.Auditing.Contracts;
-using FSH.Modules.Auditing.Contracts.Dtos;
-using FSH.Framework.Shared.Persistence;
+using Boilerplate.Modules.Auditing.Contracts;
+using Boilerplate.Modules.Auditing.Contracts.Dtos;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Integration.Tests.Infrastructure;
 
 namespace Integration.Tests.Tests.Auditing;

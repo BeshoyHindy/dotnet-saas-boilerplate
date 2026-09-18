@@ -2,13 +2,13 @@ using Integration.Tests.Infrastructure;
 
 namespace Integration.Tests.Tests.Authentication;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class TokenRefreshTests
 {
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public TokenRefreshTests(FshWebApplicationFactory factory)
+    public TokenRefreshTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

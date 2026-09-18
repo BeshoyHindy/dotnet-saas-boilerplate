@@ -1,6 +1,6 @@
 using Mediator;
 
-namespace FSH.Modules.Identity.Contracts.v1.Users.ResendConfirmationEmail;
+namespace Boilerplate.Modules.Identity.Contracts.v1.Users.ResendConfirmationEmail;
 
 /// <summary>
 /// Re-sends the email-confirmation link to an unconfirmed user. Gated by

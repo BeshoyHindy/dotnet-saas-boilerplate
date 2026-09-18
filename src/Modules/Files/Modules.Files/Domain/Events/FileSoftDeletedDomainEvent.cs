@@ -1,6 +1,6 @@
-using FSH.Framework.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Domain;
 
-namespace FSH.Modules.Files.Domain.Events;
+namespace Boilerplate.Modules.Files.Domain.Events;
 
 public sealed record FileSoftDeletedDomainEvent(
     Guid FileAssetId,

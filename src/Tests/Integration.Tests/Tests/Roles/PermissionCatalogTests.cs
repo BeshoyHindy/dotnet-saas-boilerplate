@@ -1,6 +1,6 @@
 using System.Net.Http.Json;
-using FSH.Framework.Shared.Constants;
-using FSH.Modules.Identity.Contracts.DTOs;
+using Boilerplate.BuildingBlocks.Shared.Constants;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 
@@ -12,14 +12,14 @@ namespace Integration.Tests.Tests.Roles;
 /// catalog is the root cause of the "N enabled / M total" drift bug the editor used to
 /// show before the endpoint was added.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class PermissionCatalogTests
 {
     private const string CatalogPath = TestConstants.IdentityBasePath + "/permissions/catalog";
     private readonly AuthHelper _auth;
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
 
-    public PermissionCatalogTests(FshWebApplicationFactory factory)
+    public PermissionCatalogTests(AppWebApplicationFactory factory)
     {
         _auth = new AuthHelper(factory);
         _factory = factory;

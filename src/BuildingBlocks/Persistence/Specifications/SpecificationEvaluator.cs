@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Framework.Persistence;
+namespace Boilerplate.BuildingBlocks.Persistence;
 
 /// <summary>
 /// Internal evaluator that turns specifications into executable <see cref="IQueryable{T}"/> queries.

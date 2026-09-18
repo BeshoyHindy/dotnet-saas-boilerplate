@@ -5,7 +5,7 @@ import { mockJsonResponse } from "../helpers/api-mocks";
 
 const SUB = {
   id: "wh-1111",
-  url: "https://hooks.example.com/fsh",
+  url: "https://hooks.example.com/boilerplate",
   events: ["tenant.created", "user.registered"],
   isActive: true,
   createdAtUtc: "2026-05-10T09:00:00Z",

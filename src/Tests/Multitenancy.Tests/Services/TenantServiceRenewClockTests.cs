@@ -1,9 +1,9 @@
 using Finbuckle.MultiTenant.Abstractions;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Framework.Shared.Persistence;
-using FSH.Modules.Multitenancy;
-using FSH.Modules.Multitenancy.Provisioning;
-using FSH.Modules.Multitenancy.Services;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Multitenancy;
+using Boilerplate.Modules.Multitenancy.Provisioning;
+using Boilerplate.Modules.Multitenancy.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -30,7 +30,7 @@ public sealed class TenantServiceRenewClockTests
 
         return new TenantService(
             _store,
-            Options.Create(new DatabaseOptions { ConnectionString = "Host=localhost;Database=fsh;Username=x;Password=y" }),
+            Options.Create(new DatabaseOptions { ConnectionString = "Host=localhost;Database=boilerplate;Username=x;Password=y" }),
             _serviceProvider,
             dbContext: null!,            // RenewAsync never touches the DbContext
             provisioningService: null!,  // RenewAsync never touches provisioning

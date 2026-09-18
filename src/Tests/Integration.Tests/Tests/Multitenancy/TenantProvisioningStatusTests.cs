@@ -4,7 +4,7 @@ using Integration.Tests.Infrastructure.Extensions;
 
 namespace Integration.Tests.Tests.Multitenancy;
 
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class TenantProvisioningStatusTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -23,7 +23,7 @@ public sealed class TenantProvisioningStatusTests
 
     private readonly AuthHelper _auth;
 
-    public TenantProvisioningStatusTests(FshWebApplicationFactory factory)
+    public TenantProvisioningStatusTests(AppWebApplicationFactory factory)
     {
         _auth = new AuthHelper(factory);
     }

@@ -1,6 +1,6 @@
 using System.Text.Json;
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Multitenancy.Provisioning;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Multitenancy.Provisioning;
 using Integration.Tests.Infrastructure;
 
 namespace Integration.Tests.Tests.Multitenancy;
@@ -22,7 +22,7 @@ namespace Integration.Tests.Tests.Multitenancy;
 /// <c>MarkFailedAsync(..., Migrations, ...)</c>. No production code or shared test infra is
 /// modified; the failure flows through the exact production pipeline.
 /// </summary>
-[Collection(FshCollectionDefinition.Name)]
+[Collection(AppCollectionDefinition.Name)]
 public sealed class TenantProvisioningFailureTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -36,10 +36,10 @@ public sealed class TenantProvisioningFailureTests
     private const string UnreachableConnectionString =
         "Host=127.0.0.1;Port=1;Database=does_not_exist;Username=postgres;Password=x;Timeout=3;Command Timeout=3";
 
-    private readonly FshWebApplicationFactory _factory;
+    private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
 
-    public TenantProvisioningFailureTests(FshWebApplicationFactory factory)
+    public TenantProvisioningFailureTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _auth = new AuthHelper(factory);

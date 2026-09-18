@@ -1,6 +1,6 @@
-using FSH.Framework.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Domain;
 
-namespace FSH.Modules.Notifications.Domain;
+namespace Boilerplate.Modules.Notifications.Domain;
 
 /// <summary>
 /// A single inbox row for the bell-icon UI. One notification per (user, event). Source modules

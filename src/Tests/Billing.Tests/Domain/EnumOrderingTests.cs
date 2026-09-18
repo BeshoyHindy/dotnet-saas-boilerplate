@@ -1,4 +1,4 @@
-using FSH.Modules.Billing.Contracts;
+using Boilerplate.Modules.Billing.Contracts;
 using Shouldly;
 using Xunit;
 

@@ -1,10 +1,10 @@
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Files.Contracts.v1.Commands;
-using FSH.Modules.Files.Data;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Files.Contracts.v1.Commands;
+using Boilerplate.Modules.Files.Data;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
-namespace FSH.Modules.Files.Features.v1.RestoreFile;
+namespace Boilerplate.Modules.Files.Features.v1.RestoreFile;
 
 public sealed class RestoreFileCommandHandler(FilesDbContext db)
     : ICommandHandler<RestoreFileCommand, Unit>

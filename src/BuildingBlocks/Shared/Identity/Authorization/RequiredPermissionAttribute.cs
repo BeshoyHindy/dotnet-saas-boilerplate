@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-namespace FSH.Framework.Shared.Identity.Authorization;
+namespace Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
 
 public interface IRequiredPermissionMetadata
 {

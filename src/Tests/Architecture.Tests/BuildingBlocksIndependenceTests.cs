@@ -1,7 +1,7 @@
-using FSH.Framework.Core;
-using FSH.Framework.Persistence;
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Framework.Web;
+using Boilerplate.BuildingBlocks.Core;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Web;
 using NetArchTest.Rules;
 using Shouldly;
 using System.Reflection;
@@ -20,10 +20,10 @@ public class BuildingBlocksIndependenceTests
 
     private static readonly Assembly[] BuildingBlockAssemblies =
     [
-        typeof(IFshCore).Assembly,               // Core
+        typeof(IAppCore).Assembly,               // Core
         typeof(IConnectionStringValidator).Assembly,  // Persistence
         typeof(IAppTenantInfo).Assembly,         // Shared
-        typeof(IFshWeb).Assembly                 // Web
+        typeof(IAppWeb).Assembly                 // Web
     ];
 
     [Fact]
@@ -35,9 +35,9 @@ public class BuildingBlocksIndependenceTests
                 .InAssembly(assembly)
                 .ShouldNot()
                 .HaveDependencyOnAny(
-                    "FSH.Modules.Auditing",
-                    "FSH.Modules.Identity",
-                    "FSH.Modules.Multitenancy")
+                    "Boilerplate.Modules.Auditing",
+                    "Boilerplate.Modules.Identity",
+                    "Boilerplate.Modules.Multitenancy")
                 .GetResult();
 
             var failingTypes = result.FailingTypeNames ?? [];
@@ -57,8 +57,10 @@ public class BuildingBlocksIndependenceTests
                 .InAssembly(assembly)
                 .ShouldNot()
                 .HaveDependencyOnAny(
-                    "FSH.Starter",
-                    "FSH.Starter.Api")
+                    "Boilerplate.Api",
+                    "Boilerplate.AppHost",
+                    "Boilerplate.DbMigrator",
+                    "Boilerplate.Migrations")
                 .GetResult();
 
             var failingTypes = result.FailingTypeNames ?? [];
@@ -98,14 +100,14 @@ public class BuildingBlocksIndependenceTests
                 string referencedName = GetReferencedProjectName(include);
 
                 // Check if it references a Modules project
-                if (referencedName.StartsWith("Modules.", StringComparison.OrdinalIgnoreCase))
+                if (referencedName.StartsWith("Boilerplate.Modules.", StringComparison.OrdinalIgnoreCase))
                 {
                     violations.Add($"{projectName} -> {referencedName}");
                 }
 
                 // Check if it references a Host project
                 if (referencedName.Contains("AppHost", StringComparison.OrdinalIgnoreCase) ||
-                    referencedName.StartsWith("FSH.Starter.Api", StringComparison.OrdinalIgnoreCase))
+                    referencedName.StartsWith("Boilerplate.Api", StringComparison.OrdinalIgnoreCase))
                 {
                     violations.Add($"{projectName} -> {referencedName}");
                 }
@@ -130,7 +132,7 @@ public class BuildingBlocksIndependenceTests
             "mscorlib"
         ];
 
-        string coreProjectPath = Path.Combine(SolutionRoot, "src", "BuildingBlocks", "Core", "Core.csproj");
+        string coreProjectPath = Path.Combine(SolutionRoot, "src", "BuildingBlocks", "Core", "Boilerplate.BuildingBlocks.Core.csproj");
         var document = XDocument.Load(coreProjectPath);
 
         var packageReferences = document
@@ -210,7 +212,9 @@ public class BuildingBlocksIndependenceTests
         string[] allowedDependencies,
         List<string> violations)
     {
-        string projectPath = Path.Combine(SolutionRoot, "src", "BuildingBlocks", projectName, $"{projectName}.csproj");
+        // Directory keeps the short name; the project file is named after the assembly.
+        string projectPath = Path.Combine(
+            SolutionRoot, "src", "BuildingBlocks", projectName, $"Boilerplate.BuildingBlocks.{projectName}.csproj");
 
         if (!File.Exists(projectPath))
         {
@@ -222,7 +226,7 @@ public class BuildingBlocksIndependenceTests
         var projectReferences = document
             .Descendants("ProjectReference")
             .Select(x => (string?)x.Attribute("Include") ?? string.Empty)
-            .Select(GetReferencedProjectName)
+            .Select(GetShortBuildingBlockName)
             .Where(p => !string.IsNullOrEmpty(p))
             .ToArray();
 
@@ -235,8 +239,14 @@ public class BuildingBlocksIndependenceTests
         }
     }
 
-    // ProjectReference paths use Windows separators (..\Core\Core.csproj), but GetFileNameWithoutExtension only
+    // ProjectReference paths use Windows separators (..\Core\Boilerplate.BuildingBlocks.Core.csproj), but GetFileNameWithoutExtension only
     // splits on '\' on Windows — normalize to '/' first so Linux CI also gets the bare project name.
     private static string GetReferencedProjectName(string includePath) =>
         Path.GetFileNameWithoutExtension(includePath.Replace('\\', '/'));
+
+    // The layering rules above are written in short BuildingBlock names ("Core",
+    // "Shared"); project/assembly names carry the `Boilerplate.BuildingBlocks.` prefix.
+    private static string GetShortBuildingBlockName(string includePath) =>
+        GetReferencedProjectName(includePath)
+            .Replace("Boilerplate.BuildingBlocks.", string.Empty, StringComparison.Ordinal);
 }

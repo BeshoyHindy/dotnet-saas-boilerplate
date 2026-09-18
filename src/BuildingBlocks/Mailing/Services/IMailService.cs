@@ -1,4 +1,4 @@
-﻿namespace FSH.Framework.Mailing.Services;
+﻿namespace Boilerplate.BuildingBlocks.Mailing.Services;
 
 public interface IMailService
 {

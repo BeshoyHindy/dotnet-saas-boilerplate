@@ -1,6 +1,6 @@
-using FSH.Framework.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Domain;
 
-namespace FSH.Modules.Chat.Domain.Events;
+namespace Boilerplate.Modules.Chat.Domain.Events;
 
 public sealed record ChannelMemberAddedDomainEvent(
     Guid ChannelId,

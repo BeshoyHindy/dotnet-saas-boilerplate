@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
-using FSH.Framework.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 
-namespace FSH.Modules.Multitenancy.Services;
+namespace Boilerplate.Modules.Multitenancy.Services;
 
 internal sealed class TenantInitialPasswordBuffer : ITenantInitialPasswordBuffer
 {

@@ -1,5 +1,5 @@
-using FSH.Modules.Billing.Features.v1.Wallets.CreateTopupRequest;
-using FSH.Modules.Billing.Contracts.v1.Wallets;
+using Boilerplate.Modules.Billing.Features.v1.Wallets.CreateTopupRequest;
+using Boilerplate.Modules.Billing.Contracts.v1.Wallets;
 using Shouldly;
 using Xunit;
 

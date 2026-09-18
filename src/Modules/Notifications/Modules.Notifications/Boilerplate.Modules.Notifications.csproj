@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<RootNamespace>Boilerplate.Modules.Notifications</RootNamespace>
+		<AssemblyName>Boilerplate.Modules.Notifications</AssemblyName>
+		<NoWarn>$(NoWarn);CA1031;CA1711;CA1812;CA1859;CA1002;CA2227;S3267</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Mediator.Abstractions" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\..\BuildingBlocks\Persistence\Boilerplate.BuildingBlocks.Persistence.csproj" />
+		<ProjectReference Include="..\..\..\BuildingBlocks\Web\Boilerplate.BuildingBlocks.Web.csproj" />
+		<ProjectReference Include="..\..\..\BuildingBlocks\Eventing\Boilerplate.BuildingBlocks.Eventing.csproj" />
+		<ProjectReference Include="..\..\..\BuildingBlocks\Mailing\Boilerplate.BuildingBlocks.Mailing.csproj" />
+		<ProjectReference Include="..\Modules.Notifications.Contracts\Boilerplate.Modules.Notifications.Contracts.csproj" />
+		<ProjectReference Include="..\..\Chat\Modules.Chat.Contracts\Boilerplate.Modules.Chat.Contracts.csproj" />
+		<ProjectReference Include="..\..\Multitenancy\Modules.Multitenancy.Contracts\Boilerplate.Modules.Multitenancy.Contracts.csproj" />
+		<ProjectReference Include="..\..\Billing\Modules.Billing.Contracts\Boilerplate.Modules.Billing.Contracts.csproj" />
+	</ItemGroup>
+
+</Project>

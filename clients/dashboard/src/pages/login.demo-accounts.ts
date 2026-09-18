@@ -1,4 +1,4 @@
-// Mirrors src/Host/FSH.Starter.Api/DevSeeding/DevDataSeeder.cs (keep in sync).
+// Mirrors src/Host/Boilerplate.Api/DevSeeding/DevDataSeeder.cs (keep in sync).
 // Static — no API call — because the login page is unauthenticated and the
 // API can't safely advertise demo credentials anyway. The shape is hand-
 // curated; if you add a demo account on the backend, add it here too.

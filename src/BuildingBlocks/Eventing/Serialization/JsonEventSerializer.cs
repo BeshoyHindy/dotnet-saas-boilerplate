@@ -1,8 +1,8 @@
-using FSH.Framework.Eventing.Abstractions;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
 using System.Collections.Concurrent;
 using System.Text.Json;
 
-namespace FSH.Framework.Eventing.Serialization;
+namespace Boilerplate.BuildingBlocks.Eventing.Serialization;
 
 /// <summary>
 /// System.Text.Json-based event serializer.

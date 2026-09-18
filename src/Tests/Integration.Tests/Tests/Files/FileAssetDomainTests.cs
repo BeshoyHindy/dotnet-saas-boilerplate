@@ -1,8 +1,8 @@
-using FSH.Framework.Core.Domain;
-using FSH.Framework.Core.Exceptions;
-using FSH.Modules.Files.Contracts.v1.DTOs;
-using FSH.Modules.Files.Domain;
-using FSH.Modules.Files.Domain.Events;
+using Boilerplate.BuildingBlocks.Core.Domain;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.Modules.Files.Contracts.v1.DTOs;
+using Boilerplate.Modules.Files.Domain;
+using Boilerplate.Modules.Files.Domain.Events;
 
 namespace Integration.Tests.Tests.Files;
 

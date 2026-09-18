@@ -1,11 +1,11 @@
-using FSH.Framework.Shared.Identity.Authorization;
-using FSH.Modules.Billing.Contracts.Authorization;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.Modules.Billing.Contracts.Authorization;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Billing.Features.v1.Invoices.GetInvoicePdf;
+namespace Boilerplate.Modules.Billing.Features.v1.Invoices.GetInvoicePdf;
 
 public static class GetInvoicePdfEndpoint
 {

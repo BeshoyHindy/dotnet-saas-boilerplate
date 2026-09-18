@@ -1,6 +1,6 @@
-using FSH.Framework.Eventing.Abstractions;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
 
-namespace FSH.Modules.Files.Contracts.Events;
+namespace Boilerplate.Modules.Files.Contracts.Events;
 
 /// <summary>
 /// Raised when a FileAsset transitions from PendingUpload to Available (or Quarantined). Owning

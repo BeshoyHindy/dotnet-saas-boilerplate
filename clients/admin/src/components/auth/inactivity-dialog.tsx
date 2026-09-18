@@ -46,7 +46,7 @@ export function InactivityDialog({
         <DialogPrimitive.Overlay
           className={cn(
             "fixed inset-0 z-50 bg-[oklch(0_0_0_/_0.45)] backdrop-blur-[6px]",
-            "data-[state=open]:animate-fsh-overlay-in data-[state=closed]:animate-fsh-overlay-out",
+            "data-[state=open]:animate-app-overlay-in data-[state=closed]:animate-app-overlay-out",
           )}
         />
         <DialogPrimitive.Content
@@ -57,7 +57,7 @@ export function InactivityDialog({
           className={cn(
             "fixed left-1/2 top-1/2 z-50 w-full max-w-[400px] -translate-x-1/2 -translate-y-1/2",
             "rounded-2xl border border-[var(--color-border)] bg-[var(--color-card)] p-7 text-center shadow-xl outline-none",
-            "data-[state=open]:animate-fsh-dialog-in data-[state=closed]:animate-fsh-dialog-out",
+            "data-[state=open]:animate-app-dialog-in data-[state=closed]:animate-app-dialog-out",
           )}
         >
           {/* Countdown ring */}

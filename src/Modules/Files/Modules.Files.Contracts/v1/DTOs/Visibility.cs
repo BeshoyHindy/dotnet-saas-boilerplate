@@ -1,4 +1,4 @@
-namespace FSH.Modules.Files.Contracts.v1.DTOs;
+namespace Boilerplate.Modules.Files.Contracts.v1.DTOs;
 
 /// <summary>
 /// File visibility. Public = visible to anyone in the tenant; Private = uploader-only.

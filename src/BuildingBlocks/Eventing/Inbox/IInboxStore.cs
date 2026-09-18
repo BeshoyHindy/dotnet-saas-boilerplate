@@ -1,4 +1,4 @@
-namespace FSH.Framework.Eventing.Inbox;
+namespace Boilerplate.BuildingBlocks.Eventing.Inbox;
 
 /// <summary>
 /// Abstraction for idempotent consumer tracking.

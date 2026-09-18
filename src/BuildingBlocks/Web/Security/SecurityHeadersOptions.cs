@@ -1,4 +1,4 @@
-namespace FSH.Framework.Web.Security;
+namespace Boilerplate.BuildingBlocks.Web.Security;
 
 public sealed class SecurityHeadersOptions
 {

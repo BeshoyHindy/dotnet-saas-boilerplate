@@ -17,7 +17,7 @@ import {
   type NavSpec,
 } from "@/components/layout/nav-data";
 
-const COLLAPSED_KEY = "fsh.sidebar.collapsed";
+const COLLAPSED_KEY = "boilerplate.sidebar.collapsed";
 
 /** Persisted collapsed state. Reads localStorage on mount; writes on change. */
 function useCollapsedSidebar() {
@@ -96,12 +96,12 @@ export function Sidebar() {
               "font-display text-[12px] font-bold text-[var(--color-primary-foreground)]",
             )}
           >
-            F
+            B
           </span>
           {!collapsed && (
             <div className="flex flex-col">
               <span className="whitespace-nowrap font-display text-[15px] font-bold leading-none tracking-tight text-[var(--color-foreground)]">
-                fullstack<span className="text-[var(--color-primary)]">hero</span>
+                Boilerplate
               </span>
               <span className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-[oklch(from_var(--color-muted-foreground)_l_c_h_/_0.7)]">
                 Dashboard

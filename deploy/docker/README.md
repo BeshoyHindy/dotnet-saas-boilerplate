@@ -1,13 +1,13 @@
-# Deploy fullstackhero with Docker Compose
+# Deploy boilerplate with Docker Compose
 
 This brings up the full stack on a single host:
 
 | Service | Image | Host port | What it is |
 |---|---|---|---|
-| `api` | `fsh/api:local` (built locally) | `FSH_API_PORT` (default 8080) | ASP.NET Core API |
-| `admin` | `fsh/admin:local` | `FSH_ADMIN_PORT` (default 8081) | Operator console (nginx + React) |
-| `dashboard` | `fsh/dashboard:local` | `FSH_DASHBOARD_PORT` (default 8082) | Tenant dashboard (nginx + React) |
-| `migrator` | `fsh/dbmigrator:local` | — | One-shot: applies EF migrations + seeds the root tenant + creates the default admin user |
+| `api` | `boilerplate/api:local` (built locally) | `APP_API_PORT` (default 8080) | ASP.NET Core API |
+| `admin` | `boilerplate/admin:local` | `APP_ADMIN_PORT` (default 8081) | Operator console (nginx + React) |
+| `dashboard` | `boilerplate/dashboard:local` | `APP_DASHBOARD_PORT` (default 8082) | Tenant dashboard (nginx + React) |
+| `migrator` | `boilerplate/dbmigrator:local` | — | One-shot: applies EF migrations + seeds the root tenant + creates the default admin user |
 | `postgres` | `postgres:17-alpine` | (internal) | Identity, tenant catalog, module schemas |
 | `redis` | `redis:7-alpine` | (internal) | HybridCache L2, Data Protection keys, idempotency store |
 | `minio` | `minio/minio:latest` | (internal) | S3-compatible blob store for the Files module |
@@ -42,7 +42,7 @@ Wait until you see something like `[migrator] DbMigrator completed` and the `mig
 ```bash
 curl -fsS http://localhost:8080/health/live   # API liveness
 curl -fsSI http://localhost:8081/ | head -1   # admin SPA — HTTP/1.1 200 OK
-curl -fsS  http://localhost:8081/config.json  # admin runtime config — shows FSH_API_URL
+curl -fsS  http://localhost:8081/config.json  # admin runtime config — shows APP_API_URL
 curl -fsSI http://localhost:8082/ | head -1   # dashboard SPA
 ```
 
@@ -56,7 +56,7 @@ Point three TLS subdomains at the published ports:
 | `admin.example.com` | `8081` |
 | `app.example.com` | `8082` |
 
-Make sure the URLs you serve match the `FSH_API_URL` / `FSH_ADMIN_URL` / `FSH_DASHBOARD_URL` you set in `.env` — those values are baked into the frontends' runtime `/config.json` (CORS will fail loudly otherwise).
+Make sure the URLs you serve match the `APP_API_URL` / `APP_ADMIN_URL` / `APP_DASHBOARD_URL` you set in `.env` — those values are baked into the frontends' runtime `/config.json` (CORS will fail loudly otherwise).
 
 ## Sign in for the first time
 
@@ -83,11 +83,11 @@ The three named volumes hold all state:
 
 ```bash
 docker run --rm \
-  -v fsh_pg_data:/source:ro \
+  -v boilerplate_pg_data:/source:ro \
   -v "$PWD":/backup \
   alpine \
   tar czf /backup/pg_data-$(date +%Y%m%d).tar.gz -C /source .
-# Repeat for fsh_redis_data and fsh_minio_data.
+# Repeat for boilerplate_redis_data and boilerplate_minio_data.
 ```
 
 ## Swapping in managed services
@@ -108,7 +108,7 @@ The data-plane volumes (`pg_data`, `redis_data`, `minio_data`) can be deleted on
 | Symptom | Likely cause |
 |---|---|
 | `xxx_PASSWORD is required` at `docker compose up` | A required env var is empty in `.env`. The error names the var. |
-| Migrator exits non-zero with `Failed to fetch dynamically imported module` | A frontend bundle baked the wrong API URL. Check `FSH_API_URL` in `.env` and re-run with `--build`. |
+| Migrator exits non-zero with `Failed to fetch dynamically imported module` | A frontend bundle baked the wrong API URL. Check `APP_API_URL` in `.env` and re-run with `--build`. |
 | `OptionsValidationException: SigningKey looks like a sample placeholder` | `JWT_SIGNING_KEY` contains `replace-with` (the framework's placeholder detector). Generate a real key: `openssl rand -base64 48`. |
-| API up but admin shows a CORS error | `FSH_ADMIN_URL` / `FSH_DASHBOARD_URL` in `.env` doesn't match what your external proxy serves. Both go on the CORS allow-list. |
+| API up but admin shows a CORS error | `APP_ADMIN_URL` / `APP_DASHBOARD_URL` in `.env` doesn't match what your external proxy serves. Both go on the CORS allow-list. |
 | `migrator` retries Postgres for 2 minutes then fails | Postgres didn't come up — check `docker compose logs postgres`. Most often a `POSTGRES_PASSWORD` change against an existing `pg_data` volume; delete the volume with `docker compose down -v` (destructive) and start over. |

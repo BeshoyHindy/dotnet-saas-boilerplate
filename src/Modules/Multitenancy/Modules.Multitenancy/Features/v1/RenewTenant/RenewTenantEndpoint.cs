@@ -1,13 +1,13 @@
-using FSH.Framework.Shared.Identity.Authorization;
-using FSH.Modules.Multitenancy.Contracts.Authorization;
-using FSH.Modules.Multitenancy.Contracts.v1.RenewTenant;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.Modules.Multitenancy.Contracts.Authorization;
+using Boilerplate.Modules.Multitenancy.Contracts.v1.RenewTenant;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Multitenancy.Features.v1.RenewTenant;
+namespace Boilerplate.Modules.Multitenancy.Features.v1.RenewTenant;
 
 public static class RenewTenantEndpoint
 {

@@ -8,7 +8,7 @@ const TENANT_ACME = {
   adminEmail: "admin@acme.com",
   isActive: true,
   validUpto: "2027-01-01T00:00:00Z",
-  issuer: "fsh.demo.acme",
+  issuer: "acme.example.com",
 };
 
 test.beforeEach(async ({ page }) => {

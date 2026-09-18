@@ -2,15 +2,15 @@ using Hangfire.Common;
 using Hangfire.Server;
 using System.Diagnostics;
 
-namespace FSH.Framework.Jobs;
+namespace Boilerplate.BuildingBlocks.Jobs;
 
 /// <summary>
 /// Adds basic tracing around Hangfire job execution.
 /// </summary>
 public sealed class HangfireTelemetryFilter : JobFilterAttribute, IServerFilter
 {
-    private const string ActivityKey = "__fsh_activity";
-    private static readonly ActivitySource ActivitySource = new("FSH.Hangfire");
+    private const string ActivityKey = "__boilerplate_activity";
+    private static readonly ActivitySource ActivitySource = new("Boilerplate.Hangfire");
 
     public void OnPerforming(PerformingContext context)
     {

@@ -20,7 +20,7 @@ Changes to BuildingBlocks affect ALL modules across the entire framework. These 
 - Make minimal, focused changes
 - Ensure backward compatibility
 - Update all affected modules
-- Run full test suite: `dotnet test src/FSH.Starter.slnx`
+- Run full test suite: `dotnet test src/Boilerplate.slnx`
 - Document the change
 
 ## Alternatives to Consider

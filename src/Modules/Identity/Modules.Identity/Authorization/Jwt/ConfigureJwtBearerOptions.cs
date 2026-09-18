@@ -1,6 +1,6 @@
-﻿using FSH.Framework.Core.Exceptions;
-using FSH.Framework.Shared.Constants;
-using FSH.Modules.Identity.Contracts.Services;
+﻿using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Constants;
+using Boilerplate.Modules.Identity.Contracts.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -14,7 +14,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
-namespace FSH.Modules.Identity.Authorization.Jwt;
+namespace Boilerplate.Modules.Identity.Authorization.Jwt;
 
 public class ConfigureJwtBearerOptions : IConfigureNamedOptions<JwtBearerOptions>
 {
@@ -79,7 +79,7 @@ public class ConfigureJwtBearerOptions : IConfigureNamedOptions<JwtBearerOptions
                 // Server-side log so we can also see the rejection reason in the API console.
                 var failedLogger = context.HttpContext.RequestServices
                     .GetRequiredService<ILoggerFactory>()
-                    .CreateLogger("FSH.Identity.JwtAuth");
+                    .CreateLogger("Boilerplate.Identity.JwtAuth");
                 failedLogger.LogWarning(context.Exception,
                     "JwtBearer authentication FAILED for {Method} {Path}: {Reason}",
                     SanitizeForLog(context.HttpContext.Request.Method),
@@ -131,7 +131,7 @@ public class ConfigureJwtBearerOptions : IConfigureNamedOptions<JwtBearerOptions
 
                         var challengeLogger = context.HttpContext.RequestServices
                             .GetRequiredService<ILoggerFactory>()
-                            .CreateLogger("FSH.Identity.JwtAuth");
+                            .CreateLogger("Boilerplate.Identity.JwtAuth");
                         challengeLogger.LogWarning(
                             "JwtBearer challenge for {Method} {Path}: hadAuthHeader={HadHeader} reason={Reason}",
                             SanitizeForLog(context.HttpContext.Request.Method),

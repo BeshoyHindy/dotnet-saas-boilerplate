@@ -1,6 +1,6 @@
-using FSH.Framework.Core.Domain;
-using FSH.Modules.Catalog.Domain;
-using FSH.Modules.Catalog.Domain.Events;
+using Boilerplate.BuildingBlocks.Core.Domain;
+using Boilerplate.Modules.Catalog.Domain;
+using Boilerplate.Modules.Catalog.Domain.Events;
 
 namespace Catalog.Tests.Domain;
 

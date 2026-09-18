@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace FSH.CLI.Infrastructure;
+namespace Boilerplate.CLI.Infrastructure;
 
 /// <summary>
 /// Lightweight NuGet API client for version checking.
@@ -22,7 +22,7 @@ internal static class NuGetClient
         {
             // NuGet API requires lowercase package IDs
 #pragma warning disable CA1308 // NuGet flat container API requires lowercase
-            string url = $"{FshConstants.NuGetFlatContainerUrl}/{packageId.ToLowerInvariant()}/index.json";
+            string url = $"{AppConstants.NuGetFlatContainerUrl}/{packageId.ToLowerInvariant()}/index.json";
 #pragma warning restore CA1308
             using var response = await Http.GetAsync(new Uri(url), cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
@@ -59,7 +59,7 @@ internal static class NuGetClient
     }
 
     /// <summary>
-    /// Gets the installed version of the FSH dotnet new template, or null if it is not
+    /// Gets the installed version of the Boilerplate dotnet new template, or null if it is not
     /// installed. Returns "local" when installed from a folder (no package version).
     /// </summary>
     internal static async Task<string?> GetInstalledTemplateVersionAsync(
@@ -76,7 +76,7 @@ internal static class NuGetClient
         for (int i = 0; i < lines.Length; i++)
         {
             // Match the package-block header: the package id on its own (indented) line.
-            if (!string.Equals(lines[i].Trim(), FshConstants.TemplatePackageId, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(lines[i].Trim(), AppConstants.TemplatePackageId, StringComparison.OrdinalIgnoreCase))
                 continue;
 
             // The next indented line is "Version: x.y.z" for NuGet-installed packages.
@@ -91,8 +91,8 @@ internal static class NuGetClient
         }
 
         // A folder install lists a path rather than the package id — detect via the template entry.
-        if (output.Contains("FullStackHero", StringComparison.OrdinalIgnoreCase)
-            && output.Contains($"({FshConstants.TemplateShortName})", StringComparison.OrdinalIgnoreCase))
+        if (output.Contains("Boilerplate", StringComparison.OrdinalIgnoreCase)
+            && output.Contains($"({AppConstants.TemplateShortName})", StringComparison.OrdinalIgnoreCase))
             return "local";
 
         return null;
@@ -101,7 +101,7 @@ internal static class NuGetClient
     private static HttpClient CreateClient()
     {
         var client = new HttpClient();
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("FSH-CLI/1.0");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Boilerplate-CLI/1.0");
         client.Timeout = TimeSpan.FromSeconds(10);
         return client;
     }

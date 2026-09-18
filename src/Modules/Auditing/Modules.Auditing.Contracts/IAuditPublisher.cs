@@ -1,4 +1,4 @@
-﻿namespace FSH.Modules.Auditing.Contracts;
+﻿namespace Boilerplate.Modules.Auditing.Contracts;
 
 /// <summary>
 /// Low-latency, non-blocking publisher. Implement with a bounded channel + background worker.

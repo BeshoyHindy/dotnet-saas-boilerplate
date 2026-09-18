@@ -64,7 +64,7 @@ export function DemoAccountsDialog({ open, onOpenChange, onPick }: DemoAccountsD
         />
 
         {/* Header */}
-        <header className="fsh-enter relative px-7 pt-7 pb-5">
+        <header className="app-enter relative px-7 pt-7 pb-5">
           <div className="mb-2.5 flex items-center gap-2">
             <span className="relative flex size-1.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
@@ -78,7 +78,7 @@ export function DemoAccountsDialog({ open, onOpenChange, onPick }: DemoAccountsD
             Step into any role.
           </h2>
           <p className="mt-1.5 max-w-[80%] text-[12.5px] leading-relaxed text-muted-foreground/80">
-            Explore fullstackhero as any user across the demo tenants — we'll sign you in instantly.
+            Explore Boilerplate as any user across the demo tenants — we'll sign you in instantly.
           </p>
         </header>
 
@@ -185,7 +185,7 @@ function UserPane({
   onPick: (account: DemoAccount) => void;
 }) {
   return (
-    <div className="fsh-enter max-h-[340px] overflow-y-auto p-3">
+    <div className="app-enter max-h-[340px] overflow-y-auto p-3">
       <div className="mb-1 flex items-baseline gap-2 px-2 pb-2">
         <span className="font-mono text-[9.5px] font-semibold uppercase tabular-nums tracking-[0.18em] text-primary/55">
           Users
@@ -226,7 +226,7 @@ function UserRow({
       type="button"
       onClick={() => onPick(account)}
       style={{ animationDelay: `${delay}ms` }}
-      className="fsh-enter group relative flex w-full cursor-pointer items-center gap-3 overflow-hidden rounded-lg px-2 py-2.5 text-left outline-none transition-all duration-200 hover:translate-x-0.5 focus-visible:bg-primary/[0.04] active:scale-[0.99]"
+      className="app-enter group relative flex w-full cursor-pointer items-center gap-3 overflow-hidden rounded-lg px-2 py-2.5 text-left outline-none transition-all duration-200 hover:translate-x-0.5 focus-visible:bg-primary/[0.04] active:scale-[0.99]"
     >
       {/* Gradient wash — left → transparent on hover */}
       <span

@@ -1,4 +1,4 @@
-using FSH.Modules.Files.Services;
+using Boilerplate.Modules.Files.Services;
 using Shouldly;
 
 namespace Files.Tests.Services;

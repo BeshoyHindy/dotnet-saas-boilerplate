@@ -1,13 +1,13 @@
-using FSH.Framework.Shared.Multitenancy;
-using FSH.Framework.Web.Idempotency;
-using FSH.Modules.Identity.Contracts.v1.Users.RegisterUser;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Web.Idempotency;
+using Boilerplate.Modules.Identity.Contracts.v1.Users.RegisterUser;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
-namespace FSH.Modules.Identity.Features.v1.Users.SelfRegistration;
+namespace Boilerplate.Modules.Identity.Features.v1.Users.SelfRegistration;
 
 public static class SelfRegisterUserEndpoint
 {

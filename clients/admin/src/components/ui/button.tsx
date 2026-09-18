@@ -4,7 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/cn";
 
 /**
- * Button — FSH unified design system.
+ * Button — Boilerplate unified design system.
  *
  * Variants (preserved + extended):
  *   • default     — solid primary brand fill with hover lift shadow.

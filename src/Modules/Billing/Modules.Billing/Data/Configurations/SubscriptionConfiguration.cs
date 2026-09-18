@@ -1,9 +1,9 @@
-using FSH.Modules.Billing.Contracts;
-using FSH.Modules.Billing.Domain;
+using Boilerplate.Modules.Billing.Contracts;
+using Boilerplate.Modules.Billing.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace FSH.Modules.Billing.Data.Configurations;
+namespace Boilerplate.Modules.Billing.Data.Configurations;
 
 public sealed class SubscriptionConfiguration : IEntityTypeConfiguration<Subscription>
 {
