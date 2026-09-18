@@ -1,4 +1,4 @@
-using Boilerplate.BuildingBlocks.Core.Context;
+﻿using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.Modules.Auditing.Contracts;
 using Boilerplate.Modules.Identity.Contracts.Services;
 using Boilerplate.BuildingBlocks.Core.Exceptions;
@@ -57,7 +57,7 @@ public sealed class RefreshTokenCommandHandler
         var (subject, claims) = validated.Value;
 
         // Check if the session associated with this refresh token is still valid
-        var refreshTokenHash = Sha256Short(request.RefreshToken);
+        var refreshTokenHash = TokenFingerprint.Sha256Short(request.RefreshToken);
         var isSessionValid = await _sessionService.ValidateSessionAsync(refreshTokenHash, cancellationToken);
         if (!isSessionValid)
         {
@@ -95,13 +95,13 @@ public sealed class RefreshTokenCommandHandler
         await _securityAudit.TokenRevokedAsync(subject, clientId!, "RefreshTokenRotated", cancellationToken);
 
         // Issue new tokens
-        var newToken = await _tokenService.IssueAsync(subject, claims, null, cancellationToken);
+        var newToken = await _tokenService.IssueAsync(subject, claims, cancellationToken);
 
         // Persist rotated refresh token for this user
         await _identityService.StoreRefreshTokenAsync(subject, newToken.RefreshToken, newToken.RefreshTokenExpiresAt, cancellationToken);
 
         // Update the session with the new refresh token hash
-        var newRefreshTokenHash = Sha256Short(newToken.RefreshToken);
+        var newRefreshTokenHash = TokenFingerprint.Sha256Short(newToken.RefreshToken);
         await _sessionService.UpdateSessionRefreshTokenAsync(
             refreshTokenHash,
             newRefreshTokenHash,
@@ -109,7 +109,7 @@ public sealed class RefreshTokenCommandHandler
             cancellationToken);
 
         // Audit the newly issued token with a fingerprint
-        var fingerprint = Sha256Short(newToken.AccessToken);
+        var fingerprint = TokenFingerprint.Sha256Short(newToken.AccessToken);
         await _securityAudit.TokenIssuedAsync(
             userId: subject,
             userName: claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? string.Empty,
@@ -122,11 +122,5 @@ public sealed class RefreshTokenCommandHandler
             Token: newToken.AccessToken,
             RefreshToken: newToken.RefreshToken,
             RefreshTokenExpiryTime: newToken.RefreshTokenExpiresAt);
-    }
-
-    private static string Sha256Short(string value)
-    {
-        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value));
-        return Convert.ToHexString(hash.AsSpan(0, 8));
     }
 }

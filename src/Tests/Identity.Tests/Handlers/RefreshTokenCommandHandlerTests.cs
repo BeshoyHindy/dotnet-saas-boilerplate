@@ -1,4 +1,4 @@
-using AutoFixture;
+﻿using AutoFixture;
 using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.Modules.Auditing.Contracts;
 using Boilerplate.Modules.Identity.Contracts.DTOs;
@@ -78,7 +78,7 @@ public sealed class RefreshTokenCommandHandlerTests
         _sessionService.ValidateSessionAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(true);
 
-        _tokenService.IssueAsync(userId, claims, null, Arg.Any<CancellationToken>())
+        _tokenService.IssueAsync(userId, claims, Arg.Any<CancellationToken>())
             .Returns(newToken);
 
         // Act
@@ -108,7 +108,7 @@ public sealed class RefreshTokenCommandHandlerTests
         _sessionService.ValidateSessionAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(true);
 
-        _tokenService.IssueAsync(userId, claims, null, Arg.Any<CancellationToken>())
+        _tokenService.IssueAsync(userId, claims, Arg.Any<CancellationToken>())
             .Returns(newToken);
 
         // Act
@@ -117,7 +117,7 @@ public sealed class RefreshTokenCommandHandlerTests
         // Assert
         await _identityService.Received(1).ValidateRefreshTokenAsync(command.RefreshToken, Arg.Any<CancellationToken>());
         await _sessionService.Received(1).ValidateSessionAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await _tokenService.Received(1).IssueAsync(userId, claims, null, Arg.Any<CancellationToken>());
+        await _tokenService.Received(1).IssueAsync(userId, claims, Arg.Any<CancellationToken>());
         await _identityService.Received(1).StoreRefreshTokenAsync(userId, newToken.RefreshToken, newToken.RefreshTokenExpiresAt, Arg.Any<CancellationToken>());
         await _sessionService.Received(1).UpdateSessionRefreshTokenAsync(Arg.Any<string>(), Arg.Any<string>(), newToken.RefreshTokenExpiresAt, Arg.Any<CancellationToken>());
         await _securityAudit.Received(1).TokenRevokedAsync(userId, "test-client", "RefreshTokenRotated", Arg.Any<CancellationToken>());
@@ -279,7 +279,7 @@ public sealed class RefreshTokenCommandHandlerTests
         _sessionService.ValidateSessionAsync(Arg.Any<string>(), cancellationToken)
             .Returns(true);
 
-        _tokenService.IssueAsync(userId, claims, null, cancellationToken)
+        _tokenService.IssueAsync(userId, claims, cancellationToken)
             .Returns(newToken);
 
         // Act
@@ -288,7 +288,7 @@ public sealed class RefreshTokenCommandHandlerTests
         // Assert
         await _identityService.Received(1).ValidateRefreshTokenAsync(command.RefreshToken, cancellationToken);
         await _sessionService.Received(1).ValidateSessionAsync(Arg.Any<string>(), cancellationToken);
-        await _tokenService.Received(1).IssueAsync(userId, claims, null, cancellationToken);
+        await _tokenService.Received(1).IssueAsync(userId, claims, cancellationToken);
         await _identityService.Received(1).StoreRefreshTokenAsync(userId, newToken.RefreshToken, newToken.RefreshTokenExpiresAt, cancellationToken);
         await _sessionService.Received(1).UpdateSessionRefreshTokenAsync(Arg.Any<string>(), Arg.Any<string>(), newToken.RefreshTokenExpiresAt, cancellationToken);
     }
