@@ -20,6 +20,7 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read # dorny/paths-filter lists the PR's changed files
 
 jobs:
   changes:
