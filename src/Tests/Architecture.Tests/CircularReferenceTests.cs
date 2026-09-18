@@ -139,12 +139,12 @@ public class CircularReferenceTests
                 .Descendants("ProjectReference")
                 .Select(x => (string?)x.Attribute("Include") ?? string.Empty)
                 .Where(include => include.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
-                .Select(Path.GetFileNameWithoutExtension)
+                .Select(ProjectReferences.GetReferencedProjectName)
                 .Where(name => !string.IsNullOrEmpty(name));
 
             foreach (var reference in projectRefs)
             {
-                references.Add(reference!);
+                references.Add(reference);
             }
         }
         catch (System.Xml.XmlException)
