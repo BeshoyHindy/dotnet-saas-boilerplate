@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Clock, X } from "lucide-react";
-import { getMyStatus, type TenantStatusDto } from "@/api/billing";
+import { getMyStatus, type TenantStatusDto } from "@/api/tenants";
 import { useAuth } from "@/auth/use-auth";
 import { cn } from "@/lib/cn";
 
-// Days within which an "Active" subscription nearing its validUpto starts
+// Days within which an "Active" tenant nearing its validUpto starts
 // surfacing the soft info bar.
 const NEARING_EXPIRY_DAYS = 7;
 
@@ -74,10 +74,10 @@ function pluralizeDays(n: number): string {
 }
 
 /**
- * Global subscription health bar. Shows a warning while the tenant is in
+ * Global tenant validity bar. Shows a warning while the tenant is in
  * its post-expiry grace window, and a softer info note when an active
- * subscription is within a week of expiring. Dismissal is per browser
- * session — it reappears on reload while the condition still holds.
+ * tenant is within a week of its validity expiring. Dismissal is per
+ * browser session — it reappears on reload while the condition still holds.
  */
 export function ExpiryBanner() {
   const { user } = useAuth();
@@ -96,7 +96,7 @@ export function ExpiryBanner() {
   if (view.kind === "none") return null;
 
   // The expired state is the hardest failure — it stays pinned (no dismiss)
-  // so the tenant can't lose track that their subscription has lapsed. The
+  // so the tenant can't lose track that their validity has lapsed. The
   // softer grace/nearing notices remain dismissible for the session.
   const isExpired = view.kind === "expired";
   if (dismissed && !isExpired) return null;
@@ -109,10 +109,10 @@ export function ExpiryBanner() {
       : "var(--color-info)";
   const Icon = isExpired || isGrace ? AlertTriangle : Clock;
   const message = isExpired
-    ? "Your subscription has expired. Contact your operator to renew and restore full access."
+    ? "Your tenant's validity has expired. Contact your operator to renew and restore full access."
     : isGrace
-      ? `Your subscription expired — ${pluralizeDays(view.daysLeft)} of grace left (until ${view.graceEndsLabel}). Contact your operator to renew.`
-      : `Your subscription expires in ${pluralizeDays(view.daysLeft)}.`;
+      ? `Your tenant's validity expired — ${pluralizeDays(view.daysLeft)} of grace left (until ${view.graceEndsLabel}). Contact your operator to renew.`
+      : `Your tenant's validity expires in ${pluralizeDays(view.daysLeft)}.`;
 
   return (
     <div
@@ -150,7 +150,7 @@ export function ExpiryBanner() {
         <button
           type="button"
           onClick={() => setDismissed(true)}
-          aria-label="Dismiss subscription notice"
+          aria-label="Dismiss validity notice"
           title="Dismiss"
           className="grid size-7 shrink-0 cursor-pointer place-items-center rounded-md transition-colors hover:bg-[oklch(from_var(--color-foreground)_l_c_h_/_0.06)]"
           style={{ color: tone }}

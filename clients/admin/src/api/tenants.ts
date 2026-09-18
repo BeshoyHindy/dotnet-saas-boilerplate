@@ -12,8 +12,6 @@ export type TenantDto = {
   isActive: boolean;
   validUpto: string;
   issuer?: string;
-  /** Present on the status endpoint (TenantStatusDto); absent on the list projection. */
-  plan?: string | null;
   expiryState?: TenantExpiryState;
   graceEndsUtc?: string;
 };
@@ -31,15 +29,13 @@ export type CreateTenantInput = {
   adminPassword: string;
   issuer: string;
   connectionString?: string | null;
-  /** Plan key to subscribe the tenant to. Omitted → server falls back to the default/trial plan. */
-  planKey?: string | null;
+  /** ISO date-time the tenant stays valid until. Omitted → server default. */
+  validUpto?: string | null;
 };
 
 export type RenewTenantResponse = {
   tenantId: string;
   validUpto: string;
-  planKey: string;
-  planChanged: boolean;
 };
 
 export type AdjustTenantValidityResponse = {
@@ -104,23 +100,23 @@ export async function createTenant(input: CreateTenantInput): Promise<CreateTena
       adminPassword: input.adminPassword,
       issuer: input.issuer,
       connectionString: input.connectionString ?? null,
-      planKey: input.planKey ?? null,
+      validUpto: input.validUpto ?? null,
     }),
   });
 }
 
-/** Renew a tenant for one more plan term, optionally switching plans. */
-export async function renewTenant(id: string, planKey?: string | null): Promise<RenewTenantResponse> {
+/** Renew a tenant, optionally extending validity by a specific number of months (1–120). Omitted → server default. */
+export async function renewTenant(id: string, months?: number | null): Promise<RenewTenantResponse> {
   return apiFetch<RenewTenantResponse>(`/api/v1/tenants/${encodeURIComponent(id)}/renew`, {
     method: "POST",
-    body: JSON.stringify({ tenantId: id, planKey: planKey ?? null }),
+    body: JSON.stringify({ months: months ?? null }),
   });
 }
 
 /**
- * Operator override: set a tenant's ValidUpto directly with NO invoice
- * (comp/correction). Backdating is allowed server-side. Root-operator only —
- * gated by MultitenancyPermissions.Tenants.UpgradeSubscription, same as renew.
+ * Operator override: set a tenant's ValidUpto directly (comp/correction).
+ * Backdating is allowed server-side. Root-operator only — gated by
+ * MultitenancyPermissions.Tenants.UpgradeSubscription, same as renew.
  */
 export async function adjustTenantValidity(id: string, validUpto: string): Promise<AdjustTenantValidityResponse> {
   return apiFetch<AdjustTenantValidityResponse>(`/api/v1/tenants/${encodeURIComponent(id)}/adjust-validity`, {

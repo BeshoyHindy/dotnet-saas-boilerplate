@@ -423,7 +423,6 @@ function formatTimestamp(value: string | undefined | null): string {
 
 const TAG_NAMES: ReadonlyArray<{ bit: number; label: string }> = [
   { bit: 1 << 0, label: "PiiMasked" },
-  { bit: 1 << 1, label: "OutOfQuota" },
   { bit: 1 << 2, label: "Sampled" },
   { bit: 1 << 3, label: "RetainedLong" },
   { bit: 1 << 4, label: "HealthCheck" },

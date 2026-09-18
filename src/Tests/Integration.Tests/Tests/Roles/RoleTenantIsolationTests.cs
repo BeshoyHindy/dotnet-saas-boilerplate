@@ -7,7 +7,7 @@ namespace Integration.Tests.Tests.Roles;
 /// Roles are tenant-scoped: a custom role created in one tenant must be completely
 /// invisible to another tenant. Verifies both the list endpoint (the role does not
 /// appear in tenant B's roles) and direct lookup (tenant B cannot read the role by id).
-/// Cross-tenant scaffolding mirrors <see cref="Webhooks.WebhookTenantIsolationTests"/>.
+/// Cross-tenant scaffolding mirrors <see cref="Files.FileTenantIsolationTests"/>.
 /// </summary>
 [Collection(AppCollectionDefinition.Name)]
 public sealed class RoleTenantIsolationTests

@@ -5,7 +5,6 @@ using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.BuildingBlocks.Web;
 using Boilerplate.BuildingBlocks.Web.Modules;
 using Boilerplate.Modules.Auditing;
-using Boilerplate.Modules.Billing;
 using Boilerplate.Modules.Identity;
 using Boilerplate.Modules.Identity.Contracts.v1.Tokens.TokenGeneration;
 using Boilerplate.Modules.Identity.Features.v1.Tokens.TokenGeneration;
@@ -14,7 +13,6 @@ using Boilerplate.Modules.Multitenancy.Contracts;
 using Boilerplate.Modules.Multitenancy.Contracts.v1.GetTenantStatus;
 using Boilerplate.Modules.Multitenancy.Data;
 using Boilerplate.Modules.Multitenancy.Features.v1.GetTenantStatus;
-using Boilerplate.Modules.Webhooks;
 using Boilerplate.DbMigrator;
 using Finbuckle.MultiTenant.Abstractions;
 using Microsoft.EntityFrameworkCore;
@@ -85,10 +83,6 @@ builder.Services.AddMediator(o =>
         typeof(GetTenantStatusQueryHandler),
         typeof(Boilerplate.Modules.Auditing.Contracts.AuditEnvelope),
         typeof(Boilerplate.Modules.Auditing.Persistence.AuditDbContext),
-        typeof(Boilerplate.Modules.Webhooks.Contracts.v1.CreateWebhookSubscription.CreateWebhookSubscriptionCommand),
-        typeof(Boilerplate.Modules.Webhooks.WebhooksModule),
-        typeof(Boilerplate.Modules.Billing.Contracts.BillingContractsMarker),
-        typeof(Boilerplate.Modules.Billing.BillingModule),
         typeof(Boilerplate.Modules.Files.Contracts.v1.Commands.RequestUploadUrlCommand),
         typeof(Boilerplate.Modules.Files.FilesModule),
         typeof(Boilerplate.Modules.Notifications.Contracts.v1.Commands.MarkNotificationReadCommand),
@@ -102,8 +96,6 @@ var moduleAssemblies = new Assembly[]
     typeof(MultitenancyModule).Assembly,
     typeof(AuditingModule).Assembly,
     typeof(Boilerplate.Modules.Files.FilesModule).Assembly,
-    typeof(WebhooksModule).Assembly,
-    typeof(BillingModule).Assembly,
     typeof(Boilerplate.Modules.Notifications.NotificationsModule).Assembly,
 };
 
@@ -118,7 +110,6 @@ builder.AddHeroPlatform(o =>
     o.EnableMailing = false;
     o.EnableSse = false;
     o.EnableRealtime = false;
-    o.EnableQuotas = false;
     o.EnableFeatureFlags = false;
     o.EnableIdempotency = false;
     o.EnableCaching = true;

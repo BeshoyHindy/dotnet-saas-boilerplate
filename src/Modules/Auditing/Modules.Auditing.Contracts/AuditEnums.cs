@@ -108,7 +108,6 @@ public enum AuditTag
 {
     None = 0,
     PiiMasked = 1 << 0,
-    OutOfQuota = 1 << 1,
     Sampled = 1 << 2,
     RetainedLong = 1 << 3,
     HealthCheck = 1 << 4,

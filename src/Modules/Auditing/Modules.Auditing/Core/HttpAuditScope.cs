@@ -68,7 +68,7 @@ public sealed class HttpAuditScope : IAuditScope
     public string? Source =>
         _http.HttpContext?.GetEndpoint()?.DisplayName
         // Background path: the activator names the activity after the job method
-        // (e.g. "MonthlyInvoiceJob.RunAsync"); a stable source key when no HTTP endpoint is in scope.
+        // (e.g. "PurgeDeletedFilesJob.RunAsync"); a stable source key when no HTTP endpoint is in scope.
         ?? Activity.Current?.OperationName
         ?? "background";
 

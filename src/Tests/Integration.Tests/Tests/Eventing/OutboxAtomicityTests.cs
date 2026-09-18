@@ -4,7 +4,7 @@ using Boilerplate.BuildingBlocks.Eventing.Abstractions;
 using Boilerplate.BuildingBlocks.Eventing.Outbox;
 using Boilerplate.BuildingBlocks.Eventing.Persistence;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
-using Boilerplate.Modules.Billing.Contracts.Events;
+using Boilerplate.Modules.Files.Contracts.Events;
 using Boilerplate.Modules.Notifications.Data;
 using Boilerplate.Modules.Notifications.Domain;
 using Integration.Tests.Infrastructure;
@@ -148,19 +148,18 @@ public sealed class OutboxAtomicityTests
         await AssertOutboxRowAsync(afterId, shouldExist: true, "a later write must stand on its own again");
     }
 
-    private static InvoiceIssuedIntegrationEvent NewEvent(Guid id) => new(
+    private static FileFinalizedIntegrationEvent NewEvent(Guid id) => new(
         id,
         DateTime.UtcNow,
         TestConstants.RootTenantId,
         $"corr-{id:N}",
-        "Billing",
+        "Files",
         Guid.CreateVersion7(),
-        "INV-ATOMIC",
-        10.00m,
-        "USD",
-        DateTime.UtcNow.AddDays(7),
-        2026,
-        8);
+        "outbox-atomic",
+        Guid.CreateVersion7(),
+        "text/plain",
+        512,
+        1);
 
     private async Task AssertOutboxRowAsync(Guid eventId, bool shouldExist, string because)
     {

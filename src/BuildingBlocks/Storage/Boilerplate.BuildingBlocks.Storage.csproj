@@ -8,7 +8,6 @@
 	
 	<ItemGroup>
 		<ProjectReference Include="..\Core\Boilerplate.BuildingBlocks.Core.csproj" />
-		<ProjectReference Include="..\Quota\Boilerplate.BuildingBlocks.Quota.csproj" />
 		<ProjectReference Include="..\Shared\Boilerplate.BuildingBlocks.Shared.csproj" />
 	</ItemGroup>
 

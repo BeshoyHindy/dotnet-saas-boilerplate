@@ -10,9 +10,6 @@ public sealed class TenantStatusDto
     public string AdminEmail { get; init; } = default!;
     public string? Issuer { get; init; }
 
-    /// <summary>The tenant's current billing plan key (drives quotas + subscription).</summary>
-    public string? Plan { get; init; }
-
     /// <summary>Derived lifecycle state: "Active", "InGrace", or "Expired".</summary>
     public string ExpiryState { get; init; } = "Active";
 

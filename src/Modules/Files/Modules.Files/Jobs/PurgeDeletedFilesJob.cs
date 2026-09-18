@@ -1,5 +1,3 @@
-using Boilerplate.BuildingBlocks.Quota;
-using Boilerplate.BuildingBlocks.Shared.Quota;
 using Boilerplate.BuildingBlocks.Storage.Services;
 using Boilerplate.Modules.Files.Data;
 using Hangfire;
@@ -10,13 +8,12 @@ using Microsoft.Extensions.Options;
 namespace Boilerplate.Modules.Files.Jobs;
 
 /// <summary>
-/// Daily purge of soft-deleted FileAsset rows past the retention window. Hard-deletes the row,
-/// removes the bytes from storage, and refunds the quota (the bytes were debited at finalize time).
+/// Daily purge of soft-deleted FileAsset rows past the retention window. Hard-deletes the row and
+/// removes the bytes from storage.
 /// </summary>
 public sealed class PurgeDeletedFilesJob(
     FilesDbContext db,
     IStorageService storage,
-    IQuotaService quotas,
     IOptions<FilesOptions> options,
     ILogger<PurgeDeletedFilesJob> logger)
 {
@@ -49,22 +46,7 @@ public sealed class PurgeDeletedFilesJob(
             }
         }
 
-        // Quota refund — group bytes once per tenant. In schema-per-tenant the resolved tenant
-        // matches every row's logical tenant; the framework's QuotaService is tenant-scoped via DI.
         var totalBytes = candidates.Sum(f => f.SizeBytes);
-        if (totalBytes > 0)
-        {
-            // Empty tenant id satisfies the contract; QuotaService resolves the tenant from DI.
-            // Falls back gracefully with no tenant (the refund is simply lost).
-            try
-            {
-                await quotas.RecordAsync("", QuotaResource.StorageBytes, -totalBytes, cancellationToken).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Quota refund failed for {Bytes} bytes", totalBytes);
-            }
-        }
 
         var ids = candidates.Select(f => f.Id).ToList();
         await db.FileAssets

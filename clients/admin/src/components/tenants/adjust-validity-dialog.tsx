@@ -52,9 +52,9 @@ function toDateInputValue(value?: string | null): string {
 }
 
 /**
- * Operator override that sets a tenant's ValidUpto directly with NO invoice —
- * a comp/correction, distinct from Renew (which issues a term invoice).
- * Backdating is permitted server-side. Root-operator only.
+ * Operator override that sets a tenant's ValidUpto directly — a comp/correction,
+ * distinct from Renew (which extends validity by a term of months instead of
+ * setting an absolute date). Backdating is permitted server-side. Root-operator only.
  */
 export function AdjustValidityDialog({
   open,
@@ -89,7 +89,7 @@ export function AdjustValidityDialog({
     mutationFn: (value: string) => adjustTenantValidity(tenantId, new Date(value).toISOString()),
     onSuccess: (result) => {
       toast.success("Validity adjusted", {
-        description: `Valid until ${formatDate(result.validUpto)}. No invoice was issued.`,
+        description: `Valid until ${formatDate(result.validUpto)}.`,
       });
       queryClient.invalidateQueries({ queryKey: ["tenant", tenantId] });
       queryClient.invalidateQueries({ queryKey: ["tenants"] });
@@ -128,9 +128,9 @@ export function AdjustValidityDialog({
             <DialogTitle className="text-[16px]">Adjust validity</DialogTitle>
           </div>
           <DialogDescription className="mt-1">
-            Set this tenant's expiry date directly — an operator override with{" "}
-            <strong className="text-[var(--color-foreground)]">no invoice</strong>. Use for comps or
-            corrections; renewals that should bill belong in Renew. Currently valid until{" "}
+            Set this tenant's expiry date directly — an operator override for{" "}
+            <strong className="text-[var(--color-foreground)]">comps or corrections</strong>. For a
+            standard term extension, use Renew instead. Currently valid until{" "}
             {formatDate(validUpto)}.
           </DialogDescription>
         </DialogHeader>
@@ -141,7 +141,7 @@ export function AdjustValidityDialog({
               id="av-validUpto"
               label="Valid until"
               required
-              hint="Backdating is allowed. No invoice is issued for an adjustment."
+              hint="Backdating is allowed."
               error={errors.validUpto?.message}
             >
               <Input id="av-validUpto" type="date" {...register("validUpto")} />

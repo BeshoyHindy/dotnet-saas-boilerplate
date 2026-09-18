@@ -55,7 +55,6 @@ export async function installShellMocks(page: Page): Promise<void> {
     hasConnectionString: false,
     adminEmail: "admin@acme.com",
     issuer: null,
-    plan: "Scale",
     expiryState: "Active",
     graceEndsUtc: new Date(Date.now() + 372 * 24 * 60 * 60 * 1000).toISOString(),
   });

@@ -1,8 +1,6 @@
 using System.Net;
 using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.BuildingBlocks.Core.Exceptions;
-using Boilerplate.BuildingBlocks.Quota;
-using Boilerplate.BuildingBlocks.Shared.Quota;
 using Boilerplate.BuildingBlocks.Storage.Services;
 using Boilerplate.Modules.Files.Contracts;
 using Boilerplate.Modules.Files.Contracts.v1.Commands;
@@ -19,7 +17,6 @@ public sealed class RequestUploadUrlCommandHandler(
     FilesDbContext db,
     IStorageService storage,
     FileAccessPolicyRegistry policies,
-    IQuotaService quotas,
     ICurrentUser currentUser,
     IOptions<FilesOptions> options)
     : ICommandHandler<RequestUploadUrlCommand, PresignedUploadResponse>
@@ -65,16 +62,6 @@ public sealed class RequestUploadUrlCommandHandler(
         if (!await policy.CanAttachAsync(cmd.OwnerId, userId.ToString(), cancellationToken).ConfigureAwait(false))
         {
             throw new ForbiddenException("Not allowed to attach files to this owner.");
-        }
-
-        // Quota pre-check (no debit yet — debit happens on finalize with actual bytes).
-        var quotaCheck = await quotas.CheckAsync(tenantId, QuotaResource.StorageBytes, cmd.SizeBytes, cancellationToken).ConfigureAwait(false);
-        if (!quotaCheck.Allowed)
-        {
-            throw new CustomException(
-                $"Storage quota exceeded ({quotaCheck.CurrentUsage}/{quotaCheck.Limit} bytes).",
-                (IEnumerable<string>?)null,
-                (HttpStatusCode)507);
         }
 
         // Generate id + storage key + presigned URL.

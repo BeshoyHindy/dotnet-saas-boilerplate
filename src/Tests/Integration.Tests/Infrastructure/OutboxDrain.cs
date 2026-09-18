@@ -12,8 +12,8 @@ namespace Integration.Tests.Infrastructure;
 ///
 /// It loops rather than dispatching once for two reasons: one cycle claims at most
 /// <c>OutboxBatchSize</c> rows, and the whole suite shares one database, so unrelated tests' rows
-/// can sit ahead of the one under test in CreatedOnUtc order. Chained events (TenantSubscribed →
-/// InvoiceIssued) also need a cycle each. Stops as soon as a pass clears nothing, so rows another
+/// can sit ahead of the one under test in CreatedOnUtc order. Chained events (one handler's publish
+/// feeding the next) also need a cycle each. Stops as soon as a pass clears nothing, so rows another
 /// test still holds a lease on cannot spin it.
 /// </summary>
 internal static class OutboxDrain

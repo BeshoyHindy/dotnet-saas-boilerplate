@@ -2,7 +2,6 @@
 using Boilerplate.BuildingBlocks.Jobs;
 using Boilerplate.BuildingBlocks.Mailing;
 using Boilerplate.BuildingBlocks.Persistence;
-using Boilerplate.BuildingBlocks.Quota;
 using Boilerplate.BuildingBlocks.Shared.Constants;
 using Boilerplate.BuildingBlocks.Web.Auth;
 using Boilerplate.BuildingBlocks.Web.Cors;
@@ -124,11 +123,6 @@ public static class Extensions
             builder.Services.AddHeroRealtime(builder.Configuration);
         }
 
-        if (options.EnableQuotas)
-        {
-            builder.Services.AddHeroQuotas(builder.Configuration);
-        }
-
         builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
         builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
         builder.Services.AddProblemDetails();
@@ -190,11 +184,6 @@ public static class Extensions
 
         app.UseHeroRateLimiting();
 
-        if (options.UseQuotas)
-        {
-            app.UseHeroQuotas();
-        }
-
         app.UseAuthorization();
 
         if (options.MapModules)
@@ -243,7 +232,6 @@ public sealed class AppPlatformOptions
     public bool EnableIdempotency { get; set; } = true;
     public bool EnableSse { get; set; } = false;
     public bool EnableRealtime { get; set; } = false;
-    public bool EnableQuotas { get; set; } = false;
 }
 
 public sealed class AppPipelineOptions
@@ -254,5 +242,4 @@ public sealed class AppPipelineOptions
     public bool MapModules { get; set; } = true;
     public bool MapSseEndpoints { get; set; } = false;
     public bool MapRealtime { get; set; } = false;
-    public bool UseQuotas { get; set; } = false;
 }

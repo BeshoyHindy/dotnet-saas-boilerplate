@@ -13,8 +13,6 @@
 	  <ProjectReference Include="..\..\Modules\Auditing\Modules.Auditing\Boilerplate.Modules.Auditing.csproj" />
 	  <ProjectReference Include="..\..\Modules\Identity\Modules.Identity\Boilerplate.Modules.Identity.csproj" />
 	  <ProjectReference Include="..\..\Modules\Multitenancy\Modules.Multitenancy\Boilerplate.Modules.Multitenancy.csproj" />
-	  <ProjectReference Include="..\..\Modules\Webhooks\Modules.Webhooks\Boilerplate.Modules.Webhooks.csproj" />
-	  <ProjectReference Include="..\..\Modules\Billing\Modules.Billing\Boilerplate.Modules.Billing.csproj" />
 	  <ProjectReference Include="..\..\Modules\Notifications\Modules.Notifications\Boilerplate.Modules.Notifications.csproj" />
 	  <ProjectReference Include="..\..\Modules\Files\Modules.Files\Boilerplate.Modules.Files.csproj" />
 	</ItemGroup>
@@ -22,7 +20,6 @@
 	<ItemGroup>
 	  <Folder Include="Audit\" />
 	  <Folder Include="MultiTenancy\" />
-	  <Folder Include="Billing\" />
 	  <Folder Include="Notifications\" />
 	  <Folder Include="Files\" />
 	</ItemGroup>

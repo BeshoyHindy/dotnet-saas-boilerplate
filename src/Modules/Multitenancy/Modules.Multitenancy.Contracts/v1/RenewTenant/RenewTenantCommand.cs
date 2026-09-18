@@ -3,8 +3,8 @@ using Mediator;
 namespace Boilerplate.Modules.Multitenancy.Contracts.v1.RenewTenant;
 
 /// <summary>
-/// Renews a tenant for one more plan term. When <see cref="PlanKey"/> is null the current plan is
-/// renewed; when it differs the tenant is switched to the new plan from the renewal forward.
+/// Extends a tenant's validity. When <see cref="Months"/> is null the configured default validity
+/// term is applied; remaining time is stacked on rather than discarded.
 /// </summary>
-public sealed record RenewTenantCommand(string TenantId, string? PlanKey = null)
+public sealed record RenewTenantCommand(string TenantId, int? Months = null)
     : ICommand<RenewTenantCommandResponse>;

@@ -24,7 +24,7 @@ public sealed class TenantExpiryScanJob
     private readonly IOutboxWriter _outbox;
     private readonly IMultiTenantContextSetter _tenantContextSetter;
     private readonly TimeProvider _timeProvider;
-    private readonly TenantBillingOptions _options;
+    private readonly TenantValidityOptions _options;
     private readonly ILogger<TenantExpiryScanJob> _logger;
 
     public TenantExpiryScanJob(
@@ -33,7 +33,7 @@ public sealed class TenantExpiryScanJob
         IOutboxWriter outbox,
         IMultiTenantContextSetter tenantContextSetter,
         TimeProvider timeProvider,
-        IOptions<TenantBillingOptions> options,
+        IOptions<TenantValidityOptions> options,
         ILogger<TenantExpiryScanJob> logger)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -116,8 +116,8 @@ public sealed class TenantExpiryScanJob
         _db.TenantExpiryNotices.Add(TenantExpiryNotice.Record(tenant.Id, noticeType, validUpto, now));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        // Install the Finbuckle context before publishing: downstream handlers (e.g. webhook fan-out) use
-        // tenant-filtered DbContexts that NRE without it, since a background job carries no HTTP request.
+        // Install the Finbuckle context before publishing: downstream handlers use tenant-filtered
+        // DbContexts that NRE without it, since a background job carries no HTTP request.
         _tenantContextSetter.MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
 
         await _outbox.AddAsync(BuildEvent(noticeType, tenant, validUpto, graceEnds, now), ct).ConfigureAwait(false);
@@ -136,12 +136,12 @@ public sealed class TenantExpiryScanJob
         return noticeType switch
         {
             TenantExpiryNoticeTypes.NearingExpiry => new TenantNearingExpiryIntegrationEvent(
-                id, now, tenant.Id, correlationId, source, name, email, tenant.Plan, validUpto, graceEnds,
+                id, now, tenant.Id, correlationId, source, name, email, validUpto, graceEnds,
                 DaysRemaining: Math.Max(0, (int)Math.Ceiling((validUpto - now).TotalDays))),
             TenantExpiryNoticeTypes.EnteredGrace => new TenantEnteredGraceIntegrationEvent(
-                id, now, tenant.Id, correlationId, source, name, email, tenant.Plan, validUpto, graceEnds),
+                id, now, tenant.Id, correlationId, source, name, email, validUpto, graceEnds),
             _ => new TenantExpiredIntegrationEvent(
-                id, now, tenant.Id, correlationId, source, name, email, tenant.Plan, validUpto, graceEnds),
+                id, now, tenant.Id, correlationId, source, name, email, validUpto, graceEnds),
         };
     }
 }

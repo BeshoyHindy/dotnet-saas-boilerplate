@@ -45,7 +45,6 @@
 	  <ProjectReference Include="..\Jobs\Boilerplate.BuildingBlocks.Jobs.csproj" />
 	  <ProjectReference Include="..\Mailing\Boilerplate.BuildingBlocks.Mailing.csproj" />
 	  <ProjectReference Include="..\Persistence\Boilerplate.BuildingBlocks.Persistence.csproj" />
-	  <ProjectReference Include="..\Quota\Boilerplate.BuildingBlocks.Quota.csproj" />
 	</ItemGroup>
 
 </Project>

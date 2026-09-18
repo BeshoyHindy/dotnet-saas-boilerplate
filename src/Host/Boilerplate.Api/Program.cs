@@ -7,8 +7,6 @@ using Boilerplate.Modules.Identity.Contracts.v1.Tokens.TokenGeneration;
 using Boilerplate.Modules.Identity.Features.v1.Tokens.TokenGeneration;
 using Boilerplate.Modules.Multitenancy;
 using Boilerplate.Modules.Multitenancy.Contracts.v1.GetTenantStatus;
-using Boilerplate.Modules.Webhooks;
-using Boilerplate.Modules.Billing;
 using Boilerplate.Modules.Multitenancy.Features.v1.GetTenantStatus;
 using System.Reflection;
 using System.Text.Json.Serialization;
@@ -48,10 +46,6 @@ builder.Services.AddMediator(o =>
         typeof(GetTenantStatusQueryHandler),
         typeof(Boilerplate.Modules.Auditing.Contracts.AuditEnvelope),
         typeof(Boilerplate.Modules.Auditing.Persistence.AuditDbContext),
-        typeof(Boilerplate.Modules.Webhooks.Contracts.v1.CreateWebhookSubscription.CreateWebhookSubscriptionCommand),
-        typeof(Boilerplate.Modules.Webhooks.WebhooksModule),
-        typeof(Boilerplate.Modules.Billing.Contracts.BillingContractsMarker),
-        typeof(Boilerplate.Modules.Billing.BillingModule),
         typeof(Boilerplate.Modules.Files.Contracts.v1.Commands.RequestUploadUrlCommand),
         typeof(Boilerplate.Modules.Files.FilesModule),
         typeof(Boilerplate.Modules.Notifications.Contracts.v1.Commands.MarkNotificationReadCommand),
@@ -64,8 +58,6 @@ var moduleAssemblies = new Assembly[]
     typeof(MultitenancyModule).Assembly,
     typeof(AuditingModule).Assembly,
     typeof(Boilerplate.Modules.Files.FilesModule).Assembly,
-    typeof(WebhooksModule).Assembly,
-    typeof(BillingModule).Assembly,
     typeof(Boilerplate.Modules.Notifications.NotificationsModule).Assembly,
 };
 
@@ -74,7 +66,6 @@ builder.AddHeroPlatform(o =>
     o.EnableCaching = true;
     o.EnableMailing = true;
     o.EnableJobs = true;
-    o.EnableQuotas = true;
     o.EnableSse = true;
     o.EnableRealtime = true;
 });
@@ -96,7 +87,6 @@ app.UseHeroPlatform(p =>
 {
     p.MapModules = true;
     p.ServeStaticFiles = true;
-    p.UseQuotas = true;
     p.MapSseEndpoints = true;
     p.MapRealtime = true;
 });

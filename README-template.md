@@ -50,8 +50,8 @@ The React apps read their API URL at runtime from `public/config.json` — no re
 ```
 src/
   BuildingBlocks/      Shared framework libraries — yours to modify
-  Modules/             Bounded contexts: Identity, Multitenancy, Auditing, Billing,
-                       Files, Notifications, Webhooks
+  Modules/             Bounded contexts: Identity, Multitenancy, Auditing,
+                       Files, Notifications
   Host/
     Boilerplate.Api/                    API composition root
     Boilerplate.AppHost/                .NET Aspire orchestrator

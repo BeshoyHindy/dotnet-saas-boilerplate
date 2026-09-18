@@ -65,7 +65,6 @@ export function severityRank(severity: AuditSeverity): number {
 export const AuditTag = {
   None: 0,
   PiiMasked: 1 << 0,
-  OutOfQuota: 1 << 1,
   Sampled: 1 << 2,
   RetainedLong: 1 << 3,
   HealthCheck: 1 << 4,
@@ -76,7 +75,6 @@ export type AuditTag = (typeof AuditTag)[keyof typeof AuditTag];
 
 export const AUDIT_TAG_LABELS: Array<{ flag: number; name: string }> = [
   { flag: AuditTag.PiiMasked, name: "PII masked" },
-  { flag: AuditTag.OutOfQuota, name: "Quota exceeded" },
   { flag: AuditTag.Sampled, name: "Sampled" },
   { flag: AuditTag.RetainedLong, name: "Retained" },
   { flag: AuditTag.HealthCheck, name: "Health check" },

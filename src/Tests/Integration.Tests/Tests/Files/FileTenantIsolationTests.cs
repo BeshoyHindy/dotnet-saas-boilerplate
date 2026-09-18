@@ -82,7 +82,7 @@ public sealed class FileTenantIsolationTests
 
     #endregion
 
-    #region Tenant scaffolding (copied from WebhookTenantIsolationTests)
+    #region Tenant scaffolding
 
     private async Task<HttpClient> CreateOtherTenantAdminClientAsync()
     {

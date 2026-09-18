@@ -7,9 +7,7 @@ import {
   ArrowUpRight,
   Calendar,
   ChevronRight,
-  CreditCard,
   FolderOpen,
-  Gauge,
   RefreshCw,
   ScrollText,
   Server,
@@ -23,13 +21,9 @@ import {
 } from "lucide-react";
 import {
   getMyStatus,
-  getMySubscription,
-  getUsageSnapshots,
-  type SubscriptionDto,
   type TenantExpiryState,
   type TenantStatusDto,
-  type UsageSnapshotDto,
-} from "@/api/billing";
+} from "@/api/tenants";
 import {
   AuditEventType,
   AuditSeverity,
@@ -50,51 +44,8 @@ import { cn } from "@/lib/cn";
 // Shaping helpers — pure, tested via memoization at the call sites.
 // ────────────────────────────────────────────────────────────────────────
 
-type UsageRowVm = {
-  resource: string;
-  used: number;
-  limit: number;
-  overage: number;
-  utilization: number;
-};
-
 const numberFmt = new Intl.NumberFormat("en-US");
 const formatNumber = (n: number) => numberFmt.format(n);
-
-function toUsageRows(snapshots: UsageSnapshotDto[]): UsageRowVm[] {
-  const now = new Date();
-  const cy = now.getUTCFullYear();
-  const cm = now.getUTCMonth() + 1;
-  return snapshots
-    .filter((s) => s.periodYear === cy && s.periodMonth === cm)
-    .map((s) => ({
-      resource: String(s.resource),
-      used: s.usedUnits,
-      limit: s.limitUnits,
-      overage: s.overage,
-      utilization: s.limitUnits > 0 ? Math.min(100, (s.usedUnits / s.limitUnits) * 100) : 0,
-    }))
-    .sort((a, b) => b.utilization - a.utilization);
-}
-
-/**
- * Fraction of the subscription term elapsed, 0..1 — computed from the
- * subscription's own start→end window (NOT the calendar month), so it tracks
- * the same validity the operator sees. Returns null for an open-ended or
- * unparseable term (no finite window to chart). A future-dated start clamps
- * to 0, a past end clamps to 1.
- */
-function subscriptionProgress(
-  startUtc: string,
-  endUtc: string | null | undefined,
-  now: Date = new Date(),
-): number | null {
-  if (!endUtc) return null;
-  const start = Date.parse(startUtc);
-  const end = Date.parse(endUtc);
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null;
-  return Math.min(1, Math.max(0, (now.getTime() - start) / (end - start)));
-}
 
 /** Whole days from now until `iso`, floored at 0. */
 function daysUntil(iso: string, now: Date = new Date()): number {
@@ -258,209 +209,6 @@ function StatCard({
     </Link>
   ) : (
     body
-  );
-}
-
-// ────────────────────────────────────────────────────────────────────────
-// Usage row — tightened single-line layout. Label · used/limit · bar.
-// ────────────────────────────────────────────────────────────────────────
-
-function UsageRow({ row }: { row: UsageRowVm }) {
-  const overUtilized = row.utilization >= 80;
-  const overage = row.overage > 0;
-  return (
-    <li className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 border-t border-[oklch(from_var(--color-border)_l_c_h_/_0.5)] py-2.5 first:border-t-0 first:pt-0">
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="truncate text-[12.5px] font-medium tracking-tight text-foreground">
-          {row.resource}
-        </span>
-        {overage && <Badge variant="danger">+{formatNumber(row.overage)}</Badge>}
-      </div>
-
-      <div className="text-right tabular-nums">
-        <span className="text-[12.5px] font-semibold tracking-tight text-foreground">
-          {formatNumber(row.used)}
-        </span>
-        <span className="ml-1 text-[11.5px] font-normal text-muted-foreground">
-          / {formatNumber(row.limit)}
-        </span>
-        <span className="ml-2 text-[11px] tabular-nums text-muted-foreground">
-          {row.utilization.toFixed(0)}%
-        </span>
-      </div>
-
-      <div className="col-span-2">
-        <div className="relative h-1 overflow-hidden rounded-full bg-[var(--color-muted)]">
-          <div
-            className={cn(
-              "h-full rounded-full transition-[width] duration-[700ms] ease-[var(--ease-out-cubic)]",
-              overage
-                ? "bg-[var(--color-destructive)]"
-                : overUtilized
-                  ? "bg-[var(--color-warning)]"
-                  : "bg-[var(--color-primary)]",
-            )}
-            style={{ width: `${row.utilization}%` }}
-          />
-        </div>
-      </div>
-    </li>
-  );
-}
-
-function UsageSkeleton() {
-  return (
-    <ul className="space-y-3">
-      {[0, 1, 2].map((i) => (
-        <li key={i} className="space-y-2 py-1.5">
-          <div className="flex items-center justify-between">
-            <Skeleton className="h-3.5 w-32" />
-            <Skeleton className="h-3.5 w-24" />
-          </div>
-          <Skeleton className="h-1 w-full" />
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function UsageEmpty({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-      <span
-        aria-hidden
-        className="grid size-8 place-items-center rounded-lg bg-[oklch(from_var(--color-primary)_l_c_h_/_0.10)]"
-      >
-        <Gauge className="size-3.5 text-[var(--color-primary)]" />
-      </span>
-      <div className="text-[13px] font-semibold tracking-tight text-foreground">{title}</div>
-      <p className="max-w-sm text-[11.5px] leading-relaxed text-muted-foreground">
-        {description}
-      </p>
-    </div>
-  );
-}
-
-// ────────────────────────────────────────────────────────────────────────
-// Subscription side card — plan name + status badge, validity window,
-// and current-period progress bar.
-// ────────────────────────────────────────────────────────────────────────
-
-function SubscriptionBody({
-  data,
-  loading,
-  isError,
-}: {
-  data: SubscriptionDto | null | undefined;
-  loading: boolean;
-  isError: boolean;
-}) {
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        <Skeleton className="h-6 w-3/5" />
-        <Skeleton className="h-3 w-2/5" />
-        <Skeleton className="h-3 w-4/5" />
-        <Skeleton className="h-2 w-full" />
-      </div>
-    );
-  }
-  if (isError) {
-    return (
-      <div className="flex flex-col items-start gap-3">
-        <div>
-          <div className="text-[13px] font-semibold tracking-tight text-foreground">
-            Couldn't load subscription
-          </div>
-          <p className="mt-1 text-[11.5px] leading-relaxed text-muted-foreground">
-            The subscription endpoint returned an error. Try refreshing.
-          </p>
-        </div>
-      </div>
-    );
-  }
-  if (!data) {
-    return (
-      <div className="flex flex-col items-start gap-3">
-        <div>
-          <div className="text-[13px] font-semibold tracking-tight text-foreground">
-            No active subscription
-          </div>
-          <p className="mt-1 text-[11.5px] leading-relaxed text-muted-foreground">
-            Pick a plan to enable billing, quotas, and overage tracking.
-          </p>
-        </div>
-        <Button asChild variant="soft" size="sm">
-          <Link to="/subscription">View subscription</Link>
-        </Button>
-      </div>
-    );
-  }
-
-  const progress = subscriptionProgress(data.startUtc, data.endUtc);
-  const progressPct = progress === null ? null : Math.round(progress * 100);
-  const daysLeft = data.endUtc ? daysUntil(data.endUtc) : null;
-
-  const dateFmt: Intl.DateTimeFormatOptions = {
-    month: "short",
-    day: "2-digit",
-    year: "numeric",
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="font-display text-[22px] font-bold tracking-tight text-foreground">
-          {data.planKey}
-        </span>
-        {/* /subscriptions/me only ever returns the ACTIVE subscription, so
-            the status badge is always the active tone. */}
-        <Badge variant="success">
-          <span
-            aria-hidden
-            className="pulse-dot inline-block h-1.5 w-1.5 rounded-full"
-            style={{ backgroundColor: "var(--color-success)", color: "var(--color-success)" }}
-          />
-          {data.status}
-        </Badge>
-      </div>
-
-      <dl className="space-y-1.5 text-[12px]">
-        <div className="flex items-center justify-between gap-3">
-          <dt className="text-muted-foreground">Started</dt>
-          <dd className="tabular-nums text-foreground">
-            {new Date(data.startUtc).toLocaleDateString("en-US", dateFmt)}
-          </dd>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <dt className="text-muted-foreground">Ends</dt>
-          <dd className="tabular-nums text-foreground">
-            {data.endUtc
-              ? new Date(data.endUtc).toLocaleDateString("en-US", dateFmt)
-              : "open-ended"}
-          </dd>
-        </div>
-      </dl>
-
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between text-[11px]">
-          <span className="text-muted-foreground">Current term</span>
-          <span className="tabular-nums text-foreground">
-            {progressPct === null
-              ? "open-ended"
-              : `${progressPct}% · ${daysLeft}d left`}
-          </span>
-        </div>
-        {progressPct !== null && (
-          <div className="h-1 overflow-hidden rounded-full bg-[var(--color-muted)]">
-            <div
-              className="h-full rounded-full bg-[var(--color-primary)] transition-[width] duration-[700ms] ease-[var(--ease-out-cubic)]"
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -678,10 +426,10 @@ const QUICK_ACTIONS: QuickAction[] = [
     tone: "success",
   },
   {
-    to: "/subscription",
-    title: "Subscription",
-    description: "Plan, usage, invoices.",
-    icon: CreditCard,
+    to: "/system/audits",
+    title: "Audit trail",
+    description: "Security & entity-change events.",
+    icon: ScrollText,
     tone: "primary",
   },
   {
@@ -766,9 +514,8 @@ function LiveFeedBody({ events }: { events: SseEvent[] }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// First-run setup card — shown when the tenant has no active subscription
-// and the user hasn't dismissed it. Auto-hides as soon as the tenant
-// picks a plan; users can also opt out per-tenant via localStorage.
+// First-run setup card — shown until the user dismisses it. Users can opt
+// out per-tenant via localStorage; it doesn't reappear once dismissed.
 // ────────────────────────────────────────────────────────────────────────
 
 const FIRST_RUN_DISMISSED_KEY = "boilerplate.firstrun.dismissed";
@@ -806,16 +553,8 @@ type SetupTileSpec = {
 
 const SETUP_TILES: SetupTileSpec[] = [
   {
-    to: "/invoices",
-    step: "01",
-    title: "Pick a plan",
-    description: "Enable billing, quotas, and overage tracking.",
-    icon: Sparkles,
-    tone: "primary",
-  },
-  {
     to: "/identity/users",
-    step: "02",
+    step: "01",
     title: "Invite your team",
     description: "Add teammates, assign roles, and group them.",
     icon: UsersRound,
@@ -823,7 +562,7 @@ const SETUP_TILES: SetupTileSpec[] = [
   },
   {
     to: "/files",
-    step: "03",
+    step: "02",
     title: "Upload files",
     description: "Share documents and assets with your team.",
     icon: FolderOpen,
@@ -831,7 +570,7 @@ const SETUP_TILES: SetupTileSpec[] = [
   },
   {
     to: "/activity",
-    step: "04",
+    step: "03",
     title: "Watch live",
     description: "SSE stream right into the dashboard.",
     icon: Activity,
@@ -877,7 +616,7 @@ function FirstRunPanel({
           Your tenant is provisioned and ready. Here's where most teams start.
         </p>
 
-        <ul className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+        <ul className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
           {SETUP_TILES.map((tile, idx) => (
             <li
               key={tile.to}
@@ -944,62 +683,25 @@ export function OverviewPage() {
   const { status: sseStatus, eventCount } = useSseStatus();
   const { events } = useSseEvents();
 
-  const usage = useQuery({
-    queryKey: ["billing", "usage"],
-    queryFn: () => getUsageSnapshots(),
-    staleTime: 60_000,
-  });
-
-  const subscription = useQuery({
-    queryKey: ["billing", "subscription", "me"],
-    queryFn: () => getMySubscription(),
-    staleTime: 60_000,
-  });
-
-  // Tenant status drives the "Valid for" stat card and its tone — the same
-  // source of truth (expiryState / validUpto / graceEndsUtc) the Subscription
-  // page reads, so the landing page reflects grace/expired instead of a
-  // healthy number computed from the subscription term alone.
+  // Tenant status drives the "Valid for" stat card and its tone, plus the
+  // global expiry/grace banner mounted in the AppShell.
   const status = useQuery({
     queryKey: ["tenant", "me", "status"],
     queryFn: () => getMyStatus(),
     staleTime: 60_000,
   });
 
-  // First-run state — show only when the tenant has no active subscription
-  // and the user hasn't dismissed it for this tenant. Gated on `!isError` so
-  // an API failure surfaces an error branch instead of masquerading as a
-  // first-run (no-plan) tenant. Re-checks on tenant change so switching
-  // tenants restores the panel.
+  // First-run state — shown until the user dismisses it for this tenant.
+  // Re-checks on tenant change so switching tenants restores the panel.
   const tenantId = user?.tenant;
   const [dismissed, setDismissed] = useState<boolean>(() => readDismissed(tenantId));
   useEffect(() => {
     setDismissed(readDismissed(tenantId));
   }, [tenantId]);
-  const showFirstRun =
-    !dismissed &&
-    !subscription.isLoading &&
-    !subscription.isError &&
-    !subscription.data;
+  const showFirstRun = !dismissed;
 
-  const rows = useMemo(
-    () => (usage.data ? toUsageRows(usage.data) : []),
-    [usage.data],
-  );
-
-  const totalsView = useMemo(() => {
-    if (!rows.length) {
-      return { resourceCount: 0, avgUtilization: 0, overage: 0 };
-    }
-    const overage = rows.reduce((sum, r) => sum + r.overage, 0);
-    const avg = rows.reduce((sum, r) => sum + r.utilization, 0) / rows.length;
-    return { resourceCount: rows.length, avgUtilization: avg, overage };
-  }, [rows]);
-
-  const refreshing = usage.isFetching || subscription.isFetching || status.isFetching;
+  const refreshing = status.isFetching;
   const onRefresh = () => {
-    void usage.refetch();
-    void subscription.refetch();
     void status.refetch();
   };
 
@@ -1017,23 +719,10 @@ export function OverviewPage() {
     .split(" ")[0];
   const tenantLabel = user?.tenant ?? "your tenant";
 
-  // ── Stat values ───────────────────────────────────────────────────────
-  const planValue = subscription.isLoading ? (
-    <Skeleton className="h-5 w-16" />
-  ) : (
-    subscription.data?.planKey ?? "—"
-  );
-  const planSub = subscription.isError
-    ? "Unavailable"
-    : subscription.data
-      ? subscription.data.status
-      : "No subscription";
-
   // ── Validity card — driven by the tenant's expiry state (validUpto /
   // graceEndsUtc), so an in-grace tenant counts down to grace-end and an
   // expired tenant reads "Expired" in a danger tone — matching the global
-  // banner and the Subscription page. Falls back gracefully when status is
-  // unavailable.
+  // banner. Falls back gracefully when status is unavailable.
   const validity = useMemo(() => validityView(status.data), [status.data]);
   const validityDateFmt: Intl.DateTimeFormatOptions = {
     month: "short",
@@ -1074,26 +763,6 @@ export function OverviewPage() {
           : validity.targetUtc
             ? `until ${new Date(validity.targetUtc).toLocaleDateString("en-US", validityDateFmt)}`
             : "no end date";
-
-  const resourcesValue = usage.isLoading ? (
-    <Skeleton className="h-5 w-10" />
-  ) : (
-    formatNumber(totalsView.resourceCount)
-  );
-  const resourcesSub = (
-    <>
-      <span className="tabular-nums">{totalsView.avgUtilization.toFixed(0)}%</span>{" "}
-      avg utilization
-      {totalsView.overage > 0 && (
-        <>
-          {" · "}
-          <span className="text-[var(--color-destructive)]">
-            {formatNumber(totalsView.overage)} overage
-          </span>
-        </>
-      )}
-    </>
-  );
 
   return (
     <div className="space-y-5">
@@ -1137,18 +806,10 @@ export function OverviewPage() {
         </div>
       </header>
 
-      {/* ── Stats row — 4 cards ─────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
+      {/* ── Stats row — 2 cards ─────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         <StatCard
           index={0}
-          tone="primary"
-          icon={Server}
-          label="Plan"
-          value={planValue}
-          sublabel={planSub}
-        />
-        <StatCard
-          index={1}
           tone={status.isLoading || status.isError || !status.data ? "success" : validity.tone}
           icon={Calendar}
           label="Valid for"
@@ -1156,15 +817,7 @@ export function OverviewPage() {
           sublabel={validitySub}
         />
         <StatCard
-          index={2}
-          tone="warning"
-          icon={Gauge}
-          label="Resources"
-          value={resourcesValue}
-          sublabel={resourcesSub}
-        />
-        <StatCard
-          index={3}
+          index={1}
           tone="info"
           icon={Zap}
           label="Live events"
@@ -1197,20 +850,12 @@ export function OverviewPage() {
       </div>
 
       {/* ── Multi-column widget grid ────────────────────────────────────
-          Left rail (360px) holds the subscription summary and system
-          status. The right side fills with a 2-up grid of secondary
-          widgets that all read at the same density. */}
+          Left rail (360px) holds system status. The right side fills with
+          a 2-up grid of secondary widgets that all read at the same
+          density. */}
       <div className="flex flex-col gap-4 lg:flex-row">
         {/* Left rail */}
         <aside className="w-full space-y-4 lg:w-[360px] lg:shrink-0">
-          <EntityDetailSection title="Subscription" icon={CreditCard}>
-            <SubscriptionBody
-              data={subscription.data}
-              loading={subscription.isLoading}
-              isError={subscription.isError}
-            />
-          </EntityDetailSection>
-
           <EntityDetailSection title="System status" icon={Wifi}>
             <SystemStatusBody sseStatus={sseStatus} eventCount={eventCount} />
           </EntityDetailSection>
@@ -1232,35 +877,6 @@ export function OverviewPage() {
             }
           >
             <RecentAuditsBody />
-          </EntityDetailSection>
-
-          <EntityDetailSection
-            title="Usage by resource"
-            icon={Gauge}
-            description="Current-month consumption against plan limits."
-            action={
-              totalsView.overage > 0 ? <Badge variant="danger">overage</Badge> : undefined
-            }
-          >
-            {usage.isLoading ? (
-              <UsageSkeleton />
-            ) : usage.isError ? (
-              <UsageEmpty
-                title="Couldn't load usage"
-                description="The usage endpoint returned an error. Try refreshing."
-              />
-            ) : rows.length === 0 ? (
-              <UsageEmpty
-                title="No usage captured yet"
-                description="Activity will appear here as the backend records snapshots for this period."
-              />
-            ) : (
-              <ul>
-                {rows.map((row) => (
-                  <UsageRow key={row.resource} row={row} />
-                ))}
-              </ul>
-            )}
           </EntityDetailSection>
 
           <EntityDetailSection

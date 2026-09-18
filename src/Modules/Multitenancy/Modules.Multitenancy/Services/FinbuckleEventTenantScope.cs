@@ -11,8 +11,8 @@ namespace Boilerplate.Modules.Multitenancy.Services;
 /// handler DbContexts resolved afterwards capture a real <c>TenantInfo</c> instead of the
 /// null one a background scope would otherwise carry.
 ///
-/// Mirrors the create-scope-then-set-tenant pattern already used by
-/// <c>WebhookDispatchJob</c> / <c>SqlAuditSink</c>, generalized to the event pipeline.
+/// Mirrors the create-scope-then-set-tenant pattern already used by <c>SqlAuditSink</c>,
+/// generalized to the event pipeline.
 /// Only tenant identity is set (sufficient for the row-level tenant query filter in the
 /// shared-database model); per-tenant connection strings are not resolved here.
 /// </summary>

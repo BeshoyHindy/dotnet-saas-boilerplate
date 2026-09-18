@@ -9,7 +9,7 @@ Host (composition root)  →  Modules.{Name} (runtime)  →  Modules.{Name}.Cont
                          →  BuildingBlocks (shared framework)
 ```
 
-- **BuildingBlocks** (`src/BuildingBlocks/`) — Core, Persistence, Web, Caching, Eventing, Storage, Quota, Jobs, Mailing, Shared. Consumed by all modules. **Do not modify without explicit approval.**
+- **BuildingBlocks** (`src/BuildingBlocks/`) — Core, Persistence, Web, Caching, Eventing, Storage, Jobs, Mailing, Shared. Consumed by all modules. **Do not modify without explicit approval.**
 - **Modules** (`src/Modules/{Name}/`) — bounded contexts. Each = a runtime project (internal) + a `.Contracts` project (public API: commands, queries, events, DTOs, service interfaces).
 - A module **MUST NOT** reference another module's runtime project — only its `.Contracts`. Enforced by `Architecture.Tests` (NetArchTest).
 
@@ -82,7 +82,7 @@ In `src/BuildingBlocks/Web/Extensions.cs` (`UseHeroPlatform`):
 3. HttpsRedirection → SecurityHeaders → static files → Routing
 4. **`UseAuthentication`**
 5. **`UseModuleMiddlewares`** — each module's `ConfigureMiddleware`, runs **after** auth
-6. RateLimiting → Quotas → `UseAuthorization` → `MapModules`
+6. RateLimiting → `UseAuthorization` → `MapModules`
 
 `app.UseHeroMultiTenantDatabases()` (Finbuckle `UseMultiTenant()`) runs in `Program.cs` **before** `UseHeroPlatform`, i.e. **before `UseAuthentication`** — so tenant resolution is header-driven, not claim-driven. See `modules/multitenancy.md`.
 
@@ -93,7 +93,7 @@ No global mutable static collections enumerated under concurrency. `Audit` (Audi
 ## Configuration & options
 
 - `appsettings.json` (+ `.Development`/`.Production`) live in `src/Host/Boilerplate.Api/`. DbMigrator links the same files.
-- Bind config with the Options pattern: `AddOptions<T>().BindConfiguration(nameof(T))`, section name == type name (e.g. `JwtOptions`, `DatabaseOptions`, `CachingOptions`, `CorsOptions`, `QuotaOptions`, `RateLimitingOptions`; **storage section is `Storage`**, not `StorageOptions`). Add `.ValidateDataAnnotations().ValidateOnStart()` for fail-fast.
+- Bind config with the Options pattern: `AddOptions<T>().BindConfiguration(nameof(T))`, section name == type name (e.g. `JwtOptions`, `DatabaseOptions`, `CachingOptions`, `CorsOptions`, `RateLimitingOptions`; **storage section is `Storage`**, not `StorageOptions`). Add `.ValidateDataAnnotations().ValidateOnStart()` for fail-fast.
 - Validate critical options via `IValidatableObject` — `JwtOptions` requires `SigningKey` ≥32 chars and **rejects placeholder strings containing `"replace-with"`**; `DatabaseOptions` rejects empty connection strings.
 - **Production fail-fast** (`Program.cs`, before service registration): missing `DatabaseOptions:ConnectionString`, `CachingOptions:Redis`, or `JwtOptions:SigningKey` throws. Dev secrets via `dotnet user-secrets` (AppHost has a `UserSecretsId`); MinIO creds are Aspire secret parameters.
-- Platform composition is one call each: `builder.AddHeroPlatform(o => { o.Enable... })` (DI) and `app.UseHeroPlatform(...)` (middleware). Feature flags toggle Caching/Jobs/Mailing/Quotas/Sse/Realtime/OpenTelemetry/CORS/Idempotency.
+- Platform composition is one call each: `builder.AddHeroPlatform(o => { o.Enable... })` (DI) and `app.UseHeroPlatform(...)` (middleware). Feature flags toggle Caching/Jobs/Mailing/Sse/Realtime/OpenTelemetry/CORS/Idempotency.

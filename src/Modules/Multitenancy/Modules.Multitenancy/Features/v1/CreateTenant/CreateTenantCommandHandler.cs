@@ -1,10 +1,7 @@
-using Boilerplate.BuildingBlocks.Eventing.Abstractions;
-using Boilerplate.BuildingBlocks.Shared.Multitenancy;
-using Boilerplate.Modules.Billing.Contracts.v1.Plans;
 using Boilerplate.Modules.Multitenancy.Contracts;
-using Boilerplate.Modules.Multitenancy.Contracts.Events;
 using Boilerplate.Modules.Multitenancy.Contracts.v1.CreateTenant;
 using Boilerplate.Modules.Multitenancy.Provisioning;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Mediator;
 using Microsoft.Extensions.Options;
 
@@ -14,9 +11,7 @@ public sealed class CreateTenantCommandHandler(
     ITenantService tenantService,
     ITenantProvisioningService provisioningService,
     ITenantInitialPasswordBuffer passwordBuffer,
-    IMediator mediator,
-    IOutboxWriter outbox,
-    IOptions<TenantBillingOptions> billingOptions,
+    IOptions<TenantValidityOptions> validityOptions,
     TimeProvider timeProvider)
     : ICommandHandler<CreateTenantCommand, CreateTenantCommandResponse>
 {
@@ -24,15 +19,9 @@ public sealed class CreateTenantCommandHandler(
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        // Resolve the plan (falls back to trial) and read its term to set the tenant validity
-        // window. A bad plan key throws NotFound (400) before any tenant is created.
-        var planKey = string.IsNullOrWhiteSpace(command.PlanKey)
-            ? billingOptions.Value.DefaultPlanKey
-            : command.PlanKey!;
-        var term = await mediator.Send(new GetPlanTermQuery(planKey), cancellationToken).ConfigureAwait(false);
-
-        var periodStart = timeProvider.GetUtcNow().UtcDateTime;
-        var periodEnd = periodStart.AddMonths(term.TermMonths);
+        // Validity window: the caller's explicit date, else the configured default term from now.
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var validUpto = command.ValidUpto ?? now.AddMonths(validityOptions.Value.DefaultValidityMonths);
 
         var tenantId = await tenantService.CreateAsync(
             command.Id,
@@ -40,8 +29,7 @@ public sealed class CreateTenantCommandHandler(
             command.ConnectionString,
             command.AdminEmail,
             command.Issuer,
-            term.Key,
-            periodEnd,
+            validUpto,
             cancellationToken).ConfigureAwait(false);
 
         // Buffer the admin password for IdentityDbInitializer's background seed step,
@@ -49,19 +37,6 @@ public sealed class CreateTenantCommandHandler(
         passwordBuffer.Store(tenantId, command.AdminPassword);
 
         var provisioning = await provisioningService.StartAsync(tenantId, cancellationToken).ConfigureAwait(false);
-
-        // Drive the billing side-effects (subscription + term invoice) via an integration event so
-        // Multitenancy stays decoupled from the Billing runtime.
-        await outbox.AddAsync(new TenantSubscribedIntegrationEvent(
-            Id: Guid.NewGuid(),
-            OccurredOnUtc: periodStart,
-            TenantId: tenantId,
-            CorrelationId: provisioning.CorrelationId,
-            Source: "Multitenancy",
-            PlanId: term.PlanId,
-            PlanKey: term.Key,
-            PeriodStartUtc: periodStart,
-            PeriodEndUtc: periodEnd), cancellationToken).ConfigureAwait(false);
 
         return new CreateTenantCommandResponse(
             tenantId,

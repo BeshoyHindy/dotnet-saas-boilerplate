@@ -137,7 +137,7 @@ export function CreateRoleDialog({
             >
               <Input
                 id="cr-description"
-                placeholder="Inbound support · read-only on billing"
+                placeholder="Inbound support · read-only on tenants"
                 aria-invalid={errors.description ? true : undefined}
                 {...register("description")}
               />

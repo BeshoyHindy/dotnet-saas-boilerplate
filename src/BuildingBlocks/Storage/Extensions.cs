@@ -1,15 +1,11 @@
 using Amazon;
 using Amazon.Runtime;
 using Amazon.S3;
-using Finbuckle.MultiTenant.Abstractions;
-using Boilerplate.BuildingBlocks.Quota;
-using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.BuildingBlocks.Storage.Local;
 using Boilerplate.BuildingBlocks.Storage.S3;
 using Boilerplate.BuildingBlocks.Storage.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Boilerplate.BuildingBlocks.Storage;
@@ -28,9 +24,6 @@ public static class Extensions
         ArgumentNullException.ThrowIfNull(configuration);
 
         var provider = configuration["Storage:Provider"]?.ToLowerInvariant();
-        var quotaEnabled = configuration
-            .GetSection(nameof(QuotaOptions))
-            .Get<QuotaOptions>()?.Enabled == true;
 
         if (string.Equals(provider, "s3", StringComparison.OrdinalIgnoreCase))
         {
@@ -71,12 +64,12 @@ public static class Extensions
             });
 
             services.AddTransient<S3StorageService>();
-            RegisterStorageService<S3StorageService>(services, quotaEnabled, ServiceLifetime.Transient);
+            RegisterStorageService<S3StorageService>(services, ServiceLifetime.Transient);
         }
         else
         {
             services.AddScoped<LocalStorageService>();
-            RegisterStorageService<LocalStorageService>(services, quotaEnabled, ServiceLifetime.Scoped);
+            RegisterStorageService<LocalStorageService>(services, ServiceLifetime.Scoped);
         }
 
         return services;
@@ -84,21 +77,9 @@ public static class Extensions
 
     private static void RegisterStorageService<TInner>(
         IServiceCollection services,
-        bool quotaEnabled,
         ServiceLifetime innerLifetime)
         where TInner : class, IStorageService
     {
-        if (quotaEnabled)
-        {
-            // The decorator's lifetime is scoped because IQuotaService resolves per-request.
-            services.AddScoped<IStorageService>(sp => new QuotaMeteredStorageService(
-                sp.GetRequiredService<TInner>(),
-                sp.GetRequiredService<IQuotaService>(),
-                sp.GetRequiredService<IMultiTenantContextAccessor<AppTenantInfo>>(),
-                sp.GetRequiredService<ILogger<QuotaMeteredStorageService>>()));
-            return;
-        }
-
         services.Add(new ServiceDescriptor(
             typeof(IStorageService),
             sp => sp.GetRequiredService<TInner>(),

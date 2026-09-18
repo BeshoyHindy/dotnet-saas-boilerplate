@@ -15,7 +15,6 @@ export type AuditSeverity =
 export type AuditTag =
   | "None"
   | "PiiMasked"
-  | "OutOfQuota"
   | "Sampled"
   | "RetainedLong"
   | "HealthCheck"

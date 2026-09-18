@@ -1,6 +1,32 @@
 import { apiFetch } from "@/lib/api-client";
 
 // ─────────────────────────────────────────────────────────────────────────
+// Tenant status / validity
+//
+// Drives the global expiry/grace banner and the overview page's "Valid for"
+// stat — the tenant's validity window, not a subscription plan.
+// ─────────────────────────────────────────────────────────────────────────
+
+export type TenantExpiryState = "Active" | "InGrace" | "Expired" | (string & {});
+
+export type TenantStatusDto = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  validUpto: string;
+  hasConnectionString: boolean;
+  adminEmail: string;
+  issuer?: string | null;
+  expiryState: TenantExpiryState;
+  graceEndsUtc: string;
+};
+
+/** Fetch the current tenant's validity status. */
+export function getMyStatus() {
+  return apiFetch<TenantStatusDto>("/api/v1/tenants/me/status");
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Tenant theme / branding
 //
 // The theme endpoints are CURRENT-TENANT scoped server-side — they read the

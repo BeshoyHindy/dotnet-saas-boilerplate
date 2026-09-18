@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Boilerplate.Modules.Notifications.IntegrationEventHandlers;
 
-/// <summary>Emails the tenant admin that their subscription expired and access is suspended.</summary>
+/// <summary>Emails the tenant admin that their account expired and access is suspended.</summary>
 public sealed class TenantExpiredEmailHandler(
     IMailService mailService,
     ILogger<TenantExpiredEmailHandler> logger)
@@ -14,8 +14,8 @@ public sealed class TenantExpiredEmailHandler(
     public async Task HandleAsync(TenantExpiredIntegrationEvent @event, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(@event);
-        var (subject, body) = BillingEmailBodies.Expired(@event.TenantName, @event.PlanKey, @event.ValidUpto);
-        await BillingEmailSender.SendAsync(mailService, logger, @event.AdminEmail, subject, body, "expired", ct)
+        var (subject, body) = TenantLifecycleEmailBodies.Expired(@event.TenantName, @event.ValidUpto);
+        await TenantLifecycleEmailSender.SendAsync(mailService, logger, @event.AdminEmail, subject, body, "expired", ct)
             .ConfigureAwait(false);
     }
 }

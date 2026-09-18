@@ -7,14 +7,12 @@ namespace Integration.Tests.Tests.Multitenancy;
 
 /// <summary>
 /// Coverage for the operator validity override (<c>POST /api/v1/tenants/{id}/adjust-validity</c>):
-/// sets <c>ValidUpto</c> to an explicit date with no billing side-effect (no new invoice / subscription),
-/// allows backdating (immediate expiry) unlike renewal, and is root-only.
+/// sets <c>ValidUpto</c> to an explicit date, allows backdating (immediate expiry) unlike renewal,
+/// and is root-only.
 /// </summary>
 [Collection(AppCollectionDefinition.Name)]
 public sealed class AdjustTenantValidityTests
 {
-    private const string BillingBasePath = "/api/v1/billing";
-
     private static readonly JsonSerializerOptions Json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -31,16 +29,12 @@ public sealed class AdjustTenantValidityTests
     }
 
     [Fact]
-    public async Task AdjustValidity_Should_Set_ExplicitFutureDate_WithoutBillingSideEffect()
+    public async Task AdjustValidity_Should_Set_ExplicitFutureDate()
     {
         using var rootClient = await _auth.CreateRootAdminClientAsync();
         var unique = Guid.NewGuid().ToString("N")[..8];
         var tenantId = $"adj-{unique}";
-        var planKey = await CreatePlanAsync(rootClient, $"adj-m-{unique}", monthlyBasePrice: 10m);
-        await CreateTenantAsync(rootClient, tenantId, $"adj-{unique}@tenant.com", planKey);
-
-        // The subscription invoice is created synchronously on tenant create; capture the count first.
-        var invoicesBefore = await GetInvoiceCountAsync(rootClient, tenantId);
+        await CreateTenantAsync(rootClient, tenantId, $"adj-{unique}@tenant.com");
 
         var target = DateTime.UtcNow.AddYears(2);
         var response = await rootClient.PostAsJsonAsync(
@@ -55,9 +49,6 @@ public sealed class AdjustTenantValidityTests
         var status = await GetStatusAsync(rootClient, tenantId);
         status.ValidUpto!.Value.ShouldBe(target, tolerance: TimeSpan.FromSeconds(1));
         status.ExpiryState.ShouldBe("Active");
-
-        var invoicesAfter = await GetInvoiceCountAsync(rootClient, tenantId);
-        invoicesAfter.ShouldBe(invoicesBefore, "adjust-validity must not create an invoice");
     }
 
     [Fact]
@@ -66,8 +57,7 @@ public sealed class AdjustTenantValidityTests
         using var rootClient = await _auth.CreateRootAdminClientAsync();
         var unique = Guid.NewGuid().ToString("N")[..8];
         var tenantId = $"adj-back-{unique}";
-        var planKey = await CreatePlanAsync(rootClient, $"adj-b-{unique}", monthlyBasePrice: 10m);
-        await CreateTenantAsync(rootClient, tenantId, $"adj-back-{unique}@tenant.com", planKey);
+        await CreateTenantAsync(rootClient, tenantId, $"adj-back-{unique}@tenant.com");
 
         // Backdate well past the grace period — renewal would reject this; the override allows it.
         var target = DateTime.UtcNow.AddDays(-30);
@@ -88,8 +78,7 @@ public sealed class AdjustTenantValidityTests
         using var rootClient = await _auth.CreateRootAdminClientAsync();
         var unique = Guid.NewGuid().ToString("N")[..8];
         var tenantId = $"adj-mm-{unique}";
-        var planKey = await CreatePlanAsync(rootClient, $"adj-mm-{unique}", monthlyBasePrice: 5m);
-        await CreateTenantAsync(rootClient, tenantId, $"adj-mm-{unique}@tenant.com", planKey);
+        await CreateTenantAsync(rootClient, tenantId, $"adj-mm-{unique}@tenant.com");
 
         var response = await rootClient.PostAsJsonAsync(
             $"{TestConstants.TenantsBasePath}/{tenantId}/adjust-validity",
@@ -133,8 +122,7 @@ public sealed class AdjustTenantValidityTests
         var unique = Guid.NewGuid().ToString("N")[..8];
         var tenantId = $"adj-authz-{unique}";
         var adminEmail = $"adj-authz-{unique}@tenant.com";
-        var planKey = await CreatePlanAsync(rootClient, $"adj-az-{unique}", monthlyBasePrice: 5m);
-        await CreateTenantAsync(rootClient, tenantId, adminEmail, planKey);
+        await CreateTenantAsync(rootClient, tenantId, adminEmail);
         await WaitForProvisioningAsync(rootClient, tenantId);
 
         using var tenantClient = await CreateTenantAdminClientWithRetryAsync(
@@ -166,15 +154,7 @@ public sealed class AdjustTenantValidityTests
         return await _auth.CreateAuthenticatedClientAsync(email, password, tenant);
     }
 
-    private static async Task<string> CreatePlanAsync(HttpClient client, string key, decimal monthlyBasePrice)
-    {
-        var resp = await client.PostAsJsonAsync($"{BillingBasePath}/plans",
-            new { key, name = $"Plan {key}", currency = "USD", monthlyBasePrice });
-        resp.StatusCode.ShouldBe(HttpStatusCode.OK, await resp.Content.ReadAsStringAsync());
-        return key;
-    }
-
-    private static async Task CreateTenantAsync(HttpClient rootClient, string tenantId, string adminEmail, string planKey)
+    private static async Task CreateTenantAsync(HttpClient rootClient, string tenantId, string adminEmail)
     {
         var response = await rootClient.PostAsJsonAsync(TestConstants.TenantsBasePath, new
         {
@@ -184,18 +164,9 @@ public sealed class AdjustTenantValidityTests
             adminEmail,
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer",
-            planKey,
         });
         var body = await response.Content.ReadAsStringAsync();
         response.StatusCode.ShouldBe(HttpStatusCode.Created, $"Create tenant failed: {body}");
-    }
-
-    private static async Task<long> GetInvoiceCountAsync(HttpClient client, string tenantId)
-    {
-        var resp = await client.GetAsync($"{BillingBasePath}/invoices?tenantId={tenantId}&pageNumber=1&pageSize=50");
-        resp.StatusCode.ShouldBe(HttpStatusCode.OK, await resp.Content.ReadAsStringAsync());
-        using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
-        return doc.RootElement.GetProperty("totalCount").GetInt64();
     }
 
     private static async Task<TenantStatus> GetStatusAsync(HttpClient client, string tenantId)
@@ -236,7 +207,6 @@ public sealed class AdjustTenantValidityTests
         public string Id { get; init; } = string.Empty;
         public bool IsActive { get; init; }
         public DateTime? ValidUpto { get; init; }
-        public string? Plan { get; init; }
         public string ExpiryState { get; init; } = string.Empty;
     }
 

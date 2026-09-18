@@ -237,7 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       tokenStore.setTokens(tokens.accessToken, tokens.refreshToken);
       // Drop any cached query state from before login. Without this, a
-      // failed pre-login probe (e.g. OverviewPage's billing fetch
+      // failed pre-login probe (e.g. OverviewPage's tenant-status fetch
       // firing during the brief window before ProtectedRoute redirects
       // to /login, or a stale error from a previous session) sticks in
       // the react-query cache as a 401 and renders as an ErrorBand on

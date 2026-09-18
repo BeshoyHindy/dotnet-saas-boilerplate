@@ -15,9 +15,9 @@ public static class RenewTenantEndpoint
     {
         return endpoints.MapPost("/{id}/renew", Handler)
             .WithName("RenewTenant")
-            .WithSummary("Renew tenant subscription")
+            .WithSummary("Renew tenant validity")
             .RequirePermission(MultitenancyPermissions.Tenants.UpgradeSubscription)
-            .WithDescription("Extend a tenant's validity by one plan term, optionally switching plans, and issue the term invoice.")
+            .WithDescription("Extend a tenant's validity by the requested number of months (default term when omitted), stacking on any remaining time.")
             .Produces<RenewTenantCommandResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)

@@ -6,8 +6,8 @@ namespace Integration.Tests.Tests.Multitenancy;
 
 /// <summary>
 /// Coverage for the tenant-self status endpoint (<c>GET /api/v1/tenants/me/status</c>) that powers the
-/// dashboard's plan view + expiry banner: an authenticated tenant gets its own plan/validity/expiry
-/// state resolved from the caller context; an unauthenticated request is rejected.
+/// dashboard's expiry banner: an authenticated tenant gets its own validity/expiry state resolved
+/// from the caller context; an unauthenticated request is rejected.
 /// </summary>
 [Collection(AppCollectionDefinition.Name)]
 public sealed class MyTenantStatusTests
@@ -28,14 +28,13 @@ public sealed class MyTenantStatusTests
     }
 
     [Fact]
-    public async Task GetMyStatus_Should_Return_CallersOwn_Plan_And_ExpiryState()
+    public async Task GetMyStatus_Should_Return_CallersOwn_Validity_And_ExpiryState()
     {
         using var rootClient = await _auth.CreateRootAdminClientAsync();
         var unique = Guid.NewGuid().ToString("N")[..8];
         var tenantId = $"mystatus-{unique}";
         var adminEmail = $"mystatus-{unique}@tenant.com";
-        var planKey = await CreatePlanAsync(rootClient, $"mystatus-m-{unique}", 10m);
-        await CreateTenantAsync(rootClient, tenantId, adminEmail, planKey);
+        await CreateTenantAsync(rootClient, tenantId, adminEmail);
         await WaitForProvisioningAsync(rootClient, tenantId);
 
         using var tenantClient = await CreateTenantAdminClientWithRetryAsync(adminEmail, TestConstants.DefaultPassword, tenantId);
@@ -46,7 +45,8 @@ public sealed class MyTenantStatusTests
         var status = await resp.Content.ReadFromJsonAsync<MyStatus>(Json);
         status.ShouldNotBeNull();
         status!.Id.ShouldBe(tenantId);
-        status.Plan.ShouldBe(planKey);
+        status.ValidUpto.ShouldNotBeNull();
+        status.ValidUpto!.Value.ShouldBeGreaterThan(DateTime.UtcNow);
         status.ExpiryState.ShouldBe("Active");
     }
 
@@ -78,15 +78,7 @@ public sealed class MyTenantStatusTests
         return await _auth.CreateAuthenticatedClientAsync(email, password, tenant);
     }
 
-    private static async Task<string> CreatePlanAsync(HttpClient client, string key, decimal monthlyBasePrice)
-    {
-        var resp = await client.PostAsJsonAsync("/api/v1/billing/plans",
-            new { key, name = $"Plan {key}", currency = "USD", monthlyBasePrice });
-        resp.StatusCode.ShouldBe(HttpStatusCode.OK, await resp.Content.ReadAsStringAsync());
-        return key;
-    }
-
-    private static async Task CreateTenantAsync(HttpClient rootClient, string tenantId, string adminEmail, string planKey)
+    private static async Task CreateTenantAsync(HttpClient rootClient, string tenantId, string adminEmail)
     {
         var response = await rootClient.PostAsJsonAsync(TestConstants.TenantsBasePath, new
         {
@@ -96,7 +88,6 @@ public sealed class MyTenantStatusTests
             adminEmail,
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer",
-            planKey,
         });
         var body = await response.Content.ReadAsStringAsync();
         response.StatusCode.ShouldBe(HttpStatusCode.Created, $"Create tenant failed: {body}");
@@ -127,7 +118,7 @@ public sealed class MyTenantStatusTests
     private sealed record MyStatus
     {
         public string Id { get; init; } = string.Empty;
-        public string? Plan { get; init; }
+        public DateTime? ValidUpto { get; init; }
         public string ExpiryState { get; init; } = string.Empty;
     }
 }

@@ -25,7 +25,7 @@ public sealed class TenantService : ITenantService
     private readonly TenantDbContext _dbContext;
     private readonly ITenantProvisioningService _provisioningService;
     private readonly TimeProvider _timeProvider;
-    private readonly TenantBillingOptions _billingOptions;
+    private readonly TenantValidityOptions _validityOptions;
     private readonly ILogger<TenantService> _logger;
 
     public TenantService(
@@ -35,18 +35,18 @@ public sealed class TenantService : ITenantService
         TenantDbContext dbContext,
         ITenantProvisioningService provisioningService,
         TimeProvider timeProvider,
-        IOptions<TenantBillingOptions> billingOptions,
+        IOptions<TenantValidityOptions> validityOptions,
         ILogger<TenantService> logger)
     {
         ArgumentNullException.ThrowIfNull(config);
-        ArgumentNullException.ThrowIfNull(billingOptions);
+        ArgumentNullException.ThrowIfNull(validityOptions);
         _tenantStore = tenantStore;
         _config = config.Value;
         _serviceProvider = serviceProvider;
         _dbContext = dbContext;
         _provisioningService = provisioningService;
         _timeProvider = timeProvider;
-        _billingOptions = billingOptions.Value;
+        _validityOptions = validityOptions.Value;
         _logger = logger;
     }
 
@@ -72,7 +72,7 @@ public sealed class TenantService : ITenantService
     public async Task<string> CreateAsync(string id,
         string name,
         string? connectionString,
-        string adminEmail, string? issuer, string planKey, DateTime validUpto, CancellationToken cancellationToken)
+        string adminEmail, string? issuer, DateTime validUpto, CancellationToken cancellationToken)
     {
         if (connectionString?.Trim() == _config.ConnectionString.Trim())
         {
@@ -81,9 +81,8 @@ public sealed class TenantService : ITenantService
 
         AppTenantInfo tenant = new(id, name, connectionString, adminEmail, issuer)
         {
-            Plan = planKey,
-            // Set ValidUpto directly to the plan term: SetValidity() forbids moving the date backward, and
-            // the ctor seeds now+1mo, so it would reject a term computed from an earlier 'now'.
+            // Set ValidUpto directly: SetValidity() forbids moving the date backward, and the ctor
+            // seeds now+1mo, so it would reject a term computed from an earlier 'now'.
             ValidUpto = DateTime.SpecifyKind(validUpto, DateTimeKind.Utc),
         };
         await _tenantStore.AddAsync(tenant).ConfigureAwait(false);
@@ -166,7 +165,7 @@ public sealed class TenantService : ITenantService
     {
         var tenant = await GetTenantInfoAsync(id, cancellationToken).ConfigureAwait(false);
 
-        var graceEnds = tenant.ValidUpto.AddDays(_billingOptions.GracePeriodDays);
+        var graceEnds = tenant.ValidUpto.AddDays(_validityOptions.GracePeriodDays);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
         string expiryState;
         if (now <= tenant.ValidUpto)
@@ -191,35 +190,27 @@ public sealed class TenantService : ITenantService
             HasConnectionString = !string.IsNullOrWhiteSpace(tenant.ConnectionString),
             AdminEmail = tenant.AdminEmail!,
             Issuer = tenant.Issuer,
-            Plan = tenant.Plan,
             ExpiryState = expiryState,
             GraceEndsUtc = graceEnds
         };
     }
 
-    public async Task<(DateTime PeriodStartUtc, DateTime ValidUpto, bool PlanChanged)> RenewAsync(
-        string id, string newPlanKey, int termMonths, CancellationToken cancellationToken = default)
+    public async Task<(DateTime PeriodStartUtc, DateTime ValidUpto)> RenewAsync(
+        string id, int months, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(newPlanKey);
-
         var tenant = await GetTenantInfoAsync(id, cancellationToken).ConfigureAwait(false);
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         // Stack remaining time: renew from ValidUpto if still in the future, otherwise from now.
         var periodStart = DateTime.SpecifyKind(tenant.ValidUpto > now ? tenant.ValidUpto : now, DateTimeKind.Utc);
-        var newValidUpto = DateTime.SpecifyKind(periodStart.AddMonths(termMonths), DateTimeKind.Utc);
-        var planChanged = !string.Equals(tenant.Plan, newPlanKey, StringComparison.OrdinalIgnoreCase);
+        var newValidUpto = DateTime.SpecifyKind(periodStart.AddMonths(months), DateTimeKind.Utc);
 
         tenant.SetValidity(newValidUpto);
-        if (planChanged)
-        {
-            tenant.Plan = newPlanKey;
-        }
 
         await _tenantStore.UpdateAsync(tenant).ConfigureAwait(false);
         await RefreshTenantCacheAsync(tenant).ConfigureAwait(false);
 
-        return (periodStart, newValidUpto, planChanged);
+        return (periodStart, newValidUpto);
     }
 
     public async Task<DateTime> AdjustValidityAsync(string id, DateTime validUpto, CancellationToken cancellationToken = default)

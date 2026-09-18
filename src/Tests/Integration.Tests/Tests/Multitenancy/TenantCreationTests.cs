@@ -38,6 +38,74 @@ public sealed class TenantCreationTests
     }
 
     [Fact]
+    public async Task CreateTenant_Should_Apply_DefaultValidityTerm_When_ValidUptoOmitted()
+    {
+        using var client = await _auth.CreateRootAdminClientAsync();
+        var uniqueId = Guid.NewGuid().ToString("N")[..8];
+        var tenantId = $"tv-def-{uniqueId}";
+
+        var response = await client.PostAsJsonAsync(TestConstants.TenantsBasePath, new
+        {
+            id = tenantId,
+            name = $"Default Validity {uniqueId}",
+            connectionString = (string?)null,
+            adminEmail = $"tvdef-{uniqueId}@tenant.com",
+            adminPassword = TestConstants.DefaultPassword,
+            issuer = "tvdef.issuer"
+        });
+        response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+
+        // TenantValidity:DefaultValidityMonths is 1 → validity lands roughly a month out.
+        var validUpto = await GetValidUptoAsync(client, tenantId);
+        validUpto.ShouldBeGreaterThan(DateTime.UtcNow.AddDays(27));
+        validUpto.ShouldBeLessThan(DateTime.UtcNow.AddDays(32));
+    }
+
+    [Fact]
+    public async Task CreateTenant_Should_Use_ExplicitValidUpto_When_Supplied()
+    {
+        using var client = await _auth.CreateRootAdminClientAsync();
+        var uniqueId = Guid.NewGuid().ToString("N")[..8];
+        var tenantId = $"tv-exp-{uniqueId}";
+        var target = DateTime.UtcNow.AddYears(3);
+
+        var response = await client.PostAsJsonAsync(TestConstants.TenantsBasePath, new
+        {
+            id = tenantId,
+            name = $"Explicit Validity {uniqueId}",
+            connectionString = (string?)null,
+            adminEmail = $"tvexp-{uniqueId}@tenant.com",
+            adminPassword = TestConstants.DefaultPassword,
+            issuer = "tvexp.issuer",
+            validUpto = target
+        });
+        response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+
+        var validUpto = await GetValidUptoAsync(client, tenantId);
+        validUpto.ShouldBe(target, tolerance: TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public async Task CreateTenant_Should_Reject_When_ValidUptoIsInThePast()
+    {
+        using var client = await _auth.CreateRootAdminClientAsync();
+        var uniqueId = Guid.NewGuid().ToString("N")[..8];
+
+        var response = await client.PostAsJsonAsync(TestConstants.TenantsBasePath, new
+        {
+            id = $"tv-past-{uniqueId}",
+            name = $"Past Validity {uniqueId}",
+            connectionString = (string?)null,
+            adminEmail = $"tvpast-{uniqueId}@tenant.com",
+            adminPassword = TestConstants.DefaultPassword,
+            issuer = "tvpast.issuer",
+            validUpto = DateTime.UtcNow.AddDays(-1)
+        });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task CreateTenant_Should_Reject_When_IdAlreadyExists()
     {
         using var client = await _auth.CreateRootAdminClientAsync();
@@ -97,4 +165,14 @@ public sealed class TenantCreationTests
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
+
+    private static async Task<DateTime> GetValidUptoAsync(HttpClient client, string tenantId)
+    {
+        var response = await client.GetAsync($"{TestConstants.TenantsBasePath}/{tenantId}/status");
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        var status = await response.DeserializeAsync<TenantValidityStatus>();
+        return status.ValidUpto;
+    }
+
+    private sealed record TenantValidityStatus(string Id, DateTime ValidUpto);
 }

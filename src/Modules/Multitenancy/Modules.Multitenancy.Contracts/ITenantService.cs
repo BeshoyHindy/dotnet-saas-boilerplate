@@ -15,25 +15,23 @@ public interface ITenantService
 
     Task<TenantStatusDto> GetStatusAsync(string id, CancellationToken cancellationToken = default);
 
-    Task<string> CreateAsync(string id, string name, string? connectionString, string adminEmail, string? issuer, string planKey, DateTime validUpto, CancellationToken cancellationToken);
+    Task<string> CreateAsync(string id, string name, string? connectionString, string adminEmail, string? issuer, DateTime validUpto, CancellationToken cancellationToken);
 
     Task<string> ActivateAsync(string id, CancellationToken cancellationToken);
 
     Task<string> DeactivateAsync(string id, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Extends the tenant's validity by one plan term, stacking on remaining time (no backdating), and
-    /// switches the tenant's plan when <paramref name="newPlanKey"/> differs. Returns the term window
-    /// applied and whether the plan changed, so the caller can publish a matching renewal event.
+    /// Extends the tenant's validity by <paramref name="months"/>, stacking on remaining time (no
+    /// backdating). Returns the validity window applied.
     /// </summary>
-    Task<(DateTime PeriodStartUtc, DateTime ValidUpto, bool PlanChanged)> RenewAsync(
-        string id, string newPlanKey, int termMonths, CancellationToken cancellationToken = default);
+    Task<(DateTime PeriodStartUtc, DateTime ValidUpto)> RenewAsync(
+        string id, int months, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Operator override that sets the tenant's validity to an explicit date with no billing
-    /// side-effect (no subscription, no invoice, no renewal event) — for comps, support extensions,
-    /// or immediate expiry. Unlike <see cref="RenewAsync"/> this may move the date backward. Returns
-    /// the applied <c>ValidUpto</c> (UTC).
+    /// Operator override that sets the tenant's validity to an explicit date — for comps, support
+    /// extensions, or immediate expiry. Unlike <see cref="RenewAsync"/> this may move the date
+    /// backward. Returns the applied <c>ValidUpto</c> (UTC).
     /// </summary>
     Task<DateTime> AdjustValidityAsync(string id, DateTime validUpto, CancellationToken cancellationToken = default);
 

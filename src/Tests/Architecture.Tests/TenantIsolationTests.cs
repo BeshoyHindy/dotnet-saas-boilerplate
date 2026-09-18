@@ -20,7 +20,7 @@ namespace Architecture.Tests;
 /// applied — either explicitly in an <c>IEntityTypeConfiguration</c> or via
 /// the auto-apply in <c>BaseDbContext.OnModelCreating</c>. Opt-out is via the
 /// <see cref="IGlobalEntity"/> marker interface (used by platform-wide rows
-/// like BillingPlan, ImpersonationGrant, OutboxMessage, InboxMessage).
+/// like ImpersonationGrant, OutboxMessage, InboxMessage).
 ///
 /// This test catches the silent-leak class of bug where someone adds a new
 /// entity to a module, forgets to mark it multitenant, and ships it — the
@@ -63,7 +63,7 @@ public sealed class TenantIsolationTests
             "Every entity in a BaseDbContext-derived DbContext must be tenant-isolated. " +
             "Apply via builder.IsMultiTenant() in EF config, OR opt out by implementing " +
             "Boilerplate.BuildingBlocks.Core.Domain.IGlobalEntity (only for entities that are genuinely " +
-            "platform-wide, like BillingPlan or ImpersonationGrant). " +
+            "platform-wide, like ImpersonationGrant). " +
             $"Violations:\n  {string.Join("\n  ", violations)}");
     }
 

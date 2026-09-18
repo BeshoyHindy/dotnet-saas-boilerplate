@@ -3,13 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   Building2,
-  FileText,
   LayoutDashboard,
-  Receipt,
+  ScrollText,
+  ShieldCheck,
   UsersRound,
 } from "lucide-react";
 import { listTenants } from "@/api/tenants";
-import { listInvoices, getPlans } from "@/api/billing";
+import { searchUsers } from "@/api/users";
+import { listRoles } from "@/api/roles";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EntityPageHeader, Stat, StatStrip, ToneIconTile, type ToneIconTileTone } from "@/components/list";
 import { useAuth } from "@/auth/use-auth";
@@ -27,21 +28,18 @@ export function DashboardPage() {
     queryKey: ["tenants", { pageNumber: 1, pageSize: 1 }],
     queryFn: () => listTenants({ pageNumber: 1, pageSize: 1 }),
   });
-  const plansQuery = useQuery({
-    queryKey: ["billing", "plans", { includeInactive: true }],
-    queryFn: () => getPlans(true),
+  const usersQuery = useQuery({
+    queryKey: ["users", "search", { pageNumber: 1, pageSize: 1 }],
+    queryFn: () => searchUsers({ pageNumber: 1, pageSize: 1 }),
   });
-  const invoicesQuery = useQuery({
-    queryKey: ["billing", "invoices", { pageNumber: 1, pageSize: 50 }],
-    queryFn: () => listInvoices({ pageNumber: 1, pageSize: 50 }),
+  const rolesQuery = useQuery({
+    queryKey: ["roles"],
+    queryFn: () => listRoles(),
   });
 
   const tenantsTotal = tenantsQuery.data?.totalCount;
-  const plans = plansQuery.data ?? [];
-  const activePlans = plans.filter((p) => p.isActive).length;
-  const invoicesPage = invoicesQuery.data;
-  const outstandingCount =
-    invoicesPage?.items.filter((i) => i.status === "Issued").length ?? 0;
+  const usersTotal = usersQuery.data?.totalCount;
+  const roles = rolesQuery.data ?? [];
 
   const firstName = user?.name?.split(" ")[0];
 
@@ -59,12 +57,12 @@ export function DashboardPage() {
             </>
           }
           tone="primary"
-          description="Operate every tenant on this instance — identity, multitenancy, billing, and the rest of the system surface."
+          description="Operate every tenant on this instance — identity, multitenancy, and the rest of the system surface."
         />
       </div>
 
       {/* ── KPI stat strip ───────────────────────────────────────────── */}
-      <StatStrip cols={4} className="app-enter app-enter-2">
+      <StatStrip cols={3} className="app-enter app-enter-2">
         <Stat
           label="Tenants"
           value={
@@ -77,42 +75,26 @@ export function DashboardPage() {
           hint="registered on this instance"
         />
         <Stat
-          label="Plans"
+          label="Users"
           value={
-            plansQuery.isLoading ? (
+            usersQuery.isLoading ? (
               <Skeleton className="h-7 w-16" />
             ) : (
-              plans.length.toLocaleString()
+              usersTotal?.toLocaleString() ?? "—"
             )
           }
-          hint={`${activePlans} active`}
+          hint="in the root tenant"
         />
         <Stat
-          label="Invoices"
+          label="Roles"
           value={
-            invoicesQuery.isLoading ? (
+            rolesQuery.isLoading ? (
               <Skeleton className="h-7 w-16" />
             ) : (
-              invoicesPage?.items.length.toLocaleString() ?? "—"
+              roles.length.toLocaleString()
             )
           }
-          hint={
-            invoicesPage
-              ? `${invoicesPage.totalCount.toLocaleString()} total ledger`
-              : "loading…"
-          }
-        />
-        <Stat
-          label="Outstanding"
-          value={
-            invoicesQuery.isLoading ? (
-              <Skeleton className="h-7 w-16" />
-            ) : (
-              outstandingCount.toLocaleString()
-            )
-          }
-          hint="issued, awaiting payment"
-          tone={outstandingCount > 0 ? "warning" : "default"}
+          hint="defined role sets"
         />
       </StatStrip>
 
@@ -137,18 +119,18 @@ export function DashboardPage() {
             description="Root-tenant operators and role management."
           />
           <PivotCard
-            to="/billing/plans"
-            icon={Receipt}
+            to="/roles"
+            icon={ShieldCheck}
             tone="success"
-            title="Billing"
-            description="Plans, subscriptions, invoices and pricing."
+            title="Roles"
+            description="Define role sets and their permission grants."
           />
           <PivotCard
-            to="/billing/invoices"
-            icon={FileText}
+            to="/audits"
+            icon={ScrollText}
             tone="warning"
-            title="Invoices"
-            description="Cross-tenant ledger. Issue, mark paid, void."
+            title="Audits"
+            description="Security and entity-change audit trail."
           />
         </div>
       </section>

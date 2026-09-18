@@ -71,6 +71,45 @@ public class CircularReferenceTests
             $"Circular module dependencies detected: {string.Join("; ", cycles)}");
     }
 
+    /// <summary>
+    /// The Contracts projects are every module's only public surface, so a cycle between two of them
+    /// is a cycle between the modules themselves — the exact shape ADR-0003 rules out. Asserted on
+    /// its own so the graph stays readable when it fails.
+    /// </summary>
+    [Fact]
+    public void Contracts_Dependency_Graph_Should_Be_Acyclic()
+    {
+        string modulesRoot = Path.Combine(SolutionRoot, "src", "Modules");
+
+        if (!Directory.Exists(modulesRoot))
+        {
+            return;
+        }
+
+        var contractsProjects = Directory
+            .GetFiles(modulesRoot, "Boilerplate.Modules.*.Contracts.csproj", SearchOption.AllDirectories)
+            .Where(p => !p.Contains("obj", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        contractsProjects.Length.ShouldBeGreaterThan(0);
+
+        var dependencyGraph = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var projectPath in contractsProjects)
+        {
+            string projectName = Path.GetFileNameWithoutExtension(projectPath);
+            var dependencies = GetProjectReferences(projectPath)
+                .Where(d => d.StartsWith("Boilerplate.Modules.", StringComparison.OrdinalIgnoreCase))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            dependencyGraph[projectName] = dependencies;
+        }
+
+        var cycles = DetectCycles(dependencyGraph);
+
+        cycles.ShouldBeEmpty(
+            $"Circular module contract dependencies detected: {string.Join("; ", cycles)}");
+    }
+
     [Fact]
     public void BuildingBlocks_Should_Not_Have_Circular_Dependencies()
     {

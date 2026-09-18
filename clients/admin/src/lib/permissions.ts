@@ -56,24 +56,10 @@ export const MultitenancyPermissions = Object.freeze({
   },
 } as const);
 
-export const BillingPermissions = Object.freeze({
-  View: "Permissions.Billing.View",
-  Manage: "Permissions.Billing.Manage",
-} as const);
-
 export const AuditingPermissions = Object.freeze({
   AuditTrails: {
     View: "Permissions.AuditTrails.View",
     ViewCrossTenant: "Permissions.AuditTrails.ViewCrossTenant",
-  },
-} as const);
-
-export const WebhooksPermissions = Object.freeze({
-  Subscriptions: {
-    View: "Permissions.Webhooks.View",
-    Create: "Permissions.Webhooks.Create",
-    Delete: "Permissions.Webhooks.Delete",
-    Test: "Permissions.Webhooks.Test",
   },
 } as const);
 
@@ -146,14 +132,6 @@ export const PERMISSION_CATALOG: readonly PermissionGroup[] = [
     ],
   },
   {
-    category: "Billing",
-    blurb: "Inspect and manage tenant subscriptions and invoices.",
-    entries: [
-      { name: BillingPermissions.View, description: "View billing", basic: true },
-      { name: BillingPermissions.Manage, description: "Manage billing — plans, subscriptions, invoices" },
-    ],
-  },
-  {
     category: "Audit trails",
     blurb: "Inspect security and entity-change audit events.",
     entries: [
@@ -171,16 +149,6 @@ export const PERMISSION_CATALOG: readonly PermissionGroup[] = [
     entries: [
       { name: IdentityPermissions.Impersonation.View, description: "View impersonation grants" },
       { name: IdentityPermissions.Impersonation.Revoke, description: "Revoke active impersonation grants" },
-    ],
-  },
-  {
-    category: "Webhooks",
-    blurb: "Manage outbound webhook subscriptions and inspect their deliveries.",
-    entries: [
-      { name: WebhooksPermissions.Subscriptions.View, description: "View webhook subscriptions & deliveries", basic: true },
-      { name: WebhooksPermissions.Subscriptions.Create, description: "Create webhook subscriptions" },
-      { name: WebhooksPermissions.Subscriptions.Delete, description: "Delete webhook subscriptions" },
-      { name: WebhooksPermissions.Subscriptions.Test, description: "Send test webhook deliveries" },
     ],
   },
 ];

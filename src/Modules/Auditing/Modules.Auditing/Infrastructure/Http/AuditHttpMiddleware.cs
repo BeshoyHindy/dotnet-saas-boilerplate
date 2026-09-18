@@ -158,10 +158,6 @@ public sealed class AuditHttpMiddleware
             .WithRequestId(_publisher.CurrentScope?.RequestId ?? ctx.TraceIdentifier);
 
         var tags = AuditTag.None;
-        if (ctx.Items.TryGetValue(HttpContextItemKeys.QuotaRejected, out var flag) && flag is true)
-        {
-            tags |= AuditTag.OutOfQuota;
-        }
         if (requestContext.MaskedFields > 0 || respMaskedFields > 0)
         {
             tags |= AuditTag.PiiMasked;

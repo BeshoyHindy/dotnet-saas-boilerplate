@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   CircleDashed,
   ClipboardList,
-  CreditCard,
   Info,
   KeyRound,
   Loader2,
@@ -58,7 +57,7 @@ export function TenantDetailPage() {
   const [activationConfirmOpen, setActivationConfirmOpen] = useState(false);
   const permissions = currentUser?.permissions ?? [];
   const canImpersonate = permissions.includes(IdentityPermissions.Users.Impersonate);
-  // Renew / change plan + adjust validity are root-operator subscription actions.
+  // Renew + adjust validity are root-operator subscription actions.
   const canManageSubscription = permissions.includes(
     MultitenancyPermissions.Tenants.UpgradeSubscription,
   );
@@ -167,12 +166,6 @@ export function TenantDetailPage() {
                         {tenant.expiryState === "InGrace" ? "In grace" : "Expired"}
                       </Badge>
                     )}
-                    {tenant.plan && (
-                      <Badge variant="outline">
-                        <CreditCard className="h-3 w-3" />
-                        {tenant.plan}
-                      </Badge>
-                    )}
                     <Badge variant="outline">
                       <CalendarClock className="h-3 w-3" />
                       Valid until {formatDate(tenant.validUpto)}
@@ -204,10 +197,10 @@ export function TenantDetailPage() {
                     variant="outline"
                     onClick={() => setRenewOpen(true)}
                     className="shrink-0"
-                    title="Extend validity by one plan term, or switch plans"
+                    title="Extend the tenant's validity"
                   >
                     <CalendarClock className="mr-1.5 h-3.5 w-3.5" />
-                    Renew / change plan
+                    Renew
                   </Button>
                 )}
                 {canManageSubscription && (
@@ -215,7 +208,7 @@ export function TenantDetailPage() {
                     variant="outline"
                     onClick={() => setAdjustOpen(true)}
                     className="shrink-0"
-                    title="Set the expiry date directly with no invoice (operator override)"
+                    title="Set the expiry date directly (operator override)"
                   >
                     <CalendarCog className="mr-1.5 h-3.5 w-3.5" />
                     Adjust validity
@@ -251,7 +244,6 @@ export function TenantDetailPage() {
               open={renewOpen}
               onOpenChange={setRenewOpen}
               tenantId={tenant.id}
-              currentPlanKey={tenant.plan}
               validUpto={tenant.validUpto}
             />
           )}
@@ -299,14 +291,13 @@ export function TenantDetailPage() {
           <SettingsSection
             title="Details"
             icon={Info}
-            description="The tenant's identity, contact, and subscription window. Identifiers are immutable; the issuer scopes JWTs to this tenant."
+            description="The tenant's identity, contact, and validity window. Identifiers are immutable; the issuer scopes JWTs to this tenant."
           >
             <div className="space-y-0">
               <InfoRow label="Identifier" mono>{tenant.id}</InfoRow>
               <InfoRow label="Name">{tenant.name}</InfoRow>
               <InfoRow label="Admin email" mono>{tenant.adminEmail}</InfoRow>
               <InfoRow label="JWT issuer" mono>{tenant.issuer ?? "—"}</InfoRow>
-              <InfoRow label="Plan">{tenant.plan ?? "—"}</InfoRow>
               <InfoRow label="Valid until">
                 <span className="flex items-center gap-1.5">
                   <CalendarClock className="h-3.5 w-3.5 text-[var(--color-muted-foreground)]" />
