@@ -1,0 +1,12 @@
+# pnpm settings for the repo root (pnpm 12 reads them from here, not package.json).
+#
+# The root package exists only for the Sandcastle orchestrator; the React client
+# apps are independent npm projects with their own package-lock.json files and
+# are deliberately NOT pnpm workspace packages.
+#
+# tsx runs the orchestrator's .mts files unbuilt, and its esbuild dependency
+# needs its postinstall to place the platform binary. pnpm blocks dependency
+# build scripts unless they are allowed here, and a blocked one makes
+# `pnpm install` exit non-zero — which would fail CI on a fresh checkout.
+allowBuilds:
+  esbuild: true

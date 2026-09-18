@@ -1,0 +1,20 @@
+{
+  // Typechecks the Sandcastle orchestrator only (`pnpm typecheck:sandcastle`).
+  // The React apps under the client directory each own their tsconfig and are
+  // built by their own `npm run build`; this file deliberately does not include
+  // them.
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true,
+    // The modules import each other with explicit `.mts` specifiers, which is
+    // what Node's own ESM resolver needs at runtime (tsx runs these files
+    // directly, unbuilt). Legal here precisely because nothing is emitted.
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": [".sandcastle/*.mts", "sandcastle.config.mts"]
+}
