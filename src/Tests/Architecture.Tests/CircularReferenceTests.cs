@@ -12,6 +12,23 @@ public class CircularReferenceTests
 {
     private static readonly string SolutionRoot = ModuleArchitectureTestsFixture.SolutionRoot;
 
+    private const string ModuleProjectPrefix = "Boilerplate.Modules.";
+    private const string ContractsSuffix = ".Contracts";
+
+    // Module cycles that exist today. Each entry names one cycle by the set of modules it runs through,
+    // sorted and joined with " <-> " (the canonical form the detector reports), so an entry can never
+    // cover a cycle it was not written for. These are tracked defects, not sanctioned design: the test
+    // fails when an entry stops being a real cycle, so a fix cannot leave a stale exemption behind.
+    private static readonly string[] KnownModuleCycles = [
+        // Multitenancy -> Billing.Contracts and Billing -> Multitenancy.Contracts.
+        // Tracked by issue #5 "Remove Billing, Quota and Webhooks and break the Multitenancy-Billing cycle".
+        "Billing <-> Multitenancy",
+
+        // Identity -> Auditing.Contracts and Auditing -> Identity.Contracts.
+        // Tracked by issue #33 "Decide the fate of the Auditing-Identity module cycle".
+        "Auditing <-> Identity"
+    ];
+
     [Fact]
     public void Solution_Should_Not_Have_Circular_Project_References()
     {
@@ -54,21 +71,55 @@ public class CircularReferenceTests
             .Where(p => !p.Contains("obj", StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
+        // Key the graph by owning module rather than by csproj: Boilerplate.Modules.X and
+        // Boilerplate.Modules.X.Contracts are both module X. Per-csproj nodes can never go red — a
+        // ProjectReference cycle does not even build (MSB4006) — so the only module cycles that can
+        // exist are the ones that run through a Contracts project, and those need collapsed nodes.
         var dependencyGraph = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var projectPath in moduleProjects)
         {
-            string projectName = Path.GetFileNameWithoutExtension(projectPath);
-            var dependencies = GetProjectReferences(projectPath)
-                .Where(d => d.StartsWith("Boilerplate.Modules.", StringComparison.OrdinalIgnoreCase))
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            dependencyGraph[projectName] = dependencies;
+            string module = OwningModule(Path.GetFileNameWithoutExtension(projectPath));
+
+            if (!dependencyGraph.TryGetValue(module, out var dependencies))
+            {
+                dependencies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                dependencyGraph[module] = dependencies;
+            }
+
+            var moduleDependencies = GetProjectReferences(projectPath)
+                .Where(d => d.StartsWith(ModuleProjectPrefix, StringComparison.OrdinalIgnoreCase))
+                .Select(OwningModule)
+                // A module referencing its own Contracts project collapses onto itself; that is not a cycle.
+                .Where(d => !string.Equals(d, module, StringComparison.OrdinalIgnoreCase));
+
+            foreach (var dependency in moduleDependencies)
+            {
+                dependencies.Add(dependency);
+            }
         }
 
-        var cycles = DetectCycles(dependencyGraph);
+        var cycles = DetectCycles(dependencyGraph)
+            .Select(CanonicalModuleCycle)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        cycles.ShouldBeEmpty(
-            $"Circular module dependencies detected: {string.Join("; ", cycles)}");
+        var unexpectedCycles = cycles
+            .Where(cycle => !KnownModuleCycles.Contains(cycle, StringComparer.OrdinalIgnoreCase))
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var staleAllowlistEntries = KnownModuleCycles
+            .Where(known => !cycles.Contains(known))
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        unexpectedCycles.ShouldBeEmpty(
+            $"Circular module dependencies detected: {string.Join("; ", unexpectedCycles)}. " +
+            "Modules may only depend on each other in one direction, including through Contracts projects.");
+
+        staleAllowlistEntries.ShouldBeEmpty(
+            $"KnownModuleCycles lists cycles that no longer exist: {string.Join("; ", staleAllowlistEntries)}. " +
+            "Remove the entry so the allowlist keeps matching reality.");
     }
 
     [Fact]
@@ -158,6 +209,25 @@ public class CircularReferenceTests
 
         return references;
     }
+
+    // Boilerplate.Modules.Billing and Boilerplate.Modules.Billing.Contracts are both module "Billing".
+    private static string OwningModule(string projectName)
+    {
+        string module = projectName[ModuleProjectPrefix.Length..];
+
+        return module.EndsWith(ContractsSuffix, StringComparison.OrdinalIgnoreCase)
+            ? module[..^ContractsSuffix.Length]
+            : module;
+    }
+
+    // DetectCycles reports the walked path ("Billing -> Multitenancy -> Billing"), which depends on the
+    // entry point it happened to start from; reduce it to the sorted set of modules involved so that one
+    // cycle always has one name to match against KnownModuleCycles.
+    private static string CanonicalModuleCycle(string cyclePath) =>
+        string.Join(" <-> ", cyclePath
+            .Split(" -> ", StringSplitOptions.RemoveEmptyEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase));
 
     private static List<string> DetectCycles(Dictionary<string, HashSet<string>> graph)
     {
