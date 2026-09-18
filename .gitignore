@@ -1,0 +1,18 @@
+# The pipeline is part of this repo even if a global ignore hides it
+!.sandcastle/
+
+node_modules/
+.aider-desk/
+.claude/settings.local.json
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# env
+.env
+.env.*
+!.env.example
