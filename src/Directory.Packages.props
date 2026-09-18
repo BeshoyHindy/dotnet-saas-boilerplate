@@ -66,7 +66,6 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.8" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Abstractions" Version="10.0.8" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.8" />
-    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.8" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.8" />
     <!-- Pin the transitive SQLitePCLRaw.lib.e_sqlite3 explicitly. Microsoft.EntityFrameworkCore.Sqlite 10.0.8
          brings in 2.1.11, which bundles a SQLite build vulnerable to a memory-corruption bug fixed upstream in

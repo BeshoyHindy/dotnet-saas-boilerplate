@@ -30,26 +30,13 @@ public sealed class ConnectionStringValidatorTests
     }
 
     [Fact]
-    public void TryValidate_Should_ReturnTrue_When_MssqlConnectionStringValid()
-    {
-        // Arrange
-        var sut = Build(DbProviders.MSSQL);
-
-        // Act
-        var result = sut.TryValidate("Server=localhost;Database=boilerplate;User Id=sa;Password=pwd;");
-
-        // Assert
-        result.ShouldBeTrue();
-    }
-
-    [Fact]
     public void TryValidate_Should_HonorExplicitProviderOverride_When_ProvidedArgument()
     {
-        // Arrange — configured provider is Postgres, but call passes MSSQL explicitly.
-        var sut = Build(DbProviders.PostgreSQL);
+        // Arrange — configured provider is unsupported, but the call passes PostgreSQL explicitly.
+        var sut = Build("SQLITE");
 
         // Act
-        var result = sut.TryValidate("Server=localhost;Database=boilerplate;", DbProviders.MSSQL);
+        var result = sut.TryValidate("Host=localhost;Database=boilerplate;", DbProviders.PostgreSQL);
 
         // Assert
         result.ShouldBeTrue();
@@ -60,16 +47,16 @@ public sealed class ConnectionStringValidatorTests
     #region Edge Cases
 
     [Fact]
-    public void TryValidate_Should_ReturnTrue_When_ProviderUnknown()
+    public void TryValidate_Should_ReturnFalse_When_ProviderUnsupported()
     {
-        // Arrange — unknown provider falls through default arm without parsing.
+        // Arrange — PostgreSQL is the only supported provider; anything else fails closed.
         var sut = Build("SQLITE");
 
         // Act
         var result = sut.TryValidate("any-string");
 
         // Assert
-        result.ShouldBeTrue();
+        result.ShouldBeFalse();
     }
 
     [Fact]

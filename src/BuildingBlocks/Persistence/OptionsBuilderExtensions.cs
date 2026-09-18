@@ -14,7 +14,7 @@ public static class OptionsBuilderExtensions
     /// Configures the database provider and connection for the Hero framework.
     /// </summary>
     /// <param name="builder">The DbContextOptionsBuilder to configure.</param>
-    /// <param name="dbProvider">The database provider (PostgreSQL, MSSQL).</param>
+    /// <param name="dbProvider">The database provider (PostgreSQL).</param>
     /// <param name="connectionString">The database connection string.</param>
     /// <param name="migrationsAssembly">The assembly containing database migrations.</param>
     /// <param name="isDevelopment">Whether the application is running in development mode.</param>
@@ -33,27 +33,16 @@ public static class OptionsBuilderExtensions
 
         ConfigureCommon(builder, isDevelopment);
 
-        switch (dbProvider.ToUpperInvariant())
+        if (!string.Equals(dbProvider, DbProviders.PostgreSQL, StringComparison.OrdinalIgnoreCase))
         {
-            case DbProviders.PostgreSQL:
-                builder.UseNpgsql(connectionString, e =>
-                {
-                    e.MigrationsAssembly(migrationsAssembly);
-                });
-                break;
-
-            case DbProviders.MSSQL:
-                builder.UseSqlServer(connectionString, e =>
-                {
-                    e.MigrationsAssembly(migrationsAssembly);
-                    e.EnableRetryOnFailure();
-                });
-                break;
-
-            default:
-                throw new InvalidOperationException(
-                    $"Database Provider {dbProvider} is not supported.");
+            throw new InvalidOperationException(
+                $"Database Provider {dbProvider} is not supported. Only {DbProviders.PostgreSQL} is supported.");
         }
+
+        builder.UseNpgsql(connectionString, e =>
+        {
+            e.MigrationsAssembly(migrationsAssembly);
+        });
 
         return builder;
     }
@@ -79,28 +68,17 @@ public static class OptionsBuilderExtensions
 
         ConfigureCommon(builder, isDevelopment);
 
-        switch (dbProvider.ToUpperInvariant())
+        if (!string.Equals(dbProvider, DbProviders.PostgreSQL, StringComparison.OrdinalIgnoreCase))
         {
-            case DbProviders.PostgreSQL:
-                // contextOwnsConnection: false — the scope disposes it, not the first context to finish.
-                builder.UseNpgsql(connection, contextOwnsConnection: false, e =>
-                {
-                    e.MigrationsAssembly(migrationsAssembly);
-                });
-                break;
-
-            case DbProviders.MSSQL:
-                builder.UseSqlServer(connection, contextOwnsConnection: false, e =>
-                {
-                    e.MigrationsAssembly(migrationsAssembly);
-                    e.EnableRetryOnFailure();
-                });
-                break;
-
-            default:
-                throw new InvalidOperationException(
-                    $"Database Provider {dbProvider} is not supported.");
+            throw new InvalidOperationException(
+                $"Database Provider {dbProvider} is not supported. Only {DbProviders.PostgreSQL} is supported.");
         }
+
+        // contextOwnsConnection: false — the scope disposes it, not the first context to finish.
+        builder.UseNpgsql(connection, contextOwnsConnection: false, e =>
+        {
+            e.MigrationsAssembly(migrationsAssembly);
+        });
 
         return builder;
     }

@@ -8,7 +8,7 @@ namespace Boilerplate.BuildingBlocks.Shared.Persistence;
 public sealed class DatabaseOptions : IValidatableObject
 {
     /// <summary>
-    /// The database provider to use. Valid values are <see cref="DbProviders.PostgreSQL"/> or <see cref="DbProviders.MSSQL"/>.
+    /// The database provider to use. The only valid value is <see cref="DbProviders.PostgreSQL"/>.
     /// Defaults to PostgreSQL.
     /// </summary>
     public string Provider { get; set; } = DbProviders.PostgreSQL;

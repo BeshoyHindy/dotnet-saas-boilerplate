@@ -1,5 +1,4 @@
 ﻿using Boilerplate.BuildingBlocks.Shared.Persistence;
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Npgsql;
@@ -7,7 +6,7 @@ using Npgsql;
 namespace Boilerplate.BuildingBlocks.Persistence;
 
 /// <summary>
-/// Validates database connection strings for supported providers (PostgreSQL, SQL Server).
+/// Validates database connection strings for the supported provider (PostgreSQL).
 /// </summary>
 /// <param name="dbSettings">Database configuration options.</param>
 /// <param name="logger">Logger instance for error tracking.</param>
@@ -23,26 +22,25 @@ public sealed class ConnectionStringValidator(IOptions<DatabaseOptions> dbSettin
             dbProvider = _dbSettings.Provider;
         }
 
+        // Fail closed: PostgreSQL is the only supported provider, so anything else is a
+        // misconfiguration rather than a string we simply cannot parse.
+        if (!string.Equals(dbProvider, DbProviders.PostgreSQL, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogError(
+                "Database Provider {Provider} is not supported. Only {Supported} is supported.",
+                dbProvider,
+                DbProviders.PostgreSQL);
+            return false;
+        }
+
         try
         {
-            switch (dbProvider?.ToUpperInvariant())
-            {
-                case DbProviders.PostgreSQL:
-                    _ = new NpgsqlConnectionStringBuilder(connectionString);
-                    break;
-                case DbProviders.MSSQL:
-                    _ = new SqlConnectionStringBuilder(connectionString);
-                    break;
-                default:
-                    break;
-            }
-
+            _ = new NpgsqlConnectionStringBuilder(connectionString);
             return true;
         }
         catch (ArgumentException ex)
         {
-            // Catches invalid connection string format from both NpgsqlConnectionStringBuilder
-            // and SqlConnectionStringBuilder (both throw ArgumentException for malformed strings).
+            // NpgsqlConnectionStringBuilder throws ArgumentException for malformed strings.
             _logger.LogError(ex, "Connection String Validation Exception : {Error}", ex.Message);
             return false;
         }

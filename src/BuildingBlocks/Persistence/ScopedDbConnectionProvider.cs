@@ -1,6 +1,5 @@
 using System.Data.Common;
 using Boilerplate.BuildingBlocks.Shared.Persistence;
-using Microsoft.Data.SqlClient;
 using Npgsql;
 
 namespace Boilerplate.BuildingBlocks.Persistence;
@@ -29,12 +28,13 @@ public sealed class ScopedDbConnectionProvider : IScopedDbConnectionProvider, IA
             return existing;
         }
 
-        DbConnection connection = dbProvider.ToUpperInvariant() switch
+        if (!string.Equals(dbProvider, DbProviders.PostgreSQL, StringComparison.OrdinalIgnoreCase))
         {
-            DbProviders.PostgreSQL => new NpgsqlConnection(connectionString),
-            DbProviders.MSSQL => new SqlConnection(connectionString),
-            _ => throw new InvalidOperationException($"Database Provider {dbProvider} is not supported."),
-        };
+            throw new InvalidOperationException(
+                $"Database Provider {dbProvider} is not supported. Only {DbProviders.PostgreSQL} is supported.");
+        }
+
+        DbConnection connection = new NpgsqlConnection(connectionString);
 
         _connections[connectionString] = connection;
         return connection;
