@@ -2,6 +2,7 @@
 using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.BuildingBlocks.Eventing;
 using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
 using Boilerplate.BuildingBlocks.Storage;
 using Boilerplate.BuildingBlocks.Storage.Local;
 using Boilerplate.BuildingBlocks.Storage.Services;
@@ -104,6 +105,7 @@ public class IdentityModule : IModule
         services.AddTransient<IUserRoleService, UserRoleService>();
         services.AddTransient<IUserPasswordService, UserPasswordService>();
         services.AddTransient<IUserPermissionService, UserPermissionService>();
+        services.AddTransient<IPermissionChecker>(sp => sp.GetRequiredService<IUserPermissionService>());
 
         // Facade for backward compatibility
         services.AddTransient<IUserService, UserService>();
