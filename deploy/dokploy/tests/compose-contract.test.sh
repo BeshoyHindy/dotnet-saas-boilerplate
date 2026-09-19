@@ -146,6 +146,13 @@ console_block="$(service_block "$APP" console)"
 assert_match "console is routed by Traefik" "$console_block" 'traefik\.enable=true'
 assert_match "console keeps the original Host header" "$console_block" 'loadbalancer\.passhostheader=true'
 assert_match "console has a load-balancer healthcheck" "$console_block" 'loadbalancer\.healthcheck\.path='
+# The console image runs nginx as uid 101, which cannot bind :80 — it listens on 8080
+# (clients/console/Dockerfile + docker/default.conf.template). Traefik routing to :80
+# would simply never connect, and nothing else here would say why.
+assert_match "console load balancer targets the unprivileged nginx port" "$console_block" \
+  'loadbalancer\.server\.port=8080'
+assert_match "console exposes the unprivileged nginx port" "$console_block" '^[[:space:]]*-[[:space:]]*"8080"'
+refute_match "console never names the privileged port" "$console_block" 'loadbalancer\.server\.port=80$'
 
 # Traefik reports a middleware that two different containers define as a
 # configuration error, so every redirect middleware name must be unique.

@@ -252,7 +252,11 @@ What happens, in order:
 4. `console` starts and renders `/config.json`, its nginx site and its
    Content-Security-Policy from `APP_API_URL`, `APP_STORAGE_URL` and
    `APP_DEFAULT_TENANT`. It proxies `/api` to the API, so the browser only ever
-   talks to `CONSOLE_DOMAIN`.
+   talks to `CONSOLE_DOMAIN`. nginx runs as uid 101 and listens on **8080** —
+   that is what Traefik's `loadbalancer.server.port` names, not `:80`. The API
+   host is re-resolved per request through Docker's embedded DNS
+   (`APP_RESOLVER`, default `127.0.0.11`), so the console starts even if the API
+   is not up yet and follows it across a redeploy.
 5. Traefik picks up the labels, requests certificates for the three hostnames,
    and begins probing `GET /health/ready` on the API every 10 s. A container
    that fails the probe is taken out of rotation.

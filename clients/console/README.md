@@ -58,6 +58,15 @@ const user = unwrap(await api.GET("/api/v1/identity/users/{id}", { params: { pat
 | `APP_API_URL` | yes | Origin nginx proxies `/api` and `/health` to. Server-side, never seen by the browser. |
 | `APP_STORAGE_URL` | no | Object-storage origin, named in the Content-Security-Policy for presigned uploads and images. |
 | `APP_DEFAULT_TENANT` | no (`root`) | Tenant identifier the sign-in form pre-fills. |
+| `APP_RESOLVER` | no (`127.0.0.11`) | DNS nginx re-resolves `APP_API_URL` with on every request. The default is Docker's embedded resolver. |
 
 The entrypoint renders `/config.json`, the nginx site and a strict CSP from those, so one built image
 promotes across every environment.
+
+The image runs nginx as **uid 101, non-root** (`nginxinc/nginx-unprivileged`), so it listens on
+**8080** rather than the privileged `:80` — that is the port `docker-compose.yml` publishes and the
+one Traefik's `loadbalancer.server.port` names in `deploy/dokploy/app.compose.yml`.
+
+`APP_API_URL` reaches `proxy_pass` through a variable, which makes nginx resolve it per request
+instead of once at start-up: the console comes up whether or not the API is already running, and it
+follows the API to a new container IP after a redeploy.

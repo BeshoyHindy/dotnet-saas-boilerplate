@@ -12,6 +12,12 @@ set -eu
 : "${APP_STORAGE_URL:=}"
 # Tenant identifier the sign-in form pre-fills.
 : "${APP_DEFAULT_TENANT:=root}"
+# DNS server nginx re-resolves the API host with on every request (see the site
+# template). 127.0.0.11 is Docker's embedded resolver, which serves compose service
+# names and overlay-network aliases — correct for `docker compose` and for the Dokploy
+# stack alike, since both run the console as a Docker container on a Docker network.
+# Override for a runtime whose DNS lives elsewhere.
+: "${APP_RESOLVER:=127.0.0.11}"
 
 # A trailing slash would turn `proxy_pass` into a URI-rewriting one and drop /api.
 APP_API_URL="${APP_API_URL%/}"
@@ -43,11 +49,11 @@ connect-src 'self'${APP_STORAGE_URL:+ ${APP_STORAGE_URL}}; \
 worker-src 'self' blob:; \
 manifest-src 'self'"
 
-export APP_API_URL APP_STORAGE_URL APP_DEFAULT_TENANT APP_CSP
+export APP_API_URL APP_STORAGE_URL APP_DEFAULT_TENANT APP_RESOLVER APP_CSP
 
 # Substitute ONLY our own variables: nginx configuration is full of $host, $uri and
 # friends that envsubst would otherwise blank out.
-envsubst '${APP_API_URL}' \
+envsubst '${APP_API_URL} ${APP_RESOLVER}' \
   < /etc/nginx/default.conf.template > /etc/nginx/conf.d/default.conf
 envsubst '${APP_CSP}' \
   < /etc/nginx/security-headers.conf.template > /etc/nginx/security-headers.conf

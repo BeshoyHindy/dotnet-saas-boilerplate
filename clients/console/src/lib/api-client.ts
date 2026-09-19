@@ -144,6 +144,29 @@ export async function refreshAccessToken(): Promise<void> {
   tokenStore.setAccessToken(tokens.token ?? "");
 }
 
+/**
+ * One refresh at a time, shared by every 401 that lands while it is in flight.
+ *
+ * The slot is released only once the shared promise has settled *for the caller that
+ * created it*. Chaining the release onto the inner promise (`p.finally(() => slot = null)`)
+ * frees it a microtask early — before the promise the other callers are awaiting resolves —
+ * and a 401 arriving in that window starts a second refresh, rotating the refresh cookie
+ * twice and invalidating the token the first rotation just handed out.
+ */
+async function sharedRefresh(): Promise<void> {
+  const inFlight = refreshPromise;
+  if (inFlight !== null) return inFlight;
+
+  const started = refreshAccessToken();
+  refreshPromise = started;
+  try {
+    await started;
+  } finally {
+    // Only the owner clears the slot, and only if nothing has replaced it since.
+    if (refreshPromise === started) refreshPromise = null;
+  }
+}
+
 /** Paths the client calls without a bearer token (they mint or reset one). */
 function isAnonymous(url: string): boolean {
   return /\/api\/v1\/tenants\/[^/]+\/auth\//.test(url);
@@ -187,12 +210,8 @@ async function authFetch(input: Request): Promise<Response> {
   let response = await send();
 
   if (response.status === 401 && !anonymous && !isActingAsAnotherTenant()) {
-    refreshPromise ??= refreshAccessToken().finally(() => {
-      refreshPromise = null;
-    });
-
     try {
-      await refreshPromise;
+      await sharedRefresh();
     } catch (error) {
       throw error instanceof ApiRequestError ? error : new ApiRequestError(401, "Session expired");
     }

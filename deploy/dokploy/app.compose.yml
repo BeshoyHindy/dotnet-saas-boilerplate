@@ -159,8 +159,9 @@ services:
       # upload/download URLs straight from object storage.
       APP_STORAGE_URL: https://${STORAGE_DOMAIN}
       APP_DEFAULT_TENANT: ${APP_DEFAULT_TENANT}
+    # 8080: the console image runs nginx unprivileged, so it cannot bind :80.
     expose:
-      - "80"
+      - "8080"
     networks:
       dokploy-network:
         aliases:
@@ -178,7 +179,7 @@ services:
       - "traefik.http.routers.${STACK_NAME}-console.service=${STACK_NAME}-console"
       - "traefik.http.middlewares.${STACK_NAME}-console-https.redirectscheme.scheme=https"
       - "traefik.http.middlewares.${STACK_NAME}-console-https.redirectscheme.permanent=true"
-      - "traefik.http.services.${STACK_NAME}-console.loadbalancer.server.port=80"
+      - "traefik.http.services.${STACK_NAME}-console.loadbalancer.server.port=8080"
       - "traefik.http.services.${STACK_NAME}-console.loadbalancer.passhostheader=true"
       # /config.json only exists once the entrypoint has rendered it, so it is a
       # real readiness signal for this image rather than a liveness one.

@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Check,
   ChevronsUpDown,
-  KeyRound,
   LogOut,
   Monitor,
   Moon,
@@ -303,7 +302,6 @@ export function Topbar() {
           <div className="px-1 pb-1">
             <SimpleMenuItem icon={UserRound} label="Profile" onSelect={() => navigate("/settings/profile")} />
             <SimpleMenuItem icon={SettingsIcon} label="Settings" onSelect={() => navigate("/settings")} />
-            <SimpleMenuItem icon={KeyRound} label="API keys" onSelect={() => navigate("/settings/api-keys")} />
           </div>
 
           <DropdownMenuSeparator className="!my-0" />

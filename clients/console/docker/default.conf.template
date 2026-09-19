@@ -1,13 +1,35 @@
-# The console's nginx site. Rendered by docker-entrypoint.sh: `${APP_API_URL}` is
-# substituted at container start, everything else is literal nginx.
+# The console's nginx site. Rendered by docker-entrypoint.sh: `${APP_API_URL}` and
+# `${APP_RESOLVER}` are substituted at container start, everything else is literal nginx.
 #
 # The console proxies /api (and the health probes) to the API instead of letting the
 # browser call it cross-origin. That is not a convenience: the refresh token is an
 # `HttpOnly; Secure; SameSite=Strict` cookie (ADR-0002) and CORS allows no
 # credentials, so the browser only ever sends it to the console's own origin.
 
+# Resolve the API host at REQUEST time, not while reading the config. A literal
+# `proxy_pass` resolves its hostname once at start-up: a console that comes up before
+# the API then refuses to start at all, and one whose API container is recreated on a
+# redeploy keeps proxying to the old address. A `resolver` plus a variable in
+# `proxy_pass` (below) turns both into a 502 that heals by itself.
+#
+# Default 127.0.0.11 is Docker's embedded DNS, which is what serves compose service
+# names and Traefik/Dokploy network aliases alike. APP_RESOLVER overrides it for a
+# runtime whose DNS lives elsewhere (Kubernetes' kube-dns, a host resolver).
+resolver ${APP_RESOLVER} valid=10s ipv6=off;
+resolver_timeout 5s;
+
+# Assets are immutable *when one was actually served*. A year-long immutable 404 is how
+# one bad deploy stays broken in every browser that happened to ask during it.
+map $status $asset_cache_control {
+  default "no-store";
+  200     "public, max-age=31536000, immutable";
+  304     "public, max-age=31536000, immutable";
+}
+
 server {
-  listen 80;
+  # 8080, not 80: the image runs as an unprivileged user, which cannot bind a
+  # privileged port. Everything that publishes or routes to this container names 8080.
+  listen 8080;
   server_name _;
   root /usr/share/nginx/html;
   index index.html;
@@ -20,34 +42,52 @@ server {
   # Don't advertise the exact nginx build.
   server_tokens off;
 
-  # Same-origin API. No trailing slash on proxy_pass, so the original request URI
-  # (/api/v1/…) is forwarded verbatim; the entrypoint strips any trailing slash from
-  # APP_API_URL so this stays true. The Host header is deliberately NOT rewritten to
-  # the console's hostname — the API's host filtering allow-list names the API.
-  location /api {
-    proxy_pass ${APP_API_URL};
+  # Same-origin API.
+  #
+  # `^~` matters: without it the static-asset *regex* location below wins over this
+  # prefix, and a real API path ending in an asset extension —
+  # `/api/v1/files/avatar.png` — is looked up on disk and answered with the SPA's
+  # index.html instead of being proxied.
+  #
+  # The upstream goes through a variable so nginx re-resolves it per request (see
+  # `resolver` above); that form drops the original URI, so `$request_uri` (path plus
+  # query) has to be appended explicitly. The Host header is deliberately NOT
+  # rewritten to the console's hostname — the API's host filtering allow-list names
+  # the API. X-Forwarded-Host is not sent either: the API derives links from its own
+  # configured origin, and a forwarded host is a caller-controlled value that has no
+  # reader here.
+  #
+  # `add_header` does not inherit into a location that declares one of its own, and
+  # every location here does — so the security headers are included per location
+  # rather than set once on the server.
+  location ^~ /api {
+    include /etc/nginx/security-headers.conf;
+    set $api_upstream ${APP_API_URL};
+    proxy_pass $api_upstream$request_uri;
     proxy_http_version 1.1;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-Host $host;
     # Uploads go straight to object storage, so nothing large flows through here.
     client_max_body_size 12m;
     proxy_read_timeout 60s;
   }
 
-  # The anonymous liveness/readiness probes the Health page reads.
-  location /health {
-    proxy_pass ${APP_API_URL};
+  # The anonymous liveness/readiness probes the Health page reads. `^~` for the same
+  # reason as /api.
+  location ^~ /health {
+    include /etc/nginx/security-headers.conf;
+    set $health_upstream ${APP_API_URL};
+    proxy_pass $health_upstream$request_uri;
     proxy_http_version 1.1;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
   }
 
-  # Hashed bundles are immutable by construction.
+  # Hashed bundles are immutable by construction — but only once one was found, hence
+  # the $status map rather than a flat `expires 1y`.
   location ~* \.(?:js|css|woff2?|png|jpg|jpeg|svg|ico|webp)$ {
     include /etc/nginx/security-headers.conf;
-    expires 1y;
-    add_header Cache-Control "public, immutable" always;
+    add_header Cache-Control $asset_cache_control always;
   }
 
   # Runtime configuration — must be re-read on every deploy, and is the container's

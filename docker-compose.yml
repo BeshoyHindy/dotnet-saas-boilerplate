@@ -215,8 +215,10 @@ services:
       # Content-Security-Policy has to name that origin.
       APP_STORAGE_URL: http://localhost:${MINIO_API_PORT:-9000}
       APP_DEFAULT_TENANT: ${APP_DEFAULT_TENANT:-root}
+    # 8080 in the container: the console image runs nginx as an unprivileged user,
+    # which cannot bind a privileged port.
     ports:
-      - "${APP_CONSOLE_PORT:-8081}:80"
+      - "${APP_CONSOLE_PORT:-8081}:8080"
 
 volumes:
   pg_data:

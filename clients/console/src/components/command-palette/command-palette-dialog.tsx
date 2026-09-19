@@ -1,26 +1,7 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Command } from "cmdk";
-import {
-  Folder,
-  HeartPulse,
-  KeyRound,
-  LayoutDashboard,
-  LogOut,
-  Monitor,
-  Moon,
-  Palette,
-  Plus,
-  ScrollText,
-  Search,
-  Settings as SettingsIcon,
-  Shield,
-  ShieldCheck,
-  Sparkles,
-  Sun,
-  Users,
-  UserRound,
-} from "lucide-react";
+import { LogOut, Monitor, Moon, Palette, Search, Sun } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -30,7 +11,7 @@ import {
 import { useAuth } from "@/auth/use-auth";
 import { useTheme } from "@/components/theme/theme-provider";
 import { accents } from "@/components/theme/appearance-options";
-import { ALL_TRASH_PERMISSIONS } from "@/lib/trash-permissions";
+import { navigationGroups } from "@/components/command-palette/palette-actions";
 import { cn } from "@/lib/cn";
 
 /**
@@ -93,181 +74,12 @@ export function CommandPaletteDialog({
       return true;
     };
     const allGroups: ActionGroup[] = [
-      {
-        heading: "Navigate",
-        items: [
-          {
-            id: "nav-overview",
-            label: "Overview",
-            hint: "Tenant telemetry & usage",
-            Icon: LayoutDashboard,
-            keywords: ["home", "dashboard"],
-            perform: go("/"),
-          },
-          {
-            id: "nav-files",
-            label: "Files",
-            hint: "My uploaded assets",
-            Icon: Folder,
-            keywords: ["storage", "uploads", "documents"],
-            perform: go("/files"),
-            perm: "Permissions.Files.Upload",
-          },
-          {
-            id: "nav-users",
-            label: "Users",
-            hint: "Identity directory",
-            Icon: Users,
-            keywords: ["identity", "people", "members", "team"],
-            perform: go("/identity/users"),
-            perm: "Permissions.Users.Update",
-          },
-          {
-            id: "nav-roles",
-            label: "Roles",
-            hint: "Permissions & role assignment",
-            Icon: ShieldCheck,
-            keywords: ["identity", "permissions", "rbac"],
-            perform: go("/identity/roles"),
-            perm: "Permissions.Roles.Update",
-          },
-          {
-            id: "nav-groups",
-            label: "Groups",
-            hint: "Org groups & membership",
-            Icon: Users,
-            keywords: ["identity", "teams", "org"],
-            perform: go("/identity/groups"),
-            perm: "Permissions.Groups.Update",
-          },
-          {
-            id: "nav-health",
-            label: "Health",
-            hint: "Readiness probe & dependencies",
-            Icon: HeartPulse,
-            keywords: ["status", "uptime", "system", "ready", "redis", "postgres"],
-            perform: go("/system/health"),
-          },
-          {
-            id: "nav-audits",
-            label: "Audit trail",
-            hint: "Activity, security, entity-change events",
-            Icon: ScrollText,
-            keywords: ["audit", "log", "compliance", "security", "trace", "correlation"],
-            perform: go("/system/audits"),
-            perm: "Permissions.AuditTrails.View",
-          },
-          {
-            id: "nav-trash",
-            label: "Trash",
-            hint: "Soft-deleted records",
-            Icon: ScrollText,
-            keywords: ["recycle", "deleted", "restore"],
-            perform: go("/system/trash"),
-            anyPerm: ALL_TRASH_PERMISSIONS,
-          },
-          {
-            id: "nav-sessions",
-            label: "Sessions",
-            hint: "Active user sessions",
-            Icon: Shield,
-            keywords: ["devices", "logins"],
-            perform: go("/system/sessions"),
-            perm: "Permissions.Sessions.ViewAll",
-          },
-          {
-            id: "nav-settings",
-            label: "Settings",
-            Icon: SettingsIcon,
-            keywords: ["preferences", "config"],
-            perform: go("/settings"),
-          },
-        ],
-      },
-      {
-        heading: "Create",
-        items: [
-          {
-            id: "create-user",
-            label: "Create user",
-            hint: "Register a new account",
-            Icon: Plus,
-            keywords: ["new", "invite", "register", "identity"],
-            perform: go("/identity/users?action=create"),
-            perm: "Permissions.Users.Create",
-          },
-          {
-            id: "create-role",
-            label: "Create role",
-            hint: "Define a new permission set",
-            Icon: Plus,
-            keywords: ["new", "permissions", "rbac"],
-            perform: go("/identity/roles?action=create"),
-            perm: "Permissions.Roles.Create",
-          },
-          {
-            id: "create-group",
-            label: "Create group",
-            hint: "Organize members",
-            Icon: Plus,
-            keywords: ["new", "team", "org"],
-            perform: go("/identity/groups?action=create"),
-            perm: "Permissions.Groups.Create",
-          },
-          {
-            id: "create-file",
-            label: "Upload file",
-            hint: "Add to your storage",
-            Icon: Plus,
-            keywords: ["new", "upload", "attach"],
-            perform: go("/files?action=upload"),
-            perm: "Permissions.Files.Upload",
-          },
-        ],
-      },
-      {
-        heading: "Account",
-        items: [
-          {
-            id: "acc-profile",
-            label: "Profile",
-            hint: "Name, email, contact",
-            Icon: UserRound,
-            perform: go("/settings/profile"),
-          },
-          {
-            id: "acc-security",
-            label: "Security",
-            hint: "Password, 2FA, sessions",
-            Icon: Shield,
-            keywords: ["password", "2fa", "sessions"],
-            perform: go("/settings/security"),
-          },
-          {
-            id: "acc-keys",
-            label: "API keys",
-            hint: "Generate & rotate",
-            Icon: KeyRound,
-            keywords: ["token", "credentials"],
-            perform: go("/settings/api-keys"),
-          },
-          {
-            id: "acc-notifications",
-            label: "Notifications",
-            hint: "Email preferences",
-            Icon: Sparkles,
-            perform: go("/settings/notifications"),
-          },
-          {
-            id: "acc-appearance",
-            label: "Appearance",
-            hint: "Theme, accent, font, density",
-            Icon: Palette,
-            keywords: ["theme", "font", "density", "dark", "light"],
-            perform: go("/settings/appearance"),
-          },
-        ],
-      },
+      // The navigating entries live at module scope (navigationGroups) so their targets
+      // are data a test can check; only the closure that performs them is built here.
+      ...navigationGroups.map((group) => ({
+        heading: group.heading,
+        items: group.items.map((item) => ({ ...item, perform: go(item.to) })),
+      })),
       {
         heading: "Theme",
         items: [

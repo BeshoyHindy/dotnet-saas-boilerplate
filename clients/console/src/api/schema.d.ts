@@ -1455,7 +1455,7 @@ export interface paths {
         put?: never;
         /**
          * Issue JWT access and refresh tokens
-         * @description Submit credentials to receive a JWT access token and a refresh token. The tenant is taken from the '{tenant}' route segment. The 'X-Client-App' header (admin|dashboard) is used to enforce the SuperAdmin / dashboard boundary.
+         * @description Submit credentials to receive a JWT access token and a refresh token. The tenant is taken from the '{tenant}' route segment.
          */
         post: operations["IssueJwtTokens"];
         delete?: never;
@@ -5189,9 +5189,7 @@ export interface operations {
     IssueJwtTokens: {
         parameters: {
             query?: never;
-            header?: {
-                "X-Client-App"?: string;
-            };
+            header?: never;
             path: {
                 /** @description The tenant identifier. The one place a caller may name a tenant (ADR-0002). */
                 tenant: string;
@@ -5222,13 +5220,6 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden */
-            403: {
                 headers: {
                     [name: string]: unknown;
                 };

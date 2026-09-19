@@ -1,6 +1,7 @@
-// Runtime config — fetched once at boot from /config.json. See
-// clients/admin/src/env.ts for the rationale; the dashboard doesn't
-// need dashboardUrl (the handoff is one-way: admin → dashboard).
+// Runtime config — fetched once at boot from /config.json, never baked into the
+// bundle: one built image promotes across environments, and the container
+// entrypoint renders this file from APP_* variables at start (ADR-0004). There is
+// no second app to point at, so nothing here names another origin.
 type RuntimeConfig = {
   apiBase: string;
   defaultTenant: string;

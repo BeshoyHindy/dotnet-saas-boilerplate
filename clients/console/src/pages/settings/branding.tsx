@@ -23,7 +23,7 @@ import { cn } from "@/lib/cn";
 /**
  * BrandingSettings — tenant-facing theme editor for the *current* tenant.
  *
- * Mirrors the operator's TenantBrandingCard (clients/admin): the theme endpoints
+ * Shares its endpoints with the operator's TenantBrandingCard: the theme endpoints
  * are current-tenant scoped, so a tenant admin holding Tenants.UpdateTheme edits
  * the branding of whichever tenant their token names. The Branding tab only
  * renders for holders of that
@@ -31,8 +31,7 @@ import { cn } from "@/lib/cn";
  * mounts this page, and the API answers 403 — surfaced as an error band.
  *
  * Scope: palette (light + dark) + brand asset URLs. Typography and layout
- * fields exist on the server DTO but stay out of the v1 editor, matching the
- * admin card.
+ * fields exist on the server DTO but stay out of the v1 editor, on both surfaces.
  */
 const THEME_QUERY_KEY = ["tenant", "theme"] as const;
 
