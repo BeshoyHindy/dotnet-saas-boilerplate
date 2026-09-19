@@ -150,6 +150,32 @@ public sealed class IdentityService : IIdentityService
         return (user.Id, claims);
     }
 
+    public async Task<TenantUserLookup?> FindTenantUserAsync(
+        string tenantId,
+        string? userId = null,
+        string? email = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(tenantId);
+
+        if (string.IsNullOrWhiteSpace(userId) && string.IsNullOrWhiteSpace(email))
+        {
+            throw new ArgumentException("Either userId or email must be supplied.", nameof(userId));
+        }
+
+        // Same rationale as BuildClaimsForUserAsync: the caller is a root operator resolving a user
+        // in ANOTHER tenant, so Finbuckle's filter is bypassed and the tenant is pinned explicitly.
+        var normalizedEmail = email is null ? null : _userManager.NormalizeEmail(email);
+
+        return await _userManager.Users
+            .IgnoreQueryFilters()
+            .Where(u => EF.Property<string>(u, "TenantId") == tenantId
+                && (userId != null ? u.Id == userId : u.NormalizedEmail == normalizedEmail))
+            .Select(u => new TenantUserLookup(u.Id, u.UserName, u.Email, u.IsActive, u.EmailConfirmed))
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+    }
+
     private AppTenantInfo GetValidatedTenant()
     {
         var tenant = _multiTenantContextAccessor!.MultiTenantContext.TenantInfo

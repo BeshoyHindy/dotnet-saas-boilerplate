@@ -30,6 +30,14 @@ public static class SystemPermissions
         public const string Tenants = $"{nameof(Platform)}.Tenants";
         public const string Audits = $"{nameof(Platform)}.Audits";
         public const string Users = $"{nameof(Platform)}.Users";
+
+        /// <summary>
+        /// The single root-only permission behind crossing a tenant boundary: the operator token
+        /// exchange (ADR-0002). Deliberately the same permission the catalog has always called
+        /// "Cross-Tenant Impersonate" — the exchange *is* that pathway, now with a token instead of
+        /// a header — so there is one name for one capability and no seeded role claim to migrate.
+        /// </summary>
+        public const string CrossTenantImpersonate = $"Permissions.{Users}.Impersonate";
     }
 
     public static IReadOnlyList<AppPermission> All { get; } =
@@ -47,6 +55,7 @@ public static class SystemPermissions
         new("Delete Tenants",            ActionConstants.Delete, Platform.Tenants,       IsRoot: true),
 
         new("View Cross-Tenant Audits",  "ViewAll",              Platform.Audits,        IsRoot: true),
+        // Gates POST /identity/operator/token-exchange — entering another tenant as one of its users.
         new("Cross-Tenant Impersonate",  "Impersonate",          Platform.Users,         IsRoot: true),
     ];
 }

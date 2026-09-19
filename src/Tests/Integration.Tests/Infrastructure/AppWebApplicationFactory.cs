@@ -138,6 +138,11 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
                 ["JwtOptions:SigningKey"] = TestConstants.JwtSigningKey,
                 ["JwtOptions:AccessTokenMinutes"] = "30",
                 ["JwtOptions:RefreshTokenDays"] = "7",
+                // Acting-token ceiling (operator exchange + impersonation). Kept below the shipped
+                // default so a test can prove an over-long request is clamped, not honoured.
+                ["OperatorExchange:DefaultMinutes"] = "15",
+                ["OperatorExchange:MaxMinutes"] =
+                    TestConstants.OperatorExchangeMaxMinutes.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 ["OriginOptions:OriginUrl"] = "http://localhost",
                 ["OpenTelemetryOptions:Enabled"] = "false",
                 ["EventingOptions:UseHostedServiceDispatcher"] = "false",

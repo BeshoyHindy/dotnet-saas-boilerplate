@@ -31,4 +31,25 @@ public interface IIdentityService
     /// </summary>
     Task<(string Subject, IEnumerable<Claim> Claims)?>
         BuildClaimsForUserAsync(string userId, string tenantId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Locates a user inside an arbitrary tenant by id or by email, bypassing Finbuckle's tenant
+    /// query filters. The operator token exchange uses it to resolve the subject it is about to
+    /// act as (explicit <paramref name="userId"/>, else the tenant record's admin email) and to
+    /// turn "missing" and "deactivated" into distinct, deliberate status codes instead of the
+    /// generic 401 the claim builder throws. Returns null when nothing matches.
+    /// </summary>
+    Task<TenantUserLookup?> FindTenantUserAsync(
+        string tenantId,
+        string? userId = null,
+        string? email = null,
+        CancellationToken ct = default);
 }
+
+/// <summary>Minimal projection of a user in some tenant — enough to decide whether we may act as them.</summary>
+public sealed record TenantUserLookup(
+    string UserId,
+    string? UserName,
+    string? Email,
+    bool IsActive,
+    bool EmailConfirmed);

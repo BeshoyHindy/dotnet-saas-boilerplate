@@ -27,6 +27,7 @@ using Boilerplate.Modules.Identity.Features.v1.Impersonation.EndImpersonation;
 using Boilerplate.Modules.Identity.Features.v1.Impersonation.GetImpersonationGrants;
 using Boilerplate.Modules.Identity.Features.v1.Impersonation.RevokeImpersonationGrant;
 using Boilerplate.Modules.Identity.Features.v1.Impersonation.StartImpersonation;
+using Boilerplate.Modules.Identity.Features.v1.Operators.ExchangeOperatorToken;
 using Boilerplate.Modules.Identity.Features.v1.Permissions.GetPermissionCatalog;
 using Boilerplate.Modules.Identity.Features.v1.Roles;
 using Boilerplate.Modules.Identity.Features.v1.Roles.DeleteRole;
@@ -99,6 +100,10 @@ public class IdentityModule : IModule
         services.AddScoped<IRequestContext>(sp => sp.GetRequiredService<IRequestContextService>());
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IImpersonationGrantService, ImpersonationGrantService>();
+        // The one place a token is minted for someone else's identity: impersonation and the root
+        // operator token exchange both go through it, so grants, revocation and the lifetime
+        // ceiling stay unified (ADR-0002).
+        services.AddScoped<IImpersonationTokenIssuer, ImpersonationTokenIssuer>();
 
         // User services - focused single-responsibility services
         services.AddTransient<IUserRegistrationService, UserRegistrationService>();
@@ -130,6 +135,13 @@ public class IdentityModule : IModule
 
         // Tenant validity grace period (shared "TenantValidity" section) — used by the login expiry check.
         services.Configure<TenantGraceOptions>(builder.Configuration.GetSection(TenantGraceOptions.SectionName));
+
+        // Lifetime ceiling for every acting token (operator exchange + impersonation). Validated on
+        // start so a misconfigured Default/Max pair fails the host, not the first exchange.
+        services.AddOptions<OperatorExchangeOptions>()
+            .BindConfiguration(OperatorExchangeOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
         // Register password history service
         services.AddScoped<IPasswordHistoryService, PasswordHistoryService>();
@@ -264,6 +276,10 @@ public class IdentityModule : IModule
 
         // user groups
         group.MapGetUserGroupsEndpoint();
+
+        // operator — cross-tenant token exchange (ADR-0002). Root-only; NOT in the anonymous
+        // tenants/{tenant}/auth group: the caller already holds a signed root token.
+        group.MapExchangeOperatorTokenEndpoint();
 
         // impersonation
         group.MapStartImpersonationEndpoint();

@@ -1,19 +1,21 @@
 using FluentValidation;
 using Boilerplate.Modules.Identity.Contracts.v1.Impersonation.StartImpersonation;
+using Microsoft.Extensions.Options;
 
 namespace Boilerplate.Modules.Identity.Features.v1.Impersonation.StartImpersonation;
 
 public sealed class StartImpersonationCommandValidator : AbstractValidator<StartImpersonationCommand>
 {
     /// <summary>
-    /// Upper bound on impersonation token lifetime — the server will silently
-    /// cap to this even if the validator passes, but we reject obvious abuse
-    /// (negative, zero, or absurd values) up front.
+    /// Upper bound on impersonation token lifetime. There is exactly ONE such number in the system
+    /// (<see cref="OperatorExchangeOptions.MaxMinutes"/>): the issuer clamps to it regardless, and
+    /// this rule only bounces obviously abusive values (negative, zero, absurd) up front.
     /// </summary>
-    public const int MaxImpersonationMinutes = 60;
-
-    public StartImpersonationCommandValidator()
+    public StartImpersonationCommandValidator(IOptions<OperatorExchangeOptions> options)
     {
+        ArgumentNullException.ThrowIfNull(options);
+        var maxMinutes = options.Value.MaxMinutes;
+
         RuleFor(p => p.TargetUserId)
             .Cascade(CascadeMode.Stop)
             .NotEmpty();
@@ -24,8 +26,8 @@ public sealed class StartImpersonationCommandValidator : AbstractValidator<Start
 
         RuleFor(p => p.DurationMinutes!.Value)
             .GreaterThan(0)
-            .LessThanOrEqualTo(MaxImpersonationMinutes)
-            .WithMessage($"Duration must be between 1 and {MaxImpersonationMinutes} minutes.")
+            .LessThanOrEqualTo(maxMinutes)
+            .WithMessage($"Duration must be between 1 and {maxMinutes} minutes.")
             .When(p => p.DurationMinutes.HasValue);
     }
 }
