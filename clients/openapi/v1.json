@@ -536,6 +536,20 @@
         ],
         "type": "object"
       },
+      "EndSessionCommand": {
+        "properties": {
+          "refreshToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "refreshToken"
+        ],
+        "type": "object"
+      },
       "ExceptionArea": {
         "enum": [
           "None",
@@ -6049,6 +6063,53 @@
           }
         ],
         "summary": "Request password reset",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/auth/logout": {
+      "post": {
+        "description": "Revokes the session behind the caller's access token ('sid' claim) or, failing that, the session the supplied refresh token belongs to, and clears the refresh cookie. Always returns 204 so it cannot be used to probe tokens.",
+        "operationId": "Logout",
+        "parameters": [
+          {
+            "description": "The tenant identifier. The one place a caller may name a tenant (ADR-0002).",
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EndSessionCommand"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "End the current session",
         "tags": [
           "Auth"
         ]

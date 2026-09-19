@@ -1364,6 +1364,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenants/{tenant}/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End the current session
+         * @description Revokes the session behind the caller's access token ('sid' claim) or, failing that, the session the supplied refresh token belongs to, and clears the refresh cookie. Always returns 204 so it cannot be used to probe tokens.
+         */
+        post: operations["Logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenants/{tenant}/auth/refresh": {
         parameters: {
             query?: never;
@@ -1584,6 +1604,9 @@ export interface components {
             accessToken: string;
             /** Format: date-time */
             accessTokenExpiresAt: string;
+        };
+        EndSessionCommand: {
+            refreshToken: null | string;
         };
         /** @enum {unknown} */
         ExceptionArea: "None" | "Api" | "Worker" | "Ui" | "Infra" | "Unknown" | null;
@@ -5024,6 +5047,31 @@ export interface operations {
         responses: {
             /** @description OK */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    Logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The tenant identifier. The one place a caller may name a tenant (ADR-0002). */
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": null | components["schemas"]["EndSessionCommand"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
