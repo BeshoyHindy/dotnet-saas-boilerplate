@@ -40,13 +40,20 @@ public interface ITenantScope
         Func<AppTenantInfo, IServiceProvider, CancellationToken, Task> work,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Loads a tenant record from the store. Touches no ambient state.</summary>
-    /// <exception cref="UnknownTenantException">The store has no tenant with that id.</exception>
+    /// <summary>
+    /// Loads a tenant record. Touches no ambient state. Checks the registered
+    /// <see cref="Finbuckle.MultiTenant.Abstractions.IMultiTenantStore{TTenantInfo}"/>s in registration
+    /// order — the 60-minute distributed cache first, the EF-backed catalog second — the same trust the
+    /// HTTP path already places in the cache, so this is a cache hit unless the tenant was never looked
+    /// up before. A hit from a store other than the first warms that first store.
+    /// </summary>
+    /// <exception cref="UnknownTenantException">No store has a tenant with that id.</exception>
     Task<AppTenantInfo> GetTenantAsync(string tenantId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Every tenant in the store. For callers that need the catalog itself (readiness probes,
-    /// startup waits) rather than work done under each tenant.
+    /// Every tenant in the catalog. For callers that need the catalog itself (readiness probes,
+    /// startup waits) rather than work done under each tenant. Always reads the authoritative,
+    /// last-registered store — the cache store cannot enumerate.
     /// </summary>
     Task<IReadOnlyList<AppTenantInfo>> GetTenantsAsync(CancellationToken cancellationToken = default);
 

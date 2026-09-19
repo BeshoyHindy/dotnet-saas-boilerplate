@@ -201,11 +201,73 @@ public sealed class TenantScopeTests
         (await harness.Sut.GetTenantsAsync()).Select(t => t.Id).ShouldBe(["root", TenantId], ignoreOrder: true);
     }
 
+    // GetTenantAsync checks the registered stores in registration order — the 60-minute distributed
+    // cache store first, the EF-backed catalog second (see MultitenancyModule) — so a job or event
+    // dispatch costs a catalog SELECT only on a cache miss. Exercised generically, by store order, not
+    // by referencing Finbuckle's cache store type.
+    #region Cache-first tenant lookup
+
+    [Fact]
+    public async Task GetTenantAsync_Should_Return_The_First_Stores_Hit_Without_Querying_Later_Stores()
+    {
+        var cacheStore = new FakeTenantStore();
+        var efStore = new FakeTenantStore();
+        cacheStore.Seed(new AppTenantInfo(TenantId, TenantId));
+        var harness = new Harness(stores: [cacheStore, efStore]);
+
+        var tenant = await harness.Sut.GetTenantAsync(TenantId);
+
+        tenant.Id.ShouldBe(TenantId);
+        efStore.GetCallCount.ShouldBe(0, "a hit on the first store must never fall through to the second");
+    }
+
+    [Fact]
+    public async Task GetTenantAsync_Should_Fall_Through_On_A_Miss_And_Warm_The_First_Store()
+    {
+        var cacheStore = new FakeTenantStore();
+        var efStore = new FakeTenantStore();
+        efStore.Seed(new AppTenantInfo(TenantId, "Acme", "Host=acme-db", "admin@acme.test"));
+        var harness = new Harness(stores: [cacheStore, efStore]);
+
+        var tenant = await harness.Sut.GetTenantAsync(TenantId);
+
+        tenant.ConnectionString.ShouldBe("Host=acme-db");
+        (await cacheStore.GetAsync(TenantId)).ShouldNotBeNull(
+            "a miss on the first store must warm it, so the next lookup is a hit there too");
+    }
+
+    [Fact]
+    public async Task GetTenantAsync_Should_Throw_When_No_Store_Knows_The_Tenant()
+    {
+        var harness = new Harness(stores: [new FakeTenantStore(), new FakeTenantStore()]);
+
+        var ex = await Should.ThrowAsync<UnknownTenantException>(() => harness.Sut.GetTenantAsync("ghost"));
+
+        ex.Message.ShouldContain("ghost");
+    }
+
+    [Fact]
+    public async Task GetTenantsAsync_Should_Always_Read_The_Last_Registered_Store()
+    {
+        var cacheStore = new FakeTenantStore();
+        var efStore = new FakeTenantStore();
+        efStore.Seed(new AppTenantInfo("root", "root"));
+        efStore.Seed(new AppTenantInfo(TenantId, TenantId));
+        var harness = new Harness(stores: [cacheStore, efStore]);
+
+        var tenants = await harness.Sut.GetTenantsAsync();
+
+        tenants.Select(t => t.Id).ShouldBe(
+            ["root", TenantId], ignoreOrder: true, "the cache store can't enumerate — GetAllAsync must read EF");
+    }
+
+    #endregion
+
     #region Harness
 
     private sealed class Harness
     {
-        public Harness(bool useRealAsyncLocalAccessor = false)
+        public Harness(bool useRealAsyncLocalAccessor = false, IMultiTenantStore<AppTenantInfo>[]? stores = null)
         {
             // The stub is a plain field, which makes assertions easy but cannot catch execution-context
             // mistakes; the real accessor is an AsyncLocal, which can.
@@ -222,7 +284,15 @@ public sealed class TenantScopeTests
             services.AddSingleton(accessor);
             services.AddSingleton(setter);
             services.AddSingleton<AmbientTenantContext>(Ambient);
-            services.AddSingleton<IMultiTenantStore<AppTenantInfo>>(Store);
+
+            // Single-store callers (the default) get Store; multi-store callers register their own
+            // stores, in the order IMultiTenantStore<AppTenantInfo> should be resolved — DI preserves
+            // registration order for IEnumerable<T>, exactly like MultitenancyModule's cache-then-EF.
+            foreach (var store in stores ?? [Store])
+            {
+                services.AddSingleton(store);
+            }
+
             services.AddScoped<TenantCapturingService>();
 
             Provider = services.BuildServiceProvider();
@@ -259,14 +329,20 @@ public sealed class TenantScopeTests
 
         public void Seed(AppTenantInfo tenant) => _tenants.Add(tenant);
 
+        /// <summary>Number of <see cref="GetAsync"/> calls — asserts a cache hit never falls through.</summary>
+        public int GetCallCount { get; private set; }
+
         public Task<bool> AddAsync(AppTenantInfo tenantInfo)
         {
             _tenants.Add(tenantInfo);
             return Task.FromResult(true);
         }
 
-        public Task<AppTenantInfo?> GetAsync(string id) =>
-            Task.FromResult(_tenants.Find(t => t.Id == id));
+        public Task<AppTenantInfo?> GetAsync(string id)
+        {
+            GetCallCount++;
+            return Task.FromResult(_tenants.Find(t => t.Id == id));
+        }
 
         public Task<IEnumerable<AppTenantInfo>> GetAllAsync() =>
             Task.FromResult<IEnumerable<AppTenantInfo>>(_tenants.ToList());

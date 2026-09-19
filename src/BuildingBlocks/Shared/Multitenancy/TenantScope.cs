@@ -76,16 +76,47 @@ public sealed class TenantScope : ITenantScope
         // scoped, and holding it open would keep a second DbContext (and its connection) alive
         // alongside the tenant's own.
         using var lookupScope = _scopeFactory.CreateScope();
-        var store = lookupScope.ServiceProvider.GetRequiredService<IMultiTenantStore<AppTenantInfo>>();
 
-        return await store.GetAsync(tenantId).ConfigureAwait(false)
-            ?? throw UnknownTenantException.ForTenant(tenantId);
+        // Registration order, not type: MultitenancyModule registers the 60-minute distributed cache
+        // store before the EF store, the same order the HTTP path already trusts. Ask each store in
+        // turn and stop at the first hit, so a job or a dispatched event costs a catalog SELECT only
+        // on a cache miss.
+        var stores = lookupScope.ServiceProvider
+            .GetRequiredService<IEnumerable<IMultiTenantStore<AppTenantInfo>>>()
+            .ToList();
+
+        for (var i = 0; i < stores.Count; i++)
+        {
+            var tenant = await stores[i].GetAsync(tenantId).ConfigureAwait(false);
+            if (tenant is null)
+            {
+                continue;
+            }
+
+            if (i > 0)
+            {
+                // Warm the first (cache) store, mirroring what OnTenantResolveCompleted does for the
+                // HTTP path — the next lookup, from any caller, is then a cache hit too.
+                await stores[0].AddAsync(tenant).ConfigureAwait(false);
+            }
+
+            return tenant;
+        }
+
+        throw UnknownTenantException.ForTenant(tenantId);
     }
 
     public async Task<IReadOnlyList<AppTenantInfo>> GetTenantsAsync(CancellationToken cancellationToken = default)
     {
         using var lookupScope = _scopeFactory.CreateScope();
-        var store = lookupScope.ServiceProvider.GetRequiredService<IMultiTenantStore<AppTenantInfo>>();
+
+        // The cache store can't enumerate — Finbuckle's DistributedCacheStore.GetAllAsync throws
+        // NotImplementedException, it only ever holds what it was asked to look up by id. Read the
+        // authoritative store instead: stores are registered cache-first (see GetTenantAsync), so the
+        // authoritative one is the LAST registered.
+        var store = lookupScope.ServiceProvider
+            .GetRequiredService<IEnumerable<IMultiTenantStore<AppTenantInfo>>>()
+            .Last();
         var tenants = await store.GetAllAsync().ConfigureAwait(false);
         return tenants.ToList();
     }

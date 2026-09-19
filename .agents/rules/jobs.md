@@ -16,7 +16,7 @@ Queues: `default`, `email` (5 workers, 30s poll). Storage is `Hangfire.PostgreSq
 
 ## Every job is tenant-bound or `[SystemJob]` (ADR-0002)
 
-`AppJobFilter` stamps the **ambient** tenant's Id onto the job at enqueue — the ambient context, never `HttpContext`, so enqueuing from a hosted service or an event handler works the same as from a request. `AppJobActivator` re-reads the full tenant record from the store and opens the tenant **before** the job's DI scope, so a tenant with a dedicated connection string gets its own database. Only the Id travels: the record is never serialized into job storage.
+`AppJobFilter` stamps the **ambient** tenant's Id onto the job at enqueue — the ambient context, never `HttpContext`, so enqueuing from a hosted service or an event handler works the same as from a request. `AppJobActivator` loads the full tenant record through `ITenantScope.GetTenantAsync` (cache-first, same as the HTTP path) and opens the tenant **before** the job's DI scope, so a tenant with a dedicated connection string gets its own database. Only the Id travels: the record is never serialized into job storage.
 
 There is no third, silent option:
 
