@@ -25,6 +25,24 @@ public enum ResourceKind
     AuditTrace,
     ImpersonationGrant,
     Tenant,
+
+    // Rows seeded in a NON-DEFAULT state. A list endpoint that only shows such rows (the trash
+    // view, the sessions list with includeInactive=true) is invisible to the list half of the
+    // sweep unless the other tenant actually has one — which is how the trash leak fixed in
+    // 2498563 survived the sweep the first time. Each of these is a second row of an existing
+    // kind, moved into the state that makes it visible where the default row is not.
+
+    /// <summary>A soft-deleted file: only <c>GET files/trash</c> and the restore route see it.</summary>
+    TrashedFile,
+
+    /// <summary>A revoked session: only <c>GET identity/sessions?includeInactive=true</c> shows it.</summary>
+    RevokedSession,
+
+    /// <summary>A deactivated user: shown by the user lists, and by <c>isActive=false</c> searches.</summary>
+    DeactivatedUser,
+
+    /// <summary>A read notification: shown whenever the inbox is not filtered to unread only.</summary>
+    ReadNotification,
 }
 
 /// <summary>
@@ -97,6 +115,30 @@ public static class TenantSweepRegistry
             ["tenants/id"] = ResourceKind.Tenant,
             ["tenants/tenantId"] = ResourceKind.Tenant,
         };
+
+    /// <summary>
+    /// Per-route overrides, for the handful of endpoints that address a row only ever reachable in a
+    /// non-default state. <c>POST files/{id}/restore</c> is the example: pointed at a live file it
+    /// short-circuits as "already live", so probing it with the ordinary file id asks a weaker
+    /// question than the route deserves — the leak it guards is reading another tenant's
+    /// <i>trash</i>. Keyed by "<c>METHOD template</c>" and parameter name so a route with two ids
+    /// cannot be redirected by accident.
+    /// </summary>
+    public static IReadOnlyDictionary<(string Endpoint, string Parameter), ResourceKind> ByEndpointParameter { get; } =
+        new Dictionary<(string, string), ResourceKind>
+        {
+            [("POST api/v{version:apiVersion}/files/{id:guid}/restore", "id")] = ResourceKind.TrashedFile,
+        };
+
+    /// <summary>The resource one parameter of one route addresses: the override first, then the key.</summary>
+    public static ResourceKind KindFor(string endpointName, ResourceParameter parameter)
+    {
+        ArgumentNullException.ThrowIfNull(parameter);
+
+        return ByEndpointParameter.TryGetValue((endpointName, parameter.Name), out var overridden)
+            ? overridden
+            : ByRouteKey[parameter.RegistryKey];
+    }
 }
 
 /// <summary>
@@ -236,14 +278,27 @@ internal static class TenantSweepSeeder
 
         ids[ResourceKind.Role] = await SeedRoleAsync(adminClient, marker);
         ids[ResourceKind.Group] = await SeedGroupAsync(adminClient, marker);
-        ids[ResourceKind.File] = await SeedFileAsync(adminClient, marker);
+        ids[ResourceKind.File] = await SeedFileAsync(adminClient, $"sweep-{marker}.pdf");
         // The inbox is per-user and the sweep calls with the ADMIN's token, so the notification has
         // to belong to the admin or the positive control 404s for the right reason and the wrong one.
         var adminUserId = await CurrentUserIdAsync(adminClient);
-        ids[ResourceKind.Notification] = await SeedNotificationAsync(factory, tenantId, adminUserId, marker);
+        ids[ResourceKind.Notification] = await SeedNotificationAsync(
+            factory, tenantId, adminUserId, $"sweep-notification-{marker}", marker);
         ids[ResourceKind.ImpersonationGrant] = await SeedImpersonationGrantAsync(adminClient, tenantId, user.UserId);
         ids[ResourceKind.Session] = await SeedSessionAsync(auth, adminClient, user, tenantId);
         ids[ResourceKind.Tenant] = tenantId;
+
+        // Rows in a non-default state. Without these, the list half of the sweep only ever reads the
+        // default view of every collection, and a leak confined to the trash view (or to a revoked
+        // session, or a deactivated user) is invisible to it because the OTHER tenant has nothing to
+        // leak. Each of these carries the tenant marker in its display fields, exactly like the rows
+        // above, so no list endpoint needs to know they exist.
+        ids[ResourceKind.TrashedFile] = await SeedTrashedFileAsync(adminClient, marker);
+        ids[ResourceKind.RevokedSession] = await SeedRevokedSessionAsync(
+            auth, adminClient, user, tenantId, ids[ResourceKind.Session]);
+        ids[ResourceKind.DeactivatedUser] = await SeedDeactivatedUserAsync(factory, adminClient, tenantId, marker);
+        ids[ResourceKind.ReadNotification] = await SeedReadNotificationAsync(
+            factory, adminClient, tenantId, adminUserId, marker);
 
         var audit = await AuditingProbeAsync(adminClient);
         ids[ResourceKind.Audit] = audit.Id;
@@ -303,7 +358,7 @@ internal static class TenantSweepSeeder
     /// sweep gets a real, addressable file without pushing bytes through MinIO — the presigned PUT is
     /// the client's job and is not what tenant isolation turns on.
     /// </summary>
-    private static async Task<string> SeedFileAsync(HttpClient adminClient, string marker)
+    private static async Task<string> SeedFileAsync(HttpClient adminClient, string fileName)
     {
         using var response = await adminClient.PostAsJsonAsync(
             "/api/v1/files/upload-url",
@@ -311,7 +366,7 @@ internal static class TenantSweepSeeder
             {
                 ownerType = "MyFiles",
                 ownerId = (Guid?)null,
-                fileName = $"sweep-{marker}.pdf",
+                fileName,
                 contentType = "application/pdf",
                 sizeBytes = 256,
                 visibility = 1,
@@ -331,7 +386,7 @@ internal static class TenantSweepSeeder
     /// door the handler uses.
     /// </summary>
     private static async Task<string> SeedNotificationAsync(
-        AppWebApplicationFactory factory, string tenantId, string userId, string marker)
+        AppWebApplicationFactory factory, string tenantId, string userId, string title, string marker)
     {
         var scope = factory.Services.GetRequiredService<ITenantScope>();
 
@@ -341,7 +396,7 @@ internal static class TenantSweepSeeder
             var notification = Notification.Create(
                 userId,
                 "sweep.probe",
-                $"sweep-notification-{marker}",
+                title,
                 $"seeded for the cross-tenant sweep ({marker})",
                 link: null,
                 source: "TenantSweep",
@@ -414,6 +469,107 @@ internal static class TenantSweepSeeder
             ?? throw new InvalidOperationException($"no UserSession materialised in tenant {tenantId}");
 
         return session.Id;
+    }
+
+    /// <summary>
+    /// A file in the trash: created like any other, then deleted through <c>DELETE files/{id}</c> so
+    /// it is soft-deleted exactly the way a user's delete leaves it.
+    ///
+    /// This is the row that makes the list half of the sweep able to see a trash leak at all. The bug
+    /// fixed in 2498563 — a bare <c>IgnoreQueryFilters()</c> in the trash query — stripped the tenant
+    /// filter, so tenant A's trash view listed every tenant's deleted files; with no deleted file in
+    /// tenant B there was nothing for the marker search to find, and the list test stayed green.
+    /// </summary>
+    private static async Task<string> SeedTrashedFileAsync(HttpClient adminClient, string marker)
+    {
+        var fileId = await SeedFileAsync(adminClient, $"sweep-trashed-{marker}.pdf");
+
+        using var deleted = await adminClient.DeleteAsync($"/api/v1/files/{fileId}");
+        ((int)deleted.StatusCode).ShouldBeInRange(
+            200, 299,
+            $"soft-deleting the sweep's trash row failed: {await deleted.Content.ReadAsStringAsync()}");
+
+        return fileId;
+    }
+
+    /// <summary>
+    /// A revoked session. The tenant sessions list hides revoked rows unless asked for them
+    /// (<c>includeInactive=true</c>), so without one seeded here that view is swept against an empty
+    /// set — it cannot leak what the other tenant does not have.
+    ///
+    /// The second login is what mints it; the admin revoke route then takes it out of service. The
+    /// user's first session (<paramref name="activeSessionId"/>) is deliberately left alone: the
+    /// sweep needs a live session of tenant B to prove the cross-tenant revoke probes did nothing.
+    /// </summary>
+    private static async Task<string> SeedRevokedSessionAsync(
+        AuthHelper auth,
+        HttpClient adminClient,
+        TenantFixture.TestUser user,
+        string tenantId,
+        string activeSessionId)
+    {
+        await TenantFixture.GetTokenWithRetryAsync(auth, user.Email, user.Password, tenantId);
+
+        using var listed = await adminClient.GetAsync(
+            $"{TestConstants.IdentityBasePath}/users/{user.UserId}/sessions");
+        listed.StatusCode.ShouldBe(
+            HttpStatusCode.OK,
+            $"listing the seeded user's sessions failed: {await listed.Content.ReadAsStringAsync()}");
+
+        var sessions = await listed.Content.ReadFromJsonAsync<List<SessionRow>>(Json);
+        var doomed = sessions!.FirstOrDefault(s => !string.Equals(s.Id, activeSessionId, StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException(
+                $"the second login did not mint a second session for {user.UserId} in tenant {tenantId}");
+
+        using var revoked = await adminClient.DeleteAsync(
+            $"{TestConstants.IdentityBasePath}/users/{user.UserId}/sessions/{doomed.Id}");
+        ((int)revoked.StatusCode).ShouldBeInRange(
+            200, 299,
+            $"revoking the sweep's second session failed: {await revoked.Content.ReadAsStringAsync()}");
+
+        return doomed.Id;
+    }
+
+    /// <summary>
+    /// A deactivated user, so the user lists and the <c>isActive=false</c> search are swept against a
+    /// row that exists in the other tenant rather than against nothing.
+    /// </summary>
+    private static async Task<string> SeedDeactivatedUserAsync(
+        AppWebApplicationFactory factory, HttpClient adminClient, string tenantId, string marker)
+    {
+        var user = await TenantFixture.RegisterAndConfirmUserAsync(
+            factory, adminClient, tenantId, $"sweepoff{marker}");
+
+        using var response = await adminClient.PatchAsJsonAsync(
+            $"{TestConstants.IdentityBasePath}/users/{user.UserId}",
+            new { userId = user.UserId, activateUser = false });
+        ((int)response.StatusCode).ShouldBeInRange(
+            200, 299,
+            $"deactivating the sweep's user failed: {await response.Content.ReadAsStringAsync()}");
+
+        return user.UserId;
+    }
+
+    /// <summary>
+    /// A notification already marked read, for the same reason: "read" is a state the inbox shows
+    /// only when it is not filtered to unread, and the sweep should have one to look for.
+    /// </summary>
+    private static async Task<string> SeedReadNotificationAsync(
+        AppWebApplicationFactory factory,
+        HttpClient adminClient,
+        string tenantId,
+        string adminUserId,
+        string marker)
+    {
+        var id = await SeedNotificationAsync(
+            factory, tenantId, adminUserId, $"sweep-read-notification-{marker}", marker);
+
+        using var response = await adminClient.PostAsync($"/api/v1/notifications/{id}/read", content: null);
+        ((int)response.StatusCode).ShouldBeInRange(
+            200, 299,
+            $"marking the sweep's notification read failed: {await response.Content.ReadAsStringAsync()}");
+
+        return id;
     }
 
     /// <summary>

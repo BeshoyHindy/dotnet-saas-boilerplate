@@ -269,9 +269,7 @@ public sealed class TenantEndpointSweepTests
         foreach (var endpoint in Ordered(sweep.Endpoints
             .Where(e => e.Class == SweepClass.Collection && e.IsVersionedApi && !e.IsExempt)))
         {
-            // A large page size where the endpoint supports one; unknown query parameters are
-            // ignored by model binding, so this is safe to send everywhere.
-            var path = Materialise(endpoint.Template) + "?pageNumber=1&pageSize=200&take=200";
+            var path = Materialise(endpoint.Template) + ListQuery;
 
             using var response = await sweep.A.AdminClient.GetAsync(path);
 
@@ -376,6 +374,18 @@ public sealed class TenantEndpointSweepTests
             10, "the list half of the sweep should be covering the API's collections");
     }
 
+    /// <summary>
+    /// The query string every list probe carries. A large page size where the endpoint supports one,
+    /// and <c>includeInactive=true</c> so the sessions list answers with its revoked rows too —
+    /// unknown query parameters are ignored by model binding, so this is safe to send everywhere.
+    ///
+    /// The other non-default states need no flag: the inbox shows read notifications unless asked
+    /// for unread only, the user lists do not filter on active by default, and the grants list shows
+    /// every status. The trash is its own endpoint. What they all need is a row of that state
+    /// seeded in tenant B, which is <see cref="ResourceKind.TrashedFile"/> and its neighbours.
+    /// </summary>
+    private const string ListQuery = "?pageNumber=1&pageSize=200&take=200&includeInactive=true";
+
     #region Request shaping
 
     /// <summary>
@@ -402,7 +412,7 @@ public sealed class TenantEndpointSweepTests
 
         foreach (var parameter in endpoint.ResourceParameters)
         {
-            var kind = TenantSweepRegistry.ByRouteKey[parameter.RegistryKey];
+            var kind = TenantSweepRegistry.KindFor(endpoint.Name, parameter);
             var id = overrides is not null && overrides.TryGetValue(kind, out var fresh)
                 ? fresh
                 : tenant[kind];
@@ -468,7 +478,7 @@ public sealed class TenantEndpointSweepTests
         TenantSweepFixture sweep, SweptEndpoint endpoint)
     {
         var kinds = endpoint.ResourceParameters
-            .Select(p => TenantSweepRegistry.ByRouteKey[p.RegistryKey])
+            .Select(p => TenantSweepRegistry.KindFor(endpoint.Name, p))
             .Distinct()
             .ToList();
 
@@ -524,7 +534,7 @@ public sealed class TenantEndpointSweepTests
     private static bool AddressesPlatformWideRow(SweptEndpoint endpoint) =>
         endpoint.ResourceParameters.Count > 0
         && endpoint.ResourceParameters.All(p =>
-            TenantSweepExceptions.PlatformWideKinds.Contains(TenantSweepRegistry.ByRouteKey[p.RegistryKey]));
+            TenantSweepExceptions.PlatformWideKinds.Contains(TenantSweepRegistry.KindFor(endpoint.Name, p)));
 
     private static bool IsCollectionShaped(SweptEndpoint endpoint) =>
         TenantSweepExceptions.CollectionShapedRoutes.ContainsKey($"{endpoint.Method} {endpoint.Template}");
