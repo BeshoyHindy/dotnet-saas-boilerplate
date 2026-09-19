@@ -29,6 +29,16 @@ public interface ISessionService
         string refreshToken,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Ends the session a refresh token belongs to — the logout path for a caller whose access
+    /// token has already expired or was never stored. Matches the previous hash too, so a client
+    /// logging out mid-rotation can still close its session. Returns false when the token matches
+    /// nothing in this tenant; callers must not turn that into a distinguishable response.
+    /// </summary>
+    Task<bool> RevokeSessionByRefreshTokenAsync(
+        string refreshToken,
+        CancellationToken cancellationToken = default);
+
     Task<List<UserSessionDto>> GetUserSessionsAsync(
         string userId,
         CancellationToken cancellationToken = default);

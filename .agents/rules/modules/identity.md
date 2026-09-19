@@ -38,7 +38,18 @@ Login `POST /api/v1/tenants/{tenant}/auth/token` (header `X-Client-App` enforces
 - The token is `"{tenantId}.{32 CSPRNG bytes, base64url}"` (`RefreshTokenValue`), stored only as SHA-256. The prefix is routing metadata, never a credential — it must equal the resolved tenant, and the hash lookup runs inside the tenant query filter. **No `IgnoreQueryFilters()` anywhere on the token path.**
 - `RotateRefreshTokenAsync` is one compare-and-set `ExecuteUpdate`, so N concurrent refreshes yield exactly one winner (losers get `Superseded`). A `PreviousTokenHash` hit is reuse → the session is revoked. A `SecurityStamp` change (password reset, credential change) kills the session. `sid` survives rotation.
 - Browsers also get the token as `HttpOnly; Secure; SameSite=Strict` cookie (`RefreshTokenCookie`) pinned by `Path` to the tenant's refresh route; the refresh endpoint falls back to it when the body omits the token. CORS still allows no credentials (#13), so the cookie is same-site only and body delivery remains the client path.
+- **Every response that is not a successful rotation clears the cookie**, via `DeleteWhenResponseStarts` — an `OnStarting` callback, because `UseExceptionHandler` wipes headers before re-running the pipeline and an eager `Set-Cookie` would vanish from exactly the 401s that need it (same reason as the security headers; see `security.md`). `Delete` must keep every attribute identical to `Append`, `Path` above all: a browser matches a deletion by name + Path, so a mismatch silently leaves the credential in place.
 - **End-impersonation is access-only.** It runs in the impersonated tenant's context and so cannot write a session row in the actor's tenant; operator token exchange (#9) is where crossing a tenant boundary gets its mechanism.
+
+### Logout
+
+`POST /api/v1/tenants/{tenant}/auth/logout` — **`AllowAnonymous` on purpose**: it has to work when the access token is already gone, which is the state a signing-out browser is in. It revokes the session named by the caller's `sid` claim, or failing that the session the supplied refresh token belongs to (body or cookie, current *or* previous hash), and always clears the cookie. Always 204 — a different answer for a live token than a dead one would be an oracle. Both clients call it best-effort from `logout()` before clearing local state.
+
+Clearing localStorage alone is **not** a logout: the SPA cannot delete an HttpOnly cookie and `/auth/refresh` accepts that cookie on its own. Note the cookie's `Path` is the refresh route, so a browser does not send it to `/logout` — identification comes from the `sid` claim or the body token, while the deletion works regardless (a `Set-Cookie` may name any `Path`).
+
+### `sid` is issued, not enforced
+
+`sid` names the session row, but **nothing validates it per request** — there is no session lookup in the auth pipeline, by design (it would put a database read on every call). So revoking a session stops *refresh* immediately and stops API access only once the current access token expires (`JwtOptions.AccessTokenMinutes`, default 30). Revocation is eventually consistent for API access, and that window is the deliberate price of stateless JWT validation. Shorten `AccessTokenMinutes` if an application needs a tighter bound; don't add a per-request `sid` check without deciding how to pay for it.
 
 ## Tests
 

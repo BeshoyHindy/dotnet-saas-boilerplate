@@ -2,11 +2,24 @@
 using Boilerplate.BuildingBlocks.Persistence;
 using Boilerplate.Modules.Multitenancy.Contracts;
 using Boilerplate.Modules.Multitenancy.Contracts.v1.CreateTenant;
+using System.Text.RegularExpressions;
 
 namespace Boilerplate.Modules.Multitenancy.Features.v1.CreateTenant;
 
-public sealed class CreateTenantCommandValidator : AbstractValidator<CreateTenantCommand>
+public sealed partial class CreateTenantCommandValidator : AbstractValidator<CreateTenantCommand>
 {
+    /// <summary>
+    /// A tenant Id is a lowercase slug: 2–63 characters of <c>a-z0-9-</c>, not starting with a
+    /// hyphen. It is not just a database key — it is interpolated into the tenant-scoped auth
+    /// routes and into the refresh cookie's <c>Path</c>, and it is the prefix of every refresh
+    /// token. Keeping it to a slug means none of those sinks can be escaped, and the value stays
+    /// legible in a URL. It is also immutable, so this is the only place to enforce it.
+    /// </summary>
+    public const string IdPattern = "^[a-z0-9][a-z0-9-]{1,62}$";
+
+    [GeneratedRegex(IdPattern, RegexOptions.CultureInvariant)]
+    private static partial Regex IdSlug();
+
     public CreateTenantCommandValidator(
         ITenantService tenantService,
         IConnectionStringValidator connectionStringValidator,
@@ -16,6 +29,8 @@ public sealed class CreateTenantCommandValidator : AbstractValidator<CreateTenan
 
         RuleFor(t => t.Id).Cascade(CascadeMode.Stop)
             .NotEmpty()
+            .Must(id => IdSlug().IsMatch(id))
+            .WithMessage("Tenant id must be 2-63 characters of lowercase letters, digits and hyphens, and may not start with a hyphen.")
             .MustAsync(async (id, ct) => !await tenantService.ExistsWithIdAsync(id, ct).ConfigureAwait(false))
             .WithMessage((_, id) => $"Tenant {id} already exists.");
 

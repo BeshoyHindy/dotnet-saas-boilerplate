@@ -33,10 +33,18 @@ public static class RefreshTokenEndpoint
                     refreshToken = RefreshTokenCookie.Read(httpContext) ?? string.Empty;
                 }
 
+                var tenant = tenantAccessor.MultiTenantContext?.TenantInfo?.Id;
+                if (tenant is not null)
+                {
+                    // Anything but a successful rotation leaves the cookie holding a token the server
+                    // has just refused — dead, replayed, revoked, or beaten by a concurrent caller.
+                    // Clear it. The Append below wins when the rotation does succeed.
+                    RefreshTokenCookie.DeleteWhenResponseStarts(httpContext, tenant);
+                }
+
                 var response = await mediator.Send(
                     new RefreshTokenCommand(command?.Token, refreshToken), ct);
 
-                var tenant = tenantAccessor.MultiTenantContext?.TenantInfo?.Id;
                 if (tenant is not null)
                 {
                     RefreshTokenCookie.Append(

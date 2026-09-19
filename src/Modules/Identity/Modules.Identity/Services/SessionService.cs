@@ -182,11 +182,18 @@ public sealed class SessionService : ISessionService
         var newExpiresAt = now.AddDays(_jwtOptions.RefreshTokenDays);
         var newHash = RefreshTokenValue.Hash(newRefreshToken);
 
-        // The rotation: one compare-and-set. `RefreshTokenHash == hash` is the compare, and the
-        // database serialises it, so N concurrent callers holding the same token produce exactly
-        // one winner — the losers update zero rows and get nothing.
+        // The rotation: one compare-and-set. The predicate restates every precondition checked
+        // above — hash, revocation, expiry and stamp — so the single UPDATE is self-sufficient and
+        // nothing can slip through the gap between the read and the write. The database serialises
+        // it, so N concurrent callers holding the same token produce exactly one winner; the losers
+        // update zero rows and get nothing.
+        var stamp = candidate.SecurityStamp;
         var rotated = await _db.UserSessions
-            .Where(s => s.Id == candidate.Id && s.RefreshTokenHash == hash && !s.IsRevoked)
+            .Where(s => s.Id == candidate.Id
+                && s.RefreshTokenHash == hash
+                && !s.IsRevoked
+                && s.ExpiresAt > now
+                && s.SecurityStamp == stamp)
             .ExecuteUpdateAsync(
                 s => s.SetProperty(x => x.PreviousTokenHash, hash)
                       .SetProperty(x => x.RefreshTokenHash, newHash)
@@ -210,6 +217,50 @@ public sealed class SessionService : ISessionService
             candidate.UserId,
             newRefreshToken,
             newExpiresAt);
+    }
+
+    public async Task<bool> RevokeSessionByRefreshTokenAsync(
+        string refreshToken,
+        CancellationToken cancellationToken = default)
+    {
+        var tenantId = CurrentTenantId();
+
+        // Same prefix check and same tenant-filtered lookup as rotation: logout must not be a way
+        // to reach into another tenant and end someone else's session.
+        if (!RefreshTokenValue.TryGetTenantId(refreshToken, out var tokenTenantId)
+            || !string.Equals(tokenTenantId, tenantId, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var hash = RefreshTokenValue.Hash(refreshToken);
+
+        // The previous hash counts too: a client that logs out mid-rotation still holds the token
+        // it started with, and that must still be able to end the session.
+        var session = await _db.UserSessions
+            .FirstOrDefaultAsync(
+                s => (s.RefreshTokenHash == hash || s.PreviousTokenHash == hash) && !s.IsRevoked,
+                cancellationToken);
+
+        if (session is null)
+        {
+            return false;
+        }
+
+        session.Revoke(
+            _timeProvider.GetUtcNow().UtcDateTime,
+            revokedBy: session.UserId,
+            reason: "User logged out",
+            tenantId);
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("Session {SessionId} revoked by logout", session.Id);
+        }
+
+        return true;
     }
 
     private async Task RevokeForReuseAsync(SessionCandidate candidate, DateTime now, CancellationToken cancellationToken)
