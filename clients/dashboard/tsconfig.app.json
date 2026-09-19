@@ -17,7 +17,9 @@
     "noUncheckedSideEffectImports": true,
     "erasableSyntaxOnly": true,
     "noEmit": true,
-    "baseUrl": ".",
+    // No `baseUrl`: TypeScript 7 removed it (TS5102). The mapping below is
+    // already written relative to this file, which is what TS 7 resolves
+    // non-rooted `paths` against, so dropping it changes nothing.
     "paths": {
       "@/*": ["./src/*"]
     },
