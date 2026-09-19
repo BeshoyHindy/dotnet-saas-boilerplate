@@ -10,7 +10,7 @@ the shared code lives in `src/BuildingBlocks` and is yours to change.
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 <!--#if (frontend) -->
-- [Node.js 20+](https://nodejs.org) — for the React apps
+- [Node.js 20+](https://nodejs.org) — for the console
 <!--#endif -->
 - [Docker](https://www.docker.com/) — Postgres, Redis, MinIO
 
@@ -52,7 +52,9 @@ dotnet run --project src/Host/Boilerplate.Api      # needs external Postgres + R
 cd clients/console && pnpm install && pnpm dev      # → http://localhost:5173
 ```
 
-The console reads its API URL at runtime from `public/config.json` — no rebuild to repoint.
+The console reads its API URL at runtime from `public/config.json` — no rebuild to repoint. The dev
+server proxies `/api` to the API, so the browser only ever talks to one origin; keep it that way, or
+the `HttpOnly` refresh cookie can never be sent.
 Types come from the checked-in `clients/openapi/v1.json`; regenerate it with
 `bash scripts/export-openapi.sh` after changing an endpoint (ADR-0004).
 <!--#endif -->
@@ -173,10 +175,14 @@ pnpm install && pnpm test:sandcastle   # the agent orchestrator's own suite
 
 ## Learn more
 
+- [`CONTEXT.md`](CONTEXT.md) — the glossary: the words this codebase uses, and the ones it refuses.
+- [`docs/new-project-guide.md`](docs/new-project-guide.md) — first run, the tenancy rules for adding
+  a module, endpoint, job or event, CI, the GitHub settings you must configure, and the known limits.
+- [`docs/deploy-dokploy.md`](docs/deploy-dokploy.md) — blank server to a healthy HTTPS deployment.
 - Architecture decision records live in `docs/adr/`.
 - Per-area conventions (modules, database, eventing, testing, security) live in
-  `.agents/rules/`; `AGENTS.md` is the entry point coding agents read first.
-- The deployment runbook is `docs/deploy-dokploy.md`.
+  `.agents/rules/`; `AGENTS.md` is the entry point coding agents read first, and
+  `docs/agents/` tells it how to use the issue tracker, the labels and these docs.
 <!--#if (sandcastle) -->
 - The agent pipeline lives in `.sandcastle/`; everything project-specific about it is in
   `sandcastle.config.mts` (ADR-0006).
