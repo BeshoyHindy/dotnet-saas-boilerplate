@@ -109,8 +109,7 @@ public sealed class TenantActivationTests
     {
         using var client = _factory.CreateClient();
         using var request = new HttpRequestMessage(
-            HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/issue");
-        request.Headers.Add("tenant", tenantId);
+            HttpMethod.Post, $"{TestConstants.AuthBasePath(tenantId)}/token");
         request.Content = JsonContent.Create(new { email = "nobody@example.com", password = "Wrong-Password-1!" });
         using var response = await client.SendAsync(request);
         return response.StatusCode;

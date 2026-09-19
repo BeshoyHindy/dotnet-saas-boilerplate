@@ -8,11 +8,10 @@ namespace Integration.Tests.Tests.Multitenancy;
 /// <summary>
 /// End-to-end coverage for the tenant theme feature (get / update / reset) plus
 /// validation and cross-tenant isolation. Theme scoping is driven entirely by the
-/// resolved Finbuckle tenant context: a root operator can target another tenant by
-/// sending the <c>tenant</c> header (root-operator override), while a tenant operator
-/// is always pinned to its own tenant (the override is gated to root). These tests
-/// pin both the happy paths and the isolation contract — tenant B must never be able
-/// to read or mutate tenant A's theme.
+/// resolved tenant context, which under ADR-0002 comes from the caller's token claim
+/// alone — every caller, root included, is pinned to the tenant its own token names.
+/// These tests pin both the happy paths and the isolation contract: tenant B must never
+/// be able to read or mutate tenant A's theme, with or without a forged tenant header.
 /// </summary>
 [Collection(AppCollectionDefinition.Name)]
 public sealed class TenantThemeTests : IAsyncLifetime
@@ -55,7 +54,7 @@ public sealed class TenantThemeTests : IAsyncLifetime
         await WaitForProvisioningAsync(rootClient, _tenantB);
 
         // Ensure both tenant admins are queryable (token issuance is the strongest
-        // cross-check that identity seeding finished — see TenantHeaderOverrideTests).
+        // cross-check that identity seeding finished — see TenantResolutionTests).
         _ = await GetTokenWithRetryAsync(_tenantAAdminEmail, TestConstants.DefaultPassword, _tenantA);
         _ = await GetTokenWithRetryAsync(_tenantBAdminEmail, TestConstants.DefaultPassword, _tenantB);
     }
@@ -201,7 +200,6 @@ public sealed class TenantThemeTests : IAsyncLifetime
     {
         // Arrange
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", _tenantA);
 
         // Act
         var response = await client.GetAsync(ThemePath);
@@ -215,7 +213,6 @@ public sealed class TenantThemeTests : IAsyncLifetime
     {
         // Arrange
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", _tenantA);
 
         // Act
         var response = await client.PutAsJsonAsync(ThemePath, ValidTheme());
@@ -229,25 +226,22 @@ public sealed class TenantThemeTests : IAsyncLifetime
     #region Cross-Tenant Isolation
 
     [Fact]
-    public async Task UpdateTheme_Should_NotLeakAcrossTenants_When_RootOperatorTargetsTenantA()
+    public async Task UpdateTheme_Should_NotLeakAcrossTenants_When_EachTenantAdminWrites()
     {
-        // Arrange — root operator scopes to tenant A via the header override and
-        // sets a distinctive primary color.
-        var rootToken = await _auth.GetRootAdminTokenAsync();
+        // Arrange — tenant A's own admin sets a distinctive primary color. A root operator can no
+        // longer reach into another tenant at all; cross-tenant work waits on token exchange.
         const string marker = "#9911AA";
 
-        using (var clientA = _factory.CreateClient())
+        using (var clientA = await _auth.CreateAuthenticatedClientAsync(
+            _tenantAAdminEmail, TestConstants.DefaultPassword, _tenantA))
         {
-            clientA.DefaultRequestHeaders.Authorization = new("Bearer", rootToken.AccessToken);
-            clientA.DefaultRequestHeaders.Add("tenant", _tenantA);
             var update = await clientA.PutAsJsonAsync(ThemePath, ValidTheme(primary: marker));
             update.StatusCode.ShouldBe(HttpStatusCode.NoContent);
         }
 
-        // Act — root operator now scopes to tenant B and reads its theme.
-        using var clientB = _factory.CreateClient();
-        clientB.DefaultRequestHeaders.Authorization = new("Bearer", rootToken.AccessToken);
-        clientB.DefaultRequestHeaders.Add("tenant", _tenantB);
+        // Act — tenant B's admin reads its own theme.
+        using var clientB = await _auth.CreateAuthenticatedClientAsync(
+            _tenantBAdminEmail, TestConstants.DefaultPassword, _tenantB);
         var responseB = await clientB.GetAsync(ThemePath);
 
         // Assert — tenant B must NOT see tenant A's customization.
@@ -259,7 +253,7 @@ public sealed class TenantThemeTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetTheme_Should_StayInOwnTenant_When_TenantBAdminSendsTenantAHeader()
+    public async Task GetTheme_Should_StayInOwnTenant_When_TenantBAdminForgesTenantAHeader()
     {
         // Arrange — give tenant A a distinctive theme (as A's own admin).
         const string marker = "#7733EE";
@@ -270,16 +264,16 @@ public sealed class TenantThemeTests : IAsyncLifetime
             update.StatusCode.ShouldBe(HttpStatusCode.NoContent);
         }
 
-        // Tenant B admin tries to read tenant A's theme by spoofing the header.
+        // Tenant B admin forges a `tenant: A` header to read tenant A's theme.
         var tokenB = await GetTokenWithRetryAsync(_tenantBAdminEmail, TestConstants.DefaultPassword, _tenantB);
         using var clientB = _factory.CreateClient();
         clientB.DefaultRequestHeaders.Authorization = new("Bearer", tokenB.AccessToken);
-        clientB.DefaultRequestHeaders.Add("tenant", _tenantA); // spoof attempt — must be ignored
+        clientB.DefaultRequestHeaders.Add("tenant", _tenantA); // forged — must never be read
 
         // Act
         var response = await clientB.GetAsync(ThemePath);
 
-        // Assert — the override is gated to root, so B stays in B and sees defaults,
+        // Assert — resolution reads only B's token claim, so B stays in B and sees defaults,
         // never tenant A's marker color.
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var theme = await response.Content.ReadFromJsonAsync<TenantThemeDto>(Json);
@@ -289,7 +283,7 @@ public sealed class TenantThemeTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task UpdateTheme_Should_NotMutateTenantA_When_TenantBAdminSendsTenantAHeader()
+    public async Task UpdateTheme_Should_NotMutateTenantA_When_TenantBAdminForgesTenantAHeader()
     {
         // Arrange — tenant A's admin sets a known baseline.
         const string baseline = "#445566";
@@ -300,14 +294,14 @@ public sealed class TenantThemeTests : IAsyncLifetime
             seed.StatusCode.ShouldBe(HttpStatusCode.NoContent);
         }
 
-        // Tenant B admin tries to overwrite tenant A's theme by spoofing the header.
+        // Tenant B admin forges a `tenant: A` header to overwrite tenant A's theme.
         var tokenB = await GetTokenWithRetryAsync(_tenantBAdminEmail, TestConstants.DefaultPassword, _tenantB);
         using (var clientB = _factory.CreateClient())
         {
             clientB.DefaultRequestHeaders.Authorization = new("Bearer", tokenB.AccessToken);
-            clientB.DefaultRequestHeaders.Add("tenant", _tenantA); // spoof attempt
+            clientB.DefaultRequestHeaders.Add("tenant", _tenantA); // forged — must never be read
             var attack = await clientB.PutAsJsonAsync(ThemePath, ValidTheme(primary: "#000000"));
-            // The write is accepted but applies to tenant B (where B is pinned), not A.
+            // The write is accepted but applies to tenant B (where B's token pins it), not A.
             attack.StatusCode.ShouldBe(HttpStatusCode.NoContent);
         }
 

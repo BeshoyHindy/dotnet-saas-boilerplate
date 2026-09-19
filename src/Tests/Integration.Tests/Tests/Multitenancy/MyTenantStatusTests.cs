@@ -54,7 +54,6 @@ public sealed class MyTenantStatusTests
     public async Task GetMyStatus_Should_Return401_When_Unauthenticated()
     {
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         var resp = await client.GetAsync($"{TestConstants.TenantsBasePath}/me/status");
 

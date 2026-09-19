@@ -86,7 +86,6 @@ public sealed class UserRegistrationTests
     public async Task RegisterUser_Should_Return401_When_NotAuthenticated()
     {
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         var response = await client.PostAsJsonAsync($"{TestConstants.IdentityBasePath}/register", new
         {
@@ -122,8 +121,7 @@ public sealed class UserRegistrationTests
 
         // Attempt login — should fail because email is not confirmed
         using var loginClient = _factory.CreateClient();
-        var loginRequest = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/issue");
-        loginRequest.Headers.Add("tenant", TestConstants.RootTenantId);
+        var loginRequest = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.RootAuthBasePath}/token");
         loginRequest.Content = JsonContent.Create(new { email, password = "Test@1234!" });
 
         var loginResponse = await loginClient.SendAsync(loginRequest);

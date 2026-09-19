@@ -56,9 +56,8 @@ public sealed class EmailConfirmationTests
 
         // Act - Call confirm-email endpoint
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
-        var response = await client.GetAsync($"{TestConstants.IdentityBasePath}/confirm-email?userId={user.Id}&code={Uri.EscapeDataString(encodedCode)}&tenant={TestConstants.RootTenantId}");
+        var response = await client.GetAsync($"{TestConstants.RootAuthBasePath}/confirm-email?userId={user.Id}&code={Uri.EscapeDataString(encodedCode)}");
 
         // Assert
         var errorContent = await response.Content.ReadAsStringAsync();
@@ -100,10 +99,9 @@ public sealed class EmailConfirmationTests
 
         // Act - Call confirm-email with invalid code
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         var invalidCode = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes("invalid-code"));
-        var response = await client.GetAsync($"{TestConstants.IdentityBasePath}/confirm-email?userId={user.Id}&code={invalidCode}&tenant={TestConstants.RootTenantId}");
+        var response = await client.GetAsync($"{TestConstants.RootAuthBasePath}/confirm-email?userId={user.Id}&code={invalidCode}");
 
         // Assert
         // The endpoint currently returns Ok(result) where result is the message from UserService.

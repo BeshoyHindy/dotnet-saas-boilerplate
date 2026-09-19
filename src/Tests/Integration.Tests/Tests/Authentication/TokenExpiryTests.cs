@@ -26,8 +26,7 @@ public sealed class TokenExpiryTests
 
         // The refresh endpoint accepts expired access tokens (it only cross-checks the subject)
         using var client = _factory.CreateClient();
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/refresh");
-        request.Headers.Add("tenant", TestConstants.RootTenantId);
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.RootAuthBasePath}/refresh");
         request.Content = JsonContent.Create(new
         {
             token = token.AccessToken,
@@ -55,8 +54,7 @@ public sealed class TokenExpiryTests
         var token = await _auth.GetRootAdminTokenAsync();
 
         using var client = _factory.CreateClient();
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/refresh");
-        request.Headers.Add("tenant", TestConstants.RootTenantId);
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.RootAuthBasePath}/refresh");
         request.Content = JsonContent.Create(new
         {
             token = token.AccessToken,
@@ -80,8 +78,7 @@ public sealed class TokenExpiryTests
 
         // First refresh — succeeds and rotates the refresh token
         using var client1 = _factory.CreateClient();
-        var request1 = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/refresh");
-        request1.Headers.Add("tenant", TestConstants.RootTenantId);
+        var request1 = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.RootAuthBasePath}/refresh");
         request1.Content = JsonContent.Create(new
         {
             token = token.AccessToken,
@@ -92,8 +89,7 @@ public sealed class TokenExpiryTests
 
         // Act — reuse the OLD refresh token (should be invalidated by rotation)
         using var client2 = _factory.CreateClient();
-        var request2 = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/refresh");
-        request2.Headers.Add("tenant", TestConstants.RootTenantId);
+        var request2 = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.RootAuthBasePath}/refresh");
         request2.Content = JsonContent.Create(new
         {
             token = token.AccessToken,
@@ -130,8 +126,7 @@ public sealed class TokenExpiryTests
 
         // Act — refresh the token
         using var client = _factory.CreateClient();
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/refresh");
-        request.Headers.Add("tenant", TestConstants.RootTenantId);
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.RootAuthBasePath}/refresh");
         request.Content = JsonContent.Create(new
         {
             token = token.AccessToken,

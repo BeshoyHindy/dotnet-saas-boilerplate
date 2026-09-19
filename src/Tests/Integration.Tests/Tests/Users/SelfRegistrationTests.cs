@@ -17,10 +17,9 @@ public sealed class SelfRegistrationTests
     public async Task SelfRegister_Should_Return201_When_AnonymousAndPayloadIsValid()
     {
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
         var uniqueId = Guid.NewGuid().ToString("N")[..8];
 
-        var response = await client.PostAsJsonAsync($"{TestConstants.IdentityBasePath}/self-register", new
+        var response = await client.PostAsJsonAsync($"{TestConstants.RootAuthBasePath}/register", new
         {
             firstName = "Self",
             lastName = "Reg",
@@ -39,9 +38,8 @@ public sealed class SelfRegistrationTests
     public async Task SelfRegister_Should_Return400_When_PayloadInvalid()
     {
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
-        var response = await client.PostAsJsonAsync($"{TestConstants.IdentityBasePath}/self-register", new
+        var response = await client.PostAsJsonAsync($"{TestConstants.RootAuthBasePath}/register", new
         {
             firstName = "",
             lastName = "",
@@ -58,7 +56,6 @@ public sealed class SelfRegistrationTests
     public async Task SelfRegister_Should_RejectDuplicate_When_EmailAlreadyExists()
     {
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
         var uniqueId = Guid.NewGuid().ToString("N")[..8];
         var payload = new
         {
@@ -71,11 +68,11 @@ public sealed class SelfRegistrationTests
         };
 
         var firstResponse = await client.PostAsJsonAsync(
-            $"{TestConstants.IdentityBasePath}/self-register", payload);
+            $"{TestConstants.RootAuthBasePath}/register", payload);
         firstResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
 
         var secondResponse = await client.PostAsJsonAsync(
-            $"{TestConstants.IdentityBasePath}/self-register",
+            $"{TestConstants.RootAuthBasePath}/register",
             payload with { userName = $"selfdup2-{uniqueId}" });
 
         secondResponse.IsSuccessStatusCode.ShouldBeFalse();

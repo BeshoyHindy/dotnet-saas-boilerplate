@@ -29,11 +29,10 @@ public sealed class ForgotPasswordRequestTests
         var user = await IdentityUserSeeder.CreateLoginableUserAsync(_factory, adminClient, "forgot-known");
 
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         // Act
         var response = await client.PostAsJsonAsync(
-            $"{TestConstants.IdentityBasePath}/forgot-password", new { email = user.Email });
+            $"{TestConstants.RootAuthBasePath}/forgot-password", new { email = user.Email });
 
         // Assert
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -44,11 +43,10 @@ public sealed class ForgotPasswordRequestTests
     {
         // Arrange
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         // Act
         var response = await client.PostAsJsonAsync(
-            $"{TestConstants.IdentityBasePath}/forgot-password", new { email = "" });
+            $"{TestConstants.RootAuthBasePath}/forgot-password", new { email = "" });
 
         // Assert
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
@@ -59,11 +57,10 @@ public sealed class ForgotPasswordRequestTests
     {
         // Arrange
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         // Act
         var response = await client.PostAsJsonAsync(
-            $"{TestConstants.IdentityBasePath}/forgot-password", new { email = "not-an-email" });
+            $"{TestConstants.RootAuthBasePath}/forgot-password", new { email = "not-an-email" });
 
         // Assert
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
@@ -74,11 +71,10 @@ public sealed class ForgotPasswordRequestTests
     {
         // Arrange
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         // Act
         var response = await client.PostAsJsonAsync(
-            $"{TestConstants.IdentityBasePath}/forgot-password",
+            $"{TestConstants.RootAuthBasePath}/forgot-password",
             new { email = $"definitely-missing-{Guid.NewGuid():N}@example.com" });
 
         // Assert — should be indistinguishable from the known-email path.

@@ -214,7 +214,6 @@ public sealed class ImpersonationTests : IAsyncLifetime
 
         using var nestedClient = _factory.CreateClient();
         nestedClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", impersonationToken);
-        nestedClient.DefaultRequestHeaders.Add("tenant", _tenantId);
 
         // Act
         var response = await nestedClient.PostAsJsonAsync($"{ImpersonationBasePath}/start", new
@@ -253,7 +252,6 @@ public sealed class ImpersonationTests : IAsyncLifetime
     {
         // Arrange
         using var anonClient = _factory.CreateClient();
-        anonClient.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         // Act
         var response = await anonClient.PostAsJsonAsync($"{ImpersonationBasePath}/start", new
@@ -280,7 +278,7 @@ public sealed class ImpersonationTests : IAsyncLifetime
         using var rootClient = await _auth.CreateRootAdminClientAsync();
         var impersonationToken = await StartImpersonationAsync(rootClient, _tenantAdminUserId, _tenantId);
 
-        using var endClient = ClientWithBearer(impersonationToken, _tenantId);
+        using var endClient = ClientWithBearer(impersonationToken);
 
         // Act
         var response = await endClient.PostAsync($"{ImpersonationBasePath}/end", content: null);
@@ -384,7 +382,7 @@ public sealed class ImpersonationTests : IAsyncLifetime
         // Assert — the JWT validation hook should now 401 the impersonation token.
         // Cache TTL is short (and revoke primes the cache to EndedOrRevoked) so
         // the rejection should be effectively immediate.
-        using var killedClient = ClientWithBearer(impersonationToken, _tenantId);
+        using var killedClient = ClientWithBearer(impersonationToken);
         var meResponse = await killedClient.GetAsync($"{TestConstants.IdentityBasePath}/profile");
         meResponse.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
@@ -397,7 +395,7 @@ public sealed class ImpersonationTests : IAsyncLifetime
         var impersonationToken = await StartImpersonationAsync(rootClient, _tenantAdminUserId, _tenantId);
 
         // Act — end via the impersonation session, then list ended grants.
-        using var endClient = ClientWithBearer(impersonationToken, _tenantId);
+        using var endClient = ClientWithBearer(impersonationToken);
         var endResponse = await endClient.PostAsync($"{ImpersonationBasePath}/end", content: null);
         endResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
@@ -669,12 +667,12 @@ public sealed class ImpersonationTests : IAsyncLifetime
         revokeResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         // Assert — the OTHER session must still be valid.
-        using var keepClient = ClientWithBearer(keepToken, _tenantId);
+        using var keepClient = ClientWithBearer(keepToken);
         var keepProfile = await keepClient.GetAsync($"{TestConstants.IdentityBasePath}/profile");
         keepProfile.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         // And the revoked session must be rejected.
-        using var killClient = ClientWithBearer(killToken, _tenantId);
+        using var killClient = ClientWithBearer(killToken);
         var killProfile = await killClient.GetAsync($"{TestConstants.IdentityBasePath}/profile");
         killProfile.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
@@ -764,7 +762,7 @@ public sealed class ImpersonationTests : IAsyncLifetime
             $"{ImpersonationBasePath}/grants/{grantId}/revoke",
             new { reason = "killed before End" });
 
-        using var deadClient = ClientWithBearer(impersonationToken, _tenantId);
+        using var deadClient = ClientWithBearer(impersonationToken);
 
         // Act
         var response = await deadClient.PostAsync($"{ImpersonationBasePath}/end", content: null);
@@ -791,11 +789,11 @@ public sealed class ImpersonationTests : IAsyncLifetime
         return body!.AccessToken;
     }
 
-    private HttpClient ClientWithBearer(string accessToken, string tenant)
+    // No tenant argument: the token's `tenant` claim is the only thing that scopes the request.
+    private HttpClient ClientWithBearer(string accessToken)
     {
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-        client.DefaultRequestHeaders.Add("tenant", tenant);
         return client;
     }
 

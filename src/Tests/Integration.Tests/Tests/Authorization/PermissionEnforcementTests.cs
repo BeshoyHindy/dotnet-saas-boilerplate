@@ -18,7 +18,6 @@ public sealed class PermissionEnforcementTests
     public async Task ProtectedEndpoint_Should_Return401_When_NoTokenProvided()
     {
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         var response = await client.GetAsync($"{TestConstants.IdentityBasePath}/users?pageNumber=1&pageSize=10");
 
@@ -29,7 +28,6 @@ public sealed class PermissionEnforcementTests
     public async Task ProtectedEndpoint_Should_Return401_When_TokenIsInvalid()
     {
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", "invalid.jwt.token");
 
@@ -53,7 +51,6 @@ public sealed class PermissionEnforcementTests
     {
         // Verify that authentication middleware properly rejects malformed tokens
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         // Use a structurally valid but expired/tampered JWT
         client.DefaultRequestHeaders.Authorization =

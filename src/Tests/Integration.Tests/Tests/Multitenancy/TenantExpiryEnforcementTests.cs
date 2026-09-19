@@ -123,14 +123,14 @@ public sealed class TenantExpiryEnforcementTests
         return status;
     }
 
-    // Probes the post-auth guard via anonymous token-issue scoped to the tenant header, returning status
-    // plus X-Subscription-Grace (null when absent); the guard runs before the handler, so grace is set regardless of creds.
+    // Probes the tenant guard via an anonymous token request on the tenant's own auth route, returning
+    // status plus X-Subscription-Grace (null when absent); the guard runs before the handler, so grace is
+    // set regardless of credentials.
     private async Task<(HttpStatusCode Status, string? Grace)> ProbeAsync(string tenantId)
     {
         using var client = _factory.CreateClient();
         using var request = new HttpRequestMessage(
-            HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/issue");
-        request.Headers.Add("tenant", tenantId);
+            HttpMethod.Post, $"{TestConstants.AuthBasePath(tenantId)}/token");
         request.Content = JsonContent.Create(new { email = "nobody@example.com", password = "Wrong-Password-1!" });
         using var response = await client.SendAsync(request);
         var grace = response.Headers.TryGetValues("X-Subscription-Grace", out var values)

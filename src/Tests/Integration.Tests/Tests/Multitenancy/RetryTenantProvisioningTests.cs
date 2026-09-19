@@ -122,7 +122,6 @@ public sealed class RetryTenantProvisioningTests
     {
         // Arrange
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         // Act
         var response = await client.PostAsync(

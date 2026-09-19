@@ -86,7 +86,6 @@ public sealed class PermissionCatalogTests
     public async Task Catalog_Should_Return401_When_NotAuthenticated()
     {
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         var response = await client.GetAsync(CatalogPath);
 
