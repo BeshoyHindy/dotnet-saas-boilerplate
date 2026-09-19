@@ -128,6 +128,26 @@ public sealed class LocalStorageServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GenerateDownloadUrlAsync_Should_ReturnTheSameServerRelativePath_For_Public_And_Private_FilesModuleKeys()
+    {
+        // Local storage is the dev fallback: it has no signing and serves everything it stores from
+        // wwwroot through UseStaticFiles, so the URL itself is the capability — the unguessable
+        // FileAsset id in the key is all that separates one object from another.
+        //
+        // The visibility gate therefore lives one level up, in the Files module
+        // (PublicFileUrlFactory never mints a URL for a Private asset), not here. This test pins that
+        // the provider treats both alike so nobody mistakes local behaviour for enforcement.
+        const string key = "tenants/root/myfiles/2026/05/0f7b/secret.pdf";
+
+        var publicUrl = await _sut.GenerateDownloadUrlAsync(key, TimeSpan.FromMinutes(5), "inline; filename=\"secret.pdf\"");
+        var privateUrl = await _sut.GenerateDownloadUrlAsync(key, TimeSpan.FromMinutes(5));
+
+        publicUrl.IsAbsoluteUri.ShouldBeFalse();
+        publicUrl.OriginalString.ShouldBe($"/{key}");
+        privateUrl.OriginalString.ShouldBe(publicUrl.OriginalString);
+    }
+
+    [Fact]
     public void BuildPublicUrl_Should_NormalizeToServerRelativePath_When_KeyHasBackslashes()
     {
         // Act

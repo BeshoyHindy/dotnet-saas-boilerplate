@@ -1,11 +1,9 @@
 using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.BuildingBlocks.Core.Exceptions;
-using Boilerplate.BuildingBlocks.Storage.Services;
 using Boilerplate.Modules.Files.Contracts;
 using Boilerplate.Modules.Files.Contracts.v1.DTOs;
 using Boilerplate.Modules.Files.Contracts.v1.Queries;
 using Boilerplate.Modules.Files.Data;
-using Boilerplate.Modules.Files.Domain;
 using Boilerplate.Modules.Files.Features.v1.Internal;
 using Boilerplate.Modules.Files.Services;
 using Mediator;
@@ -17,7 +15,7 @@ public sealed class GetFileMetadataQueryHandler(
     FilesDbContext db,
     FileAccessPolicyRegistry policies,
     ICurrentUser currentUser,
-    IStorageService storage)
+    PublicFileUrlFactory publicUrls)
     : IQueryHandler<GetFileMetadataQuery, FileAssetDto>
 {
     public async ValueTask<FileAssetDto> Handle(GetFileMetadataQuery q, CancellationToken cancellationToken)
@@ -39,11 +37,9 @@ public sealed class GetFileMetadataQueryHandler(
             throw new NotFoundException("file not found");
         }
 
-        // Public files get a durable URL safe to persist long-term, while private files mint a
-        // short-lived presigned GET on demand via the auth-gated url endpoint.
-        var publicUrl = f.Visibility == Visibility.Public
-            ? storage.BuildPublicUrl(f.StorageKey)
-            : null;
+        // Public files get a freshly signed, short-lived GET URL (never persisted — the tenants/ key
+        // space has no anonymous grant). Private files get none; they go through the url endpoint.
+        var publicUrl = await publicUrls.TryBuildAsync(f, cancellationToken).ConfigureAwait(false);
 
         return FileAssetMapper.ToDto(f, publicUrl);
     }

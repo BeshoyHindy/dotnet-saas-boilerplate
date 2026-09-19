@@ -443,12 +443,15 @@ deployment is real:
   code currently allows, but it is still public-by-prefix rather than
   public-by-object; per-object ACLs would be narrower.
 
-Related, and an application-level gap rather than a deployment one: the Files
-module builds public URLs for `Visibility.Public` rows under `tenants/`, where
-public and private objects share a key space. That prefix is deliberately *not*
-anonymously readable — opening it would make `ChangeFileVisibility` unable to
-take access away again — so those public URLs will 403 until the module serves
-public files through a presigned URL or a per-object grant.
+Related, on the application side: Files-module objects live under `tenants/`,
+where public and private objects share a key space. That prefix is deliberately
+*not* anonymously readable — opening it would make `ChangeFileVisibility` unable
+to take access away again. The module therefore serves a `Visibility.Public`
+asset through a **short-lived presigned GET** minted on every read
+(`Files:PublicUrlTtlMinutes`, 5 minutes by default), never a bucket URL. The
+signature carries the access, so `publicUrl` must never be persisted: un-sharing
+a file stops issuance immediately, but a signature already handed out stays
+usable until it expires.
 
 ## 10. When it does not work
 

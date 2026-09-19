@@ -11,6 +11,15 @@ public sealed class FilesOptions
     /// <summary>Lifetime of a presigned GET URL minted by <c>GET /files/{id}/url</c>.</summary>
     public int DownloadUrlTtlMinutes { get; set; } = 5;
 
+    /// <summary>
+    /// Lifetime of the presigned GET URL returned as <c>publicUrl</c> for a <c>Visibility=Public</c>
+    /// asset. Public Files objects live under the private <c>tenants/</c> key space, so the signature
+    /// carries the access and this TTL bounds it: flipping a file back to Private stops issuance at
+    /// once, but a URL already handed out stays usable until it expires. Kept short for that reason
+    /// and clamped to 1–15 minutes by <c>PublicFileUrlFactory</c>.
+    /// </summary>
+    public int PublicUrlTtlMinutes { get; set; } = 5;
+
     /// <summary>How long a <c>PendingUpload</c> row is allowed to linger before the orphan purge job hard-deletes it.</summary>
     public int OrphanRetentionMinutes { get; set; } = 60;
 

@@ -59,14 +59,19 @@ public interface IStorageService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Compute a durable, non-expiring public URL for an object. Used when a <c>FileAsset</c> with
-    /// <c>Visibility=Public</c> is consumed by a long-lived persisted reference (e.g. an entity's
-    /// <c>imageUrl</c> column) where a presigned 5-minute URL would expire shortly after save.
+    /// Compute a durable, non-expiring public URL for an object. Valid <b>only for keys the bucket
+    /// policy actually publishes</b> — i.e. the <c>uploads/</c> prefix written by
+    /// <see cref="UploadAsync{T}"/> (avatars, tenant theme assets), which the deploy stacks grant
+    /// anonymous read on. Use it when a long-lived persisted reference (e.g. an entity's
+    /// <c>imageUrl</c> column) needs a URL that outlives a presign.
     ///
-    /// S3 backends build this from <c>PublicBaseUrl</c> (or the bucket's S3 host) and assume the
-    /// bucket policy grants public-read on the object. Local storage returns a path relative to the
-    /// API origin's wwwroot. Callers that want auth-gated access should use
-    /// <see cref="GenerateDownloadUrlAsync"/> instead.
+    /// <b>Not</b> for the Files module's <c>tenants/…</c> keys: that prefix carries public and
+    /// private objects side by side and is deliberately never anonymously readable (granting it
+    /// would publish every private file and make visibility changes unenforceable), so such a link
+    /// 403s. Those go through <see cref="GenerateDownloadUrlAsync"/> with a short TTL.
+    ///
+    /// S3 backends build this from <c>PublicBaseUrl</c> (or the bucket's S3 host). Local storage
+    /// returns a path relative to the API origin's wwwroot.
     /// </summary>
     /// <remarks>
     /// Returns <c>string</c> intentionally — local storage produces a server-relative path

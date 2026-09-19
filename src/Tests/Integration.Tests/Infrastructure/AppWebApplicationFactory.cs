@@ -28,6 +28,7 @@ namespace Integration.Tests.Infrastructure;
 
 public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    private const string MinioImage = "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z";
     private const string MinioAccessKey = "minioadmin";
     private const string MinioSecretKey = "minioadmin";
     private const string MinioBucket = "boilerplate-integration-test-uploads";
@@ -41,7 +42,9 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
         .WithCleanUp(true)
         .Build();
 
-    private readonly MinioContainer _minio = new MinioBuilder("minio/minio:latest")
+    // MinIO no longer publishes to Docker Hub, so `minio/minio:*` fails to pull on any machine
+    // without a cached layer. Pull from quay.io, pinned to the same release as docker-compose.yml.
+    private readonly MinioContainer _minio = new MinioBuilder(MinioImage)
         .WithUsername(MinioAccessKey)
         .WithPassword(MinioSecretKey)
         .WithAutoRemove(true)

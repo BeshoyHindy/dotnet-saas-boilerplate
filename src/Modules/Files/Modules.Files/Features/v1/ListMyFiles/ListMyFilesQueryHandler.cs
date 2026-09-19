@@ -1,12 +1,11 @@
 using System.Collections.ObjectModel;
 using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.BuildingBlocks.Core.Exceptions;
-using Boilerplate.BuildingBlocks.Storage.Services;
 using Boilerplate.Modules.Files.Contracts.v1.DTOs;
 using Boilerplate.Modules.Files.Contracts.v1.Queries;
 using Boilerplate.Modules.Files.Data;
-using Boilerplate.Modules.Files.Domain;
 using Boilerplate.Modules.Files.Features.v1.Internal;
+using Boilerplate.Modules.Files.Services;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,7 +14,7 @@ namespace Boilerplate.Modules.Files.Features.v1.ListMyFiles;
 public sealed class ListMyFilesQueryHandler(
     FilesDbContext db,
     ICurrentUser currentUser,
-    IStorageService storage)
+    PublicFileUrlFactory publicUrls)
     : IQueryHandler<ListMyFilesQuery, ReadOnlyCollection<FileAssetDto>>
 {
     public async ValueTask<ReadOnlyCollection<FileAssetDto>> Handle(ListMyFilesQuery q, CancellationToken cancellationToken)
@@ -38,13 +37,15 @@ public sealed class ListMyFilesQueryHandler(
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        // Seed publicUrl for public files so the preview dialog can paint the image
-        // immediately from the list data, without waiting on a metadata refetch to mint it.
-        return rows
-            .Select(f => FileAssetMapper.ToDto(
-                f,
-                f.Visibility == Visibility.Public ? storage.BuildPublicUrl(f.StorageKey) : null))
-            .ToList()
-            .AsReadOnly();
+        // Seed publicUrl for public files so the preview dialog can paint the image immediately from
+        // the list data, without waiting on a metadata refetch to mint it. Signing is local (no round
+        // trip) and the page size is capped at 100.
+        var dtos = new List<FileAssetDto>(rows.Count);
+        foreach (var f in rows)
+        {
+            dtos.Add(FileAssetMapper.ToDto(f, await publicUrls.TryBuildAsync(f, cancellationToken).ConfigureAwait(false)));
+        }
+
+        return dtos.AsReadOnly();
     }
 }
