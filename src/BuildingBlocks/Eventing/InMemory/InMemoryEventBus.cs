@@ -13,7 +13,6 @@ namespace Boilerplate.BuildingBlocks.Eventing.InMemory;
 /// </summary>
 public sealed partial class InMemoryEventBus : IEventBus
 {
-    private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<InMemoryEventBus> _logger;
     private readonly IEventTenantScope _tenantScope;
 
@@ -23,9 +22,8 @@ public sealed partial class InMemoryEventBus : IEventBus
 
     private readonly record struct HandlerDispatch(Type HandlerInterfaceType, MethodInfo HandleMethod);
 
-    public InMemoryEventBus(IServiceProvider serviceProvider, ILogger<InMemoryEventBus> logger, IEventTenantScope tenantScope)
+    public InMemoryEventBus(ILogger<InMemoryEventBus> logger, IEventTenantScope tenantScope)
     {
-        _serviceProvider = serviceProvider;
         _logger = logger;
         _tenantScope = tenantScope;
     }
@@ -59,27 +57,45 @@ public sealed partial class InMemoryEventBus : IEventBus
 
         var dispatch = GetDispatch(eventType);
 
-        // Set tenant context BEFORE resolving handlers — MultiTenantDbContext captures TenantInfo at
-        // construction, so a late tenant NREs the query filter. This is what makes background publishers work.
-        using (_tenantScope.Begin(@event.TenantId))
+        RequireTenantOrGlobalDeclaration(@event, eventType);
+
+        // The tenant scope owns the DI scope, so the tenant is installed BEFORE any handler — or the
+        // DbContext it holds — is constructed. A context built first captures a null tenant and the
+        // default connection string, which is what broke background dispatch.
+        using var scope = await _tenantScope.BeginAsync(@event.TenantId, ct).ConfigureAwait(false);
+        var provider = scope.Services;
+
+        var handlers = ResolveHandlers(provider, dispatch.HandlerInterfaceType);
+        if (handlers.Length == 0)
         {
-            using var scope = _serviceProvider.CreateScope();
-            var provider = scope.ServiceProvider;
-
-            var handlers = ResolveHandlers(provider, dispatch.HandlerInterfaceType);
-            if (handlers.Length == 0)
-            {
-                LogNoHandlers(eventType.FullName);
-                return;
-            }
-
-            var inbox = provider.GetService<IInboxStore>();
-
-            foreach (var handler in handlers)
-            {
-                await InvokeHandlerAsync(handler, dispatch.HandleMethod, eventType, @event, inbox, ct).ConfigureAwait(false);
-            }
+            LogNoHandlers(eventType.FullName);
+            return;
         }
+
+        var inbox = provider.GetService<IInboxStore>();
+
+        foreach (var handler in handlers)
+        {
+            await InvokeHandlerAsync(handler, dispatch.HandleMethod, eventType, @event, inbox, ct).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// ADR-0002: tenant-less dispatch is a declaration, not a null field. Without this an event whose
+    /// TenantId was simply never set runs its handlers against whatever the default connection points
+    /// at — the same silent cross-tenant read <c>[SystemJob]</c> exists to prevent on the job side.
+    /// </summary>
+    private static void RequireTenantOrGlobalDeclaration(IIntegrationEvent @event, Type eventType)
+    {
+        if (!string.IsNullOrWhiteSpace(@event.TenantId) || @event is IGlobalIntegrationEvent)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Integration event {eventType.FullName} ({@event.Id}) was published with no TenantId. Publish it " +
+            "under a tenant, or declare the event type IGlobalIntegrationEvent if it genuinely belongs to no " +
+            "tenant (ADR-0002).");
     }
 
     private static object[] ResolveHandlers(IServiceProvider provider, Type handlerInterfaceType)

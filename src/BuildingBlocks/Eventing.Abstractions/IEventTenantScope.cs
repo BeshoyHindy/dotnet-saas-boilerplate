@@ -1,27 +1,36 @@
 namespace Boilerplate.BuildingBlocks.Eventing.Abstractions;
 
 /// <summary>
-/// Establishes the ambient tenant context for the duration of an integration-event
-/// dispatch, so that handlers — and the tenant-filtered DbContexts they resolve — see
-/// the correct tenant even when the event is published from a background scope
-/// (outbox dispatcher, hosted services, recurring jobs) that carries no HTTP request
-/// and therefore no tenant context.
+/// Establishes the tenant an integration event is dispatched under, and hands back the service
+/// provider its handlers must be resolved from.
 ///
-/// The tenant context MUST be set <b>before</b> handlers are resolved: a
-/// <c>MultiTenantDbContext</c> captures its <c>TenantInfo</c> at construction time, so
-/// setting the tenant after the handler (and its DbContext) has been materialized is
-/// too late and leaves the tenant query filter dereferencing a null tenant.
+/// The scope returns the provider rather than only a restore handle so the ordering cannot be got
+/// wrong: a <c>MultiTenantDbContext</c> captures its <c>TenantInfo</c> — and with it the tenant's
+/// connection string — at construction, so a handler resolved from a DI scope created <i>before</i>
+/// the tenant is installed reads the wrong database through a null tenant filter. A caller that
+/// creates its own scope has to remember the order; a caller handed one cannot forget it.
 ///
-/// The default implementation (<c>NullEventTenantScope</c>) is a no-op; the
-/// multitenancy composition registers a Finbuckle-backed implementation. Keeping the
-/// abstraction here lets the event bus stay tenant-technology-agnostic.
+/// Implementations load the <b>full</b> tenant record from the tenant store. An id-only stub is what
+/// made per-tenant connection strings silently fall back to the default database.
+///
+/// The default implementation (<c>NullEventTenantScope</c>) just opens a DI scope; the multitenancy
+/// composition replaces it with a Finbuckle-backed one. Keeping the abstraction here lets the event
+/// bus stay tenant-technology-agnostic.
 /// </summary>
 public interface IEventTenantScope
 {
     /// <summary>
-    /// Begins a tenant scope for <paramref name="tenantId"/>. Disposing the returned
-    /// handle restores the previous ambient tenant. A null/whitespace id leaves the
-    /// ambient context unchanged (global, non-tenant-scoped events).
+    /// Begins the dispatch scope for <paramref name="tenantId"/>. A null/whitespace id means a
+    /// global event and leaves the ambient tenant alone — the bus only allows that for events that
+    /// declare themselves <see cref="IGlobalIntegrationEvent"/>.
+    /// Disposing the handle tears down the DI scope and restores the previous ambient tenant.
     /// </summary>
-    IDisposable Begin(string? tenantId);
+    Task<IEventTenantScopeHandle> BeginAsync(string? tenantId, CancellationToken cancellationToken = default);
+}
+
+/// <summary>An open event-dispatch scope.</summary>
+public interface IEventTenantScopeHandle : IDisposable
+{
+    /// <summary>Resolve handlers — and anything they need — from here, never from the root provider.</summary>
+    IServiceProvider Services { get; }
 }
