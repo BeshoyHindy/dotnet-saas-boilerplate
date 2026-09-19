@@ -50,6 +50,10 @@ Login `POST /api/v1/tenants/{tenant}/auth/token` (header `X-Client-App` enforces
 
 Neither accepts a caller that already carries `act_sub` (no nesting). The audit row lands in the **ambient** tenant — the caller's own — so an operator finds their crossings in root. `BuildClaimsForUserAsync`/`FindTenantUserAsync` read the target user with `IgnoreQueryFilters` from the ambient database, so a tenant with a dedicated connection string cannot be entered until the tenant-scope helper lands.
 
+`RevokeImpersonationGrant` takes effect immediately on the instance that handled the revoke, and within the `ImpersonationGrantService` local cache's expiration (up to 1 minute, see `Services/ImpersonationGrantService.cs`) on any other instance — not the flat "~1 second" the endpoint used to claim.
+
+**An acting token (`act_sub` present) must never be able to change or reveal the subject's own credentials.** `.DenyWhenActing()` (`BuildingBlocks/Shared/Identity/Authorization/DenyWhenActingEndpointFilter.cs`) throws `ForbiddenException` (403) when the caller's token carries `act_sub`; it is applied to 2FA enroll/verify/disable and change-password. It is deliberately **not** applied to session revocation, profile name/image updates, or the impersonation end/revoke endpoints — those either don't touch credentials or are how an actor cleans up after themself.
+
 ### Logout
 
 `POST /api/v1/tenants/{tenant}/auth/logout` — **`AllowAnonymous` on purpose**: it has to work when the access token is already gone, which is the state a signing-out browser is in. It revokes the session named by the caller's `sid` claim, or failing that the session the supplied refresh token belongs to (body or cookie, current *or* previous hash), and always clears the cookie. Always 204 — a different answer for a live token than a dead one would be an oracle. Both clients call it best-effort from `logout()` before clearing local state.

@@ -21,8 +21,11 @@ public static class DisableTwoFactorEndpoint
             .RequireAuthorization()
             // Self-service: acts on the caller's own account and re-confirms their password.
             .RequireAuthenticatedOnly()
+            // Disables the subject's own 2FA — an actor must not do this on their behalf.
+            .DenyWhenActing()
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status401Unauthorized);
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
     }
 }

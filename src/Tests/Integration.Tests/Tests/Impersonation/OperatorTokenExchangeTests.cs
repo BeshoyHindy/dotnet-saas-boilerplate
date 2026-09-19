@@ -496,6 +496,35 @@ public sealed class OperatorTokenExchangeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ExchangedToken_Should_AttributeActivityAudit_ToTheRealActor()
+    {
+        // Arrange
+        using var rootClient = await _auth.CreateRootAdminClientAsync();
+        var acting = await ExchangeAsync(rootClient, _tenantId, reason: "activity audit actor attribution");
+        using var actingClient = ClientWithBearer(acting.AccessToken);
+
+        // Act — any ordinary request made with the exchanged token.
+        var profile = await actingClient.GetAsync($"{TestConstants.IdentityBasePath}/profile");
+        profile.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        // Assert — the activity row is filed under the SUBJECT (the target tenant's admin, whom the
+        // token names), but its payload carries the REAL actor: the root operator and root tenant
+        // recorded via act_sub/act_tenant (AuditHttpMiddleware.WithActor).
+        var summary = await AuditTestHelper.PollForAuditAsync(
+            actingClient,
+            a => a.EventType == AuditEventType.Activity
+                 && a.UserId == _tenantAdminUserId
+                 && a.TenantId == _tenantId);
+
+        var detail = await AuditTestHelper.GetByIdAsync(actingClient, summary.Id);
+        detail.ShouldNotBeNull();
+        var payload = detail!.Payload.GetRawText();
+        // The operator's own subject/tenant must appear — that is what makes this "really acting".
+        payload.ShouldContain(_rootAdminUserId);
+        payload.ShouldContain(TestConstants.RootTenantId);
+    }
+
+    [Fact]
     public async Task ExchangedToken_Should_BeRejected_After_ItsGrantIsRevoked()
     {
         // Arrange
