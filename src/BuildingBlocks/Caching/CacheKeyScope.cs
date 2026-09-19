@@ -6,8 +6,8 @@ namespace Boilerplate.BuildingBlocks.Caching;
 /// Callers write <b>logical</b> names — <c>"theme"</c>, <c>"perm:u:{userId}"</c>, <c>"permissions"</c>.
 /// The cache writes <b>physical</b> ones — <c>"t:acme:theme"</c>, <c>"g:impgrant:{jti}"</c>. Nobody
 /// outside this block composes that prefix: <see cref="TenantScopedHybridCache"/>,
-/// <see cref="GlobalHybridCache"/> and the one caller that must read L2 by key (the idempotency
-/// probe-read in <c>IdempotencyEndpointFilter</c>) all come through here, so there is exactly one
+/// <see cref="GlobalHybridCache"/> and the one caller that keeps its own entries in L2 by key (the
+/// replay store in <c>IdempotencyEndpointFilter</c>) all come through here, so there is exactly one
 /// format and it cannot drift between writer and reader.
 /// </summary>
 /// <remarks>

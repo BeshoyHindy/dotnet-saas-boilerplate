@@ -17,8 +17,11 @@ public sealed class IdempotencyFilterTests
         _auth = new AuthHelper(factory);
     }
 
-    // Full replay-with-matching-body coverage isn't possible yet (filter captures the raw IResult, not the body — dotnet/aspnetcore#57191, backlog 2.4b).
-    // These tests verify only the wiring: Idempotency-Replayed header presence/absence and that a distinct key forces fresh execution.
+    // Replay is observable here now (#82). The filter keeps its own entries in IDistributedCache,
+    // which this host has — an in-memory one, which works perfectly well when used directly; it is
+    // HybridCache that ignores it as an L2. It also captures the executed response rather than the
+    // raw IResult, so "the second response is the first response" is an assertion about the body.
+    // Replay against a real Redis is IdempotencyRedisReplayTests.
 
     [Fact]
     public async Task RegisterUser_Should_ExecuteNormally_When_NoIdempotencyKey()
@@ -55,6 +58,48 @@ public sealed class IdempotencyFilterTests
         secondResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
         secondResponse.Headers.Contains(ReplayedHeader).ShouldBeFalse(
             "A different idempotency key must route through a fresh execution.");
+    }
+
+    [Fact]
+    public async Task RegisterUser_Should_ReplayTheFirstResponse_When_SameIdempotencyKey()
+    {
+        using var client = await _auth.CreateRootAdminClientAsync();
+        var uniqueId = Guid.NewGuid().ToString("N")[..8];
+        var payload = NewUserPayload(uniqueId);
+        var key = $"idem-replay-{uniqueId}";
+
+        using var firstRequest = BuildRequest(payload, key);
+        var first = await client.SendAsync(firstRequest);
+        using var secondRequest = BuildRequest(payload, key);
+        var second = await client.SendAsync(secondRequest);
+
+        first.StatusCode.ShouldBe(HttpStatusCode.Created);
+        first.Headers.Contains(ReplayedHeader).ShouldBeFalse();
+
+        // Without replay this is a 400: the user already exists. Getting the first response back,
+        // byte for byte, is the whole contract.
+        second.StatusCode.ShouldBe(HttpStatusCode.Created);
+        second.Headers.Contains(ReplayedHeader).ShouldBeTrue();
+        (await second.Content.ReadAsStringAsync()).ShouldBe(await first.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task RegisterUser_Should_Refuse_When_SameKey_Carries_A_DifferentPayload()
+    {
+        // Replaying here would answer a request nobody made — the caller asked to create a different
+        // user. 422 is the IETF Idempotency-Key draft's answer for a key reused with a new payload.
+        using var client = await _auth.CreateRootAdminClientAsync();
+        var uniqueId = Guid.NewGuid().ToString("N")[..8];
+        var key = $"idem-conflict-{uniqueId}";
+
+        using var firstRequest = BuildRequest(NewUserPayload($"a{uniqueId}"), key);
+        (await client.SendAsync(firstRequest)).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        using var secondRequest = BuildRequest(NewUserPayload($"b{uniqueId}"), key);
+        var second = await client.SendAsync(secondRequest);
+
+        second.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+        second.Headers.Contains(ReplayedHeader).ShouldBeFalse();
     }
 
     private static object NewUserPayload(string uniqueId) => new

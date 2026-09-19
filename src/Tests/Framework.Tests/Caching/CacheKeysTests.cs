@@ -26,16 +26,11 @@ public sealed class CacheKeysTests
     }
 
     [Fact]
-    public void IdempotencyEntry_Should_ScopeByKeyAlone_When_Built()
+    public void IdempotencyEntry_Should_ScopeByCallerBinding_Then_ClientKey()
     {
-        CacheKeys.IdempotencyEntry("abc").ShouldBe("idem:abc");
-    }
-
-    [Fact]
-    public void GlobalIdempotencyEntry_Should_PartitionBySubjectOrAnonymous()
-    {
-        CacheKeys.GlobalIdempotencyEntry("u-1", "abc").ShouldBe("idem:s:u-1:abc");
-        CacheKeys.GlobalIdempotencyEntry(null, "abc").ShouldBe("idem:anon:abc");
+        // One shape for both the tenant-scoped and the global entry: the branch is which namespace
+        // the filter scopes it into, not a different key.
+        CacheKeys.IdempotencyEntry("ff00", "abc").ShouldBe("idem:ff00:abc");
     }
 
     [Fact]
@@ -53,7 +48,6 @@ public sealed class CacheKeysTests
     {
         CacheKeys.Tags.Permissions.ShouldBe("permissions");
         CacheKeys.Tags.Themes.ShouldBe("themes");
-        CacheKeys.Tags.Idempotency.ShouldBe("idempotency");
     }
 
     [Fact]

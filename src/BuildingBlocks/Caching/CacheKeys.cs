@@ -28,8 +28,10 @@ public static class CacheKeys
         /// <summary>Tag applied to every tenant theme entry.</summary>
         public const string Themes = "themes";
 
-        /// <summary>Tag applied to every idempotency replay entry.</summary>
-        public const string Idempotency = "idempotency";
+        // There is deliberately no Idempotency tag. Replay entries are written straight to
+        // IDistributedCache by IdempotencyEndpointFilter — HybridCache has no get-only probe, and the
+        // framed L2 payload it writes is unreadable to a direct reader (#82) — so nothing carries a
+        // tag and a tag nobody sets is a bulk invalidation that silently evicts nothing.
 
         /// <summary>Per-user tag — invalidates all entries scoped to a user within the tenant.</summary>
         public static string User(string userId) => $"user:{userId}";
@@ -52,18 +54,19 @@ public static class CacheKeys
     /// </summary>
     public const string DefaultTheme = "theme:default";
 
-    /// <summary>Key for an idempotency replay entry within the ambient tenant.</summary>
-    public static string IdempotencyEntry(string key) => $"idem:{key}";
-
     /// <summary>
-    /// Key for an idempotency replay entry on a request with no tenant at all — written through
-    /// <see cref="GlobalHybridCache"/>, never through the tenant cache. Partitioned by the
-    /// authenticated subject when there is one so two callers cannot read each other's response;
-    /// with neither tenant nor subject the client-generated Idempotency-Key is the whole partition,
-    /// which is exactly what the header's contract already assumes.
+    /// Key for an idempotency replay entry. <paramref name="binding"/> is the filter's hash of who is
+    /// asking and what they are asking for — subject (or an anonymous marker), HTTP method and path —
+    /// so a client key can only ever replay that caller's own response to that same endpoint; the
+    /// tenant comes from the namespace, as it does for every other key here. The client-generated key
+    /// stays readable at the tail, where nothing follows it and so nothing it contains can be
+    /// arranged to name another partition.
     /// </summary>
-    public static string GlobalIdempotencyEntry(string? subjectId, string key) =>
-        string.IsNullOrEmpty(subjectId) ? $"idem:anon:{key}" : $"idem:s:{subjectId}:{key}";
+    /// <remarks>
+    /// Used for both the tenant-scoped and the explicitly global entry: the branch is which cache
+    /// namespace the filter scopes it into, not a different key shape.
+    /// </remarks>
+    public static string IdempotencyEntry(string binding, string key) => $"idem:{binding}:{key}";
 
     /// <summary>
     /// Key for the impersonation-grant revocation marker, indexed by JWT id. Read on every
