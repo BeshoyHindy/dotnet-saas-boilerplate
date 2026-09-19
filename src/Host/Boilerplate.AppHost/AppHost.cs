@@ -50,19 +50,31 @@ var minioPassword = builder.AddParameter(
     persist: true);
 
 // quay.io, not the implicit docker.io: MinIO no longer publishes to Docker Hub.
+//
+// NO FIXED HOST PORTS. The container listens on its own 9000/9001, but the host side is left to
+// Aspire to allocate. Pinning them made a second AppHost instance (another checkout or worktree)
+// unrunnable in the worst possible way: the persistent MinIO container of the first instance still
+// holds 9000/9001, the new container fails to bind, Docker leaves it attached to no network, and
+// `minio-init` then loops on "waiting for minio..." forever — which, through `WaitForCompletion`,
+// hangs the API and every client behind it with no error anywhere. Everything that needs the real
+// address takes it from the endpoint below, so nothing here knows a port number.
 var minio = builder.AddContainer("minio", "quay.io/minio/minio", "RELEASE.2025-09-07T16-13-09Z")
     .WithArgs("server", "/data", "--console-address", ":9001")
-    .WithHttpEndpoint(port: 9000, targetPort: 9000, name: "api")
-    .WithHttpEndpoint(port: 9001, targetPort: 9001, name: "console")
+    .WithHttpEndpoint(targetPort: 9000, name: "api")
+    .WithHttpEndpoint(targetPort: 9001, name: "console")
     .WithEnvironment("MINIO_ROOT_USER", minioUser)
     .WithEnvironment("MINIO_ROOT_PASSWORD", minioPassword)
     .WithEnvironment("MINIO_API_CORS_ALLOW_ORIGIN", ConsoleOrigin)
     .WithVolume($"{appPrefix}-minio-data", "/data")
     .WithLifetime(ContainerLifetime.Persistent);
 
+var minioApiEndpoint = minio.GetEndpoint("api");
+
 // Init container: bucket bootstrap (create + public-read). Script normalized to LF so /bin/sh in minio/mc doesn't choke on Windows CRLF.
+// The endpoint arrives as $MC_URL: Aspire resolves an endpoint reference injected into a *container*
+// to the container-network form (http://minio:9000), so this keeps working whatever the host port is.
 var minioInitScript = ($$"""
-until mc alias set local http://minio:9000 "$MC_USER" "$MC_PASS"; do
+until mc alias set local "$MC_URL" "$MC_USER" "$MC_PASS"; do
   echo "waiting for minio...";
   sleep 2;
 done;
@@ -73,16 +85,18 @@ mc anonymous set download local/{{MinioBucket}};
 var minioInit = builder.AddContainer("minio-init", "quay.io/minio/mc", "RELEASE.2025-08-13T08-35-41Z")
     .WithEntrypoint("/bin/sh")
     .WithArgs("-c", minioInitScript)
+    .WithEnvironment("MC_URL", minioApiEndpoint)
     .WithEnvironment("MC_USER", minioUser)
     .WithEnvironment("MC_PASS", minioPassword)
     .WaitFor(minio);
 
-var minioApiEndpoint = minio.GetEndpoint("api");
-
-// Mail catcher: traps every message the API sends instead of delivering it. SMTP on :1025, inbox UI on :8025.
+// Mail catcher: traps every message the API sends instead of delivering it. SMTP and the inbox UI
+// listen on the container's 1025/8025; the host ports are Aspire's to allocate, for the same
+// reason MinIO's are (a second instance must not be blocked by the first). Open the inbox from the
+// Aspire dashboard's "mailpit" resource link; the API is wired to the SMTP endpoint by reference.
 var mailpit = builder.AddContainer("mailpit", "axllent/mailpit", "v1.31")
-    .WithEndpoint(port: 1025, targetPort: 1025, scheme: "tcp", name: "smtp")
-    .WithHttpEndpoint(port: 8025, targetPort: 8025, name: "http")
+    .WithEndpoint(targetPort: 1025, scheme: "tcp", name: "smtp")
+    .WithHttpEndpoint(targetPort: 8025, name: "http")
     .WithEnvironment("MP_SMTP_AUTH_ACCEPT_ANY", "true")
     .WithEnvironment("MP_SMTP_AUTH_ALLOW_INSECURE", "true")
     .WithExternalHttpEndpoints();

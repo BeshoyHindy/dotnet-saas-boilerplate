@@ -76,22 +76,24 @@ Aspire starts PostgreSQL, Valkey, MinIO and Mailpit, runs the migrator to comple
 then the console. The dashboard is at <https://localhost:15888>; it also shows the generated MinIO
 and seeded-admin passwords.
 
-#### Troubleshooting the AppHost
+#### Running two AppHosts at once
 
-**Nothing starts, and `minio-init` prints `waiting for minio...` forever.**
+Every container the AppHost starts (PostgreSQL, Valkey, MinIO, Mailpit) lets Aspire allocate its
+host port, so a second checkout or worktree can run its own stack alongside yours. Read the actual
+addresses off the dashboard; nothing in the stack hard-codes them, and everything that needs one —
+the API's `Storage__S3__*`, `minio-init`, the SMTP host — takes it from an endpoint reference.
 
-Only one AppHost instance can run at a time. MinIO binds fixed host ports 9000 and 9001 and its
-container is `Persistent`, so a second checkout or worktree that has ever run the AppHost leaves a
-`minio` container holding those ports. The new run's `minio` container then comes up attached to no
-network; `minio-init` cannot reach it and loops; and because the API is declared
-`.WaitForCompletion(minioInit)`, the API — and the console behind it — never starts. The dashboard
-just shows resources waiting.
+This was not always true. Until the fix in `AppHost.cs`, MinIO pinned host ports 9000/9001 and its
+container is `Persistent`, so the second instance's `minio` container failed to bind, came up
+attached to no network, and `minio-init` looped on `waiting for minio...` — which, through
+`.WaitForCompletion(minioInit)`, silently hung the API and every client behind it. If you ever see
+that loop (`docker logs <minio-init container>`), you are running an older revision.
 
-How to see it: `docker ps` lists two `minio-*` containers, from two different projects.
-`docker logs <minio-init container>` shows the repeated `waiting for minio...`.
-
-Remedy: stop the other instance and remove its persistent containers (`minio`, `minio-init`, and
-while you are there `postgres` and `redis`), then run again. Or simply don't run two AppHosts.
+What is still pinned, deliberately: the API (`7030`/`5030`, from `launchSettings.json`, quoted by
+the `.http` request files and the devcontainer), the Aspire dashboard (`15888`) and the client dev
+server (`5173` — the Vite proxy origin is what makes the `SameSite=Strict` refresh cookie work).
+Those clash loudly and instantly, not silently, so two *full* instances still need one of them to be
+stopped.
 
 **A separate note on the database.** The initial migrations were regenerated during this template's
 construction, so a database migrated before that is incompatible with the current code and needs a
