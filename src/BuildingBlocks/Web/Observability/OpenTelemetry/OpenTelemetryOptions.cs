@@ -32,10 +32,6 @@ public sealed class OpenTelemetryOptions
     /// </summary>
     public HttpOptions Http { get; set; } = new();
 
-    /// <summary>
-    /// EF/Redis instrumentation filtering options.
-    /// </summary>
-
     public sealed class TracingOptions
     {
         public bool Enabled { get; set; } = true;

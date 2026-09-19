@@ -38,7 +38,7 @@ public static class Extensions
                     if (settings.AllowAll)
                     {
                         // Echo the request origin (not `*`): the CORS spec forbids `*` with credentialed requests,
-                        // and SignalR's negotiate always runs credentialed — so AllowCredentials needs a specific origin.
+                        // so AllowCredentials needs a specific origin.
                         builder
                             .SetIsOriginAllowed(_ => true)
                             .AllowAnyHeader()
