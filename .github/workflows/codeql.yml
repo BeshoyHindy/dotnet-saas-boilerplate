@@ -1,19 +1,41 @@
 name: CodeQL Analysis
+
+# Static analysis of the C# sources. Runs on PRs into the long-lived branches
+# (gitflow, ADR-0007: `develop` integrates, so a PR that never touches `main`
+# still has to pass), on pushes to `develop` — code scanning only records
+# alerts for a branch it has analysed on push — and weekly, so a newly published
+# query catches existing code without a commit.
+
 on:
-  pull_request:
-    branches: [main]
+  push:
+    branches: [develop, main]
     paths:
       - 'src/**'
+      - '.github/workflows/codeql.yml'
+  pull_request:
+    branches: [develop, main, 'release/**', 'hotfix/**']
+    paths:
+      - 'src/**'
+      - '.github/workflows/codeql.yml'
   schedule:
     - cron: '0 6 * * 1'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
-  security-events: write
   contents: read
 
 jobs:
   analyze:
+    name: Analyze (csharp)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      security-events: write # upload the SARIF results
+      actions: read # the analyze step reads the run's own metadata
     steps:
       - uses: actions/checkout@v6
       - uses: github/codeql-action/init@v3
@@ -22,5 +44,7 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           global-json-file: global.json
+      # Not -warnaserror: backend.yml owns that gate, and CodeQL must still be
+      # able to analyse a build that only warns.
       - run: dotnet build src/Boilerplate.slnx -c Release
       - uses: github/codeql-action/analyze@v3

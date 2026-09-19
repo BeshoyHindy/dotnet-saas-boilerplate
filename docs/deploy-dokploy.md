@@ -322,6 +322,31 @@ To roll the image forward first, set `IMAGE_TAG` in the stack's Environment tab
 (by hand or through `compose.update`) and then run the script — Dokploy reads
 the new value on the next deployment.
 
+### From GitHub Actions
+
+`.github/workflows/backend.yml` has a `deploy` job that runs exactly that script
+after the images are published: `staging` on every push to `develop`,
+`production` on every `v*` tag. It is bound to a GitHub **Environment** of the
+same name — that is where its secrets live, and where a reviewer gate goes if
+production should need approval — and it then probes `/health/live` and
+`/health/ready` from outside, because the chiseled image can carry no container
+healthcheck.
+
+The job is optional: with nothing configured it logs a notice and passes, so a
+fork or a fresh scaffold is never red for lacking a server. To enable it, create
+the `staging` and `production` environments and give each:
+
+| Kind | Name | Value |
+|---|---|---|
+| secret | `DOKPLOY_URL` | `https://dokploy.example.com` (no `/api`) |
+| secret | `DOKPLOY_API_KEY` | the API token above |
+| secret | `DOKPLOY_COMPOSE_ID` | the **app** stack's `composeId` |
+| variable | `API_BASE_URL` | `https://api.example.com` — omit to skip the probe |
+
+Staging pins `IMAGE_TAG=dev-latest` in Dokploy, so the deploy picks up the image
+the same run just pushed. Production names the exact version (`1.4.0`), which is
+what makes releasing it a deliberate act and a rollback one value away.
+
 ### The API it speaks
 
 Reference: <https://docs.dokploy.com/docs/api>. The base URL is your Dokploy

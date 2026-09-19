@@ -5,40 +5,44 @@ name: Backend CI
 # client-only PR still triggers the workflow but every heavy job is skipped —
 # the always-running "Backend CI" gate job reports green so required status
 # checks resolve. SDK is pinned via global.json (GA, no preview channel).
+#
+# Gitflow (ADR-0007): `develop` integrates, so PRs and pushes to BOTH `develop`
+# and `main` (plus the release/hotfix branches that feed `main`) run the gates.
+# A push to `develop` publishes the staging images and deploys staging; a `v*`
+# tag on `main` publishes the versioned images and deploys production.
 
 on:
   push:
-    branches: [main]
+    branches: [develop, main, 'release/**', 'hotfix/**']
     tags: ['v*']
   pull_request:
-    branches: [main]
+    branches: [develop, main, 'release/**', 'hotfix/**']
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Package version (e.g., 10.0.0-rc.1)'
-        required: false
-        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Minimal at the top level; the publish job adds `packages: write` for itself.
 permissions:
   contents: read
-  packages: write
+  pull-requests: read # dorny/paths-filter lists the PR's changed files
 
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   DOTNET_NOLOGO: true
+  REGISTRY: ghcr.io
 
 jobs:
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
-      # On any non-PR event (push to main, tags, manual release) run the
-      # full pipeline. On PRs, run only when backend-relevant paths changed.
+      # On any non-PR event (push to develop/main, tags, manual run) run the
+      # full pipeline. On PRs, run only when backend-relevant paths changed —
+      # a docs-only PR must not pay for the Testcontainers suite.
       backend: ${{ github.event_name != 'pull_request' || steps.filter.outputs.backend == 'true' }}
     steps:
       - uses: actions/checkout@v6
@@ -57,6 +61,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -126,6 +131,10 @@ jobs:
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     # Testcontainers requires Docker — ubuntu-latest has it pre-installed.
+    # This is the slowest gate in the repo (PostgreSQL + Redis + MinIO per
+    # assembly), so it gets a generous but finite budget: a hung container must
+    # fail the run, not hold a runner for six hours.
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -177,9 +186,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
-    # Catches container-publish regressions (Dockerfile-less SDK container) and DI-graph
-    # breakage in the migrator. Publishes the image locally, runs `apply --catalog-only`
-    # against an ephemeral Postgres, asserts exit 0.
+    timeout-minutes: 30
+    # Catches Dockerfile regressions and DI-graph breakage in the migrator. Builds the
+    # SAME image the deploy pulls (`src/Host/Dockerfile --target migrator`, chiseled and
+    # non-root per ADR-0005), loads it into the local daemon, runs `apply --catalog-only`
+    # against an ephemeral Postgres and asserts exit 0.
     services:
       postgres:
         image: postgres:17-alpine
@@ -198,25 +209,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v5
-        with:
-          global-json-file: global.json
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Cache NuGet packages
-        uses: actions/cache@v5
+      - name: Build DbMigrator image (local daemon)
+        uses: docker/build-push-action@v6
         with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props') }}
-          restore-keys: ${{ runner.os }}-nuget-
-
-      - name: Publish DbMigrator container (local daemon)
-        run: |
-          dotnet publish src/Host/Boilerplate.DbMigrator/Boilerplate.DbMigrator.csproj \
-            -c Release -r linux-x64 \
-            /t:PublishContainer \
-            -p:ContainerRepository=boilerplate-db-migrator \
-            -p:ContainerImageTags=smoke
+          context: .
+          file: src/Host/Dockerfile
+          target: migrator
+          load: true
+          tags: boilerplate-db-migrator:smoke
+          cache-from: type=gha,scope=migrator
+          cache-to: type=gha,mode=max,scope=migrator
 
       - name: Run DbMigrator against ephemeral Postgres
         run: |
@@ -233,6 +238,7 @@ jobs:
     needs: [changes, test, integration-test]
     if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # Merges the coverage already collected by the test + integration-test jobs
     # (no test re-runs) and fails if line coverage regresses below the floor.
     # Ratchet: bump MIN_LINE upward as coverage improves.
@@ -281,133 +287,189 @@ jobs:
           echo "Line coverage: ${LINE}% (floor: ${MIN_LINE}%)"
           awk "BEGIN { exit !(${LINE} >= ${MIN_LINE}) }" || { echo "::error::Line coverage ${LINE}% is below the ${MIN_LINE}% floor"; exit 1; }
 
-  publish-dev-containers:
-    name: Publish Dev Containers
-    needs: [changes, test, integration-test]
-    if: needs.changes.outputs.backend == 'true' && github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v5
-        with:
-          global-json-file: global.json
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v5
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props') }}
-          restore-keys: ${{ runner.os }}-nuget-
-
-      - name: Login to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish API container image
-        run: |
-          dotnet publish src/Host/Boilerplate.Api/Boilerplate.Api.csproj \
-            -c Release -r linux-x64 \
-            /t:PublishContainer \
-            -p:ContainerRegistry=ghcr.io \
-            -p:ContainerRepository=${{ github.repository_owner }}/boilerplate-api \
-            -p:ContainerImageTags='"dev-${{ github.sha }};dev-latest"'
-
-      - name: Publish DbMigrator container image
-        run: |
-          dotnet publish src/Host/Boilerplate.DbMigrator/Boilerplate.DbMigrator.csproj \
-            -c Release -r linux-x64 \
-            /t:PublishContainer \
-            -p:ContainerRegistry=ghcr.io \
-            -p:ContainerRepository=${{ github.repository_owner }}/boilerplate-db-migrator \
-            -p:ContainerImageTags='"dev-${{ github.sha }};dev-latest"'
-
-  publish-release:
-    name: Publish Release (NuGet + Containers)
-    needs: [changes, test, integration-test]
+  # ── Images ──────────────────────────────────────────────────────────
+  # Three images, one job, one tag set: deploy/dokploy/app.compose.yml brings up
+  # migrator + api + console at a single ${IMAGE_TAG}, so a tag that exists for
+  # two of the three is a broken deploy. They are built with Buildx from the
+  # Dockerfiles the deploy actually runs (ADR-0005) — NOT `dotnet publish
+  # /t:PublishContainer`, which produced a differently-based image than the one
+  # src/Host/Dockerfile defines and reviewers read.
+  #
+  # There is no NuGet.org publishing anywhere in this repo: the distribution
+  # artifact is the `dotnet new saas` template source, and template-smoke.yml
+  # (issue #20) proves the package still scaffolds.
+  publish-images:
+    name: Publish Image (${{ matrix.image }})
+    needs: [changes, test, integration-test, migrator-smoke, coverage]
+    # develop  → staging images: dev-<sha> + dev-latest
+    # v* tag   → production images: the version, e.g. 1.4.0. Never a bare
+    #            `latest` — production must name a fixed version or a redeploy
+    #            a week later is a different build (ADR-0005).
     if: |
-      (github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch') ||
-      startsWith(github.ref, 'refs/tags/v')
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: boilerplate-api
+            context: .
+            file: src/Host/Dockerfile
+            target: api
+          - image: boilerplate-db-migrator
+            context: .
+            file: src/Host/Dockerfile
+            target: migrator
+          # The console SPA. This is the ONLY place CI names the console
+          # client's path: issue #14 consolidates the two React apps into one
+          # console, and when it lands these two lines move and nothing else.
+          - image: boilerplate-console
+            context: clients/admin
+            file: clients/admin/Dockerfile
+            target: ''
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup .NET SDK
-        uses: actions/setup-dotnet@v5
-        with:
-          global-json-file: global.json
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v5
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props') }}
-          restore-keys: ${{ runner.os }}-nuget-
-
-      - name: Determine version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            VERSION="${GITHUB_REF#refs/tags/v}"
-          else
-            echo "No version specified and not a tag push"
-            exit 1
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Publishing version: $VERSION"
-
-      - name: Restore and Build with version
-        run: |
-          dotnet restore src/Boilerplate.slnx
-          dotnet build src/Boilerplate.slnx -c Release --no-restore -p:Version=${{ steps.version.outputs.version }}
-
-      # Distribution model is source-ownership: consumers get the FULL source via the
-      # `dotnet new saas` template (below), NOT per-module/BuildingBlocks NuGet packages.
-      # Only one artifact publishes to NuGet — the template.
-      # (The previous per-module packs were incomplete — 4 of 10 modules — and contradicted
-      # the locked source-ownership model, so they were removed.)
-
-      # The dotnet new template package — the primary distribution artifact. Packs the
-      # repo (with its root .template.config) so consumers can `dotnet new install` then
-      # `dotnet new saas -n MyApp`. Scaffolded output is fully owned, detached source.
-      - name: Pack Template
-        run: dotnet pack templates/Boilerplate.Templates.csproj -c Release -o ./nupkgs -p:PackageVersion=${{ steps.version.outputs.version }}
-
-      - name: Push to NuGet.org
-        run: dotnet nuget push "./nupkgs/*.nupkg" --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to GHCR
         uses: docker/login-action@v4
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push API container
-        run: |
-          dotnet publish src/Host/Boilerplate.Api/Boilerplate.Api.csproj \
-            -c Release -r linux-x64 \
-            /t:PublishContainer \
-            -p:ContainerRegistry=ghcr.io \
-            -p:ContainerRepository=${{ github.repository_owner }}/boilerplate-api \
-            -p:ContainerImageTags='"${{ steps.version.outputs.version }};latest"'
+      # GHCR rejects an uppercase repository path and `github.repository_owner`
+      # keeps the account's original casing, so lowercase it here.
+      - name: Resolve image name
+        id: image
+        env:
+          OWNER: ${{ github.repository_owner }}
+          IMAGE: ${{ matrix.image }}
+        run: echo "name=${REGISTRY}/${OWNER,,}/${IMAGE}" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push DbMigrator container
+      - name: Compute tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.name }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=dev-${{ github.sha }},enable=${{ github.ref == 'refs/heads/develop' }}
+            type=raw,value=dev-latest,enable=${{ github.ref == 'refs/heads/develop' }}
+            type=semver,pattern={{version}}
+            type=sha,prefix=sha-,format=short
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          target: ${{ matrix.target }}
+          push: true
+          # A single manifest per tag: the attestation manifest Buildx adds by
+          # default shows up in GHCR as an "unknown/unknown" platform and buys
+          # this template nothing.
+          provenance: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  # ── Deploy ──────────────────────────────────────────────────────────
+  # Optional by construction. The job is bound to a GitHub Environment
+  # (`staging` from develop, `production` from a v* tag — that is where the
+  # secrets, the reviewers and the deployment history live), and every step is
+  # gated on the Dokploy secrets being present, so a fork or a fresh scaffold of
+  # this template reports green with the deploy skipped instead of red.
+  #
+  # The job triggers a Dokploy deployment; it does not move ${IMAGE_TAG}.
+  # Staging pins IMAGE_TAG=dev-latest (pull_policy: always), so a redeploy picks
+  # up the image this run just pushed; production names the exact version in the
+  # stack's Environment tab as the deliberate act of releasing it.
+  deploy:
+    name: Deploy ${{ (github.ref == 'refs/heads/develop' && 'staging') || 'production' }}
+    needs: [publish-images]
+    if: |
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ (github.ref == 'refs/heads/develop' && 'staging') || 'production' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Check Dokploy configuration
+        id: cfg
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          DOKPLOY_COMPOSE_ID: ${{ secrets.DOKPLOY_COMPOSE_ID }}
         run: |
-          dotnet publish src/Host/Boilerplate.DbMigrator/Boilerplate.DbMigrator.csproj \
-            -c Release -r linux-x64 \
-            /t:PublishContainer \
-            -p:ContainerRegistry=ghcr.io \
-            -p:ContainerRepository=${{ github.repository_owner }}/boilerplate-db-migrator \
-            -p:ContainerImageTags='"${{ steps.version.outputs.version }};latest"'
+          if [ -n "$DOKPLOY_URL" ] && [ -n "$DOKPLOY_API_KEY" ] && [ -n "$DOKPLOY_COMPOSE_ID" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Dokploy is configured for this environment."
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Deploy skipped — set DOKPLOY_URL, DOKPLOY_API_KEY and DOKPLOY_COMPOSE_ID on this environment to enable it (docs/deploy-dokploy.md §6)."
+          fi
+
+      # The script polls the deployment it started and fails closed; `jq` is
+      # its hard dependency and ships on ubuntu-latest.
+      - name: Trigger Dokploy deployment
+        if: steps.cfg.outputs.configured == 'true'
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          DOKPLOY_COMPOSE_ID: ${{ secrets.DOKPLOY_COMPOSE_ID }}
+          DOKPLOY_DEPLOY_TITLE: ${{ github.workflow }} ${{ github.ref_name }}
+        run: |
+          command -v jq >/dev/null || { echo "::error::jq is required by dokploy-deploy.sh"; exit 1; }
+          bash deploy/dokploy/dokploy-deploy.sh --timeout 900 --interval 10
+
+      # The runtime image is chiseled, so it can carry no container healthcheck
+      # (ADR-0005): this probe from outside is the only proof the new revision
+      # actually serves traffic. /health/live first (the process answers), then
+      # /health/ready (its dependencies do). Both are anonymous — nothing in CI
+      # authenticates, and anything that ever needs to must sign in through the
+      # tenant-routed path /api/v1/tenants/{tenant}/auth/token.
+      - name: Probe health endpoints
+        if: steps.cfg.outputs.configured == 'true' && vars.API_BASE_URL != ''
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          set -euo pipefail
+          base="${API_BASE_URL%/}"
+          for path in /health/live /health/ready; do
+            ok=false
+            for attempt in $(seq 1 20); do
+              code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "${base}${path}" || echo 000)
+              if [ "$code" = 200 ]; then
+                echo "${path} → 200 (attempt ${attempt})"
+                ok=true
+                break
+              fi
+              echo "${path} → ${code}; retrying in 10s (attempt ${attempt}/20)"
+              sleep 10
+            done
+            if [ "$ok" != true ]; then
+              echo "::error::${base}${path} never returned 200 — the deployment is not serving."
+              exit 1
+            fi
+          done
+
+  # ── OpenAPI drift (issue #15) ───────────────────────────────────────
+  # The drift gate belongs in this workflow, next to the build that produces the
+  # document. Issue #15 owns it; when it lands, add it to `backend-ci` below so
+  # it becomes part of the single required check.
 
   # Single required status check. Always runs (even when the heavy jobs are
   # skipped on a client-only PR) so branch protection resolves. Fails only if a
