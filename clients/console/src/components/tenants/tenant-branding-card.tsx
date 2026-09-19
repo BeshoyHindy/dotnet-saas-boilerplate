@@ -16,9 +16,8 @@ import {
   resetTenantTheme,
   themeFingerprint,
   updateTenantTheme,
-  type BrandAssetsDto,
+  type TenantThemeDraft,
   type PaletteDto,
-  type TenantThemeDto,
 } from "@/api/tenants";
 import { ApiRequestError } from "@/lib/api-client";
 import { SystemPermissions } from "@/lib/permissions";
@@ -63,7 +62,7 @@ export function TenantBrandingCard({ tenantId }: { tenantId: string }) {
     refetchOnWindowFocus: true,
   });
 
-  const [draft, setDraft] = useState<TenantThemeDto | null>(null);
+  const [draft, setDraft] = useState<TenantThemeDraft | null>(null);
 
   // Seed draft state when the server payload arrives. We always replace the draft on a fresh
   // fetch so server-driven changes (another admin's edit, a reset) show up in the editor.
@@ -80,7 +79,7 @@ export function TenantBrandingCard({ tenantId }: { tenantId: string }) {
   }, [actingHere]);
 
   const saveMutation = useMutation({
-    mutationFn: (theme: TenantThemeDto) => updateTenantTheme(theme),
+    mutationFn: (theme: TenantThemeDraft) => updateTenantTheme(theme),
     onSuccess: () => {
       toast.success("Branding saved");
       void queryClient.invalidateQueries({ queryKey: themeQueryKey });
@@ -164,7 +163,7 @@ export function TenantBrandingCard({ tenantId }: { tenantId: string }) {
     setDraft((d) => (d ? { ...d, lightPalette: { ...d.lightPalette, ...next } } : d));
   const onDark = (next: Partial<PaletteDto>) =>
     setDraft((d) => (d ? { ...d, darkPalette: { ...d.darkPalette, ...next } } : d));
-  const onAssets = (next: Partial<BrandAssetsDto>) =>
+  const onAssets = (next: Partial<TenantThemeDraft["brandAssets"]>) =>
     setDraft((d) => (d ? { ...d, brandAssets: { ...d.brandAssets, ...next } } : d));
 
   const footer = (

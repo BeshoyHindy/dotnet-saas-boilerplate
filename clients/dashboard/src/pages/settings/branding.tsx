@@ -15,9 +15,8 @@ import {
   resetTenantTheme,
   themeFingerprint,
   updateTenantTheme,
-  type BrandAssetsDto,
+  type TenantThemeDraft,
   type PaletteDto,
-  type TenantThemeDto,
 } from "@/api/tenants";
 import { ApiRequestError } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
@@ -51,7 +50,7 @@ export function BrandingSettings() {
     refetchOnReconnect: false,
   });
 
-  const [draft, setDraft] = useState<TenantThemeDto | null>(null);
+  const [draft, setDraft] = useState<TenantThemeDraft | null>(null);
 
   // Seed the draft from the server payload — fires on initial load and after our
   // own save/reset invalidations (background refetches are disabled above, so
@@ -63,7 +62,7 @@ export function BrandingSettings() {
   }, [themeQuery.data]);
 
   const saveMutation = useMutation({
-    mutationFn: (theme: TenantThemeDto) => updateTenantTheme(theme),
+    mutationFn: (theme: TenantThemeDraft) => updateTenantTheme(theme),
     onSuccess: () => {
       toast.success("Branding saved");
       void queryClient.invalidateQueries({ queryKey: THEME_QUERY_KEY });
@@ -108,7 +107,7 @@ export function BrandingSettings() {
     setDraft((d) => (d ? { ...d, lightPalette: { ...d.lightPalette, ...next } } : d));
   const onDark = (next: Partial<PaletteDto>) =>
     setDraft((d) => (d ? { ...d, darkPalette: { ...d.darkPalette, ...next } } : d));
-  const onAssets = (next: Partial<BrandAssetsDto>) =>
+  const onAssets = (next: Partial<TenantThemeDraft["brandAssets"]>) =>
     setDraft((d) => (d ? { ...d, brandAssets: { ...d.brandAssets, ...next } } : d));
 
   const footer = (
