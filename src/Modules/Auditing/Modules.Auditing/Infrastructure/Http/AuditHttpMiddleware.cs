@@ -1,4 +1,3 @@
-using Boilerplate.BuildingBlocks.Shared.Auditing;
 using Boilerplate.Modules.Auditing.Contracts;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
