@@ -19,6 +19,17 @@ export const DEFAULT_PROFILE = {
 } as const;
 
 /**
+ * What a root operator holds. The tenant registry, the impersonation list and — root
+ * only — the cross-tenant token exchange behind "Enter tenant" (ADR-0002).
+ */
+export const OPERATOR_PERMISSIONS = [
+  "Permissions.Tenants.View",
+  "Permissions.Users.Impersonate",
+  "Permissions.Impersonation.View",
+  "Permissions.Platform.Users.Impersonate",
+] as const;
+
+/**
  * Mock every API call the authenticated AppShell fires on load so any
  * protected page can be visited in isolation without hanging on the
  * topbar's notification badge.
@@ -34,9 +45,12 @@ export async function installShellMocks(page: Page): Promise<void> {
   await mockJsonResponse(page, "**/api/v1/notifications**", []);
   await mockJsonResponse(page, "**/api/v1/notifications/unread-count**", 0);
 
-  // Defensive: profile + permissions (harmless if a page re-reads them).
+  // Defensive: profile + permissions (harmless if a page re-reads them). The default
+  // grant is the OPERATOR set: ProtectedRoute shows the "operators only" screen to a
+  // session without it (ADR-0008), so a shell with no permissions would render nothing
+  // any spec could assert on. A spec that wants a tenant user re-mocks this with [].
   await mockJsonResponse(page, "**/api/v1/identity/profile", DEFAULT_PROFILE);
-  await mockJsonResponse(page, "**/api/v1/identity/permissions", []);
+  await mockJsonResponse(page, "**/api/v1/identity/permissions", [...OPERATOR_PERMISSIONS]);
 
   // Tenant status drives the global expiry/grace banner mounted in the
   // AppShell. Default to a healthy, far-future tenant so the banner stays
@@ -53,17 +67,6 @@ export async function installShellMocks(page: Page): Promise<void> {
     graceEndsUtc: new Date(Date.now() + 372 * 24 * 60 * 60 * 1000).toISOString(),
   });
 }
-
-/**
- * What a root operator holds. The tenant registry, the impersonation list and — root
- * only — the cross-tenant token exchange behind "Enter tenant" (ADR-0002).
- */
-export const OPERATOR_PERMISSIONS = [
-  "Permissions.Tenants.View",
-  "Permissions.Users.Impersonate",
-  "Permissions.Impersonation.View",
-  "Permissions.Platform.Users.Impersonate",
-] as const;
 
 /** Build a Playwright-shaped paged response body. */
 export function paged<T>(items: T[], overrides: Partial<{ pageNumber: number; pageSize: number; totalCount: number; totalPages: number }> = {}) {

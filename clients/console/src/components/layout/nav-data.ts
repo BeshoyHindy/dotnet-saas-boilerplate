@@ -1,18 +1,15 @@
 import {
   Building2,
-  FolderOpen,
   HeartPulse,
   LayoutDashboard,
   ScrollText,
   Settings,
   ShieldCheck,
-  Trash2,
   UserCog,
   Users,
   UsersRound,
   Wifi,
 } from "lucide-react";
-import { ALL_TRASH_PERMISSIONS } from "@/lib/trash-permissions";
 import { IdentityPermissions, MultitenancyPermissions } from "@/lib/permissions";
 
 export type NavSpec = {
@@ -48,10 +45,6 @@ export type NavSection = {
 // Settings is account-scoped and lives at the very bottom.
 export const topNavTop: NavSpec[] = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
-  // Each gate mirrors the permission the page's primary list endpoint enforces
-  // server-side (Files → /files/mine). Same convention as trash-permissions.ts:
-  // if the endpoint's permission changes, mirror it.
-  { to: "/files", label: "My Files", icon: FolderOpen, perm: "Permissions.Files.Upload" },
 ];
 
 export const topNavBottom: NavSpec[] = [
@@ -104,10 +97,6 @@ export const sections: NavSection[] = [
       { to: "/system/health", label: "Health", icon: HeartPulse },
       { to: "/system/audits", label: "Audit trail", icon: ScrollText, perm: "Permissions.AuditTrails.View" },
       { to: "/system/sessions", label: "Sessions", icon: Wifi, perm: "Permissions.Sessions.ViewAll" },
-      // Trash fronts a set of tabs, each gated on a different resource's restore /
-      // view-trash permission. Show the entry if the user can reach any tab; the
-      // page hides the individual tabs they can't (see trash-permissions.ts).
-      { to: "/system/trash", label: "Trash", icon: Trash2, anyPerm: ALL_TRASH_PERMISSIONS },
     ],
   },
 ];

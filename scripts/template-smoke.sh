@@ -149,18 +149,30 @@ else
 fi
 
 if [ "$FRONTEND" = true ]; then
-  exists "clients"
+  # --frontend governs BOTH clients (ADR-0008); one without the other is a broken
+  # scaffold, so each is asserted by name here and in the compose stacks.
+  exists "clients/dashboard"
+  exists "clients/console"
   exists ".github/workflows/frontend.yml"
   exists ".agents/rules/frontend"
   exists "scripts/export-openapi.sh"
-  grep -q '^  console:' "$OUT/docker-compose.yml" || fail "docker-compose lost the console service"
+  for client in dashboard console; do
+    grep -q "^  ${client}:" "$OUT/docker-compose.yml" \
+      || fail "docker-compose lost the ${client} service"
+    grep -q "^  ${client}:" "$OUT/deploy/dokploy/app.compose.yml" \
+      || fail "the deploy stack lost the ${client} service"
+  done
 else
   not_exists "clients"
   not_exists ".github/workflows/frontend.yml"
   not_exists ".agents/rules/frontend"
   not_exists "scripts/export-openapi.sh"
-  ! grep -q '^  console:' "$OUT/docker-compose.yml" || fail "docker-compose still has a console service"
-  ! grep -q '^  console:' "$OUT/deploy/dokploy/app.compose.yml" || fail "the deploy stack still has a console service"
+  for client in dashboard console; do
+    ! grep -q "^  ${client}:" "$OUT/docker-compose.yml" \
+      || fail "docker-compose still has a ${client} service"
+    ! grep -q "^  ${client}:" "$OUT/deploy/dokploy/app.compose.yml" \
+      || fail "the deploy stack still has a ${client} service"
+  done
   ! grep -q 'AddJavaScriptApp' "$OUT/src/Host/$NAME.AppHost/AppHost.cs" 2>/dev/null \
     || fail "the AppHost still starts a client app"
 fi
@@ -212,8 +224,8 @@ if [ "$SKIP_NODE" = true ]; then
 fi
 
 # Every client app is discovered by glob, and its package manager by lockfile, so
-# nothing here names a client directory. Issue #14 replaces clients/admin +
-# clients/dashboard with a single pnpm clients/console and this loop is unchanged.
+# nothing here names a client directory — the loop was unchanged when the clients
+# went from two to one (issue #14) and back to two (ADR-0008).
 if [ "$FRONTEND" = true ]; then
   found_client=false
   for pkg in "$OUT"/clients/*/package.json; do

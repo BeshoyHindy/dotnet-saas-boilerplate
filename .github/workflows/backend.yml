@@ -90,6 +90,7 @@ jobs:
             images:
               - 'src/**'
               #if (frontend)
+              - 'clients/dashboard/**'
               - 'clients/console/**'
               #endif
               - 'global.json'
@@ -372,7 +373,12 @@ jobs:
             file: src/Host/Dockerfile
             target: migrator
           #if (frontend)
-          # The console SPA (ADR-0004).
+          # The two client SPAs (ADR-0008). Each builds from its own directory as the
+          # Docker context — they are independent pnpm projects, not workspace packages.
+          - image: boilerplate-dashboard
+            context: clients/dashboard
+            file: clients/dashboard/Dockerfile
+            target: ''
           - image: boilerplate-console
             context: clients/console
             file: clients/console/Dockerfile

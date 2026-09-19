@@ -63,8 +63,11 @@ services:
       CachingOptions__Redis: ${STACK_NAME}-valkey:6379
       CachingOptions__EnableSsl: "false"
       JwtOptions__SigningKey: ${JWT_SIGNING_KEY}
-      OriginOptions__OriginUrl: https://${CONSOLE_DOMAIN}
-      CorsOptions__AllowedOrigins__0: https://${CONSOLE_DOMAIN}
+      # Mailed links go to a tenant's users, so the origin the API writes into them is
+      # the DASHBOARD's. Both clients are in the CORS allow-list (ADR-0008).
+      OriginOptions__OriginUrl: https://${DASHBOARD_DOMAIN}
+      CorsOptions__AllowedOrigins__0: https://${DASHBOARD_DOMAIN}
+      CorsOptions__AllowedOrigins__1: https://${CONSOLE_DOMAIN}
       # Host allow-list. Must contain API_DOMAIN and must not contain "*", or the
       # host refuses to boot. It is also the Host that Traefik's healthcheck
       # sends (see the healthcheck.hostname label), so a mismatch shows up as a
@@ -138,10 +141,58 @@ services:
       - "traefik.http.services.${STACK_NAME}-api.loadbalancer.healthcheck.hostname=${API_DOMAIN}"
 
   #if (frontend)
-  # ── Console (React SPA served by nginx) ─────────────────────────────
+  # ── Dashboard (the tenant app: React SPA served by nginx) ───────────
   # Configured at container start: the entrypoint renders /config.json, the nginx
   # site and the Content-Security-Policy from these variables, so one image serves
-  # every environment (ADR-0004).
+  # every environment (ADR-0008).
+  dashboard:
+    image: ${IMAGE_REGISTRY}/${IMAGE_OWNER}/boilerplate-dashboard:${IMAGE_TAG}
+    pull_policy: always
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      # The origin nginx proxies /api and /health to — a server-side address, not a
+      # browser one. The browser only ever talks to DASHBOARD_DOMAIN, which is what lets
+      # the SameSite=Strict refresh cookie work with CORS credentials off (ADR-0002).
+      # It goes back out through Traefik so the Host header stays API_DOMAIN, which is
+      # what ALLOWED_HOSTS names.
+      APP_API_URL: https://${API_DOMAIN}
+      # Named in the Content-Security-Policy: the browser fetches presigned
+      # upload/download URLs straight from object storage.
+      APP_STORAGE_URL: https://${STORAGE_DOMAIN}
+      APP_DEFAULT_TENANT: ${APP_DEFAULT_TENANT}
+    # 8080: the image runs nginx unprivileged, so it cannot bind :80.
+    expose:
+      - "8080"
+    networks:
+      dokploy-network:
+        aliases:
+          - ${STACK_NAME}-dashboard
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=dokploy-network"
+      - "traefik.http.routers.${STACK_NAME}-dashboard-web.rule=Host(`${DASHBOARD_DOMAIN}`)"
+      - "traefik.http.routers.${STACK_NAME}-dashboard-web.entrypoints=web"
+      - "traefik.http.routers.${STACK_NAME}-dashboard-web.middlewares=${STACK_NAME}-dashboard-https"
+      - "traefik.http.routers.${STACK_NAME}-dashboard-web.service=${STACK_NAME}-dashboard"
+      - "traefik.http.routers.${STACK_NAME}-dashboard.rule=Host(`${DASHBOARD_DOMAIN}`)"
+      - "traefik.http.routers.${STACK_NAME}-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.${STACK_NAME}-dashboard.tls.certresolver=${TRAEFIK_CERT_RESOLVER}"
+      - "traefik.http.routers.${STACK_NAME}-dashboard.service=${STACK_NAME}-dashboard"
+      - "traefik.http.middlewares.${STACK_NAME}-dashboard-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.${STACK_NAME}-dashboard-https.redirectscheme.permanent=true"
+      - "traefik.http.services.${STACK_NAME}-dashboard.loadbalancer.server.port=8080"
+      - "traefik.http.services.${STACK_NAME}-dashboard.loadbalancer.passhostheader=true"
+      # /config.json only exists once the entrypoint has rendered it, so it is a
+      # real readiness signal for this image rather than a liveness one.
+      - "traefik.http.services.${STACK_NAME}-dashboard.loadbalancer.healthcheck.path=/config.json"
+      - "traefik.http.services.${STACK_NAME}-dashboard.loadbalancer.healthcheck.interval=10s"
+      - "traefik.http.services.${STACK_NAME}-dashboard.loadbalancer.healthcheck.timeout=5s"
+      - "traefik.http.services.${STACK_NAME}-dashboard.loadbalancer.healthcheck.hostname=${DASHBOARD_DOMAIN}"
+
+  # ── Console (the operator tool: same image shape, different app) ────
   console:
     image: ${IMAGE_REGISTRY}/${IMAGE_OWNER}/boilerplate-console:${IMAGE_TAG}
     pull_policy: always
@@ -159,7 +210,10 @@ services:
       # Named in the console's Content-Security-Policy: the browser fetches presigned
       # upload/download URLs straight from object storage.
       APP_STORAGE_URL: https://${STORAGE_DOMAIN}
+      # Operators live in the root tenant; the console's sign-in form has no tenant field.
       APP_DEFAULT_TENANT: ${APP_DEFAULT_TENANT}
+      # Only so a tenant user who lands here can be pointed at the app that is theirs.
+      APP_DASHBOARD_URL: https://${DASHBOARD_DOMAIN}
     # 8080: the console image runs nginx unprivileged, so it cannot bind :80.
     expose:
       - "8080"

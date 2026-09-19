@@ -42,9 +42,23 @@ var redisConnectionString = ReferenceExpression.Create(
     $"{redisEndpoint.Property(EndpointProperty.HostAndPort)}");
 
 // Object storage (MinIO, S3-compatible). CORS via MINIO_API_CORS_ALLOW_ORIGIN so browser
-// presigned PUTs from the console's dev origin reach it without proxying through the API.
+// presigned PUTs from a client's dev origin reach it without proxying through the API.
 const string MinioBucket = "boilerplate-uploads";
-const string ConsoleOrigin = "http://localhost:5173";
+
+//#if (frontend)
+// The two clients (ADR-0008): the dashboard is the app a tenant's users work in, the
+// console is the operator tool. Dev ports stay fixed — a client's origin is part of its
+// contract here (the Vite proxy, the SameSite=Strict refresh cookie, and the CORS entry
+// below all name it) — unlike the container ports above, which Aspire allocates.
+const string DashboardOrigin = "http://localhost:5173";
+const string ConsoleOrigin = "http://localhost:5174";
+// MinIO takes a comma-separated allow-list; both clients upload straight to it.
+const string ClientOrigins = $"{DashboardOrigin},{ConsoleOrigin}";
+//#else
+// No browser client in this scaffold, so nothing does a presigned upload from a page —
+// MinIO's own default allow-all is as good as an empty list and stays a valid value.
+const string ClientOrigins = "*";
+//#endif
 
 // Secrets are Aspire parameters, never literals in this file: the password is generated on first
 // run and persisted to this project's user-secrets, so it survives restarts without being committed.
@@ -71,7 +85,7 @@ var minio = builder.AddContainer("minio", "quay.io/minio/minio", "RELEASE.2025-0
     .WithHttpEndpoint(targetPort: 9001, name: "console")
     .WithEnvironment("MINIO_ROOT_USER", minioUser)
     .WithEnvironment("MINIO_ROOT_PASSWORD", minioPassword)
-    .WithEnvironment("MINIO_API_CORS_ALLOW_ORIGIN", ConsoleOrigin)
+    .WithEnvironment("MINIO_API_CORS_ALLOW_ORIGIN", ClientOrigins)
     .WithVolume($"{appPrefix}-minio-data", "/data")
     .WithLifetime(ContainerLifetime.Persistent);
 
@@ -165,7 +179,7 @@ var migrator = builder.AddProject<Projects.Boilerplate_DbMigrator>($"{appPrefix}
     .WithEnvironment("Seed__DemoPassword", seedDemoPassword)
     .WithArgs("apply", "--seed", "--demo");
 
-// API Service. Startup order is migrator → API → console: the migrator must have exited 0 before the
+// API Service. Startup order is migrator → API → clients: the migrator must have exited 0 before the
 // API boots, and the React apps below wait on the API.
 var api = builder.AddProject<Projects.Boilerplate_Api>($"{appPrefix}-api")
     .WithReference(postgres)
@@ -198,22 +212,39 @@ var api = builder.AddProject<Projects.Boilerplate_Api>($"{appPrefix}-api")
     .WithEnvironment("Storage__S3__PublicBaseUrl", ReferenceExpression.Create($"{minioApiEndpoint}/{MinioBucket}"))
 //#if (frontend)
     // Password-reset and email-confirmation links point at a client page, so the origin
-    // the API mails has to be the console's (issue #46), not the API's own.
-    .WithEnvironment("OriginOptions__OriginUrl", ConsoleOrigin)
+    // the API mails has to be a client's (issue #46), not the API's own — and it is the
+    // DASHBOARD's: those mails go to a tenant's users, who live there. An operator never
+    // receives one at the console (ADR-0008).
+    .WithEnvironment("OriginOptions__OriginUrl", DashboardOrigin)
 //#endif
     ;
 
 //#if (frontend)
-// The console (React + Vite): one client for tenant users and root operators alike
-// (ADR-0004). VITE_API_BASE_URL is the dev server's PROXY target, not the browser's API
-// base — the browser only ever talks to the console's own origin, which is what lets the
+// The two React clients (ADR-0008), each its own independent pnpm project and its own
+// image. VITE_API_BASE_URL is the dev server's PROXY target, not the browser's API base —
+// the browser only ever talks to its own client's origin, which is what lets the
 // SameSite=Strict refresh cookie work with CORS credentials off. The HTTPS endpoint is the
 // target because UseHttpsRedirection's 307 would otherwise strip the Authorization header.
-builder.AddJavaScriptApp($"{appPrefix}-console", "../../../clients/console", "dev")
+//
+// `isProxied: false` on a fixed port for both: the origin the browser sees has to be the
+// one the cookie, the CORS allow-list and the config above were written for.
+
+// The dashboard — what a tenant's own users sign in to.
+builder.AddJavaScriptApp($"{appPrefix}-dashboard", "../../../clients/dashboard", "dev")
     .WithPnpm()
     .WithReference(api)
     .WaitFor(api)
     .WithHttpEndpoint(port: 5173, targetPort: 5173, isProxied: false)
+    .WithExternalHttpEndpoints()
+    .WithEnvironment("VITE_API_BASE_URL", api.GetEndpoint("https"));
+
+// The console — the operator tool. Root operators only; a tenant user who signs in here
+// is told so (see clients/console/src/auth/operator-gate.tsx).
+builder.AddJavaScriptApp($"{appPrefix}-console", "../../../clients/console", "dev")
+    .WithPnpm()
+    .WithReference(api)
+    .WaitFor(api)
+    .WithHttpEndpoint(port: 5174, targetPort: 5174, isProxied: false)
     .WithExternalHttpEndpoints()
     .WithEnvironment("VITE_API_BASE_URL", api.GetEndpoint("https"));
 //#else

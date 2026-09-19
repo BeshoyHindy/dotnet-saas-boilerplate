@@ -10,8 +10,12 @@ set -eu
 # avatar/branding images. Empty means "no external storage origin", which is correct
 # for a deployment serving files through the API.
 : "${APP_STORAGE_URL:=}"
-# Tenant identifier the sign-in form pre-fills.
+# Tenant the console signs operators in to. Operators live in the root tenant, so this is
+# the only tenant this app ever names — there is no tenant field on its sign-in form.
 : "${APP_DEFAULT_TENANT:=root}"
+# Where the tenant app is deployed, used only to redirect a tenant user who signed in here
+# (ADR-0008). Empty = no link offered; nothing else depends on it.
+: "${APP_DASHBOARD_URL:=}"
 # DNS server nginx re-resolves the API host with on every request (see the site
 # template). 127.0.0.11 is Docker's embedded resolver, which serves compose service
 # names and overlay-network aliases — correct for `docker compose` and for the Dokploy
@@ -49,7 +53,7 @@ connect-src 'self'${APP_STORAGE_URL:+ ${APP_STORAGE_URL}}; \
 worker-src 'self' blob:; \
 manifest-src 'self'"
 
-export APP_API_URL APP_STORAGE_URL APP_DEFAULT_TENANT APP_RESOLVER APP_CSP
+export APP_API_URL APP_STORAGE_URL APP_DEFAULT_TENANT APP_DASHBOARD_URL APP_RESOLVER APP_CSP
 
 # Substitute ONLY our own variables: nginx configuration is full of $host, $uri and
 # friends that envsubst would otherwise blank out.
@@ -57,7 +61,7 @@ envsubst '${APP_API_URL} ${APP_RESOLVER}' \
   < /etc/nginx/default.conf.template > /etc/nginx/conf.d/default.conf
 envsubst '${APP_CSP}' \
   < /etc/nginx/security-headers.conf.template > /etc/nginx/security-headers.conf
-envsubst '${APP_DEFAULT_TENANT}' \
+envsubst '${APP_DEFAULT_TENANT} ${APP_DASHBOARD_URL}' \
   < /usr/share/nginx/html/config.json.template > /usr/share/nginx/html/config.json
 
 # Drop the template so it is never served.

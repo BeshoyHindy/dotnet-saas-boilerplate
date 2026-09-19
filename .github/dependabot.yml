@@ -32,16 +32,17 @@ updates:
 
 #if (frontend || sandcastle)
   # ── Node ────────────────────────────────────────────────────────────
-  # Two independent pnpm lockfiles: the repo root (the sandcastle orchestrator)
-  # and clients/console, which is deliberately NOT a workspace package — its
-  # container image is built from that directory as the Docker context, so its
-  # manifest and lockfile have to live beside it. One PR covers both.
+  # Independent pnpm lockfiles: the repo root (the sandcastle orchestrator) and one
+  # per client — neither client is a workspace package (ADR-0008), because each
+  # container image is built from its own directory as the Docker context, so its
+  # manifest and lockfile have to live beside it. One PR covers them all.
   - package-ecosystem: npm
     directories:
       #if (sandcastle)
       - '/'
       #endif
       #if (frontend)
+      - '/clients/dashboard'
       - '/clients/console'
       #endif
     target-branch: develop
@@ -76,13 +77,14 @@ updates:
         patterns: ['*']
 
   # ── Container base images ───────────────────────────────────────────
-  # The .NET hosts (src/Host/Dockerfile, both targets) and the console's nginx
+  # The .NET hosts (src/Host/Dockerfile, both targets) and each client's nginx
   # image. A bump here runs the migrator smoke and nothing else — backend.yml's
   # `docker` path filter keeps the .NET suites out of it.
   - package-ecosystem: docker
     directories:
       - '/src/Host'
       #if (frontend)
+      - '/clients/dashboard'
       - '/clients/console'
       #endif
     target-branch: develop

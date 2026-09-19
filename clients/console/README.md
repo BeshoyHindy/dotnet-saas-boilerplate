@@ -9,7 +9,7 @@ app behind the same permissions the API enforces.
 ```bash
 corepack enable                 # once: activates the pinned pnpm
 pnpm install --frozen-lockfile
-pnpm dev                        # → http://localhost:5173
+pnpm dev                        # → http://localhost:5174
 ```
 
 The dev server proxies `/api` and `/health` to `VITE_API_BASE_URL` (default
@@ -58,7 +58,7 @@ password) are disabled — the API refuses them from an actor anyway.
 
 | Script | What it does |
 |---|---|
-| `pnpm dev` | Vite dev server on port 5173 |
+| `pnpm dev` | Vite dev server on port 5174 |
 | `pnpm build` | `tsc -b && vite build` — the typecheck + bundle gate |
 | `pnpm test` | Vitest units (jsdom), beside the source |
 | `pnpm test:e2e` | Playwright smoke suite: sign-in, user CRUD, operator enters a tenant |

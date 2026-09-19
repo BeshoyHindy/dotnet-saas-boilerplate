@@ -1,4 +1,5 @@
 {
   "apiBase": "",
-  "defaultTenant": "${APP_DEFAULT_TENANT}"
+  "defaultTenant": "${APP_DEFAULT_TENANT}",
+  "dashboardUrl": "${APP_DASHBOARD_URL}"
 }

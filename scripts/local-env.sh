@@ -55,10 +55,14 @@ echo
 echo "  docker compose up --build"
 echo "  curl -fsS http://localhost:8080/health/ready"
 echo
-echo "Sign in to the console at http://localhost:8081 as admin@root.com;"
-echo "the password is SEED_ADMIN_PASSWORD in $ENV_FILE."
+echo "Two clients (ADR-0008):"
+echo "  dashboard (tenant app)  http://localhost:8081"
+echo "  console (operators)     http://localhost:8082"
 echo
-echo "Demo accounts come up too: admin@acme.com / manager@acme.com / alice@acme.com (tenant"
-echo "'acme') and admin@globex.com / dave@globex.com (tenant 'globex'). They all share"
-echo "SEED_DEMO_PASSWORD in $ENV_FILE. Drop '--demo' from the migrator command in"
-echo "docker-compose.yml to stop seeding them."
+echo "admin@root.com is the operator — sign in to the CONSOLE with it; its password is"
+echo "SEED_ADMIN_PASSWORD in $ENV_FILE."
+echo
+echo "Demo accounts come up too, and belong in the DASHBOARD: admin@acme.com /"
+echo "manager@acme.com / alice@acme.com (tenant 'acme') and admin@globex.com /"
+echo "dave@globex.com (tenant 'globex'). They all share SEED_DEMO_PASSWORD in $ENV_FILE."
+echo "Drop '--demo' from the migrator command in docker-compose.yml to stop seeding them."

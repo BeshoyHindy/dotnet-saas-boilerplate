@@ -7,7 +7,7 @@ import { defineConfig, devices } from "@playwright/test";
  * and an operator entering a tenant — the three journeys that must not break silently.
  * Everything below page level belongs in the Vitest units next to the source.
  *
- * Tests run against a Vite dev server on port 5173 with API calls intercepted via
+ * Tests run against a Vite dev server on port 5174 with API calls intercepted via
  * `page.route()`, so no backend, no database and no seeding are involved.
  *
  * Usage:
@@ -25,7 +25,7 @@ export default defineConfig({
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
 
   use: {
-    baseURL: "http://localhost:5173",
+    baseURL: "http://localhost:5174",
     trace: "on-first-retry",
     actionTimeout: 10_000,
     navigationTimeout: 15_000,
@@ -42,7 +42,7 @@ export default defineConfig({
   // re-run picks up an already-running dev server (faster local iteration).
   webServer: {
     command: "pnpm dev",
-    url: "http://localhost:5173",
+    url: "http://localhost:5174",
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
     stdout: "ignore",
