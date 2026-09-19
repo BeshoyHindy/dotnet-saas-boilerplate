@@ -1,3 +1,4 @@
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
 using Boilerplate.Modules.Identity.Contracts.DTOs;
 using Boilerplate.Modules.Identity.Contracts.v1.TwoFactor;
 using Mediator;
@@ -19,6 +20,8 @@ public static class EnrollTwoFactorEndpoint
             .WithSummary("Begin TOTP enrollment")
             .WithDescription("Generates (or rotates) the current user's authenticator shared secret and returns it plus an otpauth:// URI for QR rendering. 2FA is NOT enabled until the caller confirms with /2fa/verify.")
             .RequireAuthorization()
+            // Self-service: enrolls the caller's own authenticator.
+            .RequireAuthenticatedOnly()
             .Produces<TwoFactorEnrollmentResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized);
     }

@@ -1,3 +1,4 @@
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
 using Boilerplate.Modules.Identity.Contracts.DTOs;
 using Boilerplate.Modules.Identity.Contracts.v1.Impersonation.EndImpersonation;
 using Mediator;
@@ -25,6 +26,9 @@ public static class EndImpersonationEndpoint
             .WithName("EndImpersonation")
             .WithSummary("End user impersonation")
             .WithDescription("Returns a fresh access + refresh token for the original actor based on the act_sub/act_tenant claims embedded in the impersonation token. Callable by any authenticated impersonation session.")
+            // Stepping *out* of impersonation must stay reachable by the impersonated principal, which
+            // holds the target user's (possibly permissionless) grants — the act_sub claim is the gate.
+            .RequireAuthenticatedOnly()
             .Produces<TokenResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status400BadRequest);

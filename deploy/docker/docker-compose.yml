@@ -138,8 +138,6 @@ services:
       Storage__S3__Bucket: boilerplate
       Storage__S3__ForcePathStyle: "true"
       AllowedHosts: "*"
-      HangfireOptions__UserName: ${HANGFIRE_USERNAME:?HANGFIRE_USERNAME is required}
-      HangfireOptions__Password: ${HANGFIRE_PASSWORD:?HANGFIRE_PASSWORD is required}
       CorsOptions__AllowedOrigins__0: ${APP_ADMIN_URL:?APP_ADMIN_URL is required}
       CorsOptions__AllowedOrigins__1: ${APP_DASHBOARD_URL:?APP_DASHBOARD_URL is required}
       OpenTelemetryOptions__Exporter__Otlp__Endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}

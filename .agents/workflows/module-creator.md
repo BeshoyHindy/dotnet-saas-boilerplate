@@ -10,7 +10,7 @@ A new module has its own domain entities and is a distinct bounded context. If i
 an existing domain → use `feature-scaffolder` instead.
 
 ## Sequence (each step → its skill)
-1. **Scaffold the module** — follow **`add-module`**: copy an existing module's two `.csproj` files; `[assembly: AppModule(typeof({X}Module), order)]` (assembly-level); `IModule` with `AddHeroDbContext<{X}DbContext>()`, `PermissionConstants.Register({X}Permissions.All)`, a version-set endpoint group, and the eventing trio if it publishes/handles events; `{X}DbContext : BaseDbContext` with `base.OnModelCreating` **last**.
+1. **Scaffold the module** — follow **`add-module`**: copy an existing module's two `.csproj` files; `[assembly: AppModule(typeof({X}Module), order)]` (assembly-level); `IModule` with `AddHeroDbContext<{X}DbContext>()`, `services.AddPermissions({X}Permissions.All)`, a version-set endpoint group, and the eventing trio if it publishes/handles events; `{X}DbContext : BaseDbContext` with `base.OnModelCreating` **last**.
 2. **First entity** — follow **`add-entity`**.
 3. **First feature** — follow **`add-feature`** (and `add-react-page` if it has UI).
 4. **Migration** — follow **`create-migration`** with `--context {X}DbContext --output-dir {X}`; add the `{X}/` folder in the Migrations project.

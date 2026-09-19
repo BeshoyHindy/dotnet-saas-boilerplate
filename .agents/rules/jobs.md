@@ -27,7 +27,7 @@ Examples in the tree: `PurgeOrphanedFiles`/`PurgeDeletedFiles` (Files), `AuditRe
 
 ## Dashboard & config
 
-`/jobs` (default), behind `HangfireOptions.UserName`/`Password` basic auth — both `[Required]`, password `[MinLength(12)]`, so **startup fails in non-dev if unset**.
+`/jobs` (`HangfireOptions.Route`), mapped as a routed endpoint after `UseAuthentication`/`UseAuthorization` and gated by `.RequirePermission(SystemPermissions.Hangfire.View)` — a root-only operator permission. There is no dashboard credential: anonymous → 401, signed in without the permission → 403. Hangfire's own `DashboardOptions.Authorization` is empty on purpose, so ASP.NET Core authorization is the single gate. Authentication is bearer-only (no cookie), so plain browser navigation gets 401; the request must carry an `Authorization: Bearer` header.
 
 ## Gotchas
 

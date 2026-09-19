@@ -25,6 +25,8 @@ public static class ChangePasswordEndpoint
         .WithSummary("Change password")
         .WithDescription("Change the current user's password.")
         .RequireAuthorization()
+        // Self-service: changes the caller's own password after re-confirming the current one.
+        .RequireAuthenticatedOnly()
         .Produces(StatusCodes.Status200OK)
         .Produces(StatusCodes.Status401Unauthorized)
         .Produces(StatusCodes.Status400BadRequest);

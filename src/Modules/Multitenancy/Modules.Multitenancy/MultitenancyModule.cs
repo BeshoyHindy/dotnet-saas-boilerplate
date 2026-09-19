@@ -48,7 +48,7 @@ public sealed class MultitenancyModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        Boilerplate.BuildingBlocks.Shared.Constants.PermissionConstants.Register(
+        builder.Services.AddPermissions(
             Boilerplate.Modules.Multitenancy.Contracts.Authorization.MultitenancyPermissions.All);
 
         builder.Services.Configure<TenantValidityOptions>(

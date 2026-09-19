@@ -35,7 +35,7 @@ public sealed class {Name}Module : IModule
     public void ConfigureServices(IHostApplicationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        PermissionConstants.Register({Name}Permissions.All);
+        builder.Services.AddPermissions({Name}Permissions.All);
         builder.Services.AddHeroDbContext<{Name}DbContext>();
         builder.Services.AddScoped<IDbInitializer, {Name}DbInitializer>();
 
@@ -67,7 +67,7 @@ public sealed class {Name}Module : IModule
 
 ## Step 2 — Permissions (Contracts/Authorization)
 
-`{Name}Permissions` with nested resource classes and an `All` collection registered via `PermissionConstants.Register({Name}Permissions.All)`. Mirror the shape of `FilesPermissions`.
+`{Name}Permissions` with nested resource classes and an `All` collection contributed via `services.AddPermissions({Name}Permissions.All)`. Mirror the shape of `FilesPermissions`.
 
 ## Step 3 — DbContext (extends `BaseDbContext`)
 
@@ -129,7 +129,7 @@ dotnet test src/Boilerplate.slnx
 
 - [ ] Two projects (copied csproj), added to `.slnx`, referenced from Api + DbMigrator (+ Migrations)
 - [ ] `[assembly: AppModule(typeof({Name}Module), order)]` (assembly-level, positional)
-- [ ] `IModule`: `AddHeroDbContext<T>()`, `PermissionConstants.Register`, version-set group, eventing trio if needed
+- [ ] `IModule`: `AddHeroDbContext<T>()`, `services.AddPermissions(...)`, version-set group, eventing trio if needed
 - [ ] `{Name}DbContext : BaseDbContext`, 4-arg ctor, `base.OnModelCreating` last
 - [ ] `{Name}Permissions` in Contracts/Authorization
 - [ ] Migrations folder + initial migration (`--context {Name}DbContext`)

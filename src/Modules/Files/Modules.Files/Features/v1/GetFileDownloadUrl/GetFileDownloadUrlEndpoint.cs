@@ -1,3 +1,5 @@
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.Modules.Files.Contracts.Authorization;
 using Boilerplate.Modules.Files.Contracts.v1.Queries;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
@@ -15,5 +17,8 @@ public static class GetFileDownloadUrlEndpoint
             .WithName("GetFileDownloadUrl")
             .WithSummary("Mint a short-lived presigned download URL")
             .WithDescription("Default disposition is attachment (click-to-save). Pass ?inline=true to get an inline disposition for browser preview (PDF viewer, image render, etc.).")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            // Same module-level grant as the list endpoints; per-asset access is enforced by
+            // IFileAccessPolicy when the URL is minted.
+            .RequirePermission(FilesPermissions.Upload);
 }

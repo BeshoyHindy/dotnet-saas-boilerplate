@@ -104,9 +104,6 @@ var api = builder.AddProject<Projects.Boilerplate_Api>($"{appPrefix}-api")
     .WithEnvironment("DatabaseOptions__MigrationsAssembly", "Boilerplate.Migrations.PostgreSQL")
     .WithEnvironment("CachingOptions__Redis", redisConnectionString)
     .WithEnvironment("CachingOptions__EnableSsl", "false")
-    // Hangfire dashboard (/jobs) creds — [Required], Password [MinLength(12)], ValidateOnStart; API won't boot without them. Dev-only, mirrors appsettings.Development.json.
-    .WithEnvironment("HangfireOptions__UserName", "admin")
-    .WithEnvironment("HangfireOptions__Password", "Password123!")
     // SMTP via Ethereal (https://ethereal.email) — fake catch-all inbox for local dev (nothing delivered); mirrors appsettings.Development.json. Safe to commit: throwaway test creds.
     .WithEnvironment("MailOptions__UseSendGrid", "false")
     .WithEnvironment("MailOptions__From", "nicole.lueilwitz0@ethereal.email")

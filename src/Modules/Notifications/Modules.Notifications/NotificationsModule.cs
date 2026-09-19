@@ -30,7 +30,7 @@ public sealed class NotificationsModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        PermissionConstants.Register(NotificationPermissions.All);
+        builder.Services.AddPermissions(NotificationPermissions.All);
 
         builder.Services.AddHeroDbContext<NotificationsDbContext>();
         builder.Services.AddScoped<IDbInitializer, NotificationsDbInitializer>();

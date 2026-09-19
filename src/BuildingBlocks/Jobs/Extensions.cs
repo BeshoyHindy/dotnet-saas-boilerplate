@@ -1,9 +1,12 @@
 ﻿using Boilerplate.BuildingBlocks.Core.Exceptions;
 using Boilerplate.BuildingBlocks.Jobs.Services;
+using Boilerplate.BuildingBlocks.Shared.Constants;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
 using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -60,23 +63,32 @@ public static class Extensions
     }
 
 
-    public static IApplicationBuilder UseHeroJobDashboard(this IApplicationBuilder app, IConfiguration config)
+    /// <summary>
+    /// Mounts the Hangfire dashboard as a routed endpoint gated by
+    /// <see cref="SystemPermissions.Hangfire.View"/>. Must be called after
+    /// <c>UseAuthentication()</c>/<c>UseAuthorization()</c> so the platform's own authentication and
+    /// permission policy are the gate — there is no separate dashboard credential.
+    /// </summary>
+    public static IEndpointRouteBuilder MapHeroJobDashboard(this IEndpointRouteBuilder endpoints, IConfiguration config)
     {
-        ArgumentNullException.ThrowIfNull(app);
+        ArgumentNullException.ThrowIfNull(endpoints);
         ArgumentNullException.ThrowIfNull(config);
 
         var hangfireOptions = config.GetSection(nameof(HangfireOptions)).Get<HangfireOptions>() ?? new HangfireOptions();
-        var dashboardOptions = new DashboardOptions();
-        dashboardOptions.AppPath = "/";
-        dashboardOptions.Authorization = new[]
+
+        var dashboardOptions = new DashboardOptions
         {
-           new HangfireCustomBasicAuthenticationFilter
-           {
-                User = hangfireOptions.UserName!,
-                Pass = hangfireOptions.Password!
-           }
+            AppPath = "/",
+
+            // Deliberately empty. Hangfire's default filter chain is LocalRequestsOnly, which would
+            // reject every remote operator the permission policy just allowed; ASP.NET Core
+            // authorization is the single gate.
+            Authorization = [],
         };
 
-        return app.UseHangfireDashboard(hangfireOptions.Route, dashboardOptions);
+        endpoints.MapHangfireDashboard(hangfireOptions.Route, dashboardOptions)
+            .RequirePermission(SystemPermissions.Hangfire.View);
+
+        return endpoints;
     }
 }

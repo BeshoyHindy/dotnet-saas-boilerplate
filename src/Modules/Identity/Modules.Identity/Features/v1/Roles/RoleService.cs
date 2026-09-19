@@ -18,7 +18,8 @@ public sealed class RoleService(RoleManager<AppRole> roleManager,
     IdentityDbContext context,
     IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor,
     ICurrentUser currentUser,
-    IUserPermissionService userPermissionService) : IRoleService
+    IUserPermissionService userPermissionService,
+    IPermissionRegistry permissionRegistry) : IRoleService
 {
     // Invalidate every user whose effective permissions may have shifted from a role mutation:
     // direct holders (AspNetUserRoles) and group-derived holders (members of groups carrying this role).
@@ -199,7 +200,7 @@ public sealed class RoleService(RoleManager<AppRole> roleManager,
 
         // Strip every permission flagged IsRoot in the registry. (A prior prefix check on "Permissions.Root."
         // was a no-op — no root perm uses that prefix — letting a tenant admin grant themselves root perms.)
-        var rootOnly = PermissionConstants.Root.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+        var rootOnly = permissionRegistry.Root.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
         permissions.RemoveAll(rootOnly.Contains);
     }
 

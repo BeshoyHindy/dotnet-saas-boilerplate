@@ -73,7 +73,11 @@ public static class Extensions
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        app.MapOpenApi(openApiPath);
+        // Explicitly anonymous: the permission policy is also the fallback policy and fails closed,
+        // so the document and its viewer must state their intent like any other endpoint. This matches
+        // how they already behave (PathAwareAuthorizationHandler lets /openapi and /scalar through).
+        // Both are mapped only when OpenApiOptions:Enabled is true — off by default in production.
+        app.MapOpenApi(openApiPath).AllowAnonymous();
 
         app.MapScalarApiReference(options =>
         {
@@ -85,6 +89,6 @@ public static class Extensions
                 .HideModels()
                 .WithOpenApiRoutePattern(openApiPath)
                 .AddPreferredSecuritySchemes("Bearer");
-        });
+        }).AllowAnonymous();
     }
 }

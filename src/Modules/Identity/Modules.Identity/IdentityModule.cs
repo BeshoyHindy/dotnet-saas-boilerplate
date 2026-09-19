@@ -2,6 +2,7 @@
 using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.BuildingBlocks.Eventing;
 using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Constants;
 using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
 using Boilerplate.BuildingBlocks.Storage;
 using Boilerplate.BuildingBlocks.Storage.Local;
@@ -83,10 +84,8 @@ public class IdentityModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        Boilerplate.BuildingBlocks.Shared.Constants.PermissionConstants.Register(
-            Boilerplate.Modules.Identity.Contracts.Authorization.IdentityPermissions.All);
-
         var services = builder.Services;
+        services.AddPermissions(Boilerplate.Modules.Identity.Contracts.Authorization.IdentityPermissions.All);
         services.AddScoped<RolePermissionSyncer>();
         services.AddHostedService<RolePermissionSyncHostedService>();
         services.AddSingleton<IAuthorizationMiddlewareResultHandler, PathAwareAuthorizationHandler>();

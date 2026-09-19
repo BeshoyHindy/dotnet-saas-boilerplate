@@ -1,4 +1,5 @@
 using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
 using Boilerplate.BuildingBlocks.Shared.Identity.Claims;
 using Boilerplate.Modules.Identity.Contracts.DTOs;
 using Boilerplate.Modules.Identity.Contracts.v1.Users.GetUserProfile;
@@ -27,6 +28,8 @@ public static class GetUserProfileEndpoint
         .WithSummary("Get current user profile")
         .WithDescription("Retrieve the authenticated user's profile from the access token.")
         .RequireAuthorization()
+        // Self-service: returns the caller's own profile, resolved from their token.
+        .RequireAuthenticatedOnly()
         .Produces<UserDto>(StatusCodes.Status200OK)
         .Produces(StatusCodes.Status401Unauthorized);
     }

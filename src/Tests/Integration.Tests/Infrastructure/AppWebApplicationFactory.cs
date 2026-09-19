@@ -132,8 +132,6 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
                 ["Serilog:WriteTo:0:Args:restrictedToMinimumLevel"] = "Warning",
                 ["Serilog:WriteTo:1:Name"] = "",
                 ["MailOptions:UseSendGrid"] = "false",
-                ["HangfireOptions:Username"] = "admin",
-                ["HangfireOptions:Password"] = "integration-test-hangfire-pwd",
                 ["HangfireOptions:Route"] = "/jobs",
                 ["RateLimitingOptions:Enabled"] = "false",
                 ["PasswordPolicy:EnforcePasswordExpiry"] = "false",

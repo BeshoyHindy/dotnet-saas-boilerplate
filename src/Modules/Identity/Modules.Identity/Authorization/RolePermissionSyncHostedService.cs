@@ -9,7 +9,7 @@ namespace Boilerplate.Modules.Identity.Authorization;
 
 /// <summary>
 /// Runs once on host startup: iterates every tenant and adds any permission claims that
-/// have been registered via <see cref="Boilerplate.BuildingBlocks.Shared.Constants.PermissionConstants"/>
+/// have been registered via <see cref="Boilerplate.BuildingBlocks.Shared.Constants.IPermissionRegistry"/>
 /// but are missing from the role claims table for that tenant. Idempotent and lightweight —
 /// only writes when there's something new, so it's safe to run unconditionally.
 /// </summary>

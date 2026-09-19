@@ -1,4 +1,5 @@
 using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
 using Boilerplate.BuildingBlocks.Shared.Identity.Claims;
 using Boilerplate.Modules.Identity.Contracts.v1.Users.UpdateUser;
 using Mediator;
@@ -31,6 +32,8 @@ public static class UpdateUserEndpoint
         .WithName("UpdateUserProfile")
         .WithSummary("Update user profile")
         .RequireAuthorization()
+        // Self-service: the handler forces the target id to the caller's own.
+        .RequireAuthenticatedOnly()
         .WithDescription("Update profile details for the authenticated user. Any signed-in user may edit their own profile; no admin permission required.")
         .Produces(StatusCodes.Status200OK)
         .Produces(StatusCodes.Status401Unauthorized)

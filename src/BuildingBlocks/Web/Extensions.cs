@@ -37,7 +37,7 @@ public static class Extensions
         var options = new AppPlatformOptions();
         configure?.Invoke(options);
 
-        PermissionConstants.Register(SystemPermissions.All);
+        builder.Services.AddPermissions(SystemPermissions.All);
 
         builder.Services.AddScoped<CurrentUserMiddleware>();
 
@@ -151,7 +151,6 @@ public static class Extensions
             app.UseStaticFiles();
         }
 
-        app.UseHeroJobDashboard(app.Configuration);
         app.UseRouting();
 
         if (openApiEnabled)
@@ -175,6 +174,10 @@ public static class Extensions
 
         // Always expose health endpoints
         app.MapHeroHealthEndpoints();
+
+        // Mapped here (not as pre-routing middleware) so the dashboard runs behind UseAuthentication
+        // and UseAuthorization and is gated by SystemPermissions.Hangfire.View like any other endpoint.
+        app.MapHeroJobDashboard(app.Configuration);
 
         app.UseMiddleware<CurrentUserMiddleware>();
         return app;
