@@ -29,13 +29,11 @@ export type SearchUsersParams = {
   isActive?: boolean;
   emailConfirmed?: boolean;
   roleId?: string;
-  /**
-   * Target tenant for the impersonation picker. Currently inert: since ADR-0002
-   * the tenant comes from the caller's token alone, so the search runs inside the
-   * operator's own tenant until the operator token-exchange endpoint lands.
-   */
-  tenantId?: string;
 };
+
+// There is no `tenantId` filter, by design: the search runs inside the tenant the caller's token
+// names (ADR-0002). To list another tenant's users, enter that tenant first — the exchanged token
+// scopes the search for you (see the impersonation picker).
 
 export type RegisterUserInput = {
   firstName: string;

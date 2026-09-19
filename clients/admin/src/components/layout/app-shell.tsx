@@ -7,6 +7,7 @@ import {
   MobileNavRoot,
 } from "@/components/layout/mobile-nav";
 import { InactivityGuard } from "@/components/auth/inactivity-guard";
+import { ActingBanner } from "@/components/layout/acting-banner";
 
 /**
  * AppShell — three-area layout: sidebar / topbar / main content.
@@ -17,9 +18,9 @@ import { InactivityGuard } from "@/components/auth/inactivity-guard";
  *     opens it on screens below `md`.
  *   - Suspense boundary in main catches lazy-loaded route chunks.
  *
- * Note: admin does not yet have an ImpersonationBanner — the admin app is
- * the operator surface so it doesn't impersonate itself. If that changes,
- * add a banner component here that reads from admin's AuthContext.
+ * ActingBanner sits directly under the topbar: since #9 the admin app can hold a second,
+ * in-memory credential — an exchanged token acting inside another tenant — and the operator has
+ * to see that from every page, not just the one they started it on.
  */
 export function AppShell() {
   return (
@@ -37,6 +38,7 @@ export function AppShell() {
           <Sidebar />
           <div className="flex min-w-0 flex-1 flex-col">
             <Topbar />
+            <ActingBanner />
             <main
               id="main-content"
               tabIndex={-1}

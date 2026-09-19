@@ -1,10 +1,13 @@
-import { createContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { tokenStore } from "@/auth/token-store";
+import { actingStore, type ActingSession } from "@/auth/acting-store";
 import { decodeJwt, isTokenExpired, type JwtClaims } from "@/auth/jwt";
 import { issueToken, revokeSession } from "@/auth/api";
 import { refreshAccessToken } from "@/lib/api-client";
 import { getMyPermissions } from "@/api/users";
+import { endActingSession, exchangeOperatorToken } from "@/api/operator";
 
 export type AuthUser = {
   id: string;
@@ -36,6 +39,22 @@ export type AuthContextValue = {
   /** Re-fetch the permission set for the signed-in user. Call after a role
    *  assignment changes for the current user. */
   refreshPermissions: () => Promise<void>;
+
+  /**
+   * The tenant the operator is currently acting inside, or null. The operator's own session
+   * keeps running underneath — `user` above is still them — and the acting token lives in
+   * memory only (see acting-store).
+   */
+  acting: ActingSession | null;
+  /** Exchange the operator's token for one that acts inside `tenantId`. */
+  enterTenant: (input: {
+    tenantId: string;
+    tenantName?: string;
+    reason: string;
+    durationMinutes?: number;
+  }) => Promise<ActingSession>;
+  /** Leave the tenant: end the grant server-side (best effort) and drop the acting token. */
+  exitTenant: () => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -190,8 +209,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     }
 
+    actingStore.clear();
     tokenStore.clear();
     queryClient.clear();
+  }, [queryClient]);
+
+  // ── Acting layer (operator token exchange, ADR-0002) ──────────────────
+  const acting = useSyncExternalStore(actingStore.subscribe, actingStore.get);
+
+  // An acting session can end without the operator asking (grant revoked, token expired). The
+  // api client drops it and leaves a notice; surface that rather than silently switching
+  // identity under the operator's feet.
+  useEffect(() =>
+    actingStore.subscribe(() => {
+      const notice = actingStore.consumeNotice();
+      if (notice) {
+        toast.warning("Left the tenant", { description: notice });
+        void queryClient.invalidateQueries();
+      }
+    }), [queryClient]);
+
+  const enterTenant = useCallback(
+    async (input: { tenantId: string; tenantName?: string; reason: string; durationMinutes?: number }) => {
+      const exchanged = await exchangeOperatorToken({
+        targetTenantId: input.tenantId,
+        reason: input.reason,
+        durationMinutes: input.durationMinutes,
+      });
+
+      const session: ActingSession = {
+        accessToken: exchanged.accessToken,
+        tenantId: exchanged.targetTenantId,
+        tenantName: input.tenantName,
+        userId: exchanged.targetUserId,
+        userName: exchanged.targetUserName ?? undefined,
+        expiresAt: exchanged.accessTokenExpiresAt,
+        jti: exchanged.jti,
+        grantId: exchanged.grantId,
+      };
+      actingStore.start(session);
+      // Everything cached was fetched as the operator, in the operator's tenant.
+      queryClient.clear();
+      return session;
+    },
+    [queryClient],
+  );
+
+  const exitTenant = useCallback(async () => {
+    try {
+      // Best effort: ends the grant, so the exchanged token dies immediately instead of
+      // lingering until expiry. Failing that, it expires on its own shortly.
+      await endActingSession();
+    } catch {
+      /* ignore — the local drop below is what the operator actually asked for */
+    } finally {
+      actingStore.clear();
+      queryClient.clear();
+    }
   }, [queryClient]);
 
   const refreshPermissions = useCallback(async () => {
@@ -212,8 +286,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       refreshPermissions,
+      acting,
+      enterTenant,
+      exitTenant,
     }),
-    [user, isInitializing, permissionsHydrated, login, logout, refreshPermissions],
+    [user, isInitializing, permissionsHydrated, login, logout, refreshPermissions, acting, enterTenant, exitTenant],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   CircleDashed,
   ClipboardList,
+  DoorOpen,
   Info,
   KeyRound,
   Loader2,
@@ -23,10 +24,11 @@ import { useAuth } from "@/auth/use-auth";
 import { ImpersonateDialog } from "@/components/impersonation/impersonate-dialog";
 import { ActiveGrantsCard } from "@/components/impersonation/active-grants-card";
 import { TenantBrandingCard } from "@/components/tenants/tenant-branding-card";
+import { EnterTenantDialog } from "@/components/tenants/enter-tenant-dialog";
 import { RenewTenantDialog } from "@/components/tenants/renew-tenant-dialog";
 import { AdjustValidityDialog } from "@/components/tenants/adjust-validity-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { IdentityPermissions, MultitenancyPermissions } from "@/lib/permissions";
+import { IdentityPermissions, MultitenancyPermissions, SystemPermissions } from "@/lib/permissions";
 import {
   changeTenantActivation,
   getTenantProvisioningStatus,
@@ -50,13 +52,18 @@ export function TenantDetailPage() {
   const { id = "" } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, acting } = useAuth();
   const [impersonateOpen, setImpersonateOpen] = useState(false);
+  const [enterOpen, setEnterOpen] = useState(false);
   const [renewOpen, setRenewOpen] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [activationConfirmOpen, setActivationConfirmOpen] = useState(false);
   const permissions = currentUser?.permissions ?? [];
   const canImpersonate = permissions.includes(IdentityPermissions.Users.Impersonate);
+  // The exchange is gated by the root-only cross-tenant permission, which is the same catalog
+  // entry the impersonation button uses (Platform.Users.Impersonate is its root-scoped twin).
+  const canEnterTenant = permissions.includes(SystemPermissions.Platform.CrossTenantImpersonate);
+  const actingHere = acting?.tenantId === id;
   // Renew + adjust validity are root-operator subscription actions.
   const canManageSubscription = permissions.includes(
     MultitenancyPermissions.Tenants.UpgradeSubscription,
@@ -181,6 +188,21 @@ export function TenantDetailPage() {
 
               {/* Right: action buttons */}
               <div className="flex shrink-0 flex-wrap items-center gap-2">
+                {/* Entering the tenant is the operator's way *in* (ADR-0002 token exchange).
+                    Everything tenant-scoped on this page — branding, this tenant's users —
+                    becomes reachable while acting, and the banner keeps that state visible. */}
+                {canEnterTenant && tenant.isActive && !actingHere && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setEnterOpen(true)}
+                    className="shrink-0"
+                    title="Act inside this tenant with a short-lived, audited token"
+                    data-testid="enter-tenant"
+                  >
+                    <DoorOpen className="mr-1.5 h-3.5 w-3.5" />
+                    Enter tenant
+                  </Button>
+                )}
                 {canImpersonate && tenant.isActive && (
                   <Button
                     variant="signal"
@@ -235,6 +257,13 @@ export function TenantDetailPage() {
           <ImpersonateDialog
             open={impersonateOpen}
             onOpenChange={setImpersonateOpen}
+            tenantId={tenant.id}
+            tenantName={tenant.name}
+          />
+
+          <EnterTenantDialog
+            open={enterOpen}
+            onOpenChange={setEnterOpen}
             tenantId={tenant.id}
             tenantName={tenant.name}
           />

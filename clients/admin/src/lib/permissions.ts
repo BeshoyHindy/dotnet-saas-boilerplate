@@ -56,6 +56,17 @@ export const MultitenancyPermissions = Object.freeze({
   },
 } as const);
 
+/**
+ * Platform-scoped permissions — held only by the root tenant's Admin role (IsRoot in the server
+ * catalog). `CrossTenantImpersonate` gates the operator token exchange: entering another tenant
+ * with a short-lived, audited token (ADR-0002).
+ */
+export const SystemPermissions = Object.freeze({
+  Platform: {
+    CrossTenantImpersonate: "Permissions.Platform.Users.Impersonate",
+  },
+} as const);
+
 export const AuditingPermissions = Object.freeze({
   AuditTrails: {
     View: "Permissions.AuditTrails.View",
@@ -149,6 +160,11 @@ export const PERMISSION_CATALOG: readonly PermissionGroup[] = [
     entries: [
       { name: IdentityPermissions.Impersonation.View, description: "View impersonation grants" },
       { name: IdentityPermissions.Impersonation.Revoke, description: "Revoke active impersonation grants" },
+      {
+        name: SystemPermissions.Platform.CrossTenantImpersonate,
+        description: "Enter another tenant through an audited token exchange",
+        root: true,
+      },
     ],
   },
 ];

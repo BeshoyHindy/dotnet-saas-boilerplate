@@ -1,5 +1,6 @@
 import { env } from "@/env";
 import { tokenStore } from "@/auth/token-store";
+import { actingStore } from "@/auth/acting-store";
 
 export type ApiError = {
   status: number;
@@ -45,7 +46,16 @@ export function describeError(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-type RequestInitEx = RequestInit & { skipAuth?: boolean; timeoutMs?: number };
+type RequestInitEx = RequestInit & {
+  skipAuth?: boolean;
+  timeoutMs?: number;
+  /**
+   * Force the operator's OWN token even while acting inside another tenant. The token exchange
+   * needs it (an exchanged token carries act_sub and may not be exchanged again), as does
+   * anything that must stay attributed to the operator's own tenant.
+   */
+  asOperator?: boolean;
+};
 
 /**
  * The anonymous, tenant-scoped auth routes. The tenant travels in the path because
@@ -117,7 +127,7 @@ export async function apiFetch<T = unknown>(
   path: string,
   init: RequestInitEx = {},
 ): Promise<T> {
-  const { skipAuth, headers, timeoutMs, signal, ...rest } = init;
+  const { skipAuth, headers, timeoutMs, signal, asOperator, ...rest } = init;
   const effectiveTimeout = timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   const mergedHeaders = new Headers(headers);
@@ -125,8 +135,13 @@ export async function apiFetch<T = unknown>(
     mergedHeaders.set("Content-Type", "application/json");
   }
 
+  // While acting inside another tenant, the exchanged token is the credential for everything —
+  // its `tenant` claim is the only thing that scopes the request (ADR-0002). Opt out with
+  // `asOperator` when the call must run as the operator themselves.
+  const acting = asOperator ? null : actingStore.get();
+
   if (!skipAuth) {
-    const accessToken = tokenStore.getAccessToken();
+    const accessToken = acting?.accessToken ?? tokenStore.getAccessToken();
     if (accessToken) {
       mergedHeaders.set("Authorization", `Bearer ${accessToken}`);
     } else {
@@ -149,7 +164,17 @@ export async function apiFetch<T = unknown>(
     signal: mergeSignal(signal, effectiveTimeout),
   });
 
-  if (response.status === 401 && !skipAuth && tokenStore.getRefreshToken()) {
+  // A 401 on the ACTING token is not a session problem: the exchanged token has no refresh
+  // counterpart, so there is nothing to renew. It means the grant was revoked or the short
+  // lifetime ran out. Drop back to the operator's own (still valid) session and say so — never
+  // burn their refresh token trying to rescue a credential that cannot be rescued.
+  if (response.status === 401 && acting !== null) {
+    actingStore.drop(
+      `Your session inside ${acting.tenantName ?? acting.tenantId} ended (revoked or expired). You are back in your own account.`,
+    );
+  }
+
+  if (response.status === 401 && !skipAuth && acting === null && tokenStore.getRefreshToken()) {
     refreshPromise ??= refreshAccessToken().finally(() => {
       refreshPromise = null;
     });

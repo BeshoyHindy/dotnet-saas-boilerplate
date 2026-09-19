@@ -362,15 +362,23 @@ export type ImpersonationResponse = {
 };
 
 /**
- * Access-only: a refresh token is a session row in the *actor's* tenant, and the End call runs
- * inside the impersonated tenant's context, so the server cannot mint one here (ADR-0002). The
- * operator's own session was never revoked, so the client keeps its stashed refresh token.
+ * No token comes back (#9): the actor's own session was never taken away, so there is nothing to
+ * restore server-side — the client drops the impersonation token and reinstates its stash, which
+ * still holds a refresh token. End's only job is ending the grant, which kills the impersonation
+ * token on its next request.
  */
 export type EndImpersonationResponse = {
-  accessToken: string;
-  accessTokenExpiresAt: string;
+  actorUserId: string;
+  actorTenantId: string;
+  impersonatedUserId: string;
+  impersonatedTenantId: string;
+  endedAtUtc: string;
 };
 
+/**
+ * Same-tenant only since #9: an admin impersonating one of their own tenant's users. Crossing a
+ * tenant boundary is the operator token exchange, driven from the admin app.
+ */
 export async function startImpersonation(input: {
   targetUserId: string;
   targetTenantId: string;

@@ -30,6 +30,8 @@ export const ADMIN_PERMS = [
   "Permissions.Sessions.RevokeAll",
   "Permissions.Impersonation.View",
   "Permissions.Impersonation.Revoke",
+  // Root-only: gates the operator token exchange behind "Enter tenant".
+  "Permissions.Platform.Users.Impersonate",
   "Permissions.AuditTrails.View",
   "Permissions.AuditTrails.ViewCrossTenant",
 ] as const;
