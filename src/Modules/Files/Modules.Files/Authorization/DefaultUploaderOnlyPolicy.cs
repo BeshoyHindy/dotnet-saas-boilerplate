@@ -4,7 +4,7 @@ namespace Boilerplate.Modules.Files.Authorization;
 
 /// <summary>
 /// Default policy used for the built-in <c>MyFiles</c> and <c>User</c> owner types.
-/// - Attach: any authenticated user (currentUserId is non-empty).
+/// - Attach: an authenticated user, to their own owner id or to none at all.
 /// - Read: Public files visible to anyone in tenant; Private files only to the uploader.
 /// - Delete: only the uploader.
 ///
@@ -22,8 +22,28 @@ internal sealed class DefaultUploaderOnlyPolicy : IFileAccessPolicy
 
     public string OwnerType { get; }
 
+    /// <summary>
+    /// These owner types are self-owned: <c>MyFiles</c> carries no owner at all and <c>User</c>
+    /// carries the uploader's own id, which is what the shipped profile screen sends. An owner id
+    /// that is somebody else's was accepted before and produced a row only its uploader could ever
+    /// read — and, given another tenant's user id, a file in this tenant referencing a subject of
+    /// that one, created by a caller who cannot see whether that subject exists.
+    ///
+    /// The comparison is flat: any id that is not the caller's own is refused, whichever tenant it
+    /// came from, so the refusal answers nothing about who exists. A module whose files belong to
+    /// something other than their uploader registers its own <see cref="IFileAccessPolicy"/>.
+    /// </summary>
     public Task<bool> CanAttachAsync(Guid? ownerId, string currentUserId, CancellationToken cancellationToken)
-        => Task.FromResult(!string.IsNullOrEmpty(currentUserId));
+    {
+        if (string.IsNullOrEmpty(currentUserId))
+        {
+            return Task.FromResult(false);
+        }
+
+        return Task.FromResult(
+            ownerId is null
+            || (Guid.TryParse(currentUserId, out var caller) && ownerId.Value == caller));
+    }
 
     public Task<bool> CanReadAsync(FileAccessContext context, string currentUserId, CancellationToken cancellationToken)
     {

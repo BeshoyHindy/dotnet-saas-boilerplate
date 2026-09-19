@@ -12,10 +12,17 @@ Read before touching entities, DbContexts, migrations, or query filters.
 ## Tenant isolation (default-ON)
 
 - `BaseDbContext` auto-applies a tenant query filter to every entity. **Isolation is on by default.**
-- Opt out **only** via `IGlobalEntity` (e.g. `ImpersonationGrant`, `Outbox`/`InboxMessage`).
+- Opt out **only** via `IGlobalEntity`. The whole current list is `ImpersonationGrant` (the audit record of an operator acting as someone; revoking one is the kill switch for an impersonation in flight, so it must be reachable from outside the impersonated tenant), `OutboxMessage` and `InboxMessage` (the dispatcher drains them across tenants and each row carries its own `TenantId` for the scope it re-enters). Adding a fourth is a design decision — `Architecture.Tests/TenantIsolationTests` builds every `BaseDbContext` model and fails on an entity that is neither filtered nor marked.
 - A subclass DbContext that overrides `OnModelCreating` **must call `base.OnModelCreating(modelBuilder)` LAST**, or the auto-applied filters are lost.
-- Cross-tenant reads use `IgnoreQueryFilters()` **plus an explicit re-filter** — never rely on the absence of the filter.
-- **Query-filter naming:** SoftDelete filter is *named*; the tenant filter stays *anonymous* (Finbuckle owns it). Don't rename the tenant filter.
+- **Query-filter naming:** SoftDelete filter is *named* (`QueryFilters.SoftDelete`); the tenant filter stays *anonymous* (Finbuckle owns it). Don't rename the tenant filter.
+
+### `IgnoreQueryFilters()` is allow-listed
+
+`Architecture.Tests/IgnoreQueryFiltersAllowListTests` pins **which files may call it and how many times**, plus a second, shorter list of files allowed to use the **bare** form. An unlisted file, a changed count, or an entry whose file is gone all fail.
+
+- **Want deleted rows?** Lift the named filter only: `IgnoreQueryFilters([QueryFilters.SoftDelete])`. The tenant filter stays in force, so the query cannot reach another tenant's rows. This is almost always what a trash view, a restore handler or a purge job actually wants.
+- **The bare `IgnoreQueryFilters()` strips the tenant filter too.** Reserve it for genuinely cross-tenant work — a root operator resolving a subject in another tenant — and **re-pin the tenant with an explicit predicate in the same query**. Never rely on the absence of the filter.
+- Adding an entry means editing the allow-list *and* saying why at the call site.
 
 ## AsNoTracking — and when NOT to
 

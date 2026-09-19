@@ -3,6 +3,7 @@ using Boilerplate.BuildingBlocks.Jobs;
 using Boilerplate.BuildingBlocks.Mailing;
 using Boilerplate.BuildingBlocks.Persistence;
 using Boilerplate.BuildingBlocks.Shared.Constants;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.BuildingBlocks.Web.Auth;
 using Boilerplate.BuildingBlocks.Web.Cors;
 using Boilerplate.BuildingBlocks.Web.Exceptions;
@@ -223,7 +224,10 @@ public static class Extensions
         // unaffected: it has its own route, never falls through to this one, and keeps hitting
         // FallbackPolicy (401) exactly as before — deny-by-default for mapped endpoints is unchanged.
         app.MapFallback(() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Not Found"))
-            .AllowAnonymous();
+            .AllowAnonymous()
+            .ExemptFromTenantSweep(
+                "The catch-all's {*path} is whatever the caller typed at a route that does not exist; " +
+                "it reaches no data and always answers 404, which is the sweep's own success condition.");
 
         // Mapped here (not as pre-routing middleware) so the dashboard runs behind UseAuthentication
         // and UseAuthorization and is gated by SystemPermissions.Hangfire.View like any other endpoint.

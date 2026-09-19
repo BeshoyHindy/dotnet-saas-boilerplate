@@ -48,6 +48,15 @@ public sealed class DetailedTestExceptionHandler : IExceptionHandler
                 problemDetails.Extensions["errors"] = customEx.ErrorMessages;
             }
         }
+        else if (exception is KeyNotFoundException)
+        {
+            // Mirror GlobalExceptionHandler. Without this the test host answered 500 where production
+            // answers 404, which would make the cross-tenant sweep read a correct "no such row" as a
+            // server error — the one status the sweep must be able to trust.
+            statusCode = StatusCodes.Status404NotFound;
+            problemDetails.Title = "Not Found";
+            problemDetails.Detail = exception.Message;
+        }
         else if (exception is BadHttpRequestException badRequest)
         {
             // Mirror GlobalExceptionHandler: malformed requests (missing required

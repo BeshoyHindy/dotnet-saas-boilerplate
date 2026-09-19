@@ -21,6 +21,15 @@ Don't stream large files through the API. The pattern (see Files module):
 
 Local/dev without MinIO uses `LocalPresignTokenStore` (in-memory one-shot tokens) — issued but never consumed by any endpoint, so the Files upload flow effectively needs the `s3` provider.
 
+## Tenant scoping is the caller's job — for now
+
+`IStorageService` does **not** prefix object keys with the ambient tenant, and the two key spaces differ:
+
+- Files-module keys are `tenants/{tenantId}/…`, built by `StorageKeyBuilder` — by caller convention, not by the block.
+- `UploadAsync<T>` (avatars, tenant theme assets) writes `uploads/{typeName}/{guid}_{file}` with **no tenant segment at all**. Different tenants' avatars share one flat key space; only the GUID makes a key unguessable.
+
+Nothing refuses a read or a presign for a key outside the caller's tenant. Until the block enforces it — tracked as its own ticket on the map, *Prefix storage object keys with the tenant inside the Storage building block* (#78) — **put the tenant in the key yourself** for anything new, and never pass a caller-supplied string straight to `DownloadAsync`/`GenerateDownloadUrlAsync`: look the key up from a tenant-filtered row first, as the Files module does.
+
 ## `BuildPublicUrl` vs `GenerateDownloadUrlAsync`
 
 `BuildPublicUrl` is only valid for keys the bucket policy actually publishes — i.e. `uploads/` (avatars, tenant theme), which is what `UploadAsync` writes. **Never** use it for the Files module's `tenants/…` keys: that prefix has no anonymous grant (contract-tested in `deploy/dokploy/tests/`), so the link 403s, and granting it would publish every private file. Public Files assets go through `GenerateDownloadUrlAsync` with a short TTL instead (`PublicFileUrlFactory`, see `modules/files.md`).

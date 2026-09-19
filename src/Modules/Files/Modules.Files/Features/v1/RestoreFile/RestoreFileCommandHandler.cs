@@ -1,4 +1,5 @@
 using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Persistence;
 using Boilerplate.Modules.Files.Contracts.v1.Commands;
 using Boilerplate.Modules.Files.Data;
 using Mediator;
@@ -13,9 +14,11 @@ public sealed class RestoreFileCommandHandler(FilesDbContext db)
     {
         ArgumentNullException.ThrowIfNull(cmd);
 
-        // IgnoreQueryFilters because the SoftDelete filter would otherwise hide the row.
+        // Lift ONLY the named SoftDelete filter — the row we are restoring is deleted by definition.
+        // A bare IgnoreQueryFilters() would also strip Finbuckle's anonymous tenant filter, letting
+        // tenant A restore (and thereafter read) tenant B's file by id (ADR-0002, persistence rule).
         var f = await db.FileAssets
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters([QueryFilters.SoftDelete])
             .FirstOrDefaultAsync(x => x.Id == cmd.FileAssetId, cancellationToken)
             .ConfigureAwait(false)
             ?? throw new NotFoundException("file not found");
