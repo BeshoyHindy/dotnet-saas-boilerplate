@@ -1,7 +1,9 @@
+using Boilerplate.BuildingBlocks.Shared.Constants;
 using Boilerplate.Modules.Auditing.Contracts;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics;
+using System.Security.Claims;
 
 namespace Boilerplate.Modules.Auditing;
 
@@ -153,6 +155,12 @@ public sealed class AuditHttpMiddleware
             .WithSource(AuditSourceResolver.Resolve(ctx))
             .WithTenant(_publisher.CurrentScope?.TenantId)
             .WithUser(_publisher.CurrentScope?.UserId, _publisher.CurrentScope?.UserName)
+            // An acting token (impersonation / operator token exchange) carries the *target* user as
+            // its subject, so without act_* this row would credit that tenant's own user for what an
+            // operator did. Absent on ordinary sessions — nothing is written then.
+            .WithActor(
+                ctx.User?.FindFirstValue(ClaimConstants.ActorSubject),
+                ctx.User?.FindFirstValue(ClaimConstants.ActorTenant))
             .WithCorrelation(_publisher.CurrentScope?.CorrelationId ?? ctx.TraceIdentifier)
             .WithRequestId(_publisher.CurrentScope?.RequestId ?? ctx.TraceIdentifier);
 
