@@ -1,27 +1,35 @@
 name: Backend CI
 
-# Backend pipeline. Only does real work when backend code changed (src/**,
-# central build props, global.json, coverage settings, or this file). A
-# client-only PR still triggers the workflow but every heavy job is skipped —
-# the always-running "Backend CI" gate job reports green so required status
-# checks resolve. SDK is pinned via global.json (GA, no preview channel).
+# Backend pipeline. Only does real work when backend code changed, and the
+# three path filters below say what "changed" means for each price bracket: the
+# .NET suites, the migrator image smoke, the GHCR publish. A client-only or
+# docs-only PR still triggers the workflow but every heavy job is skipped — the
+# always-running "Backend CI" gate job reports green so required status checks
+# resolve. SDK is pinned via global.json (GA, no preview channel).
 #
-# Gitflow (ADR-0007): `develop` integrates, so PRs and pushes to BOTH `develop`
-# and `main` (plus the release/hotfix branches that feed `main`) run the gates.
-# A push to `develop` publishes the staging images and deploys staging; a `v*`
-# tag on `main` publishes the versioned images and deploys production.
+# Gitflow (ADR-0007): `develop` integrates, so the gates run on PRs into
+# `develop`, `main` and the release/hotfix branches that feed `main`.
+#
+# WORK IS SPLIT BY EVENT so no commit is ever tested twice. The pull request
+# runs the gates; the push that merges it runs only the image publish and the
+# deploy. The merge commit carries the content the PR just proved, and the
+# image build compiles the code again anyway, so re-running the Testcontainers
+# suite after every merge bought nothing and cost the most expensive job in the
+# repo. `workflow_dispatch` re-runs everything by hand when that is wrong.
 
 on:
   push:
-    branches: [develop, main, 'release/**', 'hotfix/**']
+    branches: [develop]
     tags: ['v*']
   pull_request:
     branches: [develop, main, 'release/**', 'hotfix/**']
   workflow_dispatch:
 
+# Superseded runs are cancelled on pushes too, not just on PRs: two merges in a
+# minute only need the images of the second one.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 # Minimal at the top level; the publish job adds `packages: write` for itself.
 permissions:
@@ -39,27 +47,48 @@ jobs:
     name: Detect changes
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # Skipped for tag pushes: a release tag must publish whatever it points at,
+    # and a path filter is the wrong thing to ask about a tag.
+    if: github.event_name != 'push' || github.ref == 'refs/heads/develop'
     outputs:
-      # On any non-PR event (push to develop/main, tags, manual run) run the
-      # full pipeline. On PRs, run only when backend-relevant paths changed —
-      # a docs-only PR must not pay for the Testcontainers suite.
-      backend: ${{ github.event_name != 'pull_request' || steps.filter.outputs.backend == 'true' }}
+      # Three questions, because they have different answers and very
+      # different prices. On a push, dorny compares event.before..after, so a
+      # docs-only merge answers "no" to all three. A manual run answers "yes"
+      # to everything — that is what makes workflow_dispatch the escape hatch
+      # when a filter or a force-push decided wrongly.
+      backend: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.backend == 'true' }} # the .NET test suites
+      docker: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.docker == 'true' }} # the migrator image smoke
+      images: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.images == 'true' }} # publishing to GHCR
     steps:
       - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v3
         id: filter
+        # Nothing to diff against on a manual run, and nothing to ask.
+        if: github.event_name != 'workflow_dispatch'
         with:
           filters: |
             backend:
               - 'src/**'
+              - '!src/Host/Dockerfile'
               - 'global.json'
               - 'coverage.runsettings'
+              - '.github/workflows/backend.yml'
+            docker:
+              - 'src/Host/Dockerfile'
+              - 'src/Host/**'
+              - 'global.json'
+              - '.github/workflows/backend.yml'
+            images:
+              - 'src/**'
+              - 'clients/admin/**'
+              - 'global.json'
               - '.github/workflows/backend.yml'
 
   test:
     name: Unit Tests
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    # Pull requests (and manual runs) only — see the event split at the top.
+    if: github.event_name != 'push' && needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -128,7 +157,7 @@ jobs:
   integration-test:
     name: Integration Tests
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    if: github.event_name != 'push' && needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     # Testcontainers requires Docker — ubuntu-latest has it pre-installed.
     # This is the slowest gate in the repo (PostgreSQL + Redis + MinIO per
@@ -184,7 +213,9 @@ jobs:
   migrator-smoke:
     name: DbMigrator Container Smoke
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    # Keyed on the `docker` filter, not `backend`: a base-image bump to
+    # src/Host/Dockerfile needs exactly this job and none of the .NET suites.
+    if: github.event_name != 'push' && needs.changes.outputs.docker == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Catches Dockerfile regressions and DI-graph breakage in the migrator. Builds the
@@ -236,7 +267,7 @@ jobs:
   coverage:
     name: Coverage Gate
     needs: [changes, test, integration-test]
-    if: needs.changes.outputs.backend == 'true'
+    if: github.event_name != 'push' && needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Merges the coverage already collected by the test + integration-test jobs
@@ -300,14 +331,19 @@ jobs:
   # (issue #20) proves the package still scaffolds.
   publish-images:
     name: Publish Image (${{ matrix.image }})
-    needs: [changes, test, integration-test, migrator-smoke, coverage]
+    needs: [changes]
     # develop  → staging images: dev-<sha> + dev-latest
     # v* tag   → production images: the version, e.g. 1.4.0. Never a bare
     #            `latest` — production must name a fixed version or a redeploy
     #            a week later is a different build (ADR-0005).
+    #
+    # `!cancelled()` because `changes` is deliberately skipped on tag pushes: a
+    # tag publishes whatever it points at, unconditionally. On develop the
+    # filter decides, so a docs-only merge publishes nothing.
     if: |
-      github.event_name == 'push' &&
-      (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/v'))
+      !cancelled() && github.event_name != 'pull_request' &&
+      (startsWith(github.ref, 'refs/tags/v') ||
+       (github.ref == 'refs/heads/develop' && needs.changes.outputs.images == 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -397,10 +433,13 @@ jobs:
   deploy:
     name: Deploy ${{ (github.ref == 'refs/heads/develop' && 'staging') || 'production' }}
     needs: [publish-images]
+    # Never from a pull request, and only from a ref that maps to an
+    # environment — a manual run on a feature branch must not reach production.
     if: |
-      github.event_name == 'push' &&
+      github.event_name != 'pull_request' &&
       (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
+    # Long enough for the script's own 900 s budget plus the health probe.
     timeout-minutes: 30
     environment: ${{ (github.ref == 'refs/heads/develop' && 'staging') || 'production' }}
     steps:
@@ -471,14 +510,17 @@ jobs:
   # document. Issue #15 owns it; when it lands, add it to `backend-ci` below so
   # it becomes part of the single required check.
 
-  # Single required status check. Always runs (even when the heavy jobs are
-  # skipped on a client-only PR) so branch protection resolves. Fails only if a
-  # job it depends on actually failed or was cancelled — skipped is fine.
+  # Single required status check. Always runs on a pull request (even when the
+  # heavy jobs are skipped on a client-only PR) so branch protection resolves.
+  # Fails only if a job it depends on actually failed or was cancelled —
+  # skipped is fine. It does not run on pushes: branch protection asks about
+  # pull requests, and a job that reports "nothing to report" is still a runner.
   backend-ci:
     name: Backend CI
     needs: [changes, test, integration-test, migrator-smoke, coverage]
-    if: always()
+    if: always() && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Fail if a required backend job failed
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}

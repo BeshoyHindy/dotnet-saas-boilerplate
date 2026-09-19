@@ -8,17 +8,18 @@ name: Secret Scan
 # installs the (MIT) release binary itself and runs `gitleaks dir .`, exactly the
 # command contributors run locally. No marketplace action, no licence key, and
 # the version is one pinned line.
+#
+# Pull requests only: the push that merges a PR carries the same tree the gate
+# just scanned.
 
 on:
-  push:
-    branches: [develop, main, 'release/**', 'hotfix/**']
   pull_request:
     branches: [develop, main, 'release/**', 'hotfix/**']
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

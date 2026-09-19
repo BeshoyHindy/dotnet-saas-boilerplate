@@ -7,16 +7,17 @@ name: Sandcastle CI
 # and the always-running "Sandcastle CI" gate reports green so required status
 # checks resolve.
 
+# Pull requests only: this workflow produces a verdict, not an artifact, so
+# re-running it on the push that merges the PR would re-prove the same commit.
+
 on:
-  push:
-    branches: [develop, main, 'release/**', 'hotfix/**']
   pull_request:
     branches: [develop, main, 'release/**', 'hotfix/**']
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -28,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      sandcastle: ${{ github.event_name != 'pull_request' || steps.filter.outputs.sandcastle == 'true' }}
+      sandcastle: ${{ steps.filter.outputs.sandcastle }}
     steps:
       - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v3
@@ -97,6 +98,7 @@ jobs:
     needs: [changes, test]
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Fail if a required job failed
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}

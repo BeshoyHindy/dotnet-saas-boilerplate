@@ -8,14 +8,10 @@ name: Deploy Contract
 #
 # Path-filtered at the trigger rather than through a skip job: nothing else in
 # the repo can break these files, so a run that would only report "skipped" is
-# a run not worth queueing.
+# a run not worth queueing. Pull requests only, like every other verdict-only
+# workflow here.
 
 on:
-  push:
-    branches: [develop, main, 'release/**', 'hotfix/**']
-    paths:
-      - 'deploy/**'
-      - '.github/workflows/deploy-contract.yml'
   pull_request:
     branches: [develop, main, 'release/**', 'hotfix/**']
     paths:
@@ -25,7 +21,7 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

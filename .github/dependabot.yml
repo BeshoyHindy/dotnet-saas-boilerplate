@@ -1,12 +1,17 @@
 # Dependabot (issue #19).
 #
-# Every update targets `develop`, not the default-in-name-only `main`: under
-# gitflow (ADR-0007) `develop` is where changes integrate, and a dependency PR
-# against `main` would bypass every gate this repo runs.
+# Tuned for Actions minutes, not for freshness. Four ecosystems, one grouped
+# pull request each, once a month, at most two open at a time — a dependency
+# update costs a full CI run, so the unit of work is "this month's updates",
+# not "this package". `directories:` (plural) collapses every lockfile of an
+# ecosystem into that single PR.
 #
-# Updates are grouped per ecosystem so a week of patches is one PR to review and
-# one CI run to pay for, with majors left ungrouped because they are the ones
-# that need reading. Security updates ignore grouping and open immediately.
+# Everything targets `develop`, not the default-in-name-only `main`: under
+# gitflow (ADR-0007) `develop` integrates, and a PR against `main` would bypass
+# every gate this repo runs.
+#
+# Security updates ignore all of this and open immediately, which is the point:
+# they are the ones worth a run.
 version: 2
 
 updates:
@@ -17,59 +22,32 @@ updates:
     directory: '/'
     target-branch: develop
     schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 2
     commit-message:
       prefix: 'chore(deps)'
     groups:
-      nuget-minor-and-patch:
-        update-types: [minor, patch]
+      nuget:
+        patterns: ['*']
 
   # ── Node ────────────────────────────────────────────────────────────
   # Three independent lockfiles: pnpm at the root (the sandcastle orchestrator
   # only — the clients are deliberately not workspace packages) and one npm
-  # lockfile per React client. If Dependabot ever cannot read the pnpm lockfile
-  # version this repo pins, that entry reports the error in the repository's
-  # Dependabot logs; the other ecosystems keep working.
+  # lockfile per React client. One PR covers all three.
   - package-ecosystem: npm
-    directory: '/'
+    directories:
+      - '/'
+      - '/clients/admin'
+      - '/clients/dashboard'
     target-branch: develop
     schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 2
     commit-message:
       prefix: 'chore(deps)'
     groups:
-      npm-root-minor-and-patch:
-        update-types: [minor, patch]
-
-  - package-ecosystem: npm
-    directory: '/clients/admin'
-    target-branch: develop
-    schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: 'chore(deps)'
-    groups:
-      admin-minor-and-patch:
-        update-types: [minor, patch]
-
-  - package-ecosystem: npm
-    directory: '/clients/dashboard'
-    target-branch: develop
-    schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 5
-    commit-message:
-      prefix: 'chore(deps)'
-    groups:
-      dashboard-minor-and-patch:
-        update-types: [minor, patch]
+      npm:
+        patterns: ['*']
 
   # ── GitHub Actions ──────────────────────────────────────────────────
   # The workflows pin major tags; this keeps those majors from going stale and
@@ -78,41 +56,29 @@ updates:
     directory: '/'
     target-branch: develop
     schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 2
     commit-message:
       prefix: 'chore(deps)'
     groups:
-      actions-all:
+      actions:
         patterns: ['*']
 
   # ── Container base images ───────────────────────────────────────────
-  # One entry per directory that holds a Dockerfile: the .NET hosts
-  # (src/Host/Dockerfile, both targets) and each client's nginx image.
+  # The .NET hosts (src/Host/Dockerfile, both targets) and each client's nginx
+  # image. A bump here runs the migrator smoke and nothing else — backend.yml's
+  # `docker` path filter keeps the .NET suites out of it.
   - package-ecosystem: docker
-    directory: '/src/Host'
+    directories:
+      - '/src/Host'
+      - '/clients/admin'
+      - '/clients/dashboard'
     target-branch: develop
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
+    open-pull-requests-limit: 2
     commit-message:
       prefix: 'chore(deps)'
-
-  - package-ecosystem: docker
-    directory: '/clients/admin'
-    target-branch: develop
-    schedule:
-      interval: weekly
-      day: monday
-    commit-message:
-      prefix: 'chore(deps)'
-
-  - package-ecosystem: docker
-    directory: '/clients/dashboard'
-    target-branch: develop
-    schedule:
-      interval: weekly
-      day: monday
-    commit-message:
-      prefix: 'chore(deps)'
+    groups:
+      docker:
+        patterns: ['*']

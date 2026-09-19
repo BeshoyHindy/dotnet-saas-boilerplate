@@ -1,17 +1,12 @@
 name: CodeQL Analysis
 
-# Static analysis of the C# sources. Runs on PRs into the long-lived branches
-# (gitflow, ADR-0007: `develop` integrates, so a PR that never touches `main`
-# still has to pass), on pushes to `develop` — code scanning only records
-# alerts for a branch it has analysed on push — and weekly, so a newly published
-# query catches existing code without a commit.
+# Static analysis of the C# sources: a full `dotnet build` per run, so it is
+# rationed. It runs on PRs that touch src/**, and weekly on the default branch —
+# which is also what keeps the branch's alert set current and picks up newly
+# published queries without a commit. Deliberately NOT on every push: the merge
+# commit carries the code the PR run already analysed.
 
 on:
-  push:
-    branches: [develop, main]
-    paths:
-      - 'src/**'
-      - '.github/workflows/codeql.yml'
   pull_request:
     branches: [develop, main, 'release/**', 'hotfix/**']
     paths:
@@ -19,10 +14,11 @@ on:
       - '.github/workflows/codeql.yml'
   schedule:
     - cron: '0 6 * * 1'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -30,6 +26,9 @@ permissions:
 jobs:
   analyze:
     name: Analyze (csharp)
+    # A Dependabot bump changes package versions, not the code CodeQL reasons
+    # about, and the weekly run on the default branch covers what it landed.
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:

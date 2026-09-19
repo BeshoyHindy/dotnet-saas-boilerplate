@@ -6,20 +6,21 @@ name: Frontend CI
 # reports green so required status checks resolve. Playwright suites are
 # route-mocked (no backend needed) — the configs boot a Vite dev server.
 #
-# Gitflow (ADR-0007): `develop` integrates, so the gates run on PRs and pushes
-# to both `develop` and `main`. The console image itself is published from
-# backend.yml, which ships all three images at one tag.
+# Gitflow (ADR-0007): `develop` integrates, so the gates run on PRs into
+# `develop`, `main` and the release/hotfix branches.
+#
+# Pull requests only. This workflow produces nothing but a verdict — the console
+# image is published from backend.yml — so running it again on the push that
+# merges the PR would re-prove the same commit at full price.
 
 on:
-  push:
-    branches: [develop, main, 'release/**', 'hotfix/**']
   pull_request:
     branches: [develop, main, 'release/**', 'hotfix/**']
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -31,16 +32,38 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      frontend: ${{ github.event_name != 'pull_request' || steps.filter.outputs.frontend == 'true' }}
+      # Per app: a PR that only touches clients/dashboard must not rebuild and
+      # re-e2e clients/admin.
+      frontend: ${{ steps.filter.outputs.admin == 'true' || steps.filter.outputs.dashboard == 'true' }}
+      apps: ${{ steps.apps.outputs.list }}
     steps:
       - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
-            frontend:
-              - 'clients/**'
+            admin:
+              - 'clients/admin/**'
               - '.github/workflows/frontend.yml'
+            dashboard:
+              - 'clients/dashboard/**'
+              - '.github/workflows/frontend.yml'
+
+      # The matrix is built from the filter, so an admin-only PR runs two jobs
+      # instead of four. A change to this workflow touches both filters and so
+      # lists both apps.
+      - name: Build the app matrix
+        id: apps
+        env:
+          ADMIN: ${{ steps.filter.outputs.admin }}
+          DASHBOARD: ${{ steps.filter.outputs.dashboard }}
+        run: |
+          apps=()
+          [ "$ADMIN" = true ] && apps+=('"admin"')
+          [ "$DASHBOARD" = true ] && apps+=('"dashboard"')
+          list="[$(IFS=,; echo "${apps[*]}")]"
+          echo "Apps to build: $list"
+          echo "list=$list" >> "$GITHUB_OUTPUT"
 
   lint-build:
     name: Lint & Build (${{ matrix.app }})
@@ -51,7 +74,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [admin, dashboard]
+        app: ${{ fromJSON(needs.changes.outputs.apps) }}
     defaults:
       run:
         working-directory: clients/${{ matrix.app }}
@@ -85,7 +108,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [admin, dashboard]
+        app: ${{ fromJSON(needs.changes.outputs.apps) }}
     defaults:
       run:
         working-directory: clients/${{ matrix.app }}
@@ -125,6 +148,7 @@ jobs:
     needs: [changes, lint-build, e2e]
     if: always()
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Fail if a required frontend job failed
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
