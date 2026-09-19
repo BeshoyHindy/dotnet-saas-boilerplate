@@ -2,6 +2,7 @@
 using Boilerplate.BuildingBlocks.Jobs.Services;
 using Boilerplate.BuildingBlocks.Shared.Constants;
 using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Hangfire;
 using Hangfire.PostgreSql;
@@ -104,7 +105,11 @@ public static class Extensions
         };
 
         endpoints.MapHangfireDashboard(hangfireOptions.Route, dashboardOptions)
-            .RequirePermission(SystemPermissions.Hangfire.View);
+            .RequirePermission(SystemPermissions.Hangfire.View)
+            .ExemptFromTenantSweep(
+                "{**path} is Hangfire's own page/asset routing, not a tenant resource id. The route is " +
+                "root-only (Permissions.Hangfire.View is IsRoot) and the jobs it shows carry the tenant " +
+                "captured at enqueue time, never one named in this URL.");
 
         return endpoints;
     }

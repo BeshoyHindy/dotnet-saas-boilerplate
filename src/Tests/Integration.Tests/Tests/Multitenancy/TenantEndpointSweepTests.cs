@@ -1,0 +1,574 @@
+using System.Globalization;
+using System.Text.Json;
+using Integration.Tests.Infrastructure;
+using Integration.Tests.Infrastructure.TenantSweep;
+using Microsoft.AspNetCore.Http;
+using Xunit.Abstractions;
+
+namespace Integration.Tests.Tests.Multitenancy;
+
+/// <summary>
+/// ADR-0002's acceptance test, on real PostgreSQL: <i>every</i> route the host publishes that names
+/// a resource by id is called with tenant A's token and tenant B's id, and must answer 404 — not
+/// 200, not 403, not 400.
+///
+/// Why each of those is a failure and not a nicety:
+/// <list type="bullet">
+///   <item><b>200</b> is the leak itself.</item>
+///   <item><b>403</b> leaks existence. "You may not see this" and "this does not exist" are
+///     different sentences, and only the second is true across a tenant boundary. It also means
+///     authorization, not isolation, is what stopped the request — so the day someone widens a
+///     permission, the row becomes readable.</item>
+///   <item><b>400</b> means a validator fired before the lookup, so the request never reached the
+///     question we are asking. The registry supplies a body sample for exactly those routes.</item>
+/// </list>
+///
+/// The endpoint list comes from <c>EndpointDataSource</c> at run time, so a route added tomorrow is
+/// swept tomorrow. A route the registry cannot seed a resource for fails
+/// <see cref="Every_Resource_Endpoint_Is_Covered_By_The_Registry_Or_Explicitly_Exempt"/> with the
+/// registry key to add; the only way out is <c>[TenantSweepExempt("reason")]</c> at the mapping site.
+///
+/// <para><b>Shape.</b> These are aggregating tests, not a theory-per-endpoint. xUnit resolves theory
+/// data at discovery time, and the endpoint list does not exist until a host is built — enumerating
+/// it would mean standing up a second Testcontainers host for the whole suite. Instead every test
+/// collects failures and reports one line per endpoint, so a failure still names the route,
+/// the verb, and what came back.</para>
+/// </summary>
+[Collection(AppCollectionDefinition.Name)]
+public sealed class TenantEndpointSweepTests
+{
+    private readonly AppWebApplicationFactory _factory;
+    private readonly ITestOutputHelper _output;
+
+    public TenantEndpointSweepTests(AppWebApplicationFactory factory, ITestOutputHelper output)
+    {
+        _factory = factory;
+        _output = output;
+    }
+
+    private Task<TenantSweepFixture> SweepAsync() => TenantSweepFixture.GetAsync(_factory);
+
+    private static IEnumerable<SweptEndpoint> ResourceEndpoints(TenantSweepFixture sweep) =>
+        sweep.Endpoints.Where(e => e.Class == SweepClass.Resource);
+
+    /// <summary>
+    /// Coverage. This is the test that makes the acceptance criterion true: add an endpoint with an
+    /// id and it is swept automatically, because if the sweep cannot seed a resource for it, the
+    /// build goes red with the exact entry to write.
+    /// </summary>
+    [Fact]
+    public async Task Every_Resource_Endpoint_Is_Covered_By_The_Registry_Or_Explicitly_Exempt()
+    {
+        var sweep = await SweepAsync();
+        var uncovered = ResourceEndpoints(sweep)
+            .Where(e => !e.IsExempt)
+            .SelectMany(e => e.ResourceParameters
+                .Where(p => !TenantSweepRegistry.ByRouteKey.ContainsKey(p.RegistryKey))
+                .Select(p => $"{e.Name}  → no registry entry for key \"{p.RegistryKey}\" (parameter {{{p.Name}}})"))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(text => text, StringComparer.Ordinal)
+            .ToList();
+
+        uncovered.ShouldBeEmpty(
+            "every endpoint that takes a resource id must be swept for cross-tenant access. Add the " +
+            $"key to {nameof(TenantSweepRegistry)}.{nameof(TenantSweepRegistry.ByRouteKey)} pointing at " +
+            $"the {nameof(ResourceKind)} that route addresses (and, if the route is a write whose " +
+            $"validator runs before the lookup, a body sample to {nameof(TenantSweepBodies)}). If the " +
+            "parameter genuinely is not a tenant-scoped resource, say so at the mapping site with " +
+            ".ExemptFromTenantSweep(\"reason\").\n  " +
+            string.Join("\n  ", uncovered));
+    }
+
+    /// <summary>
+    /// The sweep proper. Tenant A's token, tenant B's ids, every verb.
+    /// </summary>
+    [Fact]
+    public async Task Tenant_A_Gets_404_For_Every_Tenant_B_Resource_Id()
+    {
+        var sweep = await SweepAsync();
+        var failures = new List<string>();
+
+        foreach (var endpoint in Ordered(ResourceEndpoints(sweep).Where(e => !e.IsExempt && !e.IsRootOnly)))
+        {
+            var (path, routeValues) = Substitute(endpoint, sweep.B);
+            using var response = await SendAsync(sweep.A.AdminClient, endpoint, path, routeValues, sweep.A);
+
+            var verdict = await JudgeAsync(endpoint, response, sweep.B);
+            if (verdict is not null)
+            {
+                failures.Add($"{endpoint.Name}\n      called as {endpoint.Method} {path}\n{verdict}");
+            }
+        }
+
+        failures.ShouldBeEmpty(
+            "ADR-0002: a tenant-A token must not be able to tell that a tenant-B row exists. 200 is the " +
+            "leak; 403 answers the existence question anyway and puts isolation behind a permission; " +
+            "400 means a validator fired before the lookup, so the probe proved nothing — give that " +
+            $"route a body sample in {nameof(TenantSweepBodies)}.\n  " +
+            string.Join("\n  ", failures));
+    }
+
+    /// <summary>
+    /// The positive control, without which the sweep above is worthless: the same request shape with
+    /// tenant A's <i>own</i> ids must not 404 (nor 401/403). A typo'd route or an unacceptable body
+    /// would otherwise 404 for both tenants and the sweep would pass while testing nothing.
+    ///
+    /// Destructive verbs are excluded here and controlled separately below, on rows minted for the
+    /// purpose — a DELETE control that succeeds would delete the very row the other cases probe.
+    /// </summary>
+    [Fact]
+    public async Task Positive_Control_Tenant_A_Reaches_Its_Own_Resources()
+    {
+        var sweep = await SweepAsync();
+        var failures = new List<string>();
+
+        foreach (var endpoint in Ordered(ResourceEndpoints(sweep)
+            .Where(e => !e.IsExempt && !e.IsRootOnly && !IsDestructive(e))))
+        {
+            var (path, routeValues) = Substitute(endpoint, sweep.A);
+            using var response = await SendAsync(sweep.A.AdminClient, endpoint, path, routeValues, sweep.A);
+
+            if (response.StatusCode is HttpStatusCode.NotFound
+                or HttpStatusCode.Unauthorized
+                or HttpStatusCode.Forbidden)
+            {
+                failures.Add(
+                    $"{endpoint.Name}\n      called as {endpoint.Method} {path}\n" +
+                    $"      got {(int)response.StatusCode} {response.StatusCode} for the tenant's OWN resource\n" +
+                    $"      body: {Truncate(await response.Content.ReadAsStringAsync())}");
+            }
+        }
+
+        failures.ShouldBeEmpty(
+            "the cross-tenant sweep is only meaningful if the same request succeeds against the " +
+            "caller's own row. A 404 here means the sweep's 404 proves nothing — usually a wrong " +
+            $"{nameof(ResourceKind)} in the registry or a missing body sample.\n  " +
+            string.Join("\n  ", failures));
+    }
+
+    /// <summary>
+    /// Root has no override left (ADR-0002: operators cross tenants by exchanging a token, not by
+    /// privilege). A root token is still a token for the root tenant, so tenant-scoped rows in
+    /// tenant B must be just as invisible to it.
+    /// </summary>
+    [Fact]
+    public async Task Root_Token_Also_Gets_404_For_Tenant_Scoped_Resources_Of_Another_Tenant()
+    {
+        var sweep = await SweepAsync();
+        var failures = new List<string>();
+
+        foreach (var endpoint in Ordered(ResourceEndpoints(sweep)
+            .Where(e => !e.IsExempt && !e.IsRootOnly && !AddressesPlatformWideRow(e))))
+        {
+            var (path, routeValues) = Substitute(endpoint, sweep.B);
+            using var response = await SendAsync(sweep.RootClient, endpoint, path, routeValues, sweep.A);
+
+            var verdict = await JudgeAsync(endpoint, response, sweep.B);
+            if (verdict is not null)
+            {
+                failures.Add(
+                    $"{endpoint.Name}\n      called as {endpoint.Method} {path} with a ROOT token\n{verdict}");
+            }
+        }
+
+        failures.ShouldBeEmpty(
+            "root is not a skeleton key. ADR-0002 removed the operator override: a root principal " +
+            "reaches another tenant only by exchanging its token for one whose `tenant` claim is that " +
+            "tenant. Anything reachable here is reachable without that exchange, and without its audit " +
+            $"record.\n  {string.Join("\n  ", failures)}");
+    }
+
+    /// <summary>
+    /// Root-only routes (their permission is flagged <c>IsRoot</c> in the catalog, e.g. the tenants
+    /// group) are classified from metadata rather than opted out by hand. A tenant admin must be
+    /// refused — 403 or 404, never a success — and that refusal is correct, not a leak.
+    /// </summary>
+    [Fact]
+    public async Task Root_Only_Endpoints_Refuse_A_Tenant_Admin()
+    {
+        var sweep = await SweepAsync();
+        var failures = new List<string>();
+
+        foreach (var endpoint in Ordered(ResourceEndpoints(sweep).Where(e => !e.IsExempt && e.IsRootOnly)))
+        {
+            var (path, routeValues) = Substitute(endpoint, sweep.B);
+            using var response = await SendAsync(sweep.A.AdminClient, endpoint, path, routeValues, sweep.A);
+
+            if ((int)response.StatusCode < 400)
+            {
+                failures.Add(
+                    $"{endpoint.Name}\n      called as {endpoint.Method} {path}\n" +
+                    $"      a tenant admin got {(int)response.StatusCode} {response.StatusCode} on a root-only route\n" +
+                    $"      required: {string.Join(", ", endpoint.RequiredPermissions)}");
+            }
+        }
+
+        failures.ShouldBeEmpty(
+            "a route gated by an IsRoot permission must be unreachable from a tenant admin's token, " +
+            $"whatever id it names.\n  {string.Join("\n  ", failures)}");
+    }
+
+    /// <summary>
+    /// Destructive verbs, run last and against rows minted for the purpose. Two things are asserted
+    /// at once: DELETE with B's id 404s (already covered above, re-checked here in isolation from
+    /// the other probes), and DELETE with A's own freshly-seeded id succeeds — the control that
+    /// stops a 404-for-everything route from passing the sweep silently.
+    /// </summary>
+    [Fact]
+    public async Task Positive_Control_For_Destructive_Verbs_Uses_Fresh_Rows()
+    {
+        var sweep = await SweepAsync();
+        var failures = new List<string>();
+
+        foreach (var endpoint in Ordered(ResourceEndpoints(sweep)
+            .Where(e => !e.IsExempt && !e.IsRootOnly && IsDestructive(e))))
+        {
+            var fresh = await MintFreshAsync(sweep, endpoint);
+            if (fresh is null)
+            {
+                // No fresh-row factory for this resource kind: the non-destructive control and the
+                // B-side 404 still cover the route; skipping beats deleting a row other cases need.
+                continue;
+            }
+
+            var (path, routeValues) = Substitute(endpoint, sweep.A, fresh);
+            using var response = await SendAsync(sweep.A.AdminClient, endpoint, path, routeValues, sweep.A);
+
+            if (response.StatusCode is HttpStatusCode.NotFound
+                or HttpStatusCode.Unauthorized
+                or HttpStatusCode.Forbidden)
+            {
+                failures.Add(
+                    $"{endpoint.Name}\n      called as {endpoint.Method} {path} on a row seeded moments before\n" +
+                    $"      got {(int)response.StatusCode} {response.StatusCode}\n" +
+                    $"      body: {Truncate(await response.Content.ReadAsStringAsync())}");
+            }
+        }
+
+        failures.ShouldBeEmpty(
+            "a destructive verb must reach the caller's own row, or its 404 for the other tenant says " +
+            $"nothing about isolation.\n  {string.Join("\n  ", failures)}");
+    }
+
+    /// <summary>
+    /// The list half. Every collection endpoint on the versioned API is called with tenant A's token
+    /// and the body is searched for tenant B's marker and for the ids of every row seeded in B.
+    ///
+    /// Coverage here needs no registry: the marker is stamped into the display fields of every
+    /// seeded row, so a new list endpoint that leaks B's rows is caught the first time it runs,
+    /// whether or not anyone remembered it exists.
+    /// </summary>
+    [Fact]
+    public async Task No_List_Endpoint_Returns_Another_Tenants_Rows()
+    {
+        var sweep = await SweepAsync();
+        var needles = NeedlesFor(sweep.B);
+
+        var failures = new List<string>();
+
+        foreach (var endpoint in Ordered(sweep.Endpoints
+            .Where(e => e.Class == SweepClass.Collection && e.IsVersionedApi && !e.IsExempt)))
+        {
+            // A large page size where the endpoint supports one; unknown query parameters are
+            // ignored by model binding, so this is safe to send everywhere.
+            var path = Materialise(endpoint.Template) + "?pageNumber=1&pageSize=200&take=200";
+
+            using var response = await sweep.A.AdminClient.GetAsync(path);
+
+            // Root-only lists answer 403 to a tenant admin; that is the correct answer, not a leak.
+            if (!response.IsSuccessStatusCode)
+            {
+                continue;
+            }
+
+            var body = await response.Content.ReadAsStringAsync();
+            var hits = needles
+                .Where(needle => body.Contains(needle, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            if (hits.Count > 0)
+            {
+                failures.Add(
+                    $"{endpoint.Name}\n      called as GET {path}\n" +
+                    $"      response contains tenant B's: {string.Join(", ", hits)}");
+            }
+        }
+
+        failures.ShouldBeEmpty(
+            "a list endpoint returned rows belonging to another tenant. Every row the sweep seeds in " +
+            "tenant B carries that tenant's marker in its display fields, so any appearance of it in a " +
+            $"tenant-A response is a leak.\n  {string.Join("\n  ", failures)}");
+    }
+
+    /// <summary>
+    /// After the sweep has fired every verb — including DELETE and PATCH — at tenant B's ids, tenant
+    /// B's rows must still be there and still readable with B's own token. A 404 that was really a
+    /// successful delete would otherwise pass every test above.
+    /// </summary>
+    [Fact]
+    public async Task Tenant_B_Rows_Are_Untouched_After_The_Sweep()
+    {
+        var sweep = await SweepAsync();
+        // Re-run the destructive half of the sweep first so this assertion follows it regardless of
+        // the order xUnit picks; the calls are idempotent from B's point of view (they must all 404).
+        foreach (var endpoint in Ordered(ResourceEndpoints(sweep)
+            .Where(e => !e.IsExempt && !e.IsRootOnly && IsDestructive(e))))
+        {
+            var (path, routeValues) = Substitute(endpoint, sweep.B);
+            using var _ = await SendAsync(sweep.A.AdminClient, endpoint, path, routeValues, sweep.A);
+        }
+
+        var missing = new List<string>();
+
+        foreach (var (kind, path) in ReadBackPaths(sweep.B))
+        {
+            using var response = await sweep.B.AdminClient.GetAsync(path);
+            if (!response.IsSuccessStatusCode)
+            {
+                missing.Add(
+                    $"{kind} at GET {path} → {(int)response.StatusCode} {response.StatusCode}: " +
+                    Truncate(await response.Content.ReadAsStringAsync()));
+            }
+        }
+
+        missing.ShouldBeEmpty(
+            "tenant B's rows must survive the sweep. If one is gone, a cross-tenant call did not just " +
+            "answer 404 — it did the work first and reported 404 afterwards, which is the worst of " +
+            $"both worlds.\n  {string.Join("\n  ", missing)}");
+    }
+
+    /// <summary>
+    /// Prints what was swept. Not an assertion about behaviour — a record, so the numbers in a review
+    /// come from the run rather than from someone's memory, and so the exempt list is visible with
+    /// its reasons every time.
+    /// </summary>
+    [Fact]
+    public async Task Sweep_Reports_What_It_Covered()
+    {
+        var sweep = await SweepAsync();
+        var resource = ResourceEndpoints(sweep).ToList();
+        var exempt = sweep.Endpoints.Where(e => e.IsExempt).ToList();
+        var collections = sweep.Endpoints
+            .Where(e => e.Class == SweepClass.Collection && e.IsVersionedApi && !e.IsExempt).ToList();
+
+        var culture = CultureInfo.InvariantCulture;
+        var report = new System.Text.StringBuilder()
+            .AppendLine(culture, $"endpoints discovered : {sweep.Endpoints.Count}")
+            .AppendLine(culture, $"resource endpoints   : {resource.Count}")
+            .AppendLine(culture, $"  swept (tenant)     : {resource.Count(e => !e.IsExempt && !e.IsRootOnly)}")
+            .AppendLine(culture, $"  root-only          : {resource.Count(e => !e.IsExempt && e.IsRootOnly)}")
+            .AppendLine(culture, $"  exempt             : {resource.Count(e => e.IsExempt)}")
+            .AppendLine(culture, $"list endpoints swept : {collections.Count}")
+            .AppendLine(culture, $"other (no id, write) : {sweep.Endpoints.Count(e => e.Class == SweepClass.Other)}")
+            .AppendLine("exempt routes:");
+
+        foreach (var e in exempt.OrderBy(e => e.Name, StringComparer.Ordinal))
+        {
+            report.AppendLine(culture, $"  {e.Name}\n      {e.ExemptReason}");
+        }
+
+        _output.WriteLine(report.ToString());
+
+        // The sweep must not quietly become a no-op — e.g. if endpoint classification broke.
+        resource.Count(e => !e.IsExempt && !e.IsRootOnly).ShouldBeGreaterThan(
+            20, "the sweep should be covering the whole resource surface of the API");
+        collections.Count.ShouldBeGreaterThan(
+            10, "the list half of the sweep should be covering the API's collections");
+    }
+
+    #region Request shaping
+
+    /// <summary>
+    /// Non-destructive verbs first, destructive ones last, so a control that legitimately deletes a
+    /// row cannot invalidate a probe that had not run yet.
+    /// </summary>
+    private static IEnumerable<SweptEndpoint> Ordered(IEnumerable<SweptEndpoint> endpoints) =>
+        endpoints.OrderBy(IsDestructive).ThenBy(e => e.Name, StringComparer.Ordinal);
+
+    private static bool IsDestructive(SweptEndpoint endpoint) =>
+        string.Equals(endpoint.Method, HttpMethods.Delete, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Builds the concrete URL for an endpoint, putting <paramref name="tenant"/>'s id in every
+    /// resource parameter, and returns the substituted values so a body sample can echo them.
+    /// </summary>
+    private static (string Path, IReadOnlyDictionary<string, string> RouteValues) Substitute(
+        SweptEndpoint endpoint,
+        SeededTenant tenant,
+        IReadOnlyDictionary<ResourceKind, string>? overrides = null)
+    {
+        var path = Materialise(endpoint.Template);
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        foreach (var parameter in endpoint.ResourceParameters)
+        {
+            var kind = TenantSweepRegistry.ByRouteKey[parameter.RegistryKey];
+            var id = overrides is not null && overrides.TryGetValue(kind, out var fresh)
+                ? fresh
+                : tenant[kind];
+
+            values[parameter.Name] = id;
+            path = ReplaceParameter(path, parameter.Name, id);
+        }
+
+        return (path, values);
+    }
+
+    /// <summary>Turns a route template into a callable path: version resolved, leading slash added.</summary>
+    private static string Materialise(string template)
+    {
+        var path = template.Replace("api/v{version:apiVersion}", "api/v1", StringComparison.Ordinal);
+        return path.StartsWith('/') ? path : "/" + path;
+    }
+
+    /// <summary>
+    /// Replaces <c>{name}</c>, <c>{name:constraint}</c> or <c>{name?}</c> with a value. Written by
+    /// hand rather than with a regex so the sweep cannot be defeated by an exotic constraint.
+    /// </summary>
+    private static string ReplaceParameter(string path, string name, string value)
+    {
+        var start = path.IndexOf('{' + name, StringComparison.Ordinal);
+        if (start < 0)
+        {
+            return path;
+        }
+
+        var end = path.IndexOf('}', start);
+        return end < 0 ? path : string.Concat(path.AsSpan(0, start), value, path.AsSpan(end + 1));
+    }
+
+    private static async Task<HttpResponseMessage> SendAsync(
+        HttpClient client,
+        SweptEndpoint endpoint,
+        string path,
+        IReadOnlyDictionary<string, string> routeValues,
+        SeededTenant caller)
+    {
+        using var request = new HttpRequestMessage(new HttpMethod(endpoint.Method), path);
+
+        var body = TenantSweepBodies.For(endpoint.Method, endpoint.Template, routeValues, caller);
+        if (body is not null)
+        {
+            request.Content = JsonContent.Create(body, options: JsonOptions);
+        }
+
+        return await client.SendAsync(request);
+    }
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
+    /// <summary>
+    /// A row created for a single destructive control, so the control does not consume a row the
+    /// rest of the sweep still needs. Returns null for kinds with no cheap factory.
+    /// </summary>
+    private static async Task<IReadOnlyDictionary<ResourceKind, string>?> MintFreshAsync(
+        TenantSweepFixture sweep, SweptEndpoint endpoint)
+    {
+        var kinds = endpoint.ResourceParameters
+            .Select(p => TenantSweepRegistry.ByRouteKey[p.RegistryKey])
+            .Distinct()
+            .ToList();
+
+        var fresh = new Dictionary<ResourceKind, string>();
+
+        foreach (var kind in kinds)
+        {
+            var id = await TenantSweepFreshRows.TryCreateAsync(sweep, sweep.A, kind);
+            if (id is null)
+            {
+                return null;
+            }
+
+            fresh[kind] = id;
+        }
+
+        return fresh;
+    }
+
+    /// <summary>
+    /// Read-back probes for the "tenant B is untouched" assertion: one GET per seeded row, chosen so
+    /// the check fails if the row was deleted rather than merely hidden.
+    /// </summary>
+    private static IEnumerable<(ResourceKind Kind, string Path)> ReadBackPaths(SeededTenant tenant)
+    {
+        yield return (ResourceKind.User, $"/api/v1/identity/users/{tenant[ResourceKind.User]}");
+        yield return (ResourceKind.Role, $"/api/v1/identity/roles/{tenant[ResourceKind.Role]}");
+        yield return (ResourceKind.Group, $"/api/v1/identity/groups/{tenant[ResourceKind.Group]}");
+        yield return (ResourceKind.File, $"/api/v1/files/{tenant[ResourceKind.File]}");
+        yield return (ResourceKind.Audit, $"/api/v1/audits/{tenant[ResourceKind.Audit]}");
+    }
+
+    private static string Truncate(string body) =>
+        body.Length <= 400 ? body : body[..400] + "…";
+
+    /// <summary>
+    /// Everything that identifies a row of <paramref name="tenant"/> in a response body: its marker,
+    /// its admin's e-mail, its id, and the id of every row the sweep seeded in it.
+    /// </summary>
+    private static List<string> NeedlesFor(SeededTenant tenant)
+    {
+        var needles = new List<string> { tenant.Marker, tenant.AdminEmail, tenant.TenantId };
+        needles.AddRange(tenant.Ids
+            .Where(pair => pair.Key != ResourceKind.Tenant)
+            .Select(pair => pair.Value));
+        return needles;
+    }
+
+    /// <summary>
+    /// True when every resource this route names is platform-wide by construction, so "root must 404
+    /// too" is not a question that applies to it.
+    /// </summary>
+    private static bool AddressesPlatformWideRow(SweptEndpoint endpoint) =>
+        endpoint.ResourceParameters.Count > 0
+        && endpoint.ResourceParameters.All(p =>
+            TenantSweepExceptions.PlatformWideKinds.Contains(TenantSweepRegistry.ByRouteKey[p.RegistryKey]));
+
+    private static bool IsCollectionShaped(SweptEndpoint endpoint) =>
+        TenantSweepExceptions.CollectionShapedRoutes.ContainsKey($"{endpoint.Method} {endpoint.Template}");
+
+    /// <summary>
+    /// The verdict for one probe of <paramref name="other"/>'s id: null when the endpoint behaved,
+    /// otherwise the line to print. 404 is the rule; a collection-shaped route may answer 200 instead,
+    /// but then its body has to be empty of the other tenant.
+    /// </summary>
+    private static async Task<string?> JudgeAsync(
+        SweptEndpoint endpoint, HttpResponseMessage response, SeededTenant other)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+
+        if (IsCollectionShaped(endpoint))
+        {
+            if (!response.IsSuccessStatusCode && response.StatusCode != HttpStatusCode.NotFound)
+            {
+                return $"      expected an empty result or 404, got {(int)response.StatusCode} " +
+                       $"{response.StatusCode}\n      body: {Truncate(body)}";
+            }
+
+            var hits = NeedlesFor(other)
+                .Where(needle => body.Contains(needle, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            // A non-zero count on a bulk route means it reached rows it should not have.
+            bool touchedRows = body.Contains("revokedCount", StringComparison.Ordinal)
+                && !body.Contains("\"revokedCount\":0", StringComparison.Ordinal);
+
+            if (hits.Count == 0 && !touchedRows)
+            {
+                return null;
+            }
+
+            return $"      answered {(int)response.StatusCode} carrying the other tenant's data " +
+                   $"({string.Join(", ", hits)})\n      body: {Truncate(body)}";
+        }
+
+        return response.StatusCode == HttpStatusCode.NotFound
+            ? null
+            : $"      expected 404, got {(int)response.StatusCode} {response.StatusCode}\n" +
+              $"      body: {Truncate(body)}";
+    }
+
+    #endregion
+}
