@@ -37,11 +37,11 @@ jobs:
       security-events: write # upload the SARIF results
       actions: read # the analyze step reads the run's own metadata
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: github/codeql-action/init@v3
         with:
           languages: csharp
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
       # Not -warnaserror: backend.yml owns that gate, and CodeQL must still be

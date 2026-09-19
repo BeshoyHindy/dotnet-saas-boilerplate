@@ -37,7 +37,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # shellcheck and jq are pre-installed on ubuntu-latest; docker compose is
       # too, so the suite's `docker compose config` checks run here rather than
