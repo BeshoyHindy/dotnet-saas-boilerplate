@@ -5,6 +5,11 @@
 		<AssemblyName>Boilerplate.Api</AssemblyName>
 		<IsPackable>false</IsPackable>
 
+		<!-- Development secrets (JWT signing key, SMTP, seed admin password) live in the local
+		     user-secrets store, never in appsettings.Development.json. Bootstrap them with
+		     `bash scripts/dev-secrets.sh`. -->
+		<UserSecretsId>0f2b2a2e-3d3c-4f0d-9d5f-2c9a1a9d6b71</UserSecretsId>
+
 		<!-- Container configuration — image is built via `dotnet publish /t:PublishContainer`.
 		     No PublishProfile needed (the legacy "DefaultContainer" profile auto-populates
 		     ContainerImageTag from $(Version), which collides with ContainerImageTags). -->

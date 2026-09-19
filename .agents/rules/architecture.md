@@ -77,6 +77,7 @@ After wiring, the fastest sanity check is: build, hit the endpoint, confirm the 
 
 In `src/BuildingBlocks/Web/Extensions.cs` (`UseHeroPlatform`):
 
+0. **ForwardedHeaders first** (when `ProxyOptions.Enabled`) — everything downstream that reads the scheme or client IP must see the caller's values, not the proxy's
 1. ExceptionHandler → ResponseCompression
 2. **CORS before HTTPS redirect** (so OPTIONS preflight isn't 307-redirected)
 3. HttpsRedirection → SecurityHeaders → static files → Routing
@@ -95,5 +96,7 @@ No global mutable static collections enumerated under concurrency. `Audit` (Audi
 - `appsettings.json` (+ `.Development`/`.Production`) live in `src/Host/Boilerplate.Api/`. DbMigrator links the same files.
 - Bind config with the Options pattern: `AddOptions<T>().BindConfiguration(nameof(T))`, section name == type name (e.g. `JwtOptions`, `DatabaseOptions`, `CachingOptions`, `CorsOptions`, `RateLimitingOptions`; **storage section is `Storage`**, not `StorageOptions`). Add `.ValidateDataAnnotations().ValidateOnStart()` for fail-fast.
 - Validate critical options via `IValidatableObject` — `JwtOptions` requires `SigningKey` ≥32 chars and **rejects placeholder strings containing `"replace-with"`**; `DatabaseOptions` rejects empty connection strings.
-- **Production fail-fast** (`Program.cs`, before service registration): missing `DatabaseOptions:ConnectionString`, `CachingOptions:Redis`, or `JwtOptions:SigningKey` throws. Dev secrets via `dotnet user-secrets` (AppHost has a `UserSecretsId`); MinIO creds are Aspire secret parameters.
+- Where a rule needs DI or the environment, data annotations can't express it: register an **`IValidateOptions<T>`** instead. Existing ones: `JwtOptionsProductionValidator` (Production placeholder/localhost keys), `CorsOptionsValidator` (`AllowAll` banned in Production, origins must be absolute and slash-free), `RateLimitingOptionsValidator` (per-policy ranges, only when `Enabled`), `ProxyOptionsValidator` (parseable proxy addresses, "enabled but trusting nobody").
+- **Production fail-fast** (`Program.cs` → `builder.ValidateProductionConfiguration()`, before service registration): missing `DatabaseOptions:ConnectionString` / `CachingOptions:Redis` / `JwtOptions:SigningKey`, a secret that still matches `PlaceholderSecret.Looks(...)`, or an `AllowedHosts` that is empty or contains `*` all throw.
+- **No credential ever lands in `appsettings*.json`.** Dev secrets via `dotnet user-secrets` — `bash scripts/dev-secrets.sh` bootstraps them (API and DbMigrator share one `UserSecretsId`); the AppHost passes Aspire parameters; deployments pass environment variables. `gitleaks dir .` (config in `.gitleaks.toml`) must stay clean.
 - Platform composition is one call each: `builder.AddHeroPlatform(o => { o.Enable... })` (DI) and `app.UseHeroPlatform(...)` (middleware). Toggles cover Caching/Jobs/Mailing/OpenTelemetry/CORS/OpenAPI/Idempotency.

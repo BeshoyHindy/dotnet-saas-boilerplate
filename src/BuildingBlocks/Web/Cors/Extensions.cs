@@ -26,6 +26,10 @@ public static class Extensions
             .Validate(settings => settings.AllowAll || settings.AllowedMethods.Length > 0, "CorsOptions: AllowedMethods are required when AllowAll is false.")
             .ValidateOnStart();
 
+        // Environment-aware rules (AllowAll is a Production footgun, origins must be real origins)
+        // live in a validator because inline .Validate lambdas cannot resolve IHostEnvironment.
+        services.AddSingleton<IValidateOptions<CorsOptions>, CorsOptionsValidator>();
+
         services.AddCors();
         services.AddSingleton<IConfigureOptions<AspNetCorsOptions>>(sp =>
         {

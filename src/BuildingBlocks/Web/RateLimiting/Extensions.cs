@@ -27,7 +27,10 @@ public static class Extensions
         var settings = configuration.GetSection(nameof(RateLimitingOptions)).Get<RateLimitingOptions>() ?? new RateLimitingOptions();
 
         services.AddOptions<RateLimitingOptions>()
-            .BindConfiguration(nameof(RateLimitingOptions));
+            .BindConfiguration(nameof(RateLimitingOptions))
+            .ValidateOnStart();
+
+        services.AddSingleton<IValidateOptions<RateLimitingOptions>, RateLimitingOptionsValidator>();
 
         services.AddRateLimiter(options =>
         {

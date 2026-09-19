@@ -6,6 +6,10 @@
     <AssemblyName>Boilerplate.DbMigrator</AssemblyName>
     <IsPackable>false</IsPackable>
 
+    <!-- Same local secret store as the API: the migrator seeds the root admin, so it needs the
+         seed password without it ever being committed. Bootstrap: `bash scripts/dev-secrets.sh`. -->
+    <UserSecretsId>0f2b2a2e-3d3c-4f0d-9d5f-2c9a1a9d6b71</UserSecretsId>
+
     <!-- Container configuration — published as a one-shot job image used as
          the migrate step in a Kubernetes Job / Helm pre-install hook / Aspire
          dependency. Same base image as the API for parity. Image is built via

@@ -8,6 +8,7 @@ using Boilerplate.BuildingBlocks.Web.Cors;
 using Boilerplate.BuildingBlocks.Web.Exceptions;
 using Boilerplate.BuildingBlocks.Web.Idempotency;
 using Boilerplate.BuildingBlocks.Web.Health;
+using Boilerplate.BuildingBlocks.Web.Limits;
 using Boilerplate.BuildingBlocks.Web.Mediator.Behaviors;
 using Boilerplate.BuildingBlocks.Web.Modules;
 using Boilerplate.BuildingBlocks.Web.Observability.Logging.Serilog;
@@ -18,12 +19,15 @@ using Boilerplate.BuildingBlocks.Web.RateLimiting;
 using Boilerplate.BuildingBlocks.Web.Security;
 using Boilerplate.BuildingBlocks.Web.Versioning;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Mediator;
 
 namespace Boilerplate.BuildingBlocks.Web;
@@ -77,11 +81,14 @@ public static class Extensions
             builder.Services.AddHeroOpenApi(builder.Configuration);
         }
 
-        builder.Services.AddHealthChecks().AddCheck("self", () => HealthCheckResult.Healthy());
+        builder.Services.AddHealthChecks()
+            .AddCheck("self", () => HealthCheckResult.Healthy(), tags: [HealthTags.Live, HealthTags.Ready]);
 
         if (options.EnableJobs)
         {
             builder.Services.AddHeroJobs();
+            // Not a readiness dependency: background processing can be down while the API still
+            // answers requests, and the check queries Hangfire storage.
             builder.Services.AddHealthChecks().AddCheck<HangfireHealthCheck>("hangfire");
         }
 
@@ -96,7 +103,7 @@ public static class Extensions
             var cacheConfig = builder.Configuration.GetSection(nameof(CachingOptions)).Get<CachingOptions>();
             if (cacheConfig is not null && !string.IsNullOrEmpty(cacheConfig.Redis))
             {
-                builder.Services.AddHealthChecks().AddCheck<RedisHealthCheck>("redis");
+                builder.Services.AddHealthChecks().AddCheck<RedisHealthCheck>("redis", tags: [HealthTags.Ready]);
             }
         }
 
@@ -111,6 +118,22 @@ public static class Extensions
         builder.Services.AddOptions<OriginOptions>().BindConfiguration(nameof(OriginOptions));
         builder.Services.AddOptions<SecurityHeadersOptions>().BindConfiguration(nameof(SecurityHeadersOptions));
 
+        // Kestrel request limits: bound here rather than left to the framework defaults so a single
+        // request can't stream 30 MB into memory on an API whose uploads bypass it entirely.
+        builder.Services.AddOptions<RequestLimitsOptions>()
+            .BindConfiguration(RequestLimitsOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        builder.Services.AddSingleton<IConfigureOptions<KestrelServerOptions>, ConfigureRequestLimits>();
+
+        // Reverse-proxy (Traefik) forwarded headers.
+        builder.Services.AddOptions<ProxyOptions>()
+            .BindConfiguration(ProxyOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        builder.Services.AddSingleton<IValidateOptions<ProxyOptions>, ProxyOptionsValidator>();
+        builder.Services.AddSingleton<IConfigureOptions<ForwardedHeadersOptions>, ConfigureForwardedHeaders>();
+
         return builder;
     }
 
@@ -124,6 +147,14 @@ public static class Extensions
 
         var corsEnabled = options.UseCors && IsCorsEnabled(app.Configuration);
         var openApiEnabled = options.UseOpenApi && IsOpenApiEnabled(app.Configuration);
+
+        // Forwarded headers run FIRST: every later decision that reads the scheme or the client IP
+        // (HTTPS redirect, IP rate-limit partitions, audit trails) must see the caller's values, not
+        // the proxy's.
+        if (app.Services.GetRequiredService<IOptions<ProxyOptions>>().Value.Enabled)
+        {
+            app.UseForwardedHeaders();
+        }
 
         app.UseExceptionHandler();
         app.UseResponseCompression();

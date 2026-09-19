@@ -24,6 +24,23 @@ public sealed class SecurityHeadersMiddleware(RequestDelegate next, IOptions<Sec
             return next(context);
         }
 
+        // Write the headers from an OnStarting callback instead of eagerly on the way in:
+        // UseExceptionHandler resets the response (status, body AND headers) before it re-runs the
+        // handler, so eagerly written headers are silently dropped from every 5xx it produces —
+        // exactly the responses an attacker can most easily provoke. OnStarting registrations
+        // survive that reset and fire once, immediately before the response is flushed.
+        context.Response.OnStarting(static state =>
+        {
+            var (middleware, httpContext) = ((SecurityHeadersMiddleware, HttpContext))state;
+            middleware.ApplyHeaders(httpContext);
+            return Task.CompletedTask;
+        }, (this, context));
+
+        return next(context);
+    }
+
+    private void ApplyHeaders(HttpContext context)
+    {
         var headers = context.Response.Headers;
 
         headers["X-Content-Type-Options"] = "nosniff";
@@ -52,7 +69,5 @@ public sealed class SecurityHeadersMiddleware(RequestDelegate next, IOptions<Sec
 
             headers["Content-Security-Policy"] = csp;
         }
-
-        return next(context);
     }
 }
