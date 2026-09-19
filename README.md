@@ -64,7 +64,9 @@ PostgreSQL, Valkey, MinIO and a Mailpit mail catcher. The containers run as **Pr
 same fail-fast guards apply as on a server: no placeholder secrets, no `AllowedHosts: *`. That is
 why the four secrets have no default in `docker-compose.yml` and `scripts/local-env.sh` generates
 them instead. Every other setting has a local default — see [`.env.example`](.env.example) for the
-full list. Real deployments configure these images through Dokploy environment variables (ADR-0005).
+full list. Real deployments configure these images through Dokploy environment variables (ADR-0005)
+— see [`docs/deploy-dokploy.md`](docs/deploy-dokploy.md), which takes a blank server to a healthy
+HTTPS deployment.
 
 | Symptom | Likely cause |
 |---|---|
@@ -93,7 +95,7 @@ cd clients/dashboard && npm run test:e2e  # Playwright
 | `src/Tests/` | Unit, architecture (NetArchTest) and integration (Testcontainers) tests |
 | `clients/` | The two React apps |
 | `docker-compose.yml` | Runs the production images locally, with `.env.example` |
-| `deploy/` | Dokploy deployment configuration |
+| `deploy/dokploy/` | Dokploy compose stacks, env contract and deploy script |
 | `docs/adr/` | Architecture decision records |
 
 ## Contributing
