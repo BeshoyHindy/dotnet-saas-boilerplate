@@ -50,11 +50,18 @@ var moduleAssemblies = new Assembly[]
     typeof(Boilerplate.Modules.Notifications.NotificationsModule).Assembly,
 };
 
+// `--export-openapi <file>` writes clients/openapi/v1.json and exits (ADR-0004); see
+// OpenApiDocumentExport. Background processing is the one thing it has to switch off: Hangfire's
+// recurring-job registration runs at endpoint-mapping time and opens a PostgreSQL connection, and
+// exporting the API contract must not need a database. Hangfire contributes no OpenAPI endpoint, so
+// the exported document is identical either way.
+var exportOpenApi = Boilerplate.Api.OpenApiDocumentExport.IsRequested(args);
+
 builder.AddHeroPlatform(o =>
 {
     o.EnableCaching = true;
     o.EnableMailing = true;
-    o.EnableJobs = true;
+    o.EnableJobs = !exportOpenApi;
 });
 
 // The transactional outbox is framework infrastructure with exactly one owner
@@ -68,6 +75,12 @@ builder.AddModules(moduleAssemblies);
 builder.Services.AddHostedService<Boilerplate.Api.OrphanedOutboxRecurringJobCleanupService>();
 
 var app = builder.Build();
+
+if (exportOpenApi)
+{
+    await Boilerplate.Api.OpenApiDocumentExport.RunAsync(app, args);
+    return;
+}
 
 // Tenant resolution is NOT installed here: it has to run after UseAuthentication(), so
 // MultitenancyModule.ConfigureMiddleware() calls UseMultiTenant() from inside
