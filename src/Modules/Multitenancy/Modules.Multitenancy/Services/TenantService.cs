@@ -20,6 +20,7 @@ namespace Boilerplate.Modules.Multitenancy.Services;
 public sealed class TenantService : ITenantService
 {
     private readonly IMultiTenantStore<AppTenantInfo> _tenantStore;
+    private readonly ITenantScope _tenantScope;
     private readonly DatabaseOptions _config;
     private readonly IServiceProvider _serviceProvider;
     private readonly TenantDbContext _dbContext;
@@ -30,6 +31,7 @@ public sealed class TenantService : ITenantService
 
     public TenantService(
         IMultiTenantStore<AppTenantInfo> tenantStore,
+        ITenantScope tenantScope,
         IOptions<DatabaseOptions> config,
         IServiceProvider serviceProvider,
         TenantDbContext dbContext,
@@ -41,6 +43,7 @@ public sealed class TenantService : ITenantService
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(validityOptions);
         _tenantStore = tenantStore;
+        _tenantScope = tenantScope;
         _config = config.Value;
         _serviceProvider = serviceProvider;
         _dbContext = dbContext;
@@ -93,28 +96,34 @@ public sealed class TenantService : ITenantService
 
     public async Task MigrateTenantAsync(AppTenantInfo tenant, CancellationToken cancellationToken)
     {
-        using var scope = _serviceProvider.CreateScope();
+        ArgumentNullException.ThrowIfNull(tenant);
 
-        scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()
-            .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
-
-        foreach (var initializer in scope.ServiceProvider.GetServices<IDbInitializer>())
-        {
-            await initializer.MigrateAsync(cancellationToken).ConfigureAwait(false);
-        }
+        await _tenantScope.RunAsync(
+            tenant.Id!,
+            async (services, ct) =>
+            {
+                foreach (var initializer in services.GetServices<IDbInitializer>())
+                {
+                    await initializer.MigrateAsync(ct).ConfigureAwait(false);
+                }
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     public async Task SeedTenantAsync(AppTenantInfo tenant, CancellationToken cancellationToken)
     {
-        using var scope = _serviceProvider.CreateScope();
+        ArgumentNullException.ThrowIfNull(tenant);
 
-        scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()
-            .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
-
-        foreach (var initializer in scope.ServiceProvider.GetServices<IDbInitializer>())
-        {
-            await initializer.SeedAsync(cancellationToken).ConfigureAwait(false);
-        }
+        await _tenantScope.RunAsync(
+            tenant.Id!,
+            async (services, ct) =>
+            {
+                foreach (var initializer in services.GetServices<IDbInitializer>())
+                {
+                    await initializer.SeedAsync(ct).ConfigureAwait(false);
+                }
+            },
+            cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<string> DeactivateAsync(string id, CancellationToken cancellationToken = default)

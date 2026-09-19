@@ -41,6 +41,7 @@ public sealed class TenantServiceStatusBoundaryTests
 
         var sut = new TenantService(
             _store,
+            tenantScope: null!,
             Options.Create(new DatabaseOptions { ConnectionString = "Host=localhost;Database=boilerplate;Username=x;Password=y" }),
             serviceProvider: null!,
             dbContext: null!,

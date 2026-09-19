@@ -30,6 +30,7 @@ public sealed class TenantServiceRenewClockTests
 
         return new TenantService(
             _store,
+            tenantScope: null!,          // RenewAsync never migrates or seeds
             Options.Create(new DatabaseOptions { ConnectionString = "Host=localhost;Database=boilerplate;Username=x;Password=y" }),
             _serviceProvider,
             dbContext: null!,            // RenewAsync never touches the DbContext

@@ -1,5 +1,3 @@
-using Finbuckle.MultiTenant;
-using Finbuckle.MultiTenant.Abstractions;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -22,7 +20,7 @@ namespace Boilerplate.Modules.Identity.Authorization;
 /// other startup work.
 /// </remarks>
 internal sealed class RolePermissionSyncHostedService(
-    IServiceProvider serviceProvider,
+    ITenantScope tenantScope,
     ILogger<RolePermissionSyncHostedService> logger) : BackgroundService
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
@@ -67,9 +65,7 @@ internal sealed class RolePermissionSyncHostedService(
 
             try
             {
-                using var scope = serviceProvider.CreateScope();
-                var tenantStore = scope.ServiceProvider.GetRequiredService<IMultiTenantStore<AppTenantInfo>>();
-                var tenants = (await tenantStore.GetAllAsync().ConfigureAwait(false)).ToList();
+                var tenants = await tenantScope.GetTenantsAsync(stoppingToken).ConfigureAwait(false);
                 if (tenants.Count > 0)
                 {
                     return tenants;
@@ -94,12 +90,10 @@ internal sealed class RolePermissionSyncHostedService(
     {
         try
         {
-            using var scope = serviceProvider.CreateScope();
-            scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()
-                .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
-
-            var syncer = scope.ServiceProvider.GetRequiredService<RolePermissionSyncer>();
-            await syncer.SyncAsync(stoppingToken).ConfigureAwait(false);
+            await tenantScope.RunAsync(
+                tenant.Id!,
+                (services, ct) => services.GetRequiredService<RolePermissionSyncer>().SyncAsync(ct),
+                stoppingToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

@@ -80,6 +80,18 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
     /// <summary>The MinIO endpoint URL exposed to the host configuration; useful for tests that need to PUT bytes directly.</summary>
     public string MinioServiceUrl => _minio.GetConnectionString();
 
+    /// <summary>
+    /// The container's connection string. Tests that need a *second* database — a tenant with a
+    /// dedicated connection string — derive one from it by swapping the Database keyword, so both
+    /// live in the same container and no second container is started.
+    /// </summary>
+    public string PostgresConnectionString => _postgres.GetConnectionString();
+
+    /// <summary>A connection string for <paramref name="databaseName"/> on the same server.</summary>
+    public string ConnectionStringForDatabase(string databaseName) =>
+        new Npgsql.NpgsqlConnectionStringBuilder(_postgres.GetConnectionString()) { Database = databaseName }
+            .ConnectionString;
+
     private async Task CreateMinioBucketAsync()
     {
         var config = new AmazonS3Config
@@ -185,6 +197,14 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
             services.PostConfigure<JwtBearerOptions>(
                 JwtBearerDefaults.AuthenticationScheme,
                 options => options.RequireHttpsMetadata = false);
+
+            // Probe handler for the tenant-context tests: registered here so it is dispatched by the
+            // real bus, through the real IEventTenantScope, with a real inbox — the whole point is
+            // that nothing in that path is substituted.
+            services.AddScoped<
+                Boilerplate.BuildingBlocks.Eventing.Abstractions.IIntegrationEventHandler<
+                    Tests.Jobs.TenantProbeIntegrationEvent>,
+                Tests.Jobs.TenantProbeEventHandler>();
 
             // Replace real mail service with a no-op to avoid SMTP errors and Hangfire retries
             services.RemoveAll<IMailService>();

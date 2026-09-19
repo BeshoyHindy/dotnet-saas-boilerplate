@@ -35,7 +35,7 @@ public sealed class TenantMigrationsHealthCheckTests : IAsyncLifetime
     public async Task CheckHealthAsync_Should_TransitionFromUnhealthyToHealthy_AsMigrationsApply()
     {
         await using var provider = BuildServiceProvider();
-        var check = new TenantMigrationsHealthCheck(provider.GetRequiredService<IServiceScopeFactory>());
+        var check = new TenantMigrationsHealthCheck(provider.GetRequiredService<ITenantScope>());
         var context = new HealthCheckContext
         {
             Registration = new HealthCheckRegistration("db:tenants-migrations", check, HealthStatus.Unhealthy, tags: null)
@@ -67,7 +67,7 @@ public sealed class TenantMigrationsHealthCheckTests : IAsyncLifetime
         // unreachable tenant DB. The per-tenant try/catch must convert that to an
         // Unhealthy aggregate result, not propagate the exception.
         await using var provider = BuildServiceProvider(badConnectionString: true);
-        var check = new TenantMigrationsHealthCheck(provider.GetRequiredService<IServiceScopeFactory>());
+        var check = new TenantMigrationsHealthCheck(provider.GetRequiredService<ITenantScope>());
         var context = new HealthCheckContext
         {
             Registration = new HealthCheckRegistration("db:tenants-migrations", check, HealthStatus.Unhealthy, tags: null)
@@ -89,7 +89,14 @@ public sealed class TenantMigrationsHealthCheckTests : IAsyncLifetime
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<IMultiTenantStore<AppTenantInfo>>(new SingleTenantStore());
-        services.AddScoped<IMultiTenantContextSetter, FakeMultiTenantContextSetter>();
+
+        // Real ITenantScope over a stub ambient context: the check now enters each tenant through
+        // it, and the ordering it guarantees (tenant before scope) is part of what is under test.
+        services.AddSingleton<StubAccessor>();
+        services.AddSingleton<IMultiTenantContextAccessor<AppTenantInfo>>(sp => sp.GetRequiredService<StubAccessor>());
+        services.AddSingleton<IMultiTenantContextSetter>(sp => sp.GetRequiredService<StubAccessor>());
+        services.AddSingleton<AmbientTenantContext>();
+        services.AddSingleton<ITenantScope, TenantScope>();
         services.AddDbContext<TenantDbContext>(opts =>
             opts.UseNpgsql(connectionString, b => b.MigrationsAssembly("Boilerplate.Migrations.PostgreSQL")));
         return services.BuildServiceProvider();
@@ -115,13 +122,22 @@ public sealed class TenantMigrationsHealthCheckTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// Fake <see cref="IMultiTenantContextSetter"/> that just records the value. The health
-    /// check writes to this before resolving <see cref="TenantDbContext"/>; reads of the
-    /// context are not exercised by <c>GetPendingMigrationsAsync</c>.
+    /// Stub ambient tenant context. <see cref="TenantDbContext"/> here is registered with a fixed
+    /// connection string, so the health check only needs the context to exist, not to route.
     /// </summary>
-    private sealed class FakeMultiTenantContextSetter : IMultiTenantContextSetter
+#pragma warning disable S2376 // Finbuckle's IMultiTenantContextSetter is a set-only contract.
+    private sealed class StubAccessor : IMultiTenantContextAccessor<AppTenantInfo>, IMultiTenantContextSetter
     {
-        public IMultiTenantContext MultiTenantContext { get; set; } = new MultiTenantContext<AppTenantInfo>(
-            new AppTenantInfo("placeholder", "placeholder", string.Empty, "x@x", null));
+        private IMultiTenantContext<AppTenantInfo> _context = new MultiTenantContext<AppTenantInfo>(null!);
+
+        public IMultiTenantContext<AppTenantInfo> MultiTenantContext => _context;
+
+        IMultiTenantContext IMultiTenantContextAccessor.MultiTenantContext => _context;
+
+        IMultiTenantContext IMultiTenantContextSetter.MultiTenantContext
+        {
+            set => _context = (IMultiTenantContext<AppTenantInfo>)value;
+        }
     }
+#pragma warning restore S2376
 }

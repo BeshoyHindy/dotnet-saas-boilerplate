@@ -1,5 +1,3 @@
-using Finbuckle.MultiTenant;
-using Finbuckle.MultiTenant.Abstractions;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.Modules.Multitenancy.Data;
 using Microsoft.EntityFrameworkCore;
@@ -17,69 +15,64 @@ namespace Boilerplate.Modules.Multitenancy;
 /// </summary>
 public sealed class TenantMigrationsHealthCheck : IHealthCheck
 {
-    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ITenantScope _tenantScope;
 
-    public TenantMigrationsHealthCheck(IServiceScopeFactory scopeFactory)
+    public TenantMigrationsHealthCheck(ITenantScope tenantScope)
     {
-        _scopeFactory = scopeFactory;
+        _tenantScope = tenantScope;
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
     {
-        using IServiceScope scope = _scopeFactory.CreateScope();
-
-        var tenantStore = scope.ServiceProvider.GetRequiredService<IMultiTenantStore<AppTenantInfo>>();
-        var tenants = await tenantStore.GetAllAsync().ConfigureAwait(false);
-
         var details = new Dictionary<string, object>();
         var tenantsWithPending = new List<string>();
         var tenantsWithError = new List<string>();
 
-        foreach (var tenant in tenants)
-        {
-            try
+        // Probed inside each tenant's own scope: the DbContext captures the tenant's connection
+        // string at construction, so a shared scope would report the default database's schema
+        // state for every tenant.
+        await _tenantScope.RunForEachTenantAsync(
+            async (tenant, services, ct) =>
             {
-                using IServiceScope tenantScope = scope.ServiceProvider.CreateScope();
-
-                tenantScope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()
-                    .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
-
-                var dbContext = tenantScope.ServiceProvider.GetRequiredService<TenantDbContext>();
-
-                var pendingMigrations = (await dbContext.Database
-                    .GetPendingMigrationsAsync(cancellationToken)
-                    .ConfigureAwait(false))
-                    .ToArray();
-
-                bool hasPending = pendingMigrations.Length > 0;
-                if (hasPending)
+                try
                 {
-                    tenantsWithPending.Add(tenant.Id!);
+                    var dbContext = services.GetRequiredService<TenantDbContext>();
+
+                    var pendingMigrations = (await dbContext.Database
+                        .GetPendingMigrationsAsync(ct)
+                        .ConfigureAwait(false))
+                        .ToArray();
+
+                    bool hasPending = pendingMigrations.Length > 0;
+                    if (hasPending)
+                    {
+                        tenantsWithPending.Add(tenant.Id!);
+                    }
+
+                    details[tenant.Id!] = new
+                    {
+                        tenant.Name,
+                        tenant.IsActive,
+                        tenant.ValidUpto,
+                        HasPendingMigrations = hasPending,
+                        PendingMigrations = pendingMigrations
+                    };
                 }
-
-                details[tenant.Id!] = new
+                // Health checks must report errors, not throw — capture per-tenant failures as
+                // detail entries so the readiness payload tells the operator which tenant is broken.
+                catch (Exception ex)
                 {
-                    tenant.Name,
-                    tenant.IsActive,
-                    tenant.ValidUpto,
-                    HasPendingMigrations = hasPending,
-                    PendingMigrations = pendingMigrations
-                };
-            }
-            // Health checks must report errors, not throw — capture per-tenant failures as
-            // detail entries so the readiness payload tells the operator which tenant is broken.
-            catch (Exception ex)
-            {
-                tenantsWithError.Add(tenant.Id!);
-                details[tenant.Id!] = new
-                {
-                    tenant.Name,
-                    tenant.IsActive,
-                    tenant.ValidUpto,
-                    Error = ex.Message
-                };
-            }
-        }
+                    tenantsWithError.Add(tenant.Id!);
+                    details[tenant.Id!] = new
+                    {
+                        tenant.Name,
+                        tenant.IsActive,
+                        tenant.ValidUpto,
+                        Error = ex.Message
+                    };
+                }
+            },
+            cancellationToken).ConfigureAwait(false);
 
         if (tenantsWithError.Count > 0 || tenantsWithPending.Count > 0)
         {

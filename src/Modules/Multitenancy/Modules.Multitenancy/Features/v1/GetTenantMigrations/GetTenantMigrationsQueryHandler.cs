@@ -1,4 +1,3 @@
-using Finbuckle.MultiTenant.Abstractions;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.Modules.Multitenancy.Contracts.Authorization;
 using Boilerplate.Modules.Multitenancy.Contracts.Dtos;
@@ -13,65 +12,56 @@ namespace Boilerplate.Modules.Multitenancy.Features.v1.GetTenantMigrations;
 public sealed class GetTenantMigrationsQueryHandler
     : IQueryHandler<GetTenantMigrationsQuery, IReadOnlyCollection<TenantMigrationStatusDto>>
 {
-    private readonly IMultiTenantStore<AppTenantInfo> _tenantStore;
-    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ITenantScope _tenantScope;
 
-    public GetTenantMigrationsQueryHandler(
-        IMultiTenantStore<AppTenantInfo> tenantStore,
-        IServiceScopeFactory scopeFactory)
-    {
-        _tenantStore = tenantStore;
-        _scopeFactory = scopeFactory;
-    }
+    public GetTenantMigrationsQueryHandler(ITenantScope tenantScope) => _tenantScope = tenantScope;
 
     public async ValueTask<IReadOnlyCollection<TenantMigrationStatusDto>> Handle(
         GetTenantMigrationsQuery query,
         CancellationToken cancellationToken)
     {
-        var tenants = await _tenantStore.GetAllAsync().ConfigureAwait(false);
-
         var tenantMigrationStatuses = new List<TenantMigrationStatusDto>();
 
-        foreach (var tenant in tenants)
-        {
-            var tenantStatus = new TenantMigrationStatusDto
+        // The DbContext has to be built inside the tenant scope: it captures the tenant's
+        // connection string at construction, and probing the default database for every tenant
+        // would report the wrong schema state for any tenant with a dedicated one.
+        await _tenantScope.RunForEachTenantAsync(
+            async (tenant, services, ct) =>
             {
-                TenantId = tenant.Id,
-                Name = tenant.Name!,
-                IsActive = tenant.IsActive,
-                ValidUpto = tenant.ValidUpto
-            };
+                var tenantStatus = new TenantMigrationStatusDto
+                {
+                    TenantId = tenant.Id,
+                    Name = tenant.Name!,
+                    IsActive = tenant.IsActive,
+                    ValidUpto = tenant.ValidUpto
+                };
 
-            try
-            {
-                using IServiceScope tenantScope = _scopeFactory.CreateScope();
+                try
+                {
+                    var dbContext = services.GetRequiredService<TenantDbContext>();
 
-                tenantScope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()
-                    .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
+                    var appliedMigrations = await dbContext.Database
+                        .GetAppliedMigrationsAsync(ct)
+                        .ConfigureAwait(false);
 
-                var dbContext = tenantScope.ServiceProvider.GetRequiredService<TenantDbContext>();
+                    var pendingMigrations = await dbContext.Database
+                        .GetPendingMigrationsAsync(ct)
+                        .ConfigureAwait(false);
 
-                var appliedMigrations = await dbContext.Database
-                    .GetAppliedMigrationsAsync(cancellationToken)
-                    .ConfigureAwait(false);
+                    tenantStatus.Provider = dbContext.Database.ProviderName;
+                    tenantStatus.LastAppliedMigration = appliedMigrations.LastOrDefault();
+                    tenantStatus.PendingMigrations = pendingMigrations.ToArray();
+                    tenantStatus.HasPendingMigrations = tenantStatus.PendingMigrations.Count > 0;
+                }
+                // Per-tenant failure must not stop reporting on other tenants
+                catch (Exception ex)
+                {
+                    tenantStatus.Error = ex.Message;
+                }
 
-                var pendingMigrations = await dbContext.Database
-                    .GetPendingMigrationsAsync(cancellationToken)
-                    .ConfigureAwait(false);
-
-                tenantStatus.Provider = dbContext.Database.ProviderName;
-                tenantStatus.LastAppliedMigration = appliedMigrations.LastOrDefault();
-                tenantStatus.PendingMigrations = pendingMigrations.ToArray();
-                tenantStatus.HasPendingMigrations = tenantStatus.PendingMigrations.Count > 0;
-            }
-            // Per-tenant failure must not stop reporting on other tenants
-            catch (Exception ex)
-            {
-                tenantStatus.Error = ex.Message;
-            }
-
-            tenantMigrationStatuses.Add(tenantStatus);
-        }
+                tenantMigrationStatuses.Add(tenantStatus);
+            },
+            cancellationToken).ConfigureAwait(false);
 
         return tenantMigrationStatuses;
     }
