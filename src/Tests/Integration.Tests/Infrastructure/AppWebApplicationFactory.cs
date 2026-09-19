@@ -29,6 +29,7 @@ namespace Integration.Tests.Infrastructure;
 
 public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    private const string MinioImage = "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z";
     private const string MinioAccessKey = "minioadmin";
     private const string MinioSecretKey = "minioadmin";
     private const string MinioBucket = "boilerplate-integration-test-uploads";
@@ -42,7 +43,9 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
         .WithCleanUp(true)
         .Build();
 
-    private readonly MinioContainer _minio = new MinioBuilder("minio/minio:latest")
+    // MinIO no longer publishes to Docker Hub, so `minio/minio:*` fails to pull on any machine
+    // without a cached layer. Pull from quay.io, pinned to the same release as docker-compose.yml.
+    private readonly MinioContainer _minio = new MinioBuilder(MinioImage)
         .WithUsername(MinioAccessKey)
         .WithPassword(MinioSecretKey)
         .WithAutoRemove(true)
@@ -206,9 +209,14 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
                     Tests.Jobs.TenantProbeIntegrationEvent>,
                 Tests.Jobs.TenantProbeHandler>();
 
-            // Replace real mail service with a no-op to avoid SMTP errors and Hangfire retries
+            // Replace real mail service with a no-op to avoid SMTP errors and Hangfire retries.
+            // Register the concrete type as well and alias the interface to it: Hangfire records the
+            // *concrete* type in the serialized job, and AppJobActivator resolves it with
+            // GetServiceOrCreateInstance — without the concrete registration every mail job would run
+            // against a throwaway instance and its MailRequest would never reach `Sent`.
             services.RemoveAll<IMailService>();
-            services.AddSingleton<IMailService, NoOpMailService>();
+            services.AddSingleton<NoOpMailService>();
+            services.AddSingleton<IMailService>(sp => sp.GetRequiredService<NoOpMailService>());
 
             // Detailed errors in tests instead of generic "An unexpected error occurred"
             var existingHandlers = services.Where(d =>

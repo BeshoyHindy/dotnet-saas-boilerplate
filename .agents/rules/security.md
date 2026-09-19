@@ -19,7 +19,9 @@ The headers are written from a **`Response.OnStarting` callback**, not eagerly: 
 
 `AllowedHosts` is an explicit semicolon-separated list; `*` is rejected in Production by `ProductionConfigurationGuard`. Behind Traefik set `ProxyOptions.Enabled` so `UseForwardedHeaders` runs **first** in the pipeline; it clears the loopback-only defaults, and `ProxyOptionsValidator` then **fails the boot** unless `KnownProxies`/`KnownNetworks` names the proxy or `TrustAnyProxy` is set explicitly (opt-in, only where the app is unreachable except through the proxy). Trusting any peer on a shared container network lets a neighbour spoof `X-Forwarded-For`, which partitions rate limits and lands in the audit trail.
 
-**`XForwardedHost` is never enabled.** Host filtering runs before the forwarded-headers middleware, so honouring it would let a caller rewrite `Request.Host` after the allow-list approved the real one — and that value is interpolated into the confirmation/reset links Identity mails (`RegisterUserEndpoint`, `ResendConfirmationEmailEndpoint`, `SelfRegisterUserEndpoint`). `ForwardedHeadersTests` locks this down.
+**`XForwardedHost` is never enabled.** Host filtering runs before the forwarded-headers middleware, so honouring it would let a caller rewrite `Request.Host` after the allow-list approved the real one. `ForwardedHeadersTests` locks this down.
+
+**Every emailed link is built from `OriginOptions.OriginUrl`, never from the request.** Password reset, registration and resend-confirmation all resolve the base URL through `MailLinkOrigin.Require` in their command handlers (the endpoints no longer touch `HttpContext` for it), and the handler throws if no origin is configured. A mailed link is exactly where a swapped host turns into account takeover, so keep the request out of it. The registration mail points at the **client** route `{origin}/confirm-email?userId&code&tenant` — the page then calls `/api/v1/tenants/{tenant}/auth/confirm-email`; mailing the API route landed the recipient on a raw JSON body (#46).
 
 ## Request limits (`Web/Limits/`)
 

@@ -19,7 +19,11 @@ Don't stream large files through the API. The pattern (see Files module):
 2. Client uploads **directly** to storage.
 3. `FinalizeUpload` — verifies the stored object, flips to `Available`, publishes `FileFinalizedIntegrationEvent`.
 
-Local/dev without MinIO uses `LocalPresignTokenStore` (in-memory one-shot tokens).
+Local/dev without MinIO uses `LocalPresignTokenStore` (in-memory one-shot tokens) — issued but never consumed by any endpoint, so the Files upload flow effectively needs the `s3` provider.
+
+## `BuildPublicUrl` vs `GenerateDownloadUrlAsync`
+
+`BuildPublicUrl` is only valid for keys the bucket policy actually publishes — i.e. `uploads/` (avatars, tenant theme), which is what `UploadAsync` writes. **Never** use it for the Files module's `tenants/…` keys: that prefix has no anonymous grant (contract-tested in `deploy/dokploy/tests/`), so the link 403s, and granting it would publish every private file. Public Files assets go through `GenerateDownloadUrlAsync` with a short TTL instead (`PublicFileUrlFactory`, see `modules/files.md`).
 
 ## Test gotcha
 

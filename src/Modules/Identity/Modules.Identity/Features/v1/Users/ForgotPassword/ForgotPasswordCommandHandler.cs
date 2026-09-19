@@ -1,6 +1,7 @@
 using Boilerplate.BuildingBlocks.Web.Origin;
 using Boilerplate.Modules.Identity.Contracts.Services;
 using Boilerplate.Modules.Identity.Contracts.v1.Users.ForgotPassword;
+using Boilerplate.Modules.Identity.Services;
 using Mediator;
 using Microsoft.Extensions.Options;
 
@@ -21,11 +22,7 @@ public sealed class ForgotPasswordCommandHandler : ICommandHandler<ForgotPasswor
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        var origin = _originOptions.Value?.OriginUrl?.ToString();
-        if (string.IsNullOrWhiteSpace(origin))
-        {
-            throw new InvalidOperationException("Origin URL is not configured.");
-        }
+        var origin = MailLinkOrigin.Require(_originOptions);
 
         await _userService.ForgotPasswordAsync(command.Email, origin, cancellationToken).ConfigureAwait(false);
 

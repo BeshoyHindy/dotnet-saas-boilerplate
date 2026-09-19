@@ -2,7 +2,7 @@ import { createContext, useCallback, useEffect, useMemo, useRef, useState, type 
 import { useQueryClient } from "@tanstack/react-query";
 import { tokenStore } from "@/auth/token-store";
 import { decodeJwt, isTokenExpired, type JwtClaims } from "@/auth/jwt";
-import { issueToken } from "@/auth/api";
+import { issueToken, revokeSession } from "@/auth/api";
 import { refreshAccessToken } from "@/lib/api-client";
 import { getMyPermissions } from "@/api/users";
 
@@ -176,6 +176,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
+    // Tell the server first — it revokes the session row and clears the HttpOnly refresh cookie,
+    // neither of which this code can reach. Fire-and-forget: local state is cleared either way, so
+    // a signed-out tab never waits on the network, and a failed call cannot strand the user.
+    const tenant = tokenStore.getTenant();
+    if (tenant) {
+      void revokeSession({
+        tenant,
+        accessToken: tokenStore.getAccessToken(),
+        refreshToken: tokenStore.getRefreshToken(),
+      }).catch(() => {
+        /* best-effort: the session expires on its own, and the local session is gone regardless */
+      });
+    }
+
     tokenStore.clear();
     queryClient.clear();
   }, [queryClient]);

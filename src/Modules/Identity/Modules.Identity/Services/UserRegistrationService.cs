@@ -345,16 +345,23 @@ internal sealed class UserRegistrationService(
         string code = await userManager.GenerateEmailConfirmationTokenAsync(user);
         code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
 
-        // The tenant travels in the path, not a query parameter: the confirm-email endpoint lives
-        // under the anonymous auth group /api/v1/tenants/{tenant}/auth/... (ADR-0002).
-        var tenantId = multiTenantContextAccessor?.MultiTenantContext?.TenantInfo?.Id!;
-        var route = $"api/v1/tenants/{Uri.EscapeDataString(tenantId)}/auth/confirm-email";
-        var endpointUri = new Uri(string.Concat($"{origin.TrimEnd('/')}/", route));
+        // Mail the *client* route, not the API route: a recipient clicking an API link lands on a raw
+        // JSON body. The page reads userId/code/tenant from the query and calls the tenant-routed
+        // endpoint itself. Built exactly like the reset-password link in UserPasswordService — the
+        // configured origin with any trailing slash trimmed (Uri.ToString() adds one for a host-only
+        // URL, which would produce "//confirm-email" and miss the client route) and QueryHelpers doing
+        // the URL-encoding. The tenant rides in the query because the client route has no path segment
+        // for it; it is a page parameter, never an input to tenant resolution (ADR-0002).
+        var confirmEmailUri = QueryHelpers.AddQueryString(
+            $"{origin.TrimEnd('/')}/confirm-email",
+            new Dictionary<string, string?>
+            {
+                [QueryStringKeys.UserId] = user.Id,
+                [QueryStringKeys.Code] = code,
+                ["tenant"] = multiTenantContextAccessor?.MultiTenantContext?.TenantInfo?.Id,
+            });
 
-        string verificationUri = QueryHelpers.AddQueryString(endpointUri.ToString(), QueryStringKeys.UserId, user.Id);
-        verificationUri = QueryHelpers.AddQueryString(verificationUri, QueryStringKeys.Code, code);
-
-        return verificationUri;
+        return confirmEmailUri;
     }
 
     private static string BuildConfirmationEmailHtml(string userName, string confirmationUrl)

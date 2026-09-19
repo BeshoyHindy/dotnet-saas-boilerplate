@@ -42,6 +42,7 @@ using Boilerplate.Modules.Identity.Features.v1.Sessions.GetTenantSessions;
 using Boilerplate.Modules.Identity.Features.v1.Sessions.GetUserSessions;
 using Boilerplate.Modules.Identity.Features.v1.Sessions.RevokeAllSessions;
 using Boilerplate.Modules.Identity.Features.v1.Sessions.RevokeSession;
+using Boilerplate.Modules.Identity.Features.v1.Tokens.EndSession;
 using Boilerplate.Modules.Identity.Features.v1.Tokens.RefreshToken;
 using Boilerplate.Modules.Identity.Features.v1.Tokens.TokenGeneration;
 using Boilerplate.Modules.Identity.Features.v1.TwoFactor.Disable;
@@ -201,6 +202,7 @@ public class IdentityModule : IModule
 
         authGroup.MapGenerateTokenEndpoint();
         authGroup.MapRefreshTokenEndpoint();
+        authGroup.MapEndSessionEndpoint();
         authGroup.MapForgotPasswordEndpoint();
         authGroup.MapResetPasswordEndpoint();
         authGroup.MapConfirmEmailEndpoint();

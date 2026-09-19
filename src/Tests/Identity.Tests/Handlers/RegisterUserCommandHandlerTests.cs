@@ -1,7 +1,9 @@
 using AutoFixture;
+using Boilerplate.BuildingBlocks.Web.Origin;
 using Boilerplate.Modules.Identity.Contracts.Services;
 using Boilerplate.Modules.Identity.Contracts.v1.Users.RegisterUser;
 using Boilerplate.Modules.Identity.Features.v1.Users.RegisterUser;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 
@@ -9,19 +11,36 @@ namespace Identity.Tests.Handlers;
 
 /// <summary>
 /// Tests for RegisterUserCommandHandler - handles user registration.
+/// The confirmation-link origin comes from configuration, never from the command or the request.
 /// </summary>
 public sealed class RegisterUserCommandHandlerTests
 {
+    private const string ConfiguredOrigin = "https://app.example.com/";
+
     private readonly IUserService _userService;
+    private readonly IOptions<OriginOptions> _originOptions;
     private readonly RegisterUserCommandHandler _sut;
     private readonly IFixture _fixture;
 
     public RegisterUserCommandHandlerTests()
     {
         _userService = Substitute.For<IUserService>();
-        _sut = new RegisterUserCommandHandler(_userService);
+        _originOptions = Substitute.For<IOptions<OriginOptions>>();
+        _originOptions.Value.Returns(new OriginOptions { OriginUrl = new Uri(ConfiguredOrigin) });
+        _sut = new RegisterUserCommandHandler(_userService, _originOptions);
         _fixture = new Fixture();
     }
+
+    private static RegisterUserCommand ValidCommand() => new()
+    {
+        FirstName = "John",
+        LastName = "Doe",
+        Email = "john.doe@example.com",
+        UserName = "johndoe",
+        Password = "Password123!",
+        ConfirmPassword = "Password123!",
+        PhoneNumber = "+1234567890",
+    };
 
     #region Handle - Happy Path Tests
 
@@ -29,18 +48,7 @@ public sealed class RegisterUserCommandHandlerTests
     public async Task Handle_Should_ReturnRegisteredUserId_When_RegistrationIsSuccessful()
     {
         // Arrange
-        var command = new RegisterUserCommand
-        {
-            FirstName = "John",
-            LastName = "Doe",
-            Email = "john.doe@example.com",
-            UserName = "johndoe",
-            Password = "Password123!",
-            ConfirmPassword = "Password123!",
-            PhoneNumber = "+1234567890",
-            Origin = "web"
-        };
-
+        var command = ValidCommand();
         var expectedUserId = _fixture.Create<string>();
 
         _userService.RegisterAsync(
@@ -50,8 +58,8 @@ public sealed class RegisterUserCommandHandlerTests
             command.UserName,
             command.Password,
             command.ConfirmPassword,
-            command.PhoneNumber,
-            command.Origin,
+            command.PhoneNumber!,
+            ConfiguredOrigin,
             Arg.Any<CancellationToken>())
             .Returns(expectedUserId);
 
@@ -67,17 +75,11 @@ public sealed class RegisterUserCommandHandlerTests
     public async Task Handle_Should_CallUserServiceWithCorrectParameters_When_RegistrationIsRequested()
     {
         // Arrange
-        var command = new RegisterUserCommand
-        {
-            FirstName = "Jane",
-            LastName = "Smith",
-            Email = "jane.smith@example.com",
-            UserName = "janesmith",
-            Password = "SecurePass456!",
-            ConfirmPassword = "SecurePass456!",
-            PhoneNumber = "+9876543210",
-            Origin = "mobile"
-        };
+        var command = ValidCommand();
+        command.FirstName = "Jane";
+        command.LastName = "Smith";
+        command.Email = "jane.smith@example.com";
+        command.UserName = "janesmith";
 
         var userId = _fixture.Create<string>();
         _userService.RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
@@ -94,8 +96,8 @@ public sealed class RegisterUserCommandHandlerTests
             command.UserName,
             command.Password,
             command.ConfirmPassword,
-            command.PhoneNumber,
-            command.Origin,
+            command.PhoneNumber!,
+            ConfiguredOrigin,
             Arg.Any<CancellationToken>());
     }
 
@@ -103,17 +105,8 @@ public sealed class RegisterUserCommandHandlerTests
     public async Task Handle_Should_HandleNullPhoneNumber_When_NotProvided()
     {
         // Arrange
-        var command = new RegisterUserCommand
-        {
-            FirstName = "Test",
-            LastName = "User",
-            Email = "test@example.com",
-            UserName = "testuser",
-            Password = "Password123!",
-            ConfirmPassword = "Password123!",
-            PhoneNumber = null,
-            Origin = "web"
-        };
+        var command = ValidCommand();
+        command.PhoneNumber = null;
 
         var userId = _fixture.Create<string>();
         _userService.RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
@@ -131,43 +124,26 @@ public sealed class RegisterUserCommandHandlerTests
             command.Password,
             command.ConfirmPassword,
             string.Empty, // Should convert null to empty string
-            command.Origin,
+            ConfiguredOrigin,
             Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Handle_Should_HandleNullOrigin_When_NotProvided()
+    public async Task Handle_Should_UseTheConfiguredOrigin_For_TheConfirmationLink()
     {
-        // Arrange
-        var command = new RegisterUserCommand
-        {
-            FirstName = "Test",
-            LastName = "User",
-            Email = "test@example.com",
-            UserName = "testuser",
-            Password = "Password123!",
-            ConfirmPassword = "Password123!",
-            PhoneNumber = "+1234567890",
-            Origin = null
-        };
-
-        var userId = _fixture.Create<string>();
+        // Arrange — the mailed link's base URL is configuration, not anything the caller controls.
+        var command = ValidCommand();
         _userService.RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(userId);
+            .Returns(_fixture.Create<string>());
 
         // Act
         await _sut.Handle(command, CancellationToken.None);
 
         // Assert
         await _userService.Received(1).RegisterAsync(
-            command.FirstName,
-            command.LastName,
-            command.Email,
-            command.UserName,
-            command.Password,
-            command.ConfirmPassword,
-            command.PhoneNumber,
-            string.Empty, // Should convert null to empty string
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Is<string>(origin => origin == ConfiguredOrigin),
             Arg.Any<CancellationToken>());
     }
 
@@ -179,17 +155,7 @@ public sealed class RegisterUserCommandHandlerTests
     public async Task Handle_Should_ThrowException_When_UserServiceThrows()
     {
         // Arrange
-        var command = new RegisterUserCommand
-        {
-            FirstName = "John",
-            LastName = "Doe",
-            Email = "john.doe@example.com",
-            UserName = "johndoe",
-            Password = "Password123!",
-            ConfirmPassword = "Password123!",
-            PhoneNumber = "+1234567890",
-            Origin = "web"
-        };
+        var command = ValidCommand();
 
         var expectedExceptionMessage = "Email already exists";
         _userService.RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
@@ -200,6 +166,21 @@ public sealed class RegisterUserCommandHandlerTests
             async () => await _sut.Handle(command, CancellationToken.None));
 
         exception.Message.ShouldBe(expectedExceptionMessage);
+    }
+
+    [Fact]
+    public async Task Handle_Should_Throw_When_OriginIsNotConfigured()
+    {
+        // Arrange — registering without a configured origin would mail an unusable link; fail loudly.
+        _originOptions.Value.Returns(new OriginOptions { OriginUrl = null });
+
+        // Act & Assert
+        await Should.ThrowAsync<InvalidOperationException>(
+            async () => await _sut.Handle(ValidCommand(), CancellationToken.None));
+
+        await _userService.DidNotReceive().RegisterAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     #endregion
@@ -222,18 +203,7 @@ public sealed class RegisterUserCommandHandlerTests
     public async Task Handle_Should_PassCancellationToken_ToUserService()
     {
         // Arrange
-        var command = new RegisterUserCommand
-        {
-            FirstName = "Test",
-            LastName = "User",
-            Email = "test@example.com",
-            UserName = "testuser",
-            Password = "Password123!",
-            ConfirmPassword = "Password123!",
-            PhoneNumber = "+1234567890",
-            Origin = "web"
-        };
-
+        var command = ValidCommand();
         var userId = _fixture.Create<string>();
         using var cts = new CancellationTokenSource();
         var cancellationToken = cts.Token;
@@ -253,7 +223,7 @@ public sealed class RegisterUserCommandHandlerTests
             command.Password,
             command.ConfirmPassword,
             command.PhoneNumber!,
-            command.Origin!,
+            ConfiguredOrigin,
             cancellationToken);
     }
 
@@ -265,17 +235,12 @@ public sealed class RegisterUserCommandHandlerTests
     public async Task Handle_Should_HandleEmptyStrings_When_ProvidedInCommand()
     {
         // Arrange
-        var command = new RegisterUserCommand
-        {
-            FirstName = "",
-            LastName = "",
-            Email = "test@example.com",
-            UserName = "testuser",
-            Password = "Password123!",
-            ConfirmPassword = "Password123!",
-            PhoneNumber = "",
-            Origin = ""
-        };
+        var command = ValidCommand();
+        command.FirstName = "";
+        command.LastName = "";
+        command.Email = "test@example.com";
+        command.UserName = "testuser";
+        command.PhoneNumber = "";
 
         var userId = _fixture.Create<string>();
         _userService.RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
@@ -286,7 +251,7 @@ public sealed class RegisterUserCommandHandlerTests
 
         // Assert
         result.UserId.ShouldBe(userId);
-        await _userService.Received(1).RegisterAsync("", "", "test@example.com", "testuser", "Password123!", "Password123!", "", "", Arg.Any<CancellationToken>());
+        await _userService.Received(1).RegisterAsync("", "", "test@example.com", "testuser", "Password123!", "Password123!", "", ConfiguredOrigin, Arg.Any<CancellationToken>());
     }
 
     #endregion

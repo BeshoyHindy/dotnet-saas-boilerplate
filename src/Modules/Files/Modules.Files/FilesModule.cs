@@ -51,6 +51,7 @@ public sealed class FilesModule : IModule
         builder.Services.AddScoped<IDbInitializer, FilesDbInitializer>();
 
         builder.Services.AddScoped<FileAccessPolicyRegistry>();
+        builder.Services.AddScoped<PublicFileUrlFactory>();
         builder.Services.AddSingleton<IFileScanner, NoOpFileScanner>();
         builder.Services.AddValidatorsFromAssembly(typeof(FilesModule).Assembly);
 
