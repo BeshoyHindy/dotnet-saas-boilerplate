@@ -164,6 +164,18 @@ public sealed class TenantThemeService : ITenantThemeService
         }
     }
 
+    /// <remarks>
+    /// The brand-asset columns hold URLs, not keys, and a URL in one of them may not be a key of
+    /// this tenant's at all: the editor accepts a pasted address, and a development database
+    /// predating tenant-prefixed keys still holds flat <c>uploads/{type}/…</c> values. So the
+    /// previous value is dropped with <c>RemoveIfOwnedAsync</c>, which skips and logs anything the
+    /// ambient tenant does not own rather than failing the whole theme save.
+    ///
+    /// <para>The tenant this writes for is always the ambient one — the endpoint takes no tenant
+    /// and a root operator editing another tenant's branding arrives on an exchanged token whose
+    /// <c>tenant</c> claim is the target (ADR-0002) — so the keys the block composes below land in
+    /// the right place without a tenant parameter anywhere in the storage API.</para>
+    /// </remarks>
     private async Task HandleBrandAssetUploadsAsync(BrandAssetsDto assets, TenantTheme entity, CancellationToken ct)
     {
         // Handle logo upload (same pattern as profile picture)
@@ -171,14 +183,11 @@ public sealed class TenantThemeService : ITenantThemeService
         {
             var oldLogoUrl = entity.LogoUrl;
             entity.LogoUrl = await _storageService.UploadAsync<TenantTheme>(assets.Logo, FileType.Image, ct).ConfigureAwait(false);
-            if (!string.IsNullOrEmpty(oldLogoUrl))
-            {
-                await _storageService.RemoveAsync(oldLogoUrl, ct).ConfigureAwait(false);
-            }
+            await _storageService.RemoveIfOwnedAsync(oldLogoUrl, ct).ConfigureAwait(false);
         }
         else if (assets.DeleteLogo && !string.IsNullOrEmpty(entity.LogoUrl))
         {
-            await _storageService.RemoveAsync(entity.LogoUrl, ct).ConfigureAwait(false);
+            await _storageService.RemoveIfOwnedAsync(entity.LogoUrl, ct).ConfigureAwait(false);
             entity.LogoUrl = null;
         }
 
@@ -187,14 +196,11 @@ public sealed class TenantThemeService : ITenantThemeService
         {
             var oldLogoUrl = entity.LogoDarkUrl;
             entity.LogoDarkUrl = await _storageService.UploadAsync<TenantTheme>(assets.LogoDark, FileType.Image, ct).ConfigureAwait(false);
-            if (!string.IsNullOrEmpty(oldLogoUrl))
-            {
-                await _storageService.RemoveAsync(oldLogoUrl, ct).ConfigureAwait(false);
-            }
+            await _storageService.RemoveIfOwnedAsync(oldLogoUrl, ct).ConfigureAwait(false);
         }
         else if (assets.DeleteLogoDark && !string.IsNullOrEmpty(entity.LogoDarkUrl))
         {
-            await _storageService.RemoveAsync(entity.LogoDarkUrl, ct).ConfigureAwait(false);
+            await _storageService.RemoveIfOwnedAsync(entity.LogoDarkUrl, ct).ConfigureAwait(false);
             entity.LogoDarkUrl = null;
         }
 
@@ -203,14 +209,11 @@ public sealed class TenantThemeService : ITenantThemeService
         {
             var oldFaviconUrl = entity.FaviconUrl;
             entity.FaviconUrl = await _storageService.UploadAsync<TenantTheme>(assets.Favicon, FileType.Image, ct).ConfigureAwait(false);
-            if (!string.IsNullOrEmpty(oldFaviconUrl))
-            {
-                await _storageService.RemoveAsync(oldFaviconUrl, ct).ConfigureAwait(false);
-            }
+            await _storageService.RemoveIfOwnedAsync(oldFaviconUrl, ct).ConfigureAwait(false);
         }
         else if (assets.DeleteFavicon && !string.IsNullOrEmpty(entity.FaviconUrl))
         {
-            await _storageService.RemoveAsync(entity.FaviconUrl, ct).ConfigureAwait(false);
+            await _storageService.RemoveIfOwnedAsync(entity.FaviconUrl, ct).ConfigureAwait(false);
             entity.FaviconUrl = null;
         }
     }

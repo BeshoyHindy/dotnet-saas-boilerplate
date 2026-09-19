@@ -30,6 +30,10 @@
 
 	<ItemGroup>
 		<InternalsVisibleTo Include="Boilerplate.Integration.Tests" />
+		<!-- S3StorageService is internal; its tenant-key enforcement is unit-tested against a
+		     substituted IAmazonS3, which is what makes "refused before any call reaches the
+		     backend" assertable rather than merely stated. -->
+		<InternalsVisibleTo Include="Boilerplate.Framework.Tests" />
 	</ItemGroup>
 
 </Project>

@@ -1,17 +1,24 @@
 using Boilerplate.BuildingBlocks.Shared.Storage;
 using Boilerplate.BuildingBlocks.Storage.DTOs;
+using Boilerplate.BuildingBlocks.Storage.Keys;
 using Boilerplate.BuildingBlocks.Storage.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace Boilerplate.BuildingBlocks.Storage.Local;
 
+/// <summary>
+/// The development fallback: objects are files under <c>wwwroot</c>, served by
+/// <c>UseStaticFiles</c>. Key composition and the ownership check are the same as the S3 provider's
+/// — the tenant prefix becomes a directory level, and a key outside the ambient tenant's two
+/// prefixes is refused before any path is touched. Production refuses to boot on this provider
+/// (<c>ProductionConfigurationGuard</c>) because it serves everything it stores anonymously.
+/// </summary>
 public sealed partial class LocalStorageService : IStorageService
 {
-    private const string UploadBasePath = "uploads";
-
     // Source-generated, compiled once — the inline Regex.Replace calls re-parsed the pattern on every upload.
     [GeneratedRegex("[^a-z0-9]")]
     private static partial Regex FolderSanitizer();
@@ -19,14 +26,21 @@ public sealed partial class LocalStorageService : IStorageService
     [GeneratedRegex(@"[^a-zA-Z0-9_\.-]")]
     private static partial Regex FileNameSanitizer();
     private readonly string _rootPath;
+    private readonly ITenantStorageKeys _keys;
+    private readonly ILogger<LocalStorageService> _logger;
     private readonly FileExtensionContentTypeProvider _contentTypeProvider;
 
-    public LocalStorageService(IWebHostEnvironment environment)
+    public LocalStorageService(
+        IWebHostEnvironment environment,
+        ITenantStorageKeys keys,
+        ILogger<LocalStorageService> logger)
     {
         ArgumentNullException.ThrowIfNull(environment);
         _rootPath = string.IsNullOrWhiteSpace(environment.WebRootPath)
             ? Path.Combine(environment.ContentRootPath, "wwwroot")
             : environment.WebRootPath;
+        _keys = keys;
+        _logger = logger;
         _contentTypeProvider = new FileExtensionContentTypeProvider();
     }
 
@@ -53,25 +67,23 @@ public sealed partial class LocalStorageService : IStorageService
         var folder = FolderSanitizer().Replace(typeof(T).Name.ToLowerInvariant(), "_");
 #pragma warning restore CA1308
         var safeFileName = $"{Guid.NewGuid():N}_{SanitizeFileName(request.FileName)}";
-        var relativePath = Path.Combine(UploadBasePath, folder, safeFileName);
-        var fullPath = Path.Combine(_rootPath, relativePath);
+        var key = _keys.Compose(StorageSpace.Public, $"{folder}/{safeFileName}");
+        var fullPath = ResolveDiskPath(key);
 
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
 
         await File.WriteAllBytesAsync(fullPath, request.Data.ToArray(), cancellationToken);
 
-        return relativePath.Replace("\\", "/", StringComparison.Ordinal); // Normalize for URLs
+        // The key itself, '/'-separated: it is both the handle and — because wwwroot is served
+        // verbatim — the server-relative URL, modulo the leading slash BuildPublicUrl adds.
+        return key;
     }
+
+    public string ComposeKey(StorageSpace space, string relativePath) => _keys.Compose(space, relativePath);
 
     public Task<FileDownloadResponse?> DownloadAsync(string path, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return Task.FromResult<FileDownloadResponse?>(null);
-        }
-
-        var normalizedPath = path.Replace("/", Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal);
-        var fullPath = Path.Combine(_rootPath, normalizedPath);
+        var fullPath = ResolveDiskPath(AuthorizeHandle(path));
 
         if (!File.Exists(fullPath))
         {
@@ -99,40 +111,19 @@ public sealed partial class LocalStorageService : IStorageService
 
     public Task<bool> ExistsAsync(string path, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return Task.FromResult(false);
-        }
-
-        var normalizedPath = path.Replace("/", Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal);
-        var fullPath = Path.Combine(_rootPath, normalizedPath);
-
-        return Task.FromResult(File.Exists(fullPath));
+        return Task.FromResult(File.Exists(ResolveDiskPath(AuthorizeHandle(path))));
     }
 
     public Task<long> GetSizeAsync(string path, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return Task.FromResult(0L);
-        }
+        var fullPath = ResolveDiskPath(AuthorizeHandle(path));
 
-        var normalizedPath = path.Replace("/", Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal);
-        var fullPath = Path.Combine(_rootPath, normalizedPath);
-
-        if (!File.Exists(fullPath))
-        {
-            return Task.FromResult(0L);
-        }
-
-        return Task.FromResult(new FileInfo(fullPath).Length);
+        return Task.FromResult(File.Exists(fullPath) ? new FileInfo(fullPath).Length : 0L);
     }
 
     public Task RemoveAsync(string path, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(path)) return Task.CompletedTask;
-
-        var fullPath = Path.Combine(_rootPath, path);
+        var fullPath = ResolveDiskPath(AuthorizeHandle(path));
 
         if (File.Exists(fullPath))
         {
@@ -140,6 +131,17 @@ public sealed partial class LocalStorageService : IStorageService
         }
 
         return Task.CompletedTask;
+    }
+
+    public async Task<bool> RemoveIfOwnedAsync(string? storedHandle, CancellationToken cancellationToken = default)
+    {
+        if (!TryAuthorizeHandle(storedHandle, out var key))
+        {
+            return false;
+        }
+
+        await RemoveAsync(key, cancellationToken).ConfigureAwait(false);
+        return true;
     }
 
     private static string SanitizeFileName(string fileName)
@@ -156,10 +158,12 @@ public sealed partial class LocalStorageService : IStorageService
         string storageKey, string contentType, long maxBytes, TimeSpan ttl,
         CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(storageKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(contentType);
 
-        var token = SharedTokenStore.Issue(storageKey, contentType, maxBytes, ttl);
+        // The token carries the authorized physical key, which is what binds it to one tenant:
+        // LocalPresignTokenStore.Consume re-checks ownership, so a token minted under tenant A
+        // cannot be redeemed for tenant B's object even if the token string leaks.
+        var token = SharedTokenStore.Issue(AuthorizeHandle(storageKey), contentType, maxBytes, ttl);
         var url = new Uri($"local://upload/{token}", UriKind.Absolute);
         var headers = new Dictionary<string, string>(StringComparer.Ordinal) { ["Content-Type"] = contentType };
         return Task.FromResult(new PresignedUploadUrl(url, headers, DateTimeOffset.UtcNow.Add(ttl)));
@@ -169,33 +173,24 @@ public sealed partial class LocalStorageService : IStorageService
         string storageKey, TimeSpan ttl, string? responseContentDisposition = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(storageKey);
         // Local mode serves files from /wwwroot — no signing required.
-        var normalized = storageKey.TrimStart('/').Replace("\\", "/", StringComparison.Ordinal);
-        return Task.FromResult(new Uri($"/{normalized}", UriKind.Relative));
+        return Task.FromResult(new Uri($"/{AuthorizeHandle(storageKey)}", UriKind.Relative));
     }
 
 #pragma warning disable CA1055 // returns a server-relative path, not a well-formed Uri — see IStorageService.BuildPublicUrl
     public string BuildPublicUrl(string storageKey)
 #pragma warning restore CA1055
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(storageKey);
-        var normalized = storageKey.TrimStart('/').Replace("\\", "/", StringComparison.Ordinal);
-        // Resolved later against the dashboard's API origin (as UserProfileService does for legacy
-        // avatars). The leading slash lets clients distinguish absolute from server-relative URLs.
-        return $"/{normalized}";
+        // Resolved later against the dashboard's API origin (as UserProfileService does for
+        // relative avatars). The leading slash lets clients distinguish absolute from
+        // server-relative URLs.
+        return $"/{AuthorizeHandle(storageKey)}";
     }
 
     public Task<StoredObjectMetadata?> HeadObjectAsync(
         string storageKey, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(storageKey))
-        {
-            return Task.FromResult<StoredObjectMetadata?>(null);
-        }
-
-        var normalizedPath = storageKey.Replace("/", Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal);
-        var fullPath = Path.Combine(_rootPath, normalizedPath);
+        var fullPath = ResolveDiskPath(AuthorizeHandle(storageKey));
         if (!File.Exists(fullPath))
         {
             return Task.FromResult<StoredObjectMetadata?>(null);
@@ -212,5 +207,61 @@ public sealed partial class LocalStorageService : IStorageService
             contentType!,
             new DateTimeOffset(info.LastWriteTimeUtc, TimeSpan.Zero),
             ETag: null));
+    }
+
+    /// <summary>
+    /// Maps a persisted handle back to a key and proves the ambient tenant owns it. The handle may
+    /// be the key, or the server-relative URL <see cref="BuildPublicUrl"/> and
+    /// <see cref="GenerateDownloadUrlAsync"/> hand out — one leading slash, no host — so exactly
+    /// one leading slash is removed and separators are normalised. Nothing else is repaired.
+    /// </summary>
+    private string AuthorizeHandle(string? handle) => _keys.Authorize(ToKey(handle));
+
+    private bool TryAuthorizeHandle(string? handle, out string key)
+    {
+        if (_keys.TryAuthorize(ToKey(handle), out key))
+        {
+            return true;
+        }
+
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation(
+                "Skipping local object {Handle}: not a storage key owned by tenant {TenantId}.", handle, _keys.TenantId);
+        }
+
+        return false;
+    }
+
+    private static string ToKey(string? handle)
+    {
+        if (string.IsNullOrWhiteSpace(handle))
+        {
+            return string.Empty;
+        }
+
+        var value = handle.Replace('\\', '/');
+        return value.StartsWith('/') ? value[1..] : value;
+    }
+
+    /// <summary>
+    /// The on-disk path for an already-authorized key. The key grammar rules out <c>..</c> and
+    /// absolute paths, so this cannot escape <c>wwwroot</c>; the containment check is the belt to
+    /// that braces, and fails loudly rather than reading someone else's file if it ever could.
+    /// </summary>
+    private string ResolveDiskPath(string key)
+    {
+        var relative = key.Replace('/', Path.DirectorySeparatorChar);
+        var fullPath = Path.GetFullPath(Path.Combine(_rootPath, relative));
+        var root = Path.GetFullPath(_rootPath);
+
+        if (!fullPath.StartsWith(
+                root.EndsWith(Path.DirectorySeparatorChar) ? root : root + Path.DirectorySeparatorChar,
+                StringComparison.Ordinal))
+        {
+            throw new StorageKeyNotOwnedException();
+        }
+
+        return fullPath;
     }
 }
