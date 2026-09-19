@@ -39,6 +39,12 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\Host\Boilerplate.Api\Boilerplate.Api.csproj" />
+        <!-- The demo seeder lives in the migrator, and the only honest test of it is "can these
+             accounts sign in" — which needs the API host too. Aliased because both hosts have a
+             top-level-statement `Program`, and `WebApplicationFactory<Program>` must keep meaning
+             the API's. -->
+        <ProjectReference Include="..\..\Host\Boilerplate.DbMigrator\Boilerplate.DbMigrator.csproj"
+                          Aliases="migrator" />
     </ItemGroup>
 
 </Project>

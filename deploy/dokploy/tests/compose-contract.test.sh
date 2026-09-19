@@ -101,6 +101,11 @@ assert_match "api waits for the migrator to complete successfully" "$api_block" 
 migrator_block="$(service_block "$APP" migrator)"
 assert_match "migrator is one-shot (restart: \"no\")" "$migrator_block" '^[[:space:]]*restart:[[:space:]]*"no"'
 assert_match "migrator applies and seeds" "$migrator_block" 'command:.*apply.*--seed'
+# Demo seeding (--demo) creates the well-known acme/globex tenants whose accounts share one
+# configured password. The migrator refuses the flag in Production anyway; asserting it here means
+# a deploy stack never even asks, and that nobody copies the local compose command over.
+refute_match "production migrator seeds no demo accounts" "$migrator_block" '\-\-demo'
+refute_match "production stack needs no demo password" "$app_text" 'Seed__DemoPassword'
 # EnableAuthentication is off in the migrator, so a signing key there would be an
 # unused secret in one more environment.
 refute_match "migrator is given no JWT signing key" "$migrator_block" '[Jj]wt'

@@ -5,7 +5,7 @@
 #   docker compose down -v             # stop and delete the data volumes
 #
 # Non-secret settings (ports, URLs, database and bucket names) have local
-# defaults, so .env only has to carry the four secrets. Those have NO default
+# defaults, so .env only has to carry the secrets. Those have NO default
 # on purpose: the containers run as Production, and ProductionConfigurationGuard
 # refuses to boot on a secret that looks like a template placeholder, so a
 # committed "local-dev-only" literal here would either be rejected or, worse,
@@ -123,8 +123,9 @@ services:
 
   # ── Application ───────────────────────────────────────────────────
   # One-shot migrator. Applies every pending migration under a Postgres advisory
-  # lock, seeds the root tenant + its admin user, then exits. The API starts only
-  # once this completes, so it can never run against an unmigrated database.
+  # lock, seeds the root tenant + its admin user and the demo accounts, then
+  # exits. The API starts only once this completes, so it can never run against
+  # an unmigrated database.
   migrator:
     build:
       context: .
@@ -135,14 +136,22 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
     environment:
-      DOTNET_ENVIRONMENT: Production
+      # Development, while every other service here runs as Production: `--demo` below is
+      # refused outright in a Production host, by design (it mints well-known accounts sharing
+      # one password). This stack exists to exercise the shipped images locally and wants demo
+      # accounts to sign in as; the deploy/dokploy stacks run the same image as Production and
+      # pass no --demo. Drop the --demo flag and this line together if you want neither.
+      DOTNET_ENVIRONMENT: Development
       DatabaseOptions__Provider: POSTGRESQL
       DatabaseOptions__ConnectionString: Host=postgres;Port=5432;Database=${POSTGRES_DB:-boilerplate};Username=${POSTGRES_USER:-boilerplate};Password=${POSTGRES_PASSWORD:?run scripts/local-env.sh to generate .env}
       DatabaseOptions__MigrationsAssembly: Boilerplate.Migrations.PostgreSQL
       Seed__DefaultAdminPassword: ${SEED_ADMIN_PASSWORD:?run scripts/local-env.sh to generate .env}
+      # The one password every demo account signs in with. Generated into .env like the rest;
+      # never a literal here, because this file is committed.
+      Seed__DemoPassword: ${SEED_DEMO_PASSWORD:?run scripts/local-env.sh to generate .env}
       # No JwtOptions here on purpose: the migrator turns off EnableAuthentication, so it never
       # needs a signing key it could not use anyway.
-    command: ["apply", "--seed"]
+    command: ["apply", "--seed", "--demo"]
 
   api:
     build:

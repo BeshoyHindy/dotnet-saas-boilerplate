@@ -8,6 +8,7 @@ namespace Boilerplate.DbMigrator;
 /// Flags:   --tenant &lt;id&gt;   scope to one tenant id
 ///          --catalog-only   skip per-tenant migrations
 ///          --seed           after apply, also run SeedAsync per tenant
+///          --demo           after apply, also seed the demo accounts (never in Production)
 ///          --help / -h      print help text
 /// </summary>
 internal sealed record MigratorCommand(
@@ -15,6 +16,7 @@ internal sealed record MigratorCommand(
     string? Tenant,
     bool CatalogOnly,
     bool SeedAfter,
+    bool Demo,
     bool Help)
 {
     private static readonly string[] KnownVerbs = ["apply", "seed", "list-pending"];
@@ -32,9 +34,10 @@ internal sealed record MigratorCommand(
         var tenant = ExtractValue(args, "--tenant");
         var catalogOnly = args.Any(a => string.Equals(a, "--catalog-only", StringComparison.OrdinalIgnoreCase));
         var seedAfter = args.Any(a => string.Equals(a, "--seed", StringComparison.OrdinalIgnoreCase));
+        var demo = args.Any(a => string.Equals(a, "--demo", StringComparison.OrdinalIgnoreCase));
         var help = args.Any(a => a is "-h" or "--help");
 
-        return new MigratorCommand(verb, tenant, catalogOnly, seedAfter, help);
+        return new MigratorCommand(verb, tenant, catalogOnly, seedAfter, demo, help);
     }
 
     private static string? ExtractValue(string[] args, string flag)
@@ -70,6 +73,9 @@ internal sealed record MigratorCommand(
           --tenant <id>        Restrict to a single tenant id (default: all tenants).
           --catalog-only       Skip the per-tenant pass; only the tenant catalog is migrated.
           --seed               After apply, also call ITenantService.SeedTenantAsync.
+          --demo               After apply, seed the demo accounts: the 'acme' and 'globex'
+                               tenants, their users, custom roles and groups. Needs
+                               Seed:DemoPassword; refused in Production.
           -h, --help           Print this help text.
 
         Exit codes:

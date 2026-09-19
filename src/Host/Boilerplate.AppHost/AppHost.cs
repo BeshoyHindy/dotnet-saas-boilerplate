@@ -107,9 +107,29 @@ var seedAdminPassword = builder.AddParameter(
     secret: true,
     persist: true);
 
+// Password every demo account signs in with (--demo below). Generated + persisted exactly like the
+// admin one above, and read the same way: Aspire dashboard → Resources → Parameters. Demo accounts
+// are a development affordance — the migrator refuses --demo outright when the environment is
+// Production, so this parameter never travels to a real deployment.
+var seedDemoPassword = builder.AddParameter(
+    "seed-demo-password",
+    new GenerateParameterDefault
+    {
+        MinLength = 20,
+        Lower = true,
+        Upper = true,
+        Numeric = true,
+        Special = false,
+        MinLower = 2,
+        MinUpper = 2,
+        MinNumeric = 2,
+    },
+    secret: true,
+    persist: true);
+
 // DB migrator: applies pending migrations + seeds the root tenant and its admin user, then exits. The
-// API waits for its completion so it never starts against an unmigrated DB. Structural bootstrap only —
-// no demo/sample data is seeded.
+// API waits for its completion so it never starts against an unmigrated DB. `--demo` adds the demo
+// tenants (acme, globex) and the people inside them, so a fresh stack has something to sign in as.
 var migrator = builder.AddProject<Projects.Boilerplate_DbMigrator>($"{appPrefix}-db-migrator")
     .WithReference(postgres)
     .WaitFor(postgres)
@@ -121,7 +141,8 @@ var migrator = builder.AddProject<Projects.Boilerplate_DbMigrator>($"{appPrefix}
     .WithEnvironment("DatabaseOptions__ConnectionString", postgres.Resource.ConnectionStringExpression)
     .WithEnvironment("DatabaseOptions__MigrationsAssembly", "Boilerplate.Migrations.PostgreSQL")
     .WithEnvironment("Seed__DefaultAdminPassword", seedAdminPassword)
-    .WithArgs("apply", "--seed");
+    .WithEnvironment("Seed__DemoPassword", seedDemoPassword)
+    .WithArgs("apply", "--seed", "--demo");
 
 // API Service. Startup order is migrator → API → console: the migrator must have exited 0 before the
 // API boots, and the React apps below wait on the API.
