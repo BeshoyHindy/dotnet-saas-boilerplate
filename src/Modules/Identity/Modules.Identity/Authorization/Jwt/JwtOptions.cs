@@ -14,7 +14,11 @@ public class JwtOptions : IValidatableObject
     {
         if (string.IsNullOrEmpty(SigningKey))
         {
-            yield return new ValidationResult("No Key defined in JwtOptions config", [nameof(SigningKey)]);
+            yield return new ValidationResult(
+                "No Key defined in JwtOptions config. The repository ships no signing key: run " +
+                "`bash scripts/dev-secrets.sh` to generate one into user-secrets, or set " +
+                "JwtOptions__SigningKey in the environment.",
+                [nameof(SigningKey)]);
         }
 
         if (!string.IsNullOrEmpty(SigningKey) && SigningKey.Length < 32)

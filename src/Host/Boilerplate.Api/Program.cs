@@ -1,6 +1,7 @@
 ﻿using Boilerplate.BuildingBlocks.Eventing;
 using Finbuckle.MultiTenant.AspNetCore.Extensions;
 using Boilerplate.BuildingBlocks.Web;
+using Boilerplate.BuildingBlocks.Web.Configuration;
 using Boilerplate.BuildingBlocks.Web.Modules;
 using Boilerplate.Modules.Auditing;
 using Boilerplate.Modules.Identity;
@@ -21,21 +22,9 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
-if (builder.Environment.IsProduction())
-{
-    static void Require(IConfiguration config, string key)
-    {
-        if (string.IsNullOrWhiteSpace(config[key]))
-        {
-            throw new InvalidOperationException($"Missing required configuration '{key}' in Production.");
-        }
-    }
-
-    var config = builder.Configuration;
-    Require(config, "DatabaseOptions:ConnectionString");
-    Require(config, "CachingOptions:Redis");
-    Require(config, "JwtOptions:SigningKey");
-}
+// Refuse to boot in Production with missing settings, placeholder secrets or an open host
+// allow-list. No-op in every other environment.
+builder.ValidateProductionConfiguration();
 
 builder.Services.AddMediator(o =>
 {

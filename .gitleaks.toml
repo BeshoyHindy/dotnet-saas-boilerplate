@@ -1,0 +1,35 @@
+# Secret scanning configuration (issue #13).
+#
+#   gitleaks dir .            # working tree, uses this file automatically
+#   gitleaks detect --no-git  # same, for older invocations
+#
+# The template must ship zero credential-shaped literals: every secret comes from user-secrets,
+# environment variables or Aspire parameters. The allow-list below is deliberately narrow — each
+# entry names one non-secret that the generic rules cannot tell apart from a real one.
+
+title = "Boilerplate secret scan"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Build output and documented non-secrets"
+
+paths = [
+  # Build output is a copy of tracked files; scanning it double-reports and, when stale, reports
+  # secrets that no longer exist in the source.
+  '''(^|/)bin/''',
+  '''(^|/)obj/''',
+  '''(^|/)node_modules/''',
+  # Local runtime state, gitignored like bin/obj: audit dead-letter dumps contain hashes of real
+  # request data from a dev run, and are never committed.
+  '''(^|/)audit-dlq/''',
+]
+
+regexes = [
+  # The jwt.io sample token (subject "1234567890", signed with the public key "your-256-bit-secret").
+  # It is a shape fixture for RefreshTokenCommandValidator, not a credential.
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\..*''',
+  # "S3-compatible" in prose trips the generic-api-key entropy rule.
+  '''S3-compatible''',
+]

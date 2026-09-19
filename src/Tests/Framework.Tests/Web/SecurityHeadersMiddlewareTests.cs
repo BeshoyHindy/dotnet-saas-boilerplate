@@ -1,19 +1,49 @@
 using Boilerplate.BuildingBlocks.Web.Security;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Options;
 
 namespace Framework.Tests.Web;
 
 public sealed class SecurityHeadersMiddlewareTests
 {
-    private static async Task<HttpContext> InvokeAsync(SecurityHeadersOptions options, string path = "/api/v1/users", bool https = false)
+    /// <summary>
+    /// The middleware writes its headers from an <c>OnStarting</c> callback, and
+    /// <see cref="DefaultHttpContext"/>'s stock response feature drops those callbacks on the floor.
+    /// This one records them so a test can start the response and observe the headers.
+    /// </summary>
+    private sealed class RecordingResponseFeature : HttpResponseFeature
+    {
+        private readonly List<(Func<object, Task> Callback, object State)> _callbacks = [];
+
+        public override void OnStarting(Func<object, Task> callback, object state) => _callbacks.Add((callback, state));
+
+        public async Task StartResponseAsync()
+        {
+            foreach (var (callback, state) in _callbacks)
+            {
+                await callback(state);
+            }
+        }
+    }
+
+    private static DefaultHttpContext CreateContext(string path, bool https, out RecordingResponseFeature response)
     {
         var context = new DefaultHttpContext();
+        response = new RecordingResponseFeature();
+        context.Features.Set<IHttpResponseFeature>(response);
         context.Request.Path = path;
         if (https)
         {
             context.Request.Scheme = "https";
         }
+
+        return context;
+    }
+
+    private static async Task<HttpContext> InvokeAsync(SecurityHeadersOptions options, string path = "/api/v1/users", bool https = false)
+    {
+        var context = CreateContext(path, https, out var response);
 
         var nextInvoked = false;
         var middleware = new SecurityHeadersMiddleware(
@@ -21,6 +51,7 @@ public sealed class SecurityHeadersMiddlewareTests
             Options.Create(options));
 
         await middleware.InvokeAsync(context);
+        await response.StartResponseAsync();
         context.Items["__nextInvoked"] = nextInvoked;
         return context;
     }
@@ -136,16 +167,33 @@ public sealed class SecurityHeadersMiddlewareTests
     public async Task InvokeAsync_Should_NotOverwriteCsp_When_AlreadyPresent()
     {
         // Arrange
-        var context = new DefaultHttpContext();
-        context.Request.Path = "/api";
+        var context = CreateContext("/api", https: false, out var response);
         context.Response.Headers["Content-Security-Policy"] = "default-src 'none'";
         var middleware = new SecurityHeadersMiddleware(_ => Task.CompletedTask, Options.Create(new SecurityHeadersOptions()));
 
         // Act
         await middleware.InvokeAsync(context);
+        await response.StartResponseAsync();
 
         // Assert
         context.Response.Headers["Content-Security-Policy"].ToString().ShouldBe("default-src 'none'");
+    }
+
+    [Fact]
+    public async Task InvokeAsync_Should_SetHeadersAtResponseStart_When_TheResponseIsResetAfterTheMiddlewareRan()
+    {
+        // Arrange — exactly what UseExceptionHandler does before re-running the handler.
+        var context = CreateContext("/api", https: false, out var response);
+        var middleware = new SecurityHeadersMiddleware(_ => Task.CompletedTask, Options.Create(new SecurityHeadersOptions()));
+
+        // Act
+        await middleware.InvokeAsync(context);
+        context.Response.Headers.Clear();
+        await response.StartResponseAsync();
+
+        // Assert
+        context.Response.Headers["X-Content-Type-Options"].ToString().ShouldBe("nosniff");
+        context.Response.Headers["Content-Security-Policy"].ToString().ShouldContain("default-src 'self'");
     }
 
     #endregion
