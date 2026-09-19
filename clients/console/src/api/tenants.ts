@@ -161,6 +161,22 @@ export async function updateTenantTheme(theme: TenantThemeDto): Promise<void> {
   unwrapVoid(await api.PUT("/api/v1/tenants/theme", { body: theme }));
 }
 
+/**
+ * A comparable snapshot of a theme draft, for the editors' "unsaved" check.
+ *
+ * Plain `JSON.stringify` would serialize a staged upload's byte array — megabytes of numbers — on
+ * every render. The replacer collapses each `FileUploadRequest` to its name and length, which is
+ * all the dirty check needs.
+ */
+export function themeFingerprint(theme: TenantThemeDto): string {
+  const uploads = new Set(["logo", "logoDark", "favicon"]);
+  return JSON.stringify(theme, (key, value) =>
+    uploads.has(key) && value
+      ? { fileName: (value as Schemas["FileUploadRequest"]).fileName, bytes: (value as Schemas["FileUploadRequest"]).data?.length ?? 0 }
+      : value,
+  );
+}
+
 /** Reset the caller's tenant theme to framework defaults. */
 export async function resetTenantTheme(): Promise<void> {
   unwrapVoid(await api.POST("/api/v1/tenants/theme/reset", {}));

@@ -110,6 +110,52 @@ public sealed class UserProfileTests
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
+    [Fact]
+    public async Task UpdateProfile_Should_StoreADurableUploadsUrl_When_AnAvatarIsUploaded()
+    {
+        // Arrange — this is the path the console's avatar picker takes (issue #72): the image
+        // rides on the profile PUT and the server writes it with IStorageService.UploadAsync.
+        using var adminClient = await _auth.CreateRootAdminClientAsync();
+        var user = await IdentityUserSeeder.CreateLoginableUserAsync(_factory, adminClient, "avatar-upload");
+        using var userClient = await _auth.CreateAuthenticatedClientAsync(user.Email, user.Password);
+
+        // Act — `data` must serialize as a JSON array of numbers (List<byte> on the wire), not base64.
+        var response = await userClient.PutAsJsonAsync(
+            $"{TestConstants.IdentityBasePath}/profile", new
+            {
+                firstName = "Ada",
+                lastName = "Lovelace",
+                image = new
+                {
+                    fileName = "avatar.png",
+                    contentType = "image/png",
+                    data = new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }.Select(b => (int)b).ToArray(),
+                },
+            });
+
+        // Assert
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var profile = await userClient.GetAsync($"{TestConstants.IdentityBasePath}/profile");
+        var dto = await profile.DeserializeAsync<UserDto>();
+        dto.ImageUrl.ShouldNotBeNullOrWhiteSpace();
+
+        // …under the uploads/ prefix, the only key space the deploy stacks grant anonymous read on
+        // (contract-tested in deploy/dokploy/tests) — so the avatar keeps resolving.
+        dto.ImageUrl!.ShouldContain("/uploads/");
+
+        // …and unsigned: no presign to expire. A Files-module publicUrl would carry these and die
+        // within minutes of being written to the column.
+        dto.ImageUrl.ShouldNotContain("X-Amz-Signature", Case.Insensitive);
+        dto.ImageUrl.ShouldNotContain("X-Amz-Expires", Case.Insensitive);
+
+        // …and stable: re-reading the profile after the presign TTL would have elapsed hands back
+        // the identical URL, because nothing about it is minted per-read.
+        var again = await userClient.GetAsync($"{TestConstants.IdentityBasePath}/profile");
+        var dtoAgain = await again.DeserializeAsync<UserDto>();
+        dtoAgain.ImageUrl.ShouldBe(dto.ImageUrl);
+    }
+
     #endregion
 
     #region SetProfileImage (PUT /profile/image)

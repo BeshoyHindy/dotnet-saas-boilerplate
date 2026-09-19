@@ -90,6 +90,34 @@ public sealed class StorageFlowTests
 
     #endregion
 
+    #region Edge Cases
+
+    [Fact]
+    public async Task DownloadUrl_Should_Sanitize_The_Original_Filename_In_The_Disposition()
+    {
+        // Arrange — OriginalFileName is caller-supplied. A quote in it must not break out of the
+        // signed response-content-disposition header (issue #72); the same sanitizer that guards
+        // PublicFileUrlFactory guards this path.
+        using var client = await _auth.CreateRootAdminClientAsync();
+        var id = await UploadAndFinalizeAsync(client, "my \"quarterly\" report.pdf", "application/pdf", RandomBytes(256));
+
+        // Act
+        using var urlResp = await client.GetAsync($"{FilesBasePath}/{id}/url");
+        urlResp.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var download = await urlResp.DeserializeAsync<PresignedDownloadResponse>();
+
+        using var raw = new HttpClient();
+        using var getResp = await raw.GetAsync(download.Url);
+
+        // Assert — every unsafe character, quotes included, arrives as an underscore.
+        getResp.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var disposition = getResp.Content.Headers.ContentDisposition;
+        disposition.ShouldNotBeNull();
+        disposition!.FileName!.Trim('"').ShouldBe("my__quarterly__report.pdf");
+    }
+
+    #endregion
+
     // ─── helpers ─────────────────────────────────────────────────────
 
     private static byte[] RandomBytes(int size)

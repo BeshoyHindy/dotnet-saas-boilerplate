@@ -6,13 +6,15 @@ import { useAuth } from "@/auth/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ErrorBand, Field, LoadingRow, SettingsSection } from "@/components/list";
+import { ErrorBand, LoadingRow, SettingsSection } from "@/components/list";
 import { EnterTenantDialog } from "@/components/tenants/enter-tenant-dialog";
+import { BrandAssetsEditor } from "@/components/tenants/brand-assets-editor";
 import {
   DEFAULT_DARK_PALETTE,
   DEFAULT_LIGHT_PALETTE,
   getTenantTheme,
   resetTenantTheme,
+  themeFingerprint,
   updateTenantTheme,
   type BrandAssetsDto,
   type PaletteDto,
@@ -156,7 +158,7 @@ export function TenantBrandingCard({ tenantId }: { tenantId: string }) {
   if (!draft) return null;
 
   const dirty =
-    themeQuery.data && JSON.stringify(themeQuery.data) !== JSON.stringify(draft);
+    themeQuery.data && themeFingerprint(themeQuery.data) !== themeFingerprint(draft);
 
   const onLight = (next: Partial<PaletteDto>) =>
     setDraft((d) => (d ? { ...d, lightPalette: { ...d.lightPalette, ...next } } : d));
@@ -337,99 +339,6 @@ function ColorRow({
         />
       </div>
     </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────
-// Brand assets — URL editors for logo / logo-dark / favicon
-// ─────────────────────────────────────────────────────────────────────────
-
-function BrandAssetsEditor({
-  assets,
-  onChange,
-}: {
-  assets: BrandAssetsDto;
-  onChange: (next: Partial<BrandAssetsDto>) => void;
-}) {
-  return (
-    <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-2)]">
-      <div className="border-b border-[oklch(from_var(--color-border)_l_c_h_/_0.5)] px-4 py-2.5">
-        <h4 className="text-[12.5px] font-semibold tracking-tight text-[var(--color-foreground)]">
-          Brand assets
-        </h4>
-        <p className="mt-0.5 text-[11.5px] leading-relaxed text-[var(--color-muted-foreground)]">
-          URLs to your hosted brand assets. Upload via the Files module first,
-          then paste the resulting public URL here.
-        </p>
-      </div>
-      <div className="space-y-4 p-4">
-        <AssetField
-          id="logo-url"
-          label="Logo URL"
-          value={assets.logoUrl ?? ""}
-          onChange={(v) =>
-            onChange({ logoUrl: v || null, deleteLogo: v.length === 0 })
-          }
-        />
-        <AssetField
-          id="logo-dark-url"
-          label="Logo URL (dark mode)"
-          value={assets.logoDarkUrl ?? ""}
-          onChange={(v) =>
-            onChange({ logoDarkUrl: v || null, deleteLogoDark: v.length === 0 })
-          }
-        />
-        <AssetField
-          id="favicon-url"
-          label="Favicon URL"
-          value={assets.faviconUrl ?? ""}
-          onChange={(v) =>
-            onChange({ faviconUrl: v || null, deleteFavicon: v.length === 0 })
-          }
-        />
-      </div>
-    </div>
-  );
-}
-
-function AssetField({
-  id,
-  label,
-  value,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (next: string) => void;
-}) {
-  return (
-    <Field id={id} label={label}>
-      <div className="flex items-center gap-2">
-        <Input
-          id={id}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="https://cdn.example.com/logo.svg"
-          spellCheck={false}
-          autoComplete="off"
-          className="font-mono text-[12.5px]"
-        />
-        {value && (
-          // Tiny inline preview thumbnail — reassures the operator the
-          // URL points to an actually-loadable image. Failing loads just
-          // hide via the onError handler below; no error UI necessary.
-          <img
-            src={value}
-            alt=""
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = "none";
-            }}
-            className="h-9 w-9 shrink-0 rounded-lg object-contain ring-1 ring-inset ring-[var(--color-border)] bg-[var(--color-background)]"
-          />
-        )}
-      </div>
-    </Field>
   );
 }
 

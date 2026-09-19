@@ -41,7 +41,9 @@ public sealed class GetFileDownloadUrlQueryHandler(
 
         var ttl = TimeSpan.FromMinutes(options.Value.DownloadUrlTtlMinutes);
         var mode = q.Inline ? "inline" : "attachment";
-        var disposition = $"{mode}; filename=\"{f.OriginalFileName}\"";
+        // Sanitize like PublicFileUrlFactory does: OriginalFileName is caller-supplied, and a quote
+        // in it would otherwise break out of the signed response-content-disposition header.
+        var disposition = $"{mode}; filename=\"{StorageKeyBuilder.Sanitize(f.OriginalFileName)}\"";
         var url = await storage.GenerateDownloadUrlAsync(f.StorageKey, ttl, disposition, cancellationToken).ConfigureAwait(false);
         return new PresignedDownloadResponse(url, DateTimeOffset.UtcNow.Add(ttl));
     }
