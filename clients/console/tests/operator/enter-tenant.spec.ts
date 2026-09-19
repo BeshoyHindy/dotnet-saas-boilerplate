@@ -82,7 +82,15 @@ test.describe("operator enters a tenant", () => {
     await installShellMocks(page);
     // The shell mocks grant nothing; an operator holds the tenant + impersonation set.
     await mockJsonResponse(page, "**/api/v1/identity/permissions", OPERATOR_PERMISSIONS);
-    await mockJsonResponse(page, "**/api/v1/tenants?**", paged([TENANT]));
+    // A RegExp, not a glob: the query string is what distinguishes the registry
+    // listing from the per-tenant routes mocked below.
+    await page.route(/\/api\/v1\/tenants\?/, (route) =>
+      route.fulfill({
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(paged([TENANT])),
+      }),
+    );
     await mockJsonResponse(page, `**/api/v1/tenants/${TENANT.id}/status`, TENANT);
     // No provisioning record for a tenant that was seeded rather than provisioned.
     await mockJsonResponse(page, "**/api/v1/tenants/*/provisioning", "", { status: 404 });
@@ -92,7 +100,9 @@ test.describe("operator enters a tenant", () => {
     await page.goto("/tenants");
 
     await expect(page.getByRole("heading", { name: "Registry", level: 1 })).toBeVisible();
-    await expect(page.getByText("Acme Corp").first()).toBeVisible();
+    // Both a mobile card and a desktop row carry the name; the desktop row is last
+    // in the DOM and is the visible one at the default viewport.
+    await expect(page.getByText("Acme Corp").last()).toBeVisible();
   });
 
   test("impersonating a user swaps the session in place and lands on the overview", async ({
@@ -120,7 +130,7 @@ test.describe("operator enters a tenant", () => {
     // In place: the console navigates to its own overview, and the banner that only
     // renders for a token carrying `act_sub` appears.
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByRole("status").filter({ hasText: /impersonating/i })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: /impersonat/i })).toBeVisible();
   });
 
   test("a tenant user without the operator permissions is refused the registry", async ({

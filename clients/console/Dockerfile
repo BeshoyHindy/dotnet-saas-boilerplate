@@ -6,10 +6,11 @@
 
 FROM node:25-alpine AS build
 WORKDIR /app
-# Corepack activates the pnpm version pinned in package.json#packageManager, so the
-# image and a developer's machine resolve the same dependency tree.
-RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Node 25 ships without corepack, and corepack does not support Node 25 yet, so pnpm is
+# installed directly — at the version pinned in package.json#packageManager, which stays
+# the one source of truth for it.
+RUN npm install --global "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
 RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm build
