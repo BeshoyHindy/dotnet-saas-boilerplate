@@ -96,6 +96,32 @@ public static class Create{Entity}Endpoint
 group.MapCreate{Entity}Endpoint();   // group = endpoints.MapGroup("api/v{version:apiVersion}/{x}") …
 ```
 
+## Step 5b — If the route takes an id, the cross-tenant sweep will find it
+
+`Integration.Tests` enumerates every published route and calls each one that has a resource parameter
+with another tenant's id, demanding **404**. You register nothing; it is swept because it exists.
+What it may need from you:
+
+- **A resource it can seed.** The registry key is `"{preceding literal segment}/{parameter name}"` —
+  `/{entities}/{id}` → `entities/id`. A route under an existing noun already resolves; a new noun
+  fails the coverage test with the exact key to add to `TenantSweepRegistry.ByRouteKey` (plus a
+  `ResourceKind` and a seeder).
+- **A body sample**, if your validator would 400 before the handler looks the row up —
+  `TenantSweepBodies.ByEndpoint`, keyed `"METHOD template"`.
+
+Answering **403** for another tenant's id fails the sweep too, and correctly: it confirms the row
+exists and makes isolation depend on a permission. Throw `NotFoundException` and let the tenant query
+filter do the work.
+
+Genuinely not a tenant-scoped resource? Say so at the mapping site — the reason is mandatory and the
+sweep prints it:
+
+```csharp
+.ExemptFromTenantSweep("{documentName} selects an API version document, not a tenant resource")
+```
+
+See `.agents/rules/integration-testing.md`.
+
 ## Step 6 — Verify
 
 ```bash
@@ -110,4 +136,5 @@ dotnet test src/Tests/{X}.Tests            # + add a handler/validator test (see
 - [ ] `{Name}Validator` exists
 - [ ] Endpoint `internal static …Map{Feature}Endpoint`, `.RequirePermission(...)`, `.WithName/.WithSummary`
 - [ ] Wired in `{X}Module.MapEndpoints`
+- [ ] Route with an id: resolves in `TenantSweepRegistry`, or `.ExemptFromTenantSweep("reason")`; not-found returns **404, never 403**
 - [ ] Build 0 warnings; test added
