@@ -247,6 +247,30 @@ public static class TenantSweepExceptions
     ///
     /// <c>Tenant</c> is the catalog itself, and every route that takes one is root-only anyway.
     /// </summary>
+    /// <summary>
+    /// The list endpoints that answer a tenant admin with something other than 2xx, and why. Every
+    /// other collection on the versioned API must answer 2xx to the sweep's probe, because a list
+    /// that refuses is a list the sweep did not search — and one that starts refusing quietly is a
+    /// hole that opens without anybody noticing.
+    ///
+    /// Root-only lists belong here: their permission is flagged <c>IsRoot</c>, a tenant admin can
+    /// never hold it, and 403 is the correct answer rather than a leak. Anything else in this
+    /// dictionary should be read as a bug someone decided to live with, and say so.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> ListsThatRefuseATenantAdmin { get; } =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["GET api/v{version:apiVersion}/tenants/"] =
+                "the tenant catalog: Tenants.View is an IsRoot permission, so 403 is the right answer " +
+                "to a tenant admin and the root-token pass is what sweeps this route",
+            ["GET api/v{version:apiVersion}/tenants/migrations"] =
+                "the migration status of every tenant: Tenants.View is IsRoot, same as the catalog",
+            ["GET api/v{version:apiVersion}/tenants/{tenant}/auth/confirm-email"] =
+                "not a collection at all — an anonymous confirmation action whose only route parameter " +
+                "is the sanctioned {tenant} segment, so the sweep classifies it as a list. It answers " +
+                "400 for the missing userId/code, and reads no collection to leak",
+        };
+
     public static IReadOnlySet<ResourceKind> PlatformWideKinds { get; } =
         new HashSet<ResourceKind> { ResourceKind.ImpersonationGrant, ResourceKind.Tenant };
 }

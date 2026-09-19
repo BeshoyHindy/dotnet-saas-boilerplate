@@ -257,6 +257,13 @@ public sealed class TenantEndpointSweepTests
     /// Coverage here needs no registry: the marker is stamped into the display fields of every
     /// seeded row, so a new list endpoint that leaks B's rows is caught the first time it runs,
     /// whether or not anyone remembered it exists.
+    ///
+    /// <para><b>A list that does not answer 2xx is asserted about too.</b> Skipping on any non-2xx
+    /// made the pass silently shrinkable: a list that started 400ing on the sweep's query string, or
+    /// that grew a permission a tenant admin does not hold, would drop out of the sweep and the run
+    /// would look exactly as green as before. Every refusal is therefore matched against
+    /// <see cref="TenantSweepExceptions.ListsThatRefuseATenantAdmin"/> by name, a stale entry fails
+    /// too, and the count actually asserted is printed next to the count discovered.</para>
     /// </summary>
     [Fact]
     public async Task No_List_Endpoint_Returns_Another_Tenants_Rows()
@@ -265,21 +272,60 @@ public sealed class TenantEndpointSweepTests
         var needles = NeedlesFor(sweep.B);
 
         var failures = new List<string>();
+        var refused = new List<string>();
+        var discovered = 0;
+        var asserted = 0;
 
         foreach (var endpoint in Ordered(sweep.Endpoints
             .Where(e => e.Class == SweepClass.Collection && e.IsVersionedApi && !e.IsExempt)))
         {
+            discovered++;
             var path = Materialise(endpoint.Template) + ListQuery;
 
             using var response = await sweep.A.AdminClient.GetAsync(path);
+            var body = await response.Content.ReadAsStringAsync();
+            bool expectedRefusal = TenantSweepExceptions.ListsThatRefuseATenantAdmin
+                .ContainsKey(endpoint.Name);
 
-            // Root-only lists answer 403 to a tenant admin; that is the correct answer, not a leak.
-            if (!response.IsSuccessStatusCode)
+            // A 5xx is never an acceptable answer: it is the sweep failing to ask its question, and
+            // on this route it would hide a leak behind an exception page.
+            if ((int)response.StatusCode >= 500)
             {
+                failures.Add(
+                    $"{endpoint.Name}\n      called as GET {path}\n" +
+                    $"      answered {(int)response.StatusCode} {response.StatusCode} — the list pass " +
+                    $"never got to look at a body\n      body: {Truncate(body)}");
                 continue;
             }
 
-            var body = await response.Content.ReadAsStringAsync();
+            if (!response.IsSuccessStatusCode)
+            {
+                refused.Add(endpoint.Name);
+
+                if (!expectedRefusal)
+                {
+                    failures.Add(
+                        $"{endpoint.Name}\n      called as GET {path}\n" +
+                        $"      answered {(int)response.StatusCode} {response.StatusCode}, so it was NOT " +
+                        "swept. Either fix the route, or — if a tenant admin is genuinely not allowed " +
+                        $"here — name it in {nameof(TenantSweepExceptions)}." +
+                        $"{nameof(TenantSweepExceptions.ListsThatRefuseATenantAdmin)} with the reason\n" +
+                        $"      body: {Truncate(body)}");
+                }
+
+                continue;
+            }
+
+            if (expectedRefusal)
+            {
+                failures.Add(
+                    $"{endpoint.Name}\n      called as GET {path}\n" +
+                    $"      answered {(int)response.StatusCode} but is listed as refusing a tenant " +
+                    $"admin. Delete the {nameof(TenantSweepExceptions.ListsThatRefuseATenantAdmin)} " +
+                    "entry — the list is swept now and the exemption is stale.");
+            }
+
+            asserted++;
             var hits = needles
                 .Where(needle => body.Contains(needle, StringComparison.OrdinalIgnoreCase))
                 .ToList();
@@ -292,10 +338,23 @@ public sealed class TenantEndpointSweepTests
             }
         }
 
+        _output.WriteLine(
+            $"list endpoints discovered : {discovered}\n" +
+            $"  asserted (2xx)          : {asserted}\n" +
+            $"  refused, by design      : {refused.Count}\n" +
+            string.Join("\n", refused.Select(name =>
+                $"    {name}\n      {TenantSweepExceptions.ListsThatRefuseATenantAdmin.GetValueOrDefault(name, "UNEXPECTED")}")));
+
         failures.ShouldBeEmpty(
-            "a list endpoint returned rows belonging to another tenant. Every row the sweep seeds in " +
-            "tenant B carries that tenant's marker in its display fields, so any appearance of it in a " +
-            $"tenant-A response is a leak.\n  {string.Join("\n  ", failures)}");
+            "a list endpoint returned rows belonging to another tenant, or was not swept at all. Every " +
+            "row the sweep seeds in tenant B carries that tenant's marker in its display fields, so any " +
+            "appearance of it in a tenant-A response is a leak — and a list that answers anything but " +
+            $"2xx asserts nothing, so it has to be a known, named refusal.\n  " +
+            string.Join("\n  ", failures));
+
+        asserted.ShouldBe(
+            discovered - refused.Count,
+            "every list endpoint that answered 2xx must have been searched for tenant B's rows");
     }
 
     /// <summary>
@@ -375,16 +434,18 @@ public sealed class TenantEndpointSweepTests
     }
 
     /// <summary>
-    /// The query string every list probe carries. A large page size where the endpoint supports one,
-    /// and <c>includeInactive=true</c> so the sessions list answers with its revoked rows too —
-    /// unknown query parameters are ignored by model binding, so this is safe to send everywhere.
+    /// The query string every list probe carries. The largest page size the strictest validator on
+    /// the API accepts (100 — asking for 200 made four lists answer 400 and drop out of the sweep
+    /// entirely), and <c>includeInactive=true</c> so the sessions list answers with its revoked rows
+    /// too — unknown query parameters are ignored by model binding, so this is safe to send
+    /// everywhere.
     ///
     /// The other non-default states need no flag: the inbox shows read notifications unless asked
     /// for unread only, the user lists do not filter on active by default, and the grants list shows
     /// every status. The trash is its own endpoint. What they all need is a row of that state
     /// seeded in tenant B, which is <see cref="ResourceKind.TrashedFile"/> and its neighbours.
     /// </summary>
-    private const string ListQuery = "?pageNumber=1&pageSize=200&take=200&includeInactive=true";
+    private const string ListQuery = "?pageNumber=1&pageSize=100&take=100&includeInactive=true";
 
     #region Request shaping
 
