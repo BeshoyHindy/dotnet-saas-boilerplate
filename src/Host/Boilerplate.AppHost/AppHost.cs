@@ -50,9 +50,10 @@ const string MinioBucket = "boilerplate-uploads";
 // contract here (the Vite proxy, the SameSite=Strict refresh cookie, and the CORS entry
 // below all name it) — unlike the container ports above, which Aspire allocates.
 //
-// Declared unconditionally: these are plain C# comments, so both arms of an `#if` would
-// reach the real compiler and redeclare the constant. With `--frontend false` the pair
-// simply goes unused beyond MinIO's CORS header, which is harmless.
+// Declared unconditionally, outside any template conditional: the template's markers are
+// plain C# comments, so both arms of one reach the real compiler and a constant declared
+// in each would be a duplicate. With `--frontend false` the pair simply goes unused
+// beyond MinIO's CORS header, which is harmless.
 const string DashboardOrigin = "http://localhost:5173";
 const string ConsoleOrigin = "http://localhost:5174";
 // MinIO takes a comma-separated allow-list; both clients upload straight to it.
