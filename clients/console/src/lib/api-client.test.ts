@@ -164,6 +164,7 @@ describe("the acting layer", () => {
     tenantName: "Acme Corp",
     userId: "u-9",
     expiresAt: new Date(Date.now() + 900_000).toISOString(),
+    jti: "acting-jti",
   };
 
   beforeEach(() => {
@@ -237,6 +238,74 @@ describe("the acting layer", () => {
     expect(actingStore.getNotice()).toContain("Acme Corp");
     // The operator's own session is untouched.
     expect(localStorage.getItem("boilerplate.console.accessToken")).toBe("operator-token");
+  });
+
+  it("does not send the retry with the acting token when acting started mid-flight", async () => {
+    // Not acting when the request starts.
+    let refreshCalls = 0;
+    const bearers: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: Request | string) => {
+        // `refreshAccessToken` calls the raw global `fetch` with a plain URL string;
+        // every other call arrives as a `Request` (openapi-fetch's own dispatch).
+        const url = typeof input === "string" ? input : input.url;
+        if (url.includes("/auth/refresh")) {
+          refreshCalls += 1;
+          // The operator enters a tenant while the refresh is in flight — before
+          // the retry's credential is chosen.
+          actingStore.start(ACTING);
+          return json({ token: "fresh-operator-token" });
+        }
+        bearers.push((input as Request).headers.get("Authorization") ?? "");
+        // First attempt (operator token, expired) 401s; the retry must not go out
+        // with the acting token that showed up in between.
+        return bearers.length === 1 ? json({ status: 401 }, 401) : json([]);
+      }),
+    );
+
+    const result = await api.GET("/api/v1/identity/permissions", SAME_ORIGIN);
+
+    expect(refreshCalls).toBe(1);
+    // Only the first (401'd) send actually went out; the retry was short-circuited.
+    expect(bearers).toEqual(["Bearer operator-token"]);
+    expect(result.response.status).toBe(401);
+  });
+
+  it("never falls back to the operator's token when acting is dropped mid-flight", async () => {
+    // A request captured while acting always SENDS with the acting token — nothing
+    // can drift before its first (and, for an acting-401, only) send, since nothing
+    // else runs between capturing the credential and using it (see api-client.ts).
+    // What matters is what happens next: a concurrent drop (another tab's exitTenant,
+    // a revoke landing mid-flight) must not make this response's handling turn
+    // around and spend the OPERATOR's refresh cookie retrying with their token —
+    // it must come back as the 401 it is.
+    actingStore.start(ACTING);
+    let refreshCalls = 0;
+    const bearers: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: Request | string) => {
+        const request = input as Request;
+        const url = request.url;
+        if (url.includes("/auth/refresh")) {
+          refreshCalls += 1;
+          return json({ token: "should-not-be-used" });
+        }
+        bearers.push(request.headers.get("Authorization") ?? "");
+        // Something else (another tab, a revoke) drops the acting session while
+        // THIS request is already in flight with it.
+        actingStore.clear();
+        return json({ status: 401 }, 401);
+      }),
+    );
+
+    const result = await api.GET("/api/v1/identity/permissions", SAME_ORIGIN);
+
+    expect(bearers).toEqual(["Bearer acting-token"]);
+    expect(refreshCalls).toBe(0);
+    expect(result.response.status).toBe(401);
+    expect(actingStore.get()).toBeNull();
   });
 });
 

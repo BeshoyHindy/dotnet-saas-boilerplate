@@ -49,6 +49,11 @@ server {
   # `/api/v1/files/avatar.png` — is looked up on disk and answered with the SPA's
   # index.html instead of being proxied.
   #
+  # The prefix is `/api/`, WITH the trailing slash, plus a separate exact `/api`
+  # below for the bare path — not `^~ /api`, which is a prefix match on the four
+  # characters and therefore also claims `/apifoo`, `/apiary`, anything merely
+  # starting with "api". Those must fall through to the SPA location instead.
+  #
   # The upstream goes through a variable so nginx re-resolves it per request (see
   # `resolver` above); that form drops the original URI, so `$request_uri` (path plus
   # query) has to be appended explicitly. The Host header is deliberately NOT
@@ -57,12 +62,18 @@ server {
   # configured origin, and a forwarded host is a caller-controlled value that has no
   # reader here.
   #
+  # `proxy_ssl_server_name on` sends SNI for the upstream's hostname on the TLS
+  # handshake (Dokploy's upstream is `https://${API_DOMAIN}`) — without it nginx's
+  # TLS client sends no SNI at all, and a name-based vhost/cert in front of the API
+  # can reject or mis-route the connection.
+  #
   # `add_header` does not inherit into a location that declares one of its own, and
   # every location here does — so the security headers are included per location
   # rather than set once on the server.
-  location ^~ /api {
+  location ^~ /api/ {
     include /etc/nginx/security-headers.conf;
     set $api_upstream ${APP_API_URL};
+    proxy_ssl_server_name on;
     proxy_pass $api_upstream$request_uri;
     proxy_http_version 1.1;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -72,11 +83,35 @@ server {
     proxy_read_timeout 60s;
   }
 
-  # The anonymous liveness/readiness probes the Health page reads. `^~` for the same
-  # reason as /api.
-  location ^~ /health {
+  location = /api {
+    include /etc/nginx/security-headers.conf;
+    set $api_upstream ${APP_API_URL};
+    proxy_ssl_server_name on;
+    proxy_pass $api_upstream$request_uri;
+    proxy_http_version 1.1;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 12m;
+    proxy_read_timeout 60s;
+  }
+
+  # The anonymous liveness/readiness probes the Health page reads. `^~ /health/` plus
+  # the exact `/health` below, for the same reason as `/api/` above — `/healthfoo`
+  # must fall through to the SPA.
+  location ^~ /health/ {
     include /etc/nginx/security-headers.conf;
     set $health_upstream ${APP_API_URL};
+    proxy_ssl_server_name on;
+    proxy_pass $health_upstream$request_uri;
+    proxy_http_version 1.1;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  location = /health {
+    include /etc/nginx/security-headers.conf;
+    set $health_upstream ${APP_API_URL};
+    proxy_ssl_server_name on;
     proxy_pass $health_upstream$request_uri;
     proxy_http_version 1.1;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

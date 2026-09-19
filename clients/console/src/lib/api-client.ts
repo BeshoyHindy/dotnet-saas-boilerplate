@@ -2,6 +2,7 @@ import createClient from "openapi-fetch";
 import { env } from "@/env";
 import { tokenStore } from "@/auth/token-store";
 import { actingStore, type ActingSession } from "@/auth/acting-store";
+import { endSessionLocally } from "@/lib/query-client";
 import type { paths, components } from "@/api/schema";
 
 /**
@@ -131,7 +132,10 @@ export async function refreshAccessToken(): Promise<void> {
   });
 
   if (!response.ok) {
-    tokenStore.clear();
+    // The refresh cookie is dead (expired, revoked, or rotated by another tab) — end the
+    // session locally rather than leaving a stray acting token or stale cache behind for
+    // whoever signs in next in this tab.
+    endSessionLocally();
     throw new ApiRequestError(response.status, "Refresh failed");
   }
 
@@ -168,6 +172,19 @@ function isAnonymous(url: string): boolean {
   return /\/api\/v1\/tenants\/[^/]+\/auth\//.test(url);
 }
 
+/** A 401 synthesised locally — never sent over the wire — for a request whose intended
+ *  credential identity drifted out from under it before it could go out. */
+function identityDriftedResponse(): Response {
+  return new Response(
+    JSON.stringify({
+      status: 401,
+      title: "Unauthorized",
+      detail: "Your session changed while this request was in flight. Please retry.",
+    }),
+    { status: 401, headers: { "Content-Type": "application/problem+json" } },
+  );
+}
+
 /**
  * The `fetch` every typed call runs on: bearer header, request timeout, and a
  * single-flight refresh-and-retry on 401. Concurrent 401s share one refresh.
@@ -184,6 +201,17 @@ async function authFetch(input: Request): Promise<Response> {
   // Read the flag once, off the outgoing request, then never send it.
   const asOperator = target.headers.get(AS_OPERATOR_HEADER) !== null;
 
+  // The acting identity this call was made under, captured once at the start — before
+  // the retry's `await sharedRefresh()` gives the acting session a chance to change out
+  // from under it (an operator entering/exiting a tenant, or the token being dropped).
+  // An AS_OPERATOR call never means the acting session, so it has no identity to drift.
+  const capturedActingJti = asOperator ? null : (actingStore.get()?.jti ?? null);
+
+  function identityDrifted(): boolean {
+    if (asOperator) return false;
+    return (actingStore.get()?.jti ?? null) !== capturedActingJti;
+  }
+
   // Captured before the first send so the 401 handling below judges the credential that
   // was actually used, not whatever the store holds by the time the response lands.
   // A holder object, not a `let`: the assignment happens inside `send`, and TypeScript's
@@ -191,6 +219,13 @@ async function authFetch(input: Request): Promise<Response> {
   const sent: { acting: ActingSession | null } = { acting: null };
 
   const send = async (): Promise<Response> => {
+    // The identity this call was captured under is gone (or replaced by another one) by
+    // send time — sending now would carry the WRONG credential (the new acting token for
+    // a call that started as the operator, or the operator's own token for a call that
+    // started while acting). Neither is safe to send, so this attempt is a no-op 401.
+    if (!anonymous && identityDrifted()) {
+      return identityDriftedResponse();
+    }
     const request = target.clone();
     request.headers.delete(AS_OPERATOR_HEADER);
     if (!anonymous) {
@@ -199,8 +234,9 @@ async function authFetch(input: Request): Promise<Response> {
       if (!accessToken) {
         // Not anonymous but the token is gone — likely a manual localStorage clear
         // AuthProvider missed. Surface a clean 401 so the UI flips to /login instead
-        // of firing tokenless requests forever.
-        tokenStore.clear();
+        // of firing tokenless requests forever. End the session fully so a leftover
+        // acting token or cache from before the clear cannot outlive it.
+        endSessionLocally();
         throw new ApiRequestError(401, "Not signed in", {
           status: 401,
           title: "Unauthorized",
