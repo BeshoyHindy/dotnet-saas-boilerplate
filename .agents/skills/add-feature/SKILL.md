@@ -120,6 +120,14 @@ sweep prints it:
 .ExemptFromTenantSweep("{documentName} selects an API version document, not a tenant resource")
 ```
 
+**The sweep substitutes ROUTE ids only.** An id your endpoint takes in the **body** or the **query
+string** — a role id inside an upsert, user ids inside an add-members call, an owner id on an upload —
+has no route parameter to substitute, so the sweep sees an endpoint that addresses nothing and proves
+nothing about it. Those ids reach the same handlers and are the ones a client sets freely: write a
+hand-written cross-tenant test for each, next to
+`Integration.Tests/Tests/Multitenancy/CrossTenantBodyIdTests.cs`, which shares the sweep's fixture.
+Assert both halves — nothing of the other tenant changed, and nothing of theirs was granted to you.
+
 See `.agents/rules/integration-testing.md`.
 
 ## Step 6 — Verify

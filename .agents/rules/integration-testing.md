@@ -27,6 +27,12 @@ Because it enumerates, **your new endpoint is swept the day you map it**. Two th
 
 The sweep also runs a **positive control** (the same request with the caller's own id must not 404), a **root-token pass** (root has no override — ADR-0002 — so it must 404 too, except for the declared platform-wide kinds), and a **list pass**: every seeded row carries a per-tenant marker, and no collection endpoint called with A's token may contain it. The list pass needs no registration at all.
 
+### The sweep covers route ids only
+
+It substitutes tenant B's id into **route parameters**. An id that arrives in the **body** or the **query string** has no parameter to substitute, so the endpoint is swept as if it addressed nothing — the probe runs, returns 200, and proves nothing. Body ids reach the same handlers and the same queries, and they are the ones a client can set freely: a role id inside `POST identity/roles`, role ids inside `POST identity/users/{id}/roles`, user ids inside `POST identity/groups/{groupId}/members`, an `ownerId` inside `POST files/upload-url`.
+
+**So an endpoint that takes a row id in the body or the query needs a hand-written cross-tenant test.** `Integration.Tests/Tests/Multitenancy/CrossTenantBodyIdTests.cs` is where they live; it shares `TenantSweepFixture`, so the two provisioned tenants and their seeded rows cost nothing extra. Assert both halves: nothing of tenant B changed, and nothing of B was granted to A. Pick the status from what the handler actually does (404 when it resolves the id, 403 when it compares it to the caller) and say why in the test.
+
 ## Coverage
 
 ```bash
