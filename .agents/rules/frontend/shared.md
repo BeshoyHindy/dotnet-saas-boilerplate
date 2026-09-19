@@ -11,9 +11,9 @@ class-variance-authority (shadcn-style). Path alias `@` → `src` (`vite.config.
 - One fetch wrapper: `apiFetch<T>(path, init)`. No axios.
 - **Types are hand-written**, not generated. (`openapi-typescript` is declared in admin's devDeps but unused — there is no codegen step.) Define DTO `type`s and a `const BASE = "/api/v1/..."` in each `src/api/{feature}.ts`, with thin async functions calling `apiFetch`.
 - Auth header `Authorization: Bearer <access>` from `tokenStore.getAccessToken()` (unless `skipAuth:true`).
-- Tenant header (lowercase `tenant`) = `tokenStore.getTenant() ?? env.defaultTenant`, unless overridden per request.
+- **No tenant header.** The server reads the tenant from the token's `tenant` claim (ADR-0002); the client sends none. `tokenStore.getTenant() ?? env.defaultTenant` only feeds the anonymous auth URLs via `authPath(tenant, segment)`.
 - Errors: non-OK parses RFC 9457 `application/problem+json` and throws `ApiRequestError(status, message, problem)`. 204/empty → `undefined`.
-- **Single-flight refresh:** on 401 with a refresh token, `POST /api/v1/identity/token/refresh` with `{token, refreshToken}`; a module-level `refreshPromise` dedupes concurrent refreshes; rotated token returns on `token` (not `accessToken`); the original request retries once.
+- **Single-flight refresh:** on 401 with a refresh token, `POST /api/v1/tenants/{tenant}/auth/refresh` with `{token, refreshToken}`; a module-level `refreshPromise` dedupes concurrent refreshes; rotated token returns on `token` (not `accessToken`); the original request retries once.
 - Search endpoints: build `URLSearchParams` with **PascalCase** keys (`PageNumber`, `PageSize`, …) to match the API.
 
 ## Env (`src/env.ts`) — runtime, not build-time
@@ -49,7 +49,7 @@ mutation.mutate({ text, clientId: crypto.randomUUID() });
 ## Auth (`src/auth/`)
 
 `token-store.ts` (localStorage + pub/sub), `jwt.ts` (`decodeJwt`), `AuthProvider`/`useAuth()`, `ProtectedRoute`.
-Login `POST /api/v1/identity/token/issue` with header `X-Client-App: "admin"|"dashboard"`. **localStorage keys are namespaced per app** (`boilerplate.admin.*` / `boilerplate.dashboard.*`) so both run side-by-side. Permission *source* differs per app — see the app files.
+Login `POST /api/v1/tenants/{tenant}/auth/token` with header `X-Client-App: "admin"|"dashboard"` — the tenant is a path segment, the one place a caller may name one. **localStorage keys are namespaced per app** (`boilerplate.admin.*` / `boilerplate.dashboard.*`) so both run side-by-side. Permission *source* differs per app — see the app files.
 
 ## Design system (Tailwind v4, shadcn-style)
 

@@ -30,7 +30,7 @@ These are the model for background loops: stay alive, log with context, never sw
 
 ## Tokens / sessions
 
-Login `POST /api/v1/identity/token/issue` (header `X-Client-App` enforces the operator/tenant app boundary). Refresh `POST /api/v1/identity/token/refresh` cross-checks subject. Session rows are written best-effort during login — failures log a warning and login still succeeds. Admin can't demote/deactivate the last admin or the root-tenant seed admin (guards in `UserRoleService`/`UserStatusService`).
+Login `POST /api/v1/tenants/{tenant}/auth/token` (header `X-Client-App` enforces the operator/tenant app boundary). Refresh `POST /api/v1/tenants/{tenant}/auth/refresh` cross-checks subject. Both live in the anonymous auth group alongside forgot-password, reset-password, confirm-email and register — the only endpoints that take the tenant from the route (ADR-0002). Session rows are written best-effort during login — failures log a warning and login still succeeds. Admin can't demote/deactivate the last admin or the root-tenant seed admin (guards in `UserRoleService`/`UserStatusService`).
 
 ## Tests
 

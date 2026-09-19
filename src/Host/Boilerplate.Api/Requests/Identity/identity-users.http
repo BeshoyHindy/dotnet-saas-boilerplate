@@ -5,31 +5,26 @@
 ### List users
 GET {{baseUrl}}/api/v1/identity/users
 Accept: application/json
-tenant: {{tenant}}
 Authorization: Bearer {{token}}
 
 ### Get user by id
 GET {{baseUrl}}/api/v1/identity/{{userId}}
 Accept: application/json
-tenant: {{tenant}}
 Authorization: Bearer {{token}}
 
 ### Get current user profile
 GET {{baseUrl}}/api/v1/identity/profile
 Accept: application/json
-tenant: {{tenant}}
 Authorization: Bearer {{token}}
 
 ### Get current user permissions
 GET {{baseUrl}}/api/v1/identity/permissions
 Accept: application/json
-tenant: {{tenant}}
 Authorization: Bearer {{token}}
 
 ### Register user (admin-driven)
 POST {{baseUrl}}/api/v1/identity/register
 Content-Type: application/json
-tenant: {{tenant}}
 Authorization: Bearer {{token}}
 
 {
@@ -43,9 +38,8 @@ Authorization: Bearer {{token}}
 }
 
 ### Self-register user
-POST {{baseUrl}}/api/v1/identity/self-register
+POST {{baseUrl}}/api/v1/tenants/{{tenant}}/auth/register
 Content-Type: application/json
-tenant: {{tenant}}
 
 {
   "firstName": "John",
@@ -60,7 +54,6 @@ tenant: {{tenant}}
 ### Change password for current user
 POST {{baseUrl}}/api/v1/identity/change-password
 Content-Type: application/json
-tenant: {{tenant}}
 Authorization: Bearer {{token}}
 
 {
@@ -70,18 +63,16 @@ Authorization: Bearer {{token}}
 }
 
 ### Forgot password
-POST {{baseUrl}}/api/v1/identity/forgot-password
+POST {{baseUrl}}/api/v1/tenants/{{tenant}}/auth/forgot-password
 Content-Type: application/json
-tenant: {{tenant}}
 
 {
   "email": "jane.doe@example.com"
 }
 
 ### Reset password
-POST {{baseUrl}}/api/v1/identity/reset-password
+POST {{baseUrl}}/api/v1/tenants/{{tenant}}/auth/reset-password
 Content-Type: application/json
-tenant: {{tenant}}
 
 {
   "email": "jane.doe@example.com",
@@ -90,13 +81,12 @@ tenant: {{tenant}}
 }
 
 ### Confirm email
-GET {{baseUrl}}/api/v1/identity/confirm-email?userId={{userId}}&code={{code}}&tenant={{tenant}}
+GET {{baseUrl}}/api/v1/tenants/{{tenant}}/auth/confirm-email?userId={{userId}}&code={{code}}
 Accept: application/json
 
 ### Assign roles to user
 POST {{baseUrl}}/api/v1/identity/{{userId}}/roles
 Content-Type: application/json
-tenant: {{tenant}}
 Authorization: Bearer {{token}}
 
 {
@@ -109,13 +99,11 @@ Authorization: Bearer {{token}}
 ### Get roles for user
 GET {{baseUrl}}/api/v1/identity/{{userId}}/roles
 Accept: application/json
-tenant: {{tenant}}
 Authorization: Bearer {{token}}
 
 ### Update user profile
 PUT {{baseUrl}}/api/v1/identity/profile
 Content-Type: application/json
-tenant: {{tenant}}
 Authorization: Bearer {{token}}
 
 {
@@ -130,7 +118,6 @@ Authorization: Bearer {{token}}
 ### Toggle user status (activate/deactivate)
 POST {{baseUrl}}/api/v1/identity/{{userId}}/toggle-status
 Content-Type: application/json
-tenant: {{tenant}}
 Authorization: Bearer {{token}}
 
 {
@@ -140,6 +127,5 @@ Authorization: Bearer {{token}}
 
 ### Delete user
 DELETE {{baseUrl}}/api/v1/identity/{{userId}}
-tenant: {{tenant}}
 Authorization: Bearer {{token}}
 
