@@ -30,8 +30,28 @@ administration section, a basic member does not.
   current-tenant theme endpoints); `src/lib/permissions.ts` carries no `Permissions.Tenants.*` or
   `Permissions.Platform.*` constant. Adding one is the signal that the screen belongs in the console.
 
-## Sign-in
+## Sign-in resolves the tenant, the user never types it
 
-`login()` needs a tenant, and it is the one place a caller may name one (ADR-0002). Keep tenant
-resolution claim/route based: never add a server endpoint that maps an email to tenants or lists
-them for an anonymous caller — that is user and tenant enumeration.
+`src/auth/tenant-resolution.ts`, in order: `?tenant=` on the URL (mailed links carry it) → the
+subdomain when the host has one (`acme.app.example.com`, `acme.localhost:5173`; never a bare host,
+an apex, `www`, or an IP) → the tenant last used successfully on this device → `env.defaultTenant`.
+When the query parameter or the subdomain answers, the field is not rendered at all: the form says
+"Signing in to <tenant>" with a "Not your workspace?" escape that reveals it. Otherwise the field
+appears **below** email and password, labelled "Workspace" and prefilled.
+
+Only the tenant **id** is remembered (localStorage, `try/catch`, written only after a sign-in that
+succeeded) — never a token. Keep it claim/route based (ADR-0002): never add a server endpoint that
+maps an email to tenants or lists them for an anonymous caller — that is user and tenant enumeration.
+
+The resolver is pure and unit-tested (`tenant-resolution.test.ts`); add a case there rather than
+reasoning about hostnames in a component. Vite's `server.allowedHosts` must keep accepting
+`*.localhost` so subdomain resolution can be exercised in dev.
+
+## Demo mode (`env.demoMode`)
+
+Off by default. When `APP_DEMO_MODE`/`VITE_DEMO_MODE` is on, the login page offers "Sign in with a
+demo account" (`src/pages/login.demo-accounts.ts`, `src/components/auth/demo-accounts-dialog.tsx`):
+picking an account signs in with that account's own tenant. The shared password is **never a literal
+in the repo** — it comes from runtime config (`APP_DEMO_PASSWORD`/`VITE_DEMO_PASSWORD`). With demo
+mode on and no password configured, `demoPickOutcome` returns `prefill`: the picker fills the tenant
+and email and focuses the password field instead of signing in.

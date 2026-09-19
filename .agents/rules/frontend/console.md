@@ -41,7 +41,14 @@ security boundary, and the server gates the same endpoints on the same permissio
 ## Sign-in
 
 Operators live in the root tenant, so the console's login form has **no tenant field** — it always
-signs in to `env.defaultTenant` (`APP_DEFAULT_TENANT`, default `root`).
+signs in to `env.defaultTenant` (`APP_DEFAULT_TENANT`, default `root`). Do not port the dashboard's
+tenant resolver here: there is nothing to resolve, and an operator who needs another tenant enters
+it from the registry instead.
+
+With `env.demoMode` on (`APP_DEMO_MODE`), the page offers one affordance — "Use the demo operator
+account" — which **prefills the email only** (`APP_DEMO_OPERATOR_EMAIL`, default `admin@root.com`).
+It never signs in: that account's password is `Seed__DefaultAdminPassword`, not the demo tenants'
+shared secret, so this app has nothing to sign in with and must not pretend otherwise.
 
 ## The acting token (`src/auth/acting-store.ts`, `src/api/operator.ts`, ADR-0002 + issue #9)
 
