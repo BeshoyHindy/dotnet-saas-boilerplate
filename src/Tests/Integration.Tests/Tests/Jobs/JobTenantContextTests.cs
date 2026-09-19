@@ -1,6 +1,7 @@
 using Boilerplate.BuildingBlocks.Jobs.Services;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Hangfire;
+using Hangfire.Client;
 using Hangfire.Common;
 using Hangfire.States;
 using Integration.Tests.Infrastructure;
@@ -43,14 +44,16 @@ public sealed class JobTenantContextTests
 
         // No request, no HttpContext — exactly the situation the old filter gave up on.
         var tenantScope = _factory.Services.GetRequiredService<ITenantScope>();
+        string jobId = string.Empty;
         await tenantScope.RunAsync(tenantA, (services, _) =>
         {
-            services.GetRequiredService<IJobService>()
+            jobId = services.GetRequiredService<IJobService>()
                 .Enqueue<TenantProbeJob>(job => job.RunAsync(marker, CancellationToken.None));
             return Task.CompletedTask;
         });
 
-        var observation = await WaitForAsync(() => TenantProbeJob.Observations.GetValueOrDefault(marker));
+        var observation = await WaitForAsync(
+            () => TenantProbeJob.Observations.GetValueOrDefault(marker), jobId);
 
         observation.TenantId.ShouldBe(tenantA, "the job must run under the tenant it was enqueued for");
         observation.VisibleUserEmails.ShouldContain(adminA);
@@ -71,10 +74,10 @@ public sealed class JobTenantContextTests
         var ex = Should.Throw<Exception>(() =>
             jobs.Enqueue<TenantProbeJob>(job => job.RunAsync(marker, CancellationToken.None)));
 
-        FlattenMessages(ex).ShouldContain(
-            "[SystemJob]",
-            Case.Sensitive,
-            "the failure must name the fix — either enqueue under a tenant or declare the job tenant-less");
+        var message = FlattenMessages(ex);
+        message.Contains("[SystemJob]", StringComparison.Ordinal).ShouldBeTrue(
+            "the failure must name the fix — either enqueue under a tenant or declare the job " +
+            $"tenant-less. Actual: {message}");
         TenantProbeJob.Observations.ShouldNotContainKey(marker, "the job must never have been created");
     }
 
@@ -98,7 +101,9 @@ public sealed class JobTenantContextTests
         {
             var name = storage.GetMonitoringApi().JobDetails(jobId)?.History
                 .Select(h => h.StateName)
-                .FirstOrDefault(n => n is FailedState.StateName or DeletedState.StateName);
+                .FirstOrDefault(n =>
+                    string.Equals(n, FailedState.StateName, StringComparison.Ordinal) ||
+                    string.Equals(n, DeletedState.StateName, StringComparison.Ordinal));
             return name is null ? null : new Box<string>(name);
         });
 
@@ -131,7 +136,7 @@ public sealed class JobTenantContextTests
 
     private sealed record Box<T>(T Value);
 
-    private static async Task<T> WaitForAsync<T>(Func<T?> probe) where T : class
+    private async Task<T> WaitForAsync<T>(Func<T?> probe, string? jobId = null) where T : class
     {
         var deadline = DateTime.UtcNow + JobTimeout;
         while (DateTime.UtcNow < deadline)
@@ -145,7 +150,28 @@ public sealed class JobTenantContextTests
             await Task.Delay(200);
         }
 
-        throw new TimeoutException($"The job did not reach the expected state within {JobTimeout}.");
+        throw new TimeoutException(
+            $"The job did not reach the expected state within {JobTimeout}. {DescribeJob(jobId)}");
+    }
+
+    /// <summary>Hangfire's own record of what happened, so a timeout names the real failure.</summary>
+    private string DescribeJob(string? jobId)
+    {
+        if (string.IsNullOrEmpty(jobId))
+        {
+            return string.Empty;
+        }
+
+        var details = _factory.Services.GetRequiredService<JobStorage>().GetMonitoringApi().JobDetails(jobId);
+        if (details is null)
+        {
+            return $"Job {jobId} is not in storage.";
+        }
+
+        var history = details.History.Select(h =>
+            $"{h.StateName}: {h.Reason} {string.Join("; ", h.Data.Select(d => d.Key + "=" + d.Value))}");
+
+        return $"Job {jobId} history: {string.Join(" | ", history)}";
     }
 
     private static string FlattenMessages(Exception ex)

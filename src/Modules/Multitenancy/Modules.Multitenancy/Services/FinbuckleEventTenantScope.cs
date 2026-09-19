@@ -25,37 +25,22 @@ public sealed class FinbuckleEventTenantScope : IEventTenantScope
         _scopeFactory = scopeFactory;
     }
 
-    public async Task<IEventTenantScopeHandle> BeginAsync(string? tenantId, CancellationToken cancellationToken = default)
+    public async Task DispatchAsync(
+        string? tenantId,
+        Func<IServiceProvider, CancellationToken, Task> dispatch,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(dispatch);
+
         if (string.IsNullOrWhiteSpace(tenantId))
         {
             // Global event — the bus has already checked the type declares itself one. Leave the
             // ambient context alone and just give the handlers a scope.
-            return new PlainScopeHandle(_scopeFactory.CreateScope());
+            using var scope = _scopeFactory.CreateScope();
+            await dispatch(scope.ServiceProvider, cancellationToken).ConfigureAwait(false);
+            return;
         }
 
-        return new TenantScopeHandle(await _tenantScope.BeginAsync(tenantId, cancellationToken).ConfigureAwait(false));
-    }
-
-    private sealed class TenantScopeHandle : IEventTenantScopeHandle
-    {
-        private readonly ITenantScopeHandle _inner;
-
-        public TenantScopeHandle(ITenantScopeHandle inner) => _inner = inner;
-
-        public IServiceProvider Services => _inner.Services;
-
-        public void Dispose() => _inner.Dispose();
-    }
-
-    private sealed class PlainScopeHandle : IEventTenantScopeHandle
-    {
-        private readonly IServiceScope _scope;
-
-        public PlainScopeHandle(IServiceScope scope) => _scope = scope;
-
-        public IServiceProvider Services => _scope.ServiceProvider;
-
-        public void Dispose() => _scope.Dispose();
+        await _tenantScope.RunAsync(tenantId, dispatch, cancellationToken).ConfigureAwait(false);
     }
 }

@@ -18,14 +18,6 @@ public sealed class TenantScope : ITenantScope
         _ambient = ambient;
     }
 
-    public async Task<ITenantScopeHandle> BeginAsync(string tenantId, CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
-
-        var tenant = await LoadAsync(tenantId, cancellationToken).ConfigureAwait(false);
-        return Begin(tenant);
-    }
-
     public async Task RunAsync(
         string tenantId,
         Func<IServiceProvider, CancellationToken, Task> work,
@@ -50,7 +42,7 @@ public sealed class TenantScope : ITenantScope
     {
         ArgumentNullException.ThrowIfNull(work);
 
-        var tenant = await LoadAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        var tenant = await GetTenantAsync(tenantId, cancellationToken).ConfigureAwait(false);
         return await RunForAsync(tenant, work, cancellationToken).ConfigureAwait(false);
     }
 
@@ -75,20 +67,35 @@ public sealed class TenantScope : ITenantScope
         }
     }
 
-    public async Task<IReadOnlyList<AppTenantInfo>> GetTenantsAsync(CancellationToken cancellationToken = default)
+    public async Task<AppTenantInfo> GetTenantAsync(string tenantId, CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        cancellationToken.ThrowIfCancellationRequested();
+
         // Short-lived lookup scope, disposed before any work scope exists — the EF-backed store is
         // scoped, and holding it open would keep a second DbContext (and its connection) alive
         // alongside the tenant's own.
+        using var lookupScope = _scopeFactory.CreateScope();
+        var store = lookupScope.ServiceProvider.GetRequiredService<IMultiTenantStore<AppTenantInfo>>();
+
+        return await store.GetAsync(tenantId).ConfigureAwait(false)
+            ?? throw UnknownTenantException.ForTenant(tenantId);
+    }
+
+    public async Task<IReadOnlyList<AppTenantInfo>> GetTenantsAsync(CancellationToken cancellationToken = default)
+    {
         using var lookupScope = _scopeFactory.CreateScope();
         var store = lookupScope.ServiceProvider.GetRequiredService<IMultiTenantStore<AppTenantInfo>>();
         var tenants = await store.GetAllAsync().ConfigureAwait(false);
         return tenants.ToList();
     }
 
-    private Handle Begin(AppTenantInfo tenant)
+    public ITenantScopeHandle Begin(AppTenantInfo tenant)
     {
-        // Order is the whole point: ambient context first, DI scope second.
+        ArgumentNullException.ThrowIfNull(tenant);
+
+        // Order is the whole point: ambient context first, DI scope second. Synchronous so the
+        // AsyncLocal write happens in the caller's own flow — see ITenantScope.Begin.
         var restore = _ambient.Enter(tenant);
         try
         {
@@ -106,19 +113,10 @@ public sealed class TenantScope : ITenantScope
         Func<IServiceProvider, CancellationToken, Task<TResult>> work,
         CancellationToken cancellationToken)
     {
+        // Begin and work share this method's execution context, so the ambient tenant the handle
+        // installs is visible to everything the work resolves.
         using var handle = Begin(tenant);
         return await work(handle.Services, cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task<AppTenantInfo> LoadAsync(string tenantId, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        using var lookupScope = _scopeFactory.CreateScope();
-        var store = lookupScope.ServiceProvider.GetRequiredService<IMultiTenantStore<AppTenantInfo>>();
-
-        return await store.GetAsync(tenantId).ConfigureAwait(false)
-            ?? throw UnknownTenantException.ForTenant(tenantId);
     }
 
     private sealed class Handle : ITenantScopeHandle

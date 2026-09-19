@@ -204,7 +204,7 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
             services.AddScoped<
                 Boilerplate.BuildingBlocks.Eventing.Abstractions.IIntegrationEventHandler<
                     Tests.Jobs.TenantProbeIntegrationEvent>,
-                Tests.Jobs.TenantProbeEventHandler>();
+                Tests.Jobs.TenantProbeHandler>();
 
             // Replace real mail service with a no-op to avoid SMTP errors and Hangfire retries
             services.RemoveAll<IMailService>();

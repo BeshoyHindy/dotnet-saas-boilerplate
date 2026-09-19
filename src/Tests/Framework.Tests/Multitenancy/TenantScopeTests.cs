@@ -116,13 +116,14 @@ public sealed class TenantScopeTests
     }
 
     [Fact]
-    public async Task BeginAsync_Should_Restore_The_Previous_Tenant_On_Dispose()
+    public async Task Begin_Should_Restore_The_Previous_Tenant_On_Dispose()
     {
         var harness = new Harness();
         harness.Store.Seed(new AppTenantInfo(TenantId, TenantId));
         using var outer = harness.Ambient.Enter(new AppTenantInfo("root", "root"));
 
-        using (var handle = await harness.Sut.BeginAsync(TenantId))
+        var tenant = await harness.Sut.GetTenantAsync(TenantId);
+        using (var handle = harness.Sut.Begin(tenant))
         {
             handle.Tenant.Id.ShouldBe(TenantId);
             harness.Ambient.Current!.Id.ShouldBe(TenantId);
@@ -130,6 +131,45 @@ public sealed class TenantScopeTests
         }
 
         harness.Ambient.Current!.Id.ShouldBe("root");
+    }
+
+    /// <summary>
+    /// Regression guard, with Finbuckle's real <c>AsyncLocal</c> accessor rather than a field-backed
+    /// stub. <c>Begin</c> must be synchronous: a write to an <c>AsyncLocal</c> made in the
+    /// continuation of an <c>async</c> method is discarded when that method returns, so an async
+    /// <c>BeginAsync</c> hands back a handle whose tenant is not ambient for the caller — and the
+    /// caller's first scoped DbContext is then built with no tenant at all. Hangfire's job activator
+    /// is exactly that caller.
+    /// </summary>
+    [Fact]
+    public async Task Begin_Should_Make_The_Tenant_Ambient_In_The_Callers_Own_Flow()
+    {
+        var harness = new Harness(useRealAsyncLocalAccessor: true);
+        harness.Store.Seed(new AppTenantInfo(TenantId, TenantId));
+
+        var tenant = await harness.Sut.GetTenantAsync(TenantId);
+
+        using var handle = harness.Sut.Begin(tenant);
+
+        harness.Ambient.Current.ShouldNotBeNull(
+            "the ambient tenant must survive into the caller's frame, not stay inside an async method");
+        harness.Ambient.Current!.Id.ShouldBe(TenantId);
+    }
+
+    /// <summary>The same hazard from the other side: the work callback runs inside RunAsync, so it
+    /// does see the ambient tenant even with the real AsyncLocal accessor.</summary>
+    [Fact]
+    public async Task RunAsync_Should_Make_The_Tenant_Ambient_For_The_Work_With_The_Real_AsyncLocal()
+    {
+        var harness = new Harness(useRealAsyncLocalAccessor: true);
+        harness.Store.Seed(new AppTenantInfo(TenantId, TenantId));
+
+        await harness.Sut.RunAsync(TenantId, (services, _) =>
+        {
+            harness.Ambient.Current!.Id.ShouldBe(TenantId);
+            services.GetRequiredService<TenantCapturingService>().TenantAtConstruction.ShouldBe(TenantId);
+            return Task.CompletedTask;
+        });
     }
 
     [Fact]
@@ -165,13 +205,22 @@ public sealed class TenantScopeTests
 
     private sealed class Harness
     {
-        public Harness()
+        public Harness(bool useRealAsyncLocalAccessor = false)
         {
-            Ambient = new AmbientTenantContext(Accessor, Accessor);
+            // The stub is a plain field, which makes assertions easy but cannot catch execution-context
+            // mistakes; the real accessor is an AsyncLocal, which can.
+            var accessor = useRealAsyncLocalAccessor
+                ? new AsyncLocalMultiTenantContextAccessor<AppTenantInfo>()
+                : (IMultiTenantContextAccessor<AppTenantInfo>)Accessor;
+            var setter = useRealAsyncLocalAccessor
+                ? (IMultiTenantContextSetter)accessor
+                : Accessor;
+
+            Ambient = new AmbientTenantContext(accessor, setter);
 
             var services = new ServiceCollection();
-            services.AddSingleton<IMultiTenantContextAccessor<AppTenantInfo>>(Accessor);
-            services.AddSingleton<IMultiTenantContextSetter>(Accessor);
+            services.AddSingleton(accessor);
+            services.AddSingleton(setter);
             services.AddSingleton<AmbientTenantContext>(Ambient);
             services.AddSingleton<IMultiTenantStore<AppTenantInfo>>(Store);
             services.AddScoped<TenantCapturingService>();

@@ -59,25 +59,30 @@ public sealed partial class InMemoryEventBus : IEventBus
 
         RequireTenantOrGlobalDeclaration(@event, eventType);
 
-        // The tenant scope owns the DI scope, so the tenant is installed BEFORE any handler — or the
-        // DbContext it holds — is constructed. A context built first captures a null tenant and the
-        // default connection string, which is what broke background dispatch.
-        using var scope = await _tenantScope.BeginAsync(@event.TenantId, ct).ConfigureAwait(false);
-        var provider = scope.Services;
+        // The tenant scope owns both the ambient tenant and the DI scope, so the tenant is installed
+        // BEFORE any handler — or the DbContext it holds — is constructed. A context built first
+        // captures a null tenant and the default connection string, which is what broke background
+        // dispatch.
+        await _tenantScope.DispatchAsync(
+            @event.TenantId,
+            async (provider, token) =>
+            {
+                var handlers = ResolveHandlers(provider, dispatch.HandlerInterfaceType);
+                if (handlers.Length == 0)
+                {
+                    LogNoHandlers(eventType.FullName);
+                    return;
+                }
 
-        var handlers = ResolveHandlers(provider, dispatch.HandlerInterfaceType);
-        if (handlers.Length == 0)
-        {
-            LogNoHandlers(eventType.FullName);
-            return;
-        }
+                var inbox = provider.GetService<IInboxStore>();
 
-        var inbox = provider.GetService<IInboxStore>();
-
-        foreach (var handler in handlers)
-        {
-            await InvokeHandlerAsync(handler, dispatch.HandleMethod, eventType, @event, inbox, ct).ConfigureAwait(false);
-        }
+                foreach (var handler in handlers)
+                {
+                    await InvokeHandlerAsync(handler, dispatch.HandleMethod, eventType, @event, inbox, token)
+                        .ConfigureAwait(false);
+                }
+            },
+            ct).ConfigureAwait(false);
     }
 
     /// <summary>

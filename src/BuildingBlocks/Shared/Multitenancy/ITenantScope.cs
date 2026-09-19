@@ -16,15 +16,6 @@ namespace Boilerplate.BuildingBlocks.Shared.Multitenancy;
 /// </summary>
 public interface ITenantScope
 {
-    /// <summary>
-    /// Opens a tenant scope. The caller must dispose the handle; disposal tears down the DI scope
-    /// and restores the previously ambient tenant.
-    /// Prefer <see cref="RunAsync(string, Func{IServiceProvider, CancellationToken, Task}, CancellationToken)"/>
-    /// unless the scope's lifetime is owned by a framework (the Hangfire job activator is the one case).
-    /// </summary>
-    /// <exception cref="UnknownTenantException">The store has no tenant with that id.</exception>
-    Task<ITenantScopeHandle> BeginAsync(string tenantId, CancellationToken cancellationToken = default);
-
     /// <summary>Runs <paramref name="work"/> inside a scope opened for <paramref name="tenantId"/>.</summary>
     /// <exception cref="UnknownTenantException">The store has no tenant with that id.</exception>
     Task RunAsync(
@@ -49,11 +40,31 @@ public interface ITenantScope
         Func<AppTenantInfo, IServiceProvider, CancellationToken, Task> work,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Loads a tenant record from the store. Touches no ambient state.</summary>
+    /// <exception cref="UnknownTenantException">The store has no tenant with that id.</exception>
+    Task<AppTenantInfo> GetTenantAsync(string tenantId, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Every tenant in the store. For callers that need the catalog itself (readiness probes,
     /// startup waits) rather than work done under each tenant.
     /// </summary>
     Task<IReadOnlyList<AppTenantInfo>> GetTenantsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Enters <paramref name="tenant"/> and opens a DI scope under it, for the one case where a
+    /// framework owns the scope's lifetime and <c>RunAsync</c> cannot be used — Hangfire's
+    /// <c>JobActivator.BeginScope</c>. Dispose the handle to tear the scope down and restore the
+    /// previous ambient tenant.
+    ///
+    /// <b>Synchronous on purpose, and it has to stay that way.</b> The ambient tenant is an
+    /// <c>AsyncLocal</c>, and a write performed in the continuation of an <c>async</c> method is
+    /// discarded when that method returns — so an async <c>BeginAsync</c> would hand back a handle
+    /// whose tenant is no longer ambient in the caller's flow, and the caller's first
+    /// <c>GetRequiredService&lt;SomeDbContext&gt;()</c> would build it with a null tenant. Resolve
+    /// the record with <see cref="GetTenantAsync"/> first, then call this from the frame that will
+    /// use the scope. Prefer <c>RunAsync</c>, which has no such hazard.
+    /// </summary>
+    ITenantScopeHandle Begin(AppTenantInfo tenant);
 }
 
 /// <summary>An open tenant scope: the tenant that is ambient, and the DI scope created under it.</summary>

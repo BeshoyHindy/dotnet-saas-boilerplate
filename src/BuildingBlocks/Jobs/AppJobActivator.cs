@@ -57,14 +57,15 @@ public class AppJobActivator : JobActivator
                 $"Job {SystemJobs.Describe(job)} is tenant-bound but no ITenantScope is registered. " +
                 "Register the multitenancy module, or mark the job [SystemJob].");
 
-        // Hangfire owns the scope lifetime through BeginScope/Dispose, so this is the one place the
-        // blocking form of ITenantScope is used. Job workers have no synchronization context.
-        var handle = tenantScope.BeginAsync(tenantId).GetAwaiter().GetResult();
+        // Two steps on purpose. The store lookup is async and blocked on here — Hangfire owns the
+        // scope's lifetime through BeginScope/Dispose, and a job worker has no synchronization
+        // context. Entering the tenant is then synchronous, in *this* frame: the ambient tenant is
+        // an AsyncLocal, and a write made inside an async method would be discarded on return,
+        // leaving the job's DbContexts to be built with no tenant at all.
+        var tenant = tenantScope.GetTenantAsync(tenantId).GetAwaiter().GetResult();
 
-        if (!handle.Tenant.IsActive)
+        if (!tenant.IsActive)
         {
-            handle.Dispose();
-
             // Fail closed. A deactivated tenant is one whose work must stop, and a job that keeps
             // writing for it after deactivation is exactly the leak deactivation is meant to prevent.
             throw new InvalidOperationException(
@@ -72,7 +73,7 @@ public class AppJobActivator : JobActivator
                 "Reactivate the tenant or delete the job.");
         }
 
-        return handle;
+        return tenantScope.Begin(tenant);
     }
 
     private sealed class Scope : JobActivatorScope, IServiceProvider

@@ -17,51 +17,55 @@ public sealed class FinbuckleEventTenantScopeTests
     private readonly ServiceProvider _provider = new ServiceCollection().BuildServiceProvider();
 
     [Fact]
-    public async Task BeginAsync_Should_Open_The_Tenant_Scope_When_TenantIdProvided()
+    public async Task DispatchAsync_Should_Run_The_Dispatch_Inside_The_Tenant_Scope()
     {
         var sut = new FinbuckleEventTenantScope(_tenantScope, _provider.GetRequiredService<IServiceScopeFactory>());
+        var dispatched = false;
 
-        using (var handle = await sut.BeginAsync("acme"))
+        await sut.DispatchAsync("acme", (services, _) =>
         {
-            _tenantScope.BegunWith.ShouldHaveSingleItem().ShouldBe("acme");
-            handle.Services.ShouldBeSameAs(_tenantScope.LastHandle!.Services);
-            _tenantScope.LastHandle.Disposed.ShouldBeFalse();
-        }
+            dispatched = true;
+            services.ShouldBeSameAs(_tenantScope.SuppliedServices);
+            return Task.CompletedTask;
+        });
 
-        _tenantScope.LastHandle!.Disposed.ShouldBeTrue("disposing the event scope must release the tenant scope");
+        dispatched.ShouldBeTrue();
+        _tenantScope.RanFor.ShouldHaveSingleItem().ShouldBe("acme");
     }
 
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
-    public async Task BeginAsync_Should_Open_A_Plain_Scope_For_Global_Events(string? tenantId)
+    public async Task DispatchAsync_Should_Open_A_Plain_Scope_For_Global_Events(string? tenantId)
     {
         var sut = new FinbuckleEventTenantScope(_tenantScope, _provider.GetRequiredService<IServiceScopeFactory>());
+        IServiceProvider? seen = null;
 
-        using var handle = await sut.BeginAsync(tenantId);
+        await sut.DispatchAsync(tenantId, (services, _) =>
+        {
+            seen = services;
+            return Task.CompletedTask;
+        });
 
-        handle.Services.ShouldNotBeNull();
-        _tenantScope.BegunWith.ShouldBeEmpty("a global event must not enter any tenant");
+        seen.ShouldNotBeNull();
+        _tenantScope.RanFor.ShouldBeEmpty("a global event must not enter any tenant");
     }
 
     #region Test doubles
 
     private sealed class RecordingTenantScope : ITenantScope
     {
-        public List<string> BegunWith { get; } = [];
+        public List<string> RanFor { get; } = [];
 
-        public FakeHandle? LastHandle { get; private set; }
-
-        public Task<ITenantScopeHandle> BeginAsync(string tenantId, CancellationToken cancellationToken = default)
-        {
-            BegunWith.Add(tenantId);
-            LastHandle = new FakeHandle(new AppTenantInfo(tenantId, tenantId));
-            return Task.FromResult<ITenantScopeHandle>(LastHandle);
-        }
+        public IServiceProvider SuppliedServices { get; } = new ServiceCollection().BuildServiceProvider();
 
         public Task RunAsync(string tenantId, Func<IServiceProvider, CancellationToken, Task> work, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
+        {
+            ArgumentNullException.ThrowIfNull(work);
+            RanFor.Add(tenantId);
+            return work(SuppliedServices, cancellationToken);
+        }
 
         public Task<TResult> RunAsync<TResult>(string tenantId, Func<IServiceProvider, CancellationToken, Task<TResult>> work, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
@@ -69,27 +73,13 @@ public sealed class FinbuckleEventTenantScopeTests
         public Task RunForEachTenantAsync(Func<AppTenantInfo, IServiceProvider, CancellationToken, Task> work, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
+        public Task<AppTenantInfo> GetTenantAsync(string tenantId, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
         public Task<IReadOnlyList<AppTenantInfo>> GetTenantsAsync(CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
-    }
 
-    private sealed class FakeHandle : ITenantScopeHandle
-    {
-        private readonly ServiceProvider _services = new ServiceCollection().BuildServiceProvider();
-
-        public FakeHandle(AppTenantInfo tenant) => Tenant = tenant;
-
-        public IServiceProvider Services => _services;
-
-        public AppTenantInfo Tenant { get; }
-
-        public bool Disposed { get; private set; }
-
-        public void Dispose()
-        {
-            Disposed = true;
-            _services.Dispose();
-        }
+        public ITenantScopeHandle Begin(AppTenantInfo tenant) => throw new NotSupportedException();
     }
 
     #endregion

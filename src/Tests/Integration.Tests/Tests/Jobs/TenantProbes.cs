@@ -27,7 +27,7 @@ public sealed class TenantProbeJob(
     IdentityDbContext identity,
     IInboxStore inbox)
 {
-    public static readonly ConcurrentDictionary<Guid, TenantObservation> Observations = new();
+    public static ConcurrentDictionary<Guid, TenantObservation> Observations { get; } = new();
 
     public async Task RunAsync(Guid marker, CancellationToken cancellationToken)
     {
@@ -48,7 +48,7 @@ public sealed class TenantProbeJob(
 [AutomaticRetry(Attempts = 0)]
 public sealed class SystemProbeJob(IMultiTenantContextAccessor<AppTenantInfo> accessor)
 {
-    public static readonly ConcurrentDictionary<Guid, string?> Observations = new();
+    public static ConcurrentDictionary<Guid, string?> Observations { get; } = new();
 
     public Task RunAsync(Guid marker, CancellationToken cancellationToken)
     {
@@ -70,12 +70,12 @@ public sealed record TenantProbeIntegrationEvent(
 /// The event-side twin of <see cref="TenantProbeJob"/>. Registered by
 /// <c>AppWebApplicationFactory</c> so it runs through the real bus, inbox and tenant scope.
 /// </summary>
-public sealed class TenantProbeEventHandler(
+public sealed class TenantProbeHandler(
     IMultiTenantContextAccessor<AppTenantInfo> accessor,
     IdentityDbContext identity,
     IInboxStore inbox) : IIntegrationEventHandler<TenantProbeIntegrationEvent>
 {
-    public static readonly ConcurrentDictionary<Guid, TenantObservation> Observations = new();
+    public static ConcurrentDictionary<Guid, TenantObservation> Observations { get; } = new();
 
     public async Task HandleAsync(TenantProbeIntegrationEvent @event, CancellationToken ct = default)
     {

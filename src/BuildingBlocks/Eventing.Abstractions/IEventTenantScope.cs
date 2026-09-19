@@ -1,14 +1,19 @@
 namespace Boilerplate.BuildingBlocks.Eventing.Abstractions;
 
 /// <summary>
-/// Establishes the tenant an integration event is dispatched under, and hands back the service
-/// provider its handlers must be resolved from.
+/// Runs an integration event's dispatch under the tenant that event belongs to, and hands the
+/// dispatch the service provider its handlers must be resolved from.
 ///
-/// The scope returns the provider rather than only a restore handle so the ordering cannot be got
-/// wrong: a <c>MultiTenantDbContext</c> captures its <c>TenantInfo</c> — and with it the tenant's
-/// connection string — at construction, so a handler resolved from a DI scope created <i>before</i>
-/// the tenant is installed reads the wrong database through a null tenant filter. A caller that
-/// creates its own scope has to remember the order; a caller handed one cannot forget it.
+/// Callback rather than a returned handle, for two reasons:
+/// <list type="bullet">
+///   <item>the DI scope comes from here, so "install the tenant, <i>then</i> create the scope"
+///     cannot be got wrong by a caller — a <c>MultiTenantDbContext</c> captures its
+///     <c>TenantInfo</c>, and with it the tenant's connection string, at construction;</item>
+///   <item>the ambient tenant is an <c>AsyncLocal</c>, and a write made in the continuation of an
+///     <c>async</c> method is discarded when that method returns. A <c>Task&lt;handle&gt;</c> API
+///     would therefore hand back a handle whose tenant is no longer ambient for the caller. Running
+///     the dispatch inside this method keeps the write and its use in one execution context.</item>
+/// </list>
 ///
 /// Implementations load the <b>full</b> tenant record from the tenant store. An id-only stub is what
 /// made per-tenant connection strings silently fall back to the default database.
@@ -20,17 +25,12 @@ namespace Boilerplate.BuildingBlocks.Eventing.Abstractions;
 public interface IEventTenantScope
 {
     /// <summary>
-    /// Begins the dispatch scope for <paramref name="tenantId"/>. A null/whitespace id means a
-    /// global event and leaves the ambient tenant alone — the bus only allows that for events that
-    /// declare themselves <see cref="IGlobalIntegrationEvent"/>.
-    /// Disposing the handle tears down the DI scope and restores the previous ambient tenant.
+    /// Invokes <paramref name="dispatch"/> under <paramref name="tenantId"/>. A null/whitespace id
+    /// means a global event and leaves the ambient tenant alone — the bus only allows that for
+    /// events that declare themselves <see cref="IGlobalIntegrationEvent"/>.
     /// </summary>
-    Task<IEventTenantScopeHandle> BeginAsync(string? tenantId, CancellationToken cancellationToken = default);
-}
-
-/// <summary>An open event-dispatch scope.</summary>
-public interface IEventTenantScopeHandle : IDisposable
-{
-    /// <summary>Resolve handlers — and anything they need — from here, never from the root provider.</summary>
-    IServiceProvider Services { get; }
+    Task DispatchAsync(
+        string? tenantId,
+        Func<IServiceProvider, CancellationToken, Task> dispatch,
+        CancellationToken cancellationToken = default);
 }

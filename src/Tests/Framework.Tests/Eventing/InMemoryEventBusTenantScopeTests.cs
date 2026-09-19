@@ -6,10 +6,11 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Framework.Tests.Eventing;
 
 /// <summary>
-/// Guards the systemic fix for the background-dispatch tenant-context bug: handlers are resolved
-/// from the scope the <see cref="IEventTenantScope"/> hands back, which was created after the
-/// event's tenant was installed. Handlers resolved from a scope opened first materialize
-/// tenant-filtered DbContexts with a null tenant and the default connection string.
+/// Guards the systemic fix for the background-dispatch tenant-context bug: dispatch runs inside
+/// <see cref="IEventTenantScope"/>, and handlers are resolved from the provider it supplies — a DI
+/// scope created after the event's tenant was installed. Handlers resolved from a scope opened
+/// first materialize tenant-filtered DbContexts with a null tenant and the default connection
+/// string.
 ///
 /// Also pins ADR-0002's other half for events: tenant-less dispatch has to be declared
 /// (<see cref="IGlobalIntegrationEvent"/>), never inferred from a null field.
@@ -114,18 +115,21 @@ public sealed class InMemoryEventBusTenantScopeTests
         public bool IsActive { get; private set; }
         public IServiceProvider Services { get; set; } = default!;
 
-        public Task<IEventTenantScopeHandle> BeginAsync(string? tenantId, CancellationToken cancellationToken = default)
+        public async Task DispatchAsync(
+            string? tenantId,
+            Func<IServiceProvider, CancellationToken, Task> dispatch,
+            CancellationToken cancellationToken = default)
         {
             BegunWith.Add(tenantId);
             IsActive = true;
-            return Task.FromResult<IEventTenantScopeHandle>(new Handle(this));
-        }
-
-        private sealed class Handle(RecordingTenantScope owner) : IEventTenantScopeHandle
-        {
-            public IServiceProvider Services => owner.Services;
-
-            public void Dispose() => owner.IsActive = false;
+            try
+            {
+                await dispatch(Services, cancellationToken);
+            }
+            finally
+            {
+                IsActive = false;
+            }
         }
     }
 

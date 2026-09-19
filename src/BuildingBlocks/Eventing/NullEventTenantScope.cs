@@ -14,17 +14,14 @@ public sealed class NullEventTenantScope : IEventTenantScope
 
     public NullEventTenantScope(IServiceScopeFactory scopeFactory) => _scopeFactory = scopeFactory;
 
-    public Task<IEventTenantScopeHandle> BeginAsync(string? tenantId, CancellationToken cancellationToken = default) =>
-        Task.FromResult<IEventTenantScopeHandle>(new Handle(_scopeFactory.CreateScope()));
-
-    private sealed class Handle : IEventTenantScopeHandle
+    public async Task DispatchAsync(
+        string? tenantId,
+        Func<IServiceProvider, CancellationToken, Task> dispatch,
+        CancellationToken cancellationToken = default)
     {
-        private readonly IServiceScope _scope;
+        ArgumentNullException.ThrowIfNull(dispatch);
 
-        public Handle(IServiceScope scope) => _scope = scope;
-
-        public IServiceProvider Services => _scope.ServiceProvider;
-
-        public void Dispose() => _scope.Dispose();
+        using var scope = _scopeFactory.CreateScope();
+        await dispatch(scope.ServiceProvider, cancellationToken).ConfigureAwait(false);
     }
 }
