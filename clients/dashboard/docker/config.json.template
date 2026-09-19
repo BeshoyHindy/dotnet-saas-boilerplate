@@ -1,4 +1,6 @@
 {
   "apiBase": "",
-  "defaultTenant": "${APP_DEFAULT_TENANT}"
+  "defaultTenant": "${APP_DEFAULT_TENANT}",
+  "demoMode": ${APP_DEMO_MODE},
+  "demoPassword": "${APP_DEMO_PASSWORD}"
 }

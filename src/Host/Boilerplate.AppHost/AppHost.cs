@@ -45,20 +45,18 @@ var redisConnectionString = ReferenceExpression.Create(
 // presigned PUTs from a client's dev origin reach it without proxying through the API.
 const string MinioBucket = "boilerplate-uploads";
 
-//#if (frontend)
 // The two clients (ADR-0008): the dashboard is the app a tenant's users work in, the
 // console is the operator tool. Dev ports stay fixed — a client's origin is part of its
 // contract here (the Vite proxy, the SameSite=Strict refresh cookie, and the CORS entry
 // below all name it) — unlike the container ports above, which Aspire allocates.
+//
+// Declared unconditionally: these are plain C# comments, so both arms of an `#if` would
+// reach the real compiler and redeclare the constant. With `--frontend false` the pair
+// simply goes unused beyond MinIO's CORS header, which is harmless.
 const string DashboardOrigin = "http://localhost:5173";
 const string ConsoleOrigin = "http://localhost:5174";
 // MinIO takes a comma-separated allow-list; both clients upload straight to it.
 const string ClientOrigins = $"{DashboardOrigin},{ConsoleOrigin}";
-//#else
-// No browser client in this scaffold, so nothing does a presigned upload from a page —
-// MinIO's own default allow-all is as good as an empty list and stays a valid value.
-const string ClientOrigins = "*";
-//#endif
 
 // Secrets are Aspire parameters, never literals in this file: the password is generated on first
 // run and persisted to this project's user-secrets, so it survives restarts without being committed.
@@ -236,7 +234,22 @@ builder.AddJavaScriptApp($"{appPrefix}-dashboard", "../../../clients/dashboard",
     .WaitFor(api)
     .WithHttpEndpoint(port: 5173, targetPort: 5173, isProxied: false)
     .WithExternalHttpEndpoints()
-    .WithEnvironment("VITE_API_BASE_URL", api.GetEndpoint("https"));
+    .WithEnvironment("VITE_API_BASE_URL", api.GetEndpoint("https"))
+    // The demo-account picker is on in the local stack and nowhere else by default: this
+    // is the one environment whose accounts are seeded, disposable and nobody's data.
+    .WithEnvironment("VITE_DEMO_MODE", "true");
+// ── CONNECT ME (demo seeder) ────────────────────────────────────────────────────────
+// The demo accounts' shared password belongs here, as a `VITE_DEMO_PASSWORD` environment
+// value on the dashboard above:
+//
+//     .WithEnvironment("VITE_DEMO_PASSWORD", seedDemoPassword)
+//
+// `seed-demo-password` is the Aspire parameter that carries it, and it arrives with the
+// server-side demo seeder (branch feature/restore-demo-accounts) — this file must not
+// invent a second source for the same secret in the meantime. Until the two are joined
+// the picker degrades deliberately: it fills in the tenant and the email and asks for the
+// password, rather than signing in with a credential nothing here can know.
+// ────────────────────────────────────────────────────────────────────────────────────
 
 // The console — the operator tool. Root operators only; a tenant user who signs in here
 // is told so (see clients/console/src/auth/operator-gate.tsx).
@@ -246,7 +259,10 @@ builder.AddJavaScriptApp($"{appPrefix}-console", "../../../clients/console", "de
     .WaitFor(api)
     .WithHttpEndpoint(port: 5174, targetPort: 5174, isProxied: false)
     .WithExternalHttpEndpoints()
-    .WithEnvironment("VITE_API_BASE_URL", api.GetEndpoint("https"));
+    .WithEnvironment("VITE_API_BASE_URL", api.GetEndpoint("https"))
+    // Prefills the seeded operator's email only. Its password is `seed-admin-password`
+    // above, not the demo tenants' shared one, so the console never signs in for you.
+    .WithEnvironment("VITE_DEMO_MODE", "true");
 //#else
 // React apps excluded: discard the unused api handle to keep the no-frontend scaffold warning-clean (S1481 under TreatWarningsAsErrors).
 _ = api;

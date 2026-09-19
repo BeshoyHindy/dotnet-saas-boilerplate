@@ -2,6 +2,8 @@
   "apiBase": "",
   "defaultTenant": "root",
   "dashboardUrl": "http://localhost:5173",
+  "demoMode": false,
+  "demoOperatorEmail": "admin@root.com",
   "inactivityIdleMs": 1200000,
   "inactivityWarningMs": 60000
 }

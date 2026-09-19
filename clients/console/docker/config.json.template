@@ -1,5 +1,7 @@
 {
   "apiBase": "",
   "defaultTenant": "${APP_DEFAULT_TENANT}",
-  "dashboardUrl": "${APP_DASHBOARD_URL}"
+  "dashboardUrl": "${APP_DASHBOARD_URL}",
+  "demoMode": ${APP_DEMO_MODE},
+  "demoOperatorEmail": "${APP_DEMO_OPERATOR_EMAIL}"
 }

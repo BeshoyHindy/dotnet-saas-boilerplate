@@ -21,6 +21,12 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       strictPort: true,
+      // Tenant subdomains have to reach the dev server: `acme.localhost:5173` resolves to
+      // tenant "acme" (src/auth/tenant-resolution.ts), and Vite's default host check
+      // answers 403 for any Host it was not told about. `.localhost` covers every label
+      // under it, and every browser resolves *.localhost to the loopback address without
+      // a hosts-file entry. Dev only — the nginx image does its own host handling.
+      allowedHosts: [".localhost"],
       // Dev mirrors the nginx image: the dashboard proxies to the API rather than
       // letting the browser call it cross-origin. The refresh token is an HttpOnly
       // SameSite=Strict cookie and CORS allows no credentials (ADR-0002), so a

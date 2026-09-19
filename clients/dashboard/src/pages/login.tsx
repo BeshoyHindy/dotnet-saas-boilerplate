@@ -1,8 +1,16 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, TimerOff } from "lucide-react";
+import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, Sparkles, TimerOff } from "lucide-react";
 import { useAuth } from "@/auth/use-auth";
 import { consumeSignedOutReason } from "@/auth/inactivity";
+import {
+  readRememberedTenant,
+  rememberTenant,
+  resolveTenant,
+  type ResolvedTenant,
+} from "@/auth/tenant-resolution";
+import { DemoAccountsDialog } from "@/components/auth/demo-accounts-dialog";
+import { demoPickOutcome, type DemoAccount } from "@/pages/login.demo-accounts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,8 +24,11 @@ type LocationState = { from?: { pathname: string } };
 // ────────────────────────────────────────────────────────────────────────
 // Login — dentalOS "welcome back" card on rose+saffron atmospheric orbs
 // (chrome supplied by AuthShell, shared with the rest of the auth flow).
-// Boilerplate stays multi-tenant, so the Tenant field leads the form; Email +
-// Password follow.
+// Boilerplate stays multi-tenant, but NOBODY TYPES A TENANT. It is resolved from
+// the URL, the subdomain, this device's last sign-in, or the configured default
+// (src/auth/tenant-resolution.ts). When the arrival named it, the field is not
+// rendered at all; otherwise it sits BELOW email and password, as "Workspace",
+// prefilled — a detail to correct, not a question to answer first.
 // ────────────────────────────────────────────────────────────────────────
 
 export function LoginPage() {
@@ -26,13 +37,29 @@ export function LoginPage() {
   const location = useLocation();
   const from = (location.state as LocationState | null)?.from?.pathname ?? "/";
 
+  // Resolved once, at mount: the URL and the hostname cannot change under a mounted
+  // login page, and re-resolving would fight the user the moment they edit the field.
+  const [resolved] = useState<ResolvedTenant>(() =>
+    resolveTenant({
+      search: window.location.search,
+      host: window.location.host,
+      remembered: readRememberedTenant(),
+      defaultTenant: env.defaultTenant,
+    }),
+  );
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [tenant, setTenant] = useState(env.defaultTenant);
+  const [tenant, setTenant] = useState(resolved.tenant);
+  // The field is hidden when the arrival itself named the tenant; "Not your workspace?"
+  // reveals it, because a certain answer can still be the wrong one (a forwarded link).
+  const [tenantFieldShown, setTenantFieldShown] = useState(!resolved.certain);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [demoOpen, setDemoOpen] = useState(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   // Surface why the previous session ended (read-and-clear, one-shot).
   useEffect(() => {
@@ -50,6 +77,9 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await login(creds);
+      // Only after it worked: a tenant that failed to sign in is not worth remembering,
+      // and this is the id, never a credential.
+      rememberTenant(creds.tenant);
       navigate(from, { replace: true });
     } catch (err) {
       const message =
@@ -67,6 +97,34 @@ export function LoginPage() {
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     await performLogin({ email, password, tenant });
+  };
+
+  /**
+   * Picking a demo account signs in as that account, in ITS tenant — the whole point of
+   * the picker is that nobody types or chooses a tenant. With no demo password configured
+   * (`APP_DEMO_PASSWORD` unset) there is nothing to sign in with, so fill what we know and
+   * hand the person the password field rather than firing a request that must 401.
+   */
+  const onPickDemoAccount = (account: DemoAccount) => {
+    const outcome = demoPickOutcome(account, env.demoPassword);
+    setEmail(outcome.email);
+    setTenant(outcome.tenant);
+    setError(null);
+
+    if (outcome.action === "prefill") {
+      setPassword("");
+      setNotice(outcome.reason);
+      // After the dialog's close animation hands focus back.
+      window.setTimeout(() => passwordRef.current?.focus(), 0);
+      return;
+    }
+
+    setPassword(outcome.password);
+    void performLogin({
+      email: outcome.email,
+      password: outcome.password,
+      tenant: outcome.tenant,
+    });
   };
 
   return (
@@ -96,25 +154,25 @@ export function LoginPage() {
         noValidate
         aria-describedby={error ? "login-error" : undefined}
       >
-        {/* Tenant — Boilerplate stays multi-tenant, so this leads the form. */}
-        <div className="space-y-1.5">
-          <Label
-            htmlFor="tenant"
-            className="block text-[11.5px] font-semibold uppercase tracking-wider text-[var(--color-muted-foreground)]"
-          >
-            Tenant
-          </Label>
-          <Input
-            id="tenant"
-            value={tenant}
-            onChange={(e) => setTenant(e.target.value)}
-            placeholder="root"
-            autoComplete="organization"
-            required
-            aria-invalid={error ? true : undefined}
-            className="h-11 text-[14px]"
-          />
-        </div>
+        {/* The arrival named the tenant (a mailed link, or their own subdomain), so there
+            is nothing to ask — just say which workspace this is, with a way out. */}
+        {!tenantFieldShown && (
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-muted)] px-3 py-2.5">
+            <span className="text-[12.5px] text-[var(--color-muted-foreground)]">
+              Signing in to
+            </span>
+            <code className="code-chip" data-testid="resolved-tenant">
+              {tenant}
+            </code>
+            <button
+              type="button"
+              onClick={() => setTenantFieldShown(true)}
+              className="ml-auto cursor-pointer text-[11px] font-medium text-[var(--color-muted-foreground)] underline-offset-4 transition-colors hover:text-[var(--color-primary)] hover:underline"
+            >
+              Not your workspace?
+            </button>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <Label
@@ -154,6 +212,7 @@ export function LoginPage() {
           <div className="relative">
             <Input
               id="password"
+              ref={passwordRef}
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -173,6 +232,29 @@ export function LoginPage() {
             </button>
           </div>
         </div>
+
+        {/* Workspace — BELOW the credentials on purpose. It is prefilled and usually right,
+            so it is a correction, not the first question. */}
+        {tenantFieldShown && (
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="tenant"
+              className="block text-[11.5px] font-semibold uppercase tracking-wider text-[var(--color-muted-foreground)]"
+            >
+              Workspace
+            </Label>
+            <Input
+              id="tenant"
+              value={tenant}
+              onChange={(e) => setTenant(e.target.value)}
+              placeholder={env.defaultTenant}
+              autoComplete="organization"
+              required
+              aria-invalid={error ? true : undefined}
+              className="h-11 text-[14px]"
+            />
+          </div>
+        )}
 
         {error && (
           <div
@@ -209,7 +291,35 @@ export function LoginPage() {
             )}
           </Button>
         </div>
+
+        {/* Demo mode only — off unless a deployment turns it on (env.demoMode). */}
+        {env.demoMode && (
+          <div className="pt-1 text-center">
+            <button
+              type="button"
+              onClick={() => setDemoOpen(true)}
+              data-testid="demo-accounts-open"
+              className="inline-flex cursor-pointer items-center gap-1.5 text-[12px] font-medium text-[var(--color-muted-foreground)] underline-offset-4 transition-colors hover:text-[var(--color-primary)] hover:underline"
+            >
+              <Sparkles className="size-3.5" aria-hidden />
+              Sign in with a demo account
+            </button>
+          </div>
+        )}
       </form>
+
+      {env.demoMode && (
+        <DemoAccountsDialog
+          open={demoOpen}
+          onOpenChange={setDemoOpen}
+          onPick={onPickDemoAccount}
+          hint={
+            env.demoPassword
+              ? "Resets with every reseed."
+              : "No demo password configured — we'll fill the rest in."
+          }
+        />
+      )}
     </AuthShell>
   );
 }

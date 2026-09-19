@@ -1,6 +1,6 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, TimerOff } from "lucide-react";
+import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, Sparkles, TimerOff } from "lucide-react";
 import { useAuth } from "@/auth/use-auth";
 import { consumeSignedOutReason } from "@/auth/inactivity";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,10 @@ type LocationState = { from?: { pathname: string } };
 // ────────────────────────────────────────────────────────────────────────
 // Login — dentalOS "welcome back" card on rose+saffron atmospheric orbs
 // (chrome supplied by AuthShell, shared with the rest of the auth flow).
-// Boilerplate stays multi-tenant, so the Tenant field leads the form; Email +
-// Password follow.
+// NO TENANT FIELD. Operators live in the root tenant, so this form always signs
+// in to `env.defaultTenant` (APP_DEFAULT_TENANT) — asking an operator to type
+// "root" every time is a question with one answer. The tenant an operator works
+// IN is chosen later, by entering it from the registry (ADR-0002).
 // ────────────────────────────────────────────────────────────────────────
 
 export function LoginPage() {
@@ -28,11 +30,11 @@ export function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [tenant, setTenant] = useState(env.defaultTenant);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   // Surface why the previous session ended (read-and-clear, one-shot).
   useEffect(() => {
@@ -66,7 +68,7 @@ export function LoginPage() {
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    await performLogin({ email, password, tenant });
+    await performLogin({ email, password, tenant: env.defaultTenant });
   };
 
   return (
@@ -96,26 +98,6 @@ export function LoginPage() {
         noValidate
         aria-describedby={error ? "login-error" : undefined}
       >
-        {/* Tenant — Boilerplate stays multi-tenant, so this leads the form. */}
-        <div className="space-y-1.5">
-          <Label
-            htmlFor="tenant"
-            className="block text-[11.5px] font-semibold uppercase tracking-wider text-[var(--color-muted-foreground)]"
-          >
-            Tenant
-          </Label>
-          <Input
-            id="tenant"
-            value={tenant}
-            onChange={(e) => setTenant(e.target.value)}
-            placeholder="root"
-            autoComplete="organization"
-            required
-            aria-invalid={error ? true : undefined}
-            className="h-11 text-[14px]"
-          />
-        </div>
-
         <div className="space-y-1.5">
           <Label
             htmlFor="email"
@@ -154,6 +136,7 @@ export function LoginPage() {
           <div className="relative">
             <Input
               id="password"
+              ref={passwordRef}
               type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -193,7 +176,7 @@ export function LoginPage() {
         <div className="pt-1.5">
           <Button
             type="submit"
-            disabled={submitting || !email || !password || !tenant}
+            disabled={submitting || !email || !password}
             className="group h-11 w-full text-[14px] font-semibold"
           >
             {submitting ? (
@@ -209,6 +192,31 @@ export function LoginPage() {
             )}
           </Button>
         </div>
+
+        {/* Demo mode only. The console's "picker" is one account — the seeded root
+            operator — so it is a button, not a dialog: a list of one is a worse version
+            of the same thing. And it only PREFILLS: that account's password is
+            `Seed__DefaultAdminPassword`, a different parameter from the demo tenants'
+            shared one, so this app has nothing to sign in with. */}
+        {env.demoMode && (
+          <div className="pt-1 text-center">
+            <button
+              type="button"
+              data-testid="demo-operator-fill"
+              onClick={() => {
+                setEmail(env.demoOperatorEmail);
+                setNotice(
+                  `Filled in the demo operator (${env.demoOperatorEmail}) — enter its password to sign in.`,
+                );
+                passwordRef.current?.focus();
+              }}
+              className="inline-flex cursor-pointer items-center gap-1.5 text-[12px] font-medium text-[var(--color-muted-foreground)] underline-offset-4 transition-colors hover:text-[var(--color-primary)] hover:underline"
+            >
+              <Sparkles className="size-3.5" aria-hidden />
+              Use the demo operator account
+            </button>
+          </div>
+        )}
       </form>
     </AuthShell>
   );
