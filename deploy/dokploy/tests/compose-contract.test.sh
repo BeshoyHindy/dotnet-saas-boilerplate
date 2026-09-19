@@ -99,6 +99,25 @@ refute_match "migrator is given no JWT signing key" "$migrator_block" '[Jj]wt'
 assert_match "migrator gets the seed admin password" "$migrator_block" 'Seed__DefaultAdminPassword'
 assert_match "migrator gets the migrations assembly" "$migrator_block" 'DatabaseOptions__MigrationsAssembly'
 
+# ── Object storage is open on `uploads/` and nowhere else ────────────
+# Avatars and tenant branding are served as unsigned URLs under `uploads/`, so
+# that prefix has to allow anonymous GET or every one of them 403s. Files-module
+# objects live under `tenants/` where public and private share a key space and
+# visibility is a database column, so widening this grant to the bucket would
+# silently publish every private file and make ChangeFileVisibility a no-op.
+init_block="$(service_block "$DATA" minio-init)"
+public_block="$(service_block "$DATA" minio-public-prefix)"
+assert_match "the bucket is created once, idempotently" "$init_block" 'command:.*mb.*--ignore-existing.*\$\{STORAGE_BUCKET\}'
+assert_match "anonymous download is granted" "$public_block" 'command:.*anonymous.*set.*download'
+assert_match "the grant is scoped to the uploads/ prefix" "$public_block" \
+  'local/\$\{STORAGE_BUCKET\}/uploads'
+refute_match "the grant is never the whole bucket" "$public_block" \
+  '"local/\$\{STORAGE_BUCKET\}"\]'
+refute_match "the grant never reaches the tenants/ prefix" "$data_text" 'download.*tenants'
+assert_match "the grant runs after the bucket exists" "$public_block" \
+  'condition:[[:space:]]*service_completed_successfully'
+assert_match "the grant is one-shot" "$public_block" '^[[:space:]]*restart:[[:space:]]*"no"'
+
 # ── The shared external network ──────────────────────────────────────
 for f in "$DATA" "$APP"; do
   name="${f##*/}"
@@ -136,6 +155,12 @@ assert_eq "each routed service owns its redirect middleware" "3" "$mw_names"
 # ── Production fail-fast contract ────────────────────────────────────
 assert_match "api names the proxy network (ProxyOptions fails closed)" "$api_block" \
   'ProxyOptions__KnownNetworks__0:[[:space:]]*\$\{PROXY_KNOWN_NETWORK\}'
+# An endpoint without the enable flag exports nothing: Production ships the OTLP
+# exporter disabled, so shipping only the endpoint is silent dead configuration.
+assert_match "api can actually turn the OTLP exporter on" "$api_block" \
+  'OpenTelemetryOptions__Exporter__Otlp__Enabled:[[:space:]]*\$\{OTEL_EXPORTER_ENABLED\}'
+assert_match "api is given an OTLP endpoint" "$api_block" \
+  'OpenTelemetryOptions__Exporter__Otlp__Endpoint:[[:space:]]*\$\{OTEL_EXPORTER_OTLP_ENDPOINT\}'
 refute_match "api never trusts any proxy" "$api_block" '^[[:space:]]*ProxyOptions__TrustAnyProxy:'
 refute_match "api never enables X-Forwarded-Host" "$both_text" '[Xx]ForwardedHost'
 assert_match "api sets an explicit AllowedHosts" "$api_block" '^[[:space:]]*AllowedHosts:[[:space:]]*\$\{ALLOWED_HOSTS\}'
