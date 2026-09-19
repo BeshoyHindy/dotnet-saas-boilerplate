@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { mockJsonResponse, mockProblemDetails } from "../helpers/api-mocks";
 
+// This is the exact shape the registration email mails out — the API builds
+// `{origin}/confirm-email?userId&code&tenant` (UserRegistrationService), and the
+// page turns it into a call to /api/v1/tenants/{tenant}/auth/confirm-email.
 const VALID_LINK =
   "/confirm-email?userId=u-1&code=verify-code&tenant=acme";
 

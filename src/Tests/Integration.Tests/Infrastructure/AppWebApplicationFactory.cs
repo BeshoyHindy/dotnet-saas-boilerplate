@@ -177,9 +177,14 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
                 JwtBearerDefaults.AuthenticationScheme,
                 options => options.RequireHttpsMetadata = false);
 
-            // Replace real mail service with a no-op to avoid SMTP errors and Hangfire retries
+            // Replace real mail service with a no-op to avoid SMTP errors and Hangfire retries.
+            // Register the concrete type as well and alias the interface to it: Hangfire records the
+            // *concrete* type in the serialized job, and AppJobActivator resolves it with
+            // GetServiceOrCreateInstance — without the concrete registration every mail job would run
+            // against a throwaway instance and its MailRequest would never reach `Sent`.
             services.RemoveAll<IMailService>();
-            services.AddSingleton<IMailService, NoOpMailService>();
+            services.AddSingleton<NoOpMailService>();
+            services.AddSingleton<IMailService>(sp => sp.GetRequiredService<NoOpMailService>());
 
             // Detailed errors in tests instead of generic "An unexpected error occurred"
             var existingHandlers = services.Where(d =>

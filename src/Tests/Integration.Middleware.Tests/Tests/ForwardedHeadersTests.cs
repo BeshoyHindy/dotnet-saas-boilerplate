@@ -10,8 +10,8 @@ namespace Integration.Middleware.Tests.Tests;
 /// <remarks>
 /// <c>X-Forwarded-Host</c> is refused on purpose. Host filtering runs before forwarded headers, so
 /// honouring it would let a caller swap <c>Request.Host</c> after the allow-list approved the real
-/// one — and that value is interpolated into the confirmation and password-reset links the Identity
-/// module mails out, which is a working account-takeover primitive.
+/// one. The Identity module's mailed links are additionally built from <c>OriginOptions</c> rather
+/// than the request, so a swapped host is not an account-takeover primitive on that path either.
 /// </remarks>
 [Collection(MiddlewareCollectionDefinition.Name)]
 public sealed class ForwardedHeadersTests

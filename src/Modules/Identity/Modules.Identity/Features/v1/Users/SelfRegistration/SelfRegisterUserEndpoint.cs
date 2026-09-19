@@ -12,12 +12,9 @@ public static class SelfRegisterUserEndpoint
     internal static RouteHandlerBuilder MapSelfRegisterUserEndpoint(this IEndpointRouteBuilder endpoints)
     {
         return endpoints.MapPost("/register", async (RegisterUserCommand command,
-            HttpContext context,
             IMediator mediator,
             CancellationToken cancellationToken) =>
         {
-            var origin = $"{context.Request.Scheme}://{context.Request.Host.Value}{context.Request.PathBase.Value}";
-            command.Origin = origin;
             var result = await mediator.Send(command, cancellationToken);
             return TypedResults.Created($"/api/v1/identity/users/{result.UserId}", result);
         })
