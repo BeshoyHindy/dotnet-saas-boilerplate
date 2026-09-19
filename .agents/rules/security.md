@@ -37,5 +37,5 @@ Chained partitioned fixed-window limiter: **tenant → user → IP** (defaults 1
 
 ## Idempotency (`Web/Idempotency/`)
 
-Opt-in per endpoint with **`.WithIdempotency()`**. Reads the `Idempotency-Key` header (max 128 chars, 24h TTL); replays return the cached response with `Idempotency-Replayed: true`. Cache key is tenant-scoped (`CacheKeys.IdempotencyEntry`). Put it on POSTs that must be replay-safe (e.g. CreateTenant).
+Opt-in per endpoint with **`.WithIdempotency()`**. Reads the `Idempotency-Key` header (max 128 chars, 24h TTL); replays return the cached response with `Idempotency-Replayed: true`. The entry is scoped to the **resolved** tenant by the Caching block (`CacheKeys.IdempotencyEntry`), which covers the authenticated routes and the anonymous `tenants/{tenant}/auth` ones alike; a request with no tenant at all goes to `GlobalHybridCache` explicitly, partitioned by the authenticated subject. Put it on POSTs that must be replay-safe (e.g. CreateTenant).
 
