@@ -34,7 +34,7 @@ public sealed class HybridCacheRedisTests : IAsyncLifetime
             })
             .Build();
         services.AddSingleton<IConfiguration>(config);
-        services.AddHeroCaching(config);
+        services.AddHeroCaching(config, singleTenant: true);
         var provider = services.BuildServiceProvider();
         return (provider.GetRequiredService<HybridCache>(),
                 provider.GetRequiredService<IDistributedCache>(),
@@ -69,19 +69,26 @@ public sealed class HybridCacheRedisTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task SetAsync_Should_Persist_Bytes_To_Redis()
+    public async Task SetAsync_Should_Persist_Bytes_To_Redis_Under_The_Scoped_Physical_Key()
     {
-        // Asserts that an entry written via HybridCache.SetAsync actually lands in Redis
-        // (not just in L1) — guards against silent dead-letter behavior.
+        // Two things at once. That an entry written via HybridCache.SetAsync actually lands in Redis
+        // (not just in L1) — guards against silent dead-letter behavior. And that it lands under the
+        // key CacheKeyScope names, untransformed: the idempotency filter probes L2 by that exact
+        // string, so if HybridCache ever started rewriting L2 keys the replay path would go quiet
+        // rather than fail, and this is where we would find out.
         var (cache, distributedCache, provider) = CreateCache();
         await using (provider)
         {
+            var scope = provider.GetRequiredService<CacheKeyScope>();
             await cache.SetAsync("rt:set", "persisted-value");
 
             // Read the underlying L2 directly to confirm bytes are present.
-            var raw = await distributedCache.GetAsync("rt:set");
+            var raw = await distributedCache.GetAsync(scope.TenantKey("rt:set"));
             raw.ShouldNotBeNull();
             raw!.Length.ShouldBeGreaterThan(0);
+
+            // And nothing was written under the unscoped logical key.
+            (await distributedCache.GetAsync("rt:set")).ShouldBeNull();
         }
     }
 

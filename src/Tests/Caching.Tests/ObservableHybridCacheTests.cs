@@ -66,7 +66,7 @@ public sealed class ObservableHybridCacheTests : IDisposable
         var services = new ServiceCollection();
         var config = new ConfigurationBuilder().Build();
         services.AddSingleton<IConfiguration>(config);
-        services.AddHeroCaching(config);
+        services.AddHeroCaching(config, singleTenant: true);
         return services.BuildServiceProvider().GetRequiredService<HybridCache>();
     }
 

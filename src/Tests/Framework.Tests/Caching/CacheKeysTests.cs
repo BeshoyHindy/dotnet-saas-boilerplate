@@ -13,9 +13,10 @@ public sealed class CacheKeysTests
     }
 
     [Fact]
-    public void TenantTheme_Should_ScopeByTenantId_When_Built()
+    public void TenantTheme_Should_NotCarryATenantId()
     {
-        CacheKeys.TenantTheme("t-1").ShouldBe("theme:t:t-1");
+        // The tenant prefix is applied by the cache (CacheKeyScope), not composed by the caller.
+        CacheKeys.TenantTheme.ShouldBe("theme");
     }
 
     [Fact]
@@ -25,9 +26,16 @@ public sealed class CacheKeysTests
     }
 
     [Fact]
-    public void IdempotencyEntry_Should_ScopeByTenantAndKey_When_Built()
+    public void IdempotencyEntry_Should_ScopeByKeyAlone_When_Built()
     {
-        CacheKeys.IdempotencyEntry("t-1", "abc").ShouldBe("idem:t:t-1:abc");
+        CacheKeys.IdempotencyEntry("abc").ShouldBe("idem:abc");
+    }
+
+    [Fact]
+    public void GlobalIdempotencyEntry_Should_PartitionBySubjectOrAnonymous()
+    {
+        CacheKeys.GlobalIdempotencyEntry("u-1", "abc").ShouldBe("idem:s:u-1:abc");
+        CacheKeys.GlobalIdempotencyEntry(null, "abc").ShouldBe("idem:anon:abc");
     }
 
     [Fact]
@@ -49,9 +57,8 @@ public sealed class CacheKeysTests
     }
 
     [Fact]
-    public void Tags_Should_ScopeTenantAndUser_When_Built()
+    public void Tags_Should_ScopeUser_When_Built()
     {
-        CacheKeys.Tags.Tenant("t-1").ShouldBe("tenant:t-1");
         CacheKeys.Tags.User("u-1").ShouldBe("user:u-1");
     }
 
