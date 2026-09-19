@@ -522,17 +522,29 @@
       },
       "EndImpersonationResponse": {
         "properties": {
-          "accessToken": {
+          "actorTenantId": {
             "type": "string"
           },
-          "accessTokenExpiresAt": {
+          "actorUserId": {
+            "type": "string"
+          },
+          "endedAtUtc": {
             "format": "date-time",
+            "type": "string"
+          },
+          "impersonatedTenantId": {
+            "type": "string"
+          },
+          "impersonatedUserId": {
             "type": "string"
           }
         },
         "required": [
-          "accessToken",
-          "accessTokenExpiresAt"
+          "actorUserId",
+          "actorTenantId",
+          "impersonatedUserId",
+          "impersonatedTenantId",
+          "endedAtUtc"
         ],
         "type": "object"
       },
@@ -560,6 +572,35 @@
           "Unknown",
           null
         ]
+      },
+      "ExchangeOperatorTokenCommand": {
+        "properties": {
+          "durationMinutes": {
+            "format": "int32",
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "targetTenantId": {
+            "type": "string"
+          },
+          "targetUserId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "targetTenantId",
+          "targetUserId",
+          "reason"
+        ],
+        "type": "object"
       },
       "FileAssetDto": {
         "properties": {
@@ -993,6 +1034,54 @@
           "metadataJson",
           "readAtUtc",
           "createdAtUtc"
+        ],
+        "type": "object"
+      },
+      "OperatorTokenExchangeResponse": {
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "accessTokenExpiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "actorTenantId": {
+            "type": "string"
+          },
+          "actorUserId": {
+            "type": "string"
+          },
+          "grantId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "jti": {
+            "type": "string"
+          },
+          "targetTenantId": {
+            "type": "string"
+          },
+          "targetUserId": {
+            "type": "string"
+          },
+          "targetUserName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "accessToken",
+          "accessTokenExpiresAt",
+          "targetTenantId",
+          "targetUserId",
+          "targetUserName",
+          "actorUserId",
+          "actorTenantId",
+          "grantId",
+          "jti"
         ],
         "type": "object"
       },
@@ -3237,6 +3326,9 @@
           },
           "401": {
             "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -3267,6 +3359,9 @@
           },
           "401": {
             "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -3310,6 +3405,9 @@
           },
           "401": {
             "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -3346,6 +3444,9 @@
           },
           "401": {
             "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -3728,7 +3829,7 @@
     },
     "/api/v1/identity/impersonation/end": {
       "post": {
-        "description": "Returns a fresh access token for the original actor based on the act_sub/act_tenant claims embedded in the impersonation token. Access-only: a refresh token belongs to a session row in the actor's own tenant, which this call cannot write. Callable by any authenticated impersonation session.",
+        "description": "Marks the grant behind the caller's acting token (same-tenant impersonation or an exchanged operator token) as ended, so that token is rejected on its next request. Returns no token: the actor's own session was never taken away, so the client simply drops the acting one. Callable by any authenticated session carrying act_sub.",
         "operationId": "EndImpersonation",
         "responses": {
           "200": {
@@ -3753,7 +3854,7 @@
             "Bearer": []
           }
         ],
-        "summary": "End user impersonation",
+        "summary": "End the current acting session",
         "tags": [
           "Identity"
         ]
@@ -3829,7 +3930,7 @@
     },
     "/api/v1/identity/impersonation/grants/{id}/revoke": {
       "post": {
-        "description": "Marks the grant as revoked. Subsequent requests carrying the impersonation token are rejected by the JWT validation hook within ~1 second (cache TTL).",
+        "description": "Marks the grant as revoked. Subsequent requests carrying the impersonation token are rejected by the JWT validation hook immediately on the instance that handled the revoke, and within the local cache's expiration (up to 1 minute) on any other instance.",
         "operationId": "RevokeImpersonationGrant",
         "parameters": [
           {
@@ -3934,6 +4035,58 @@
           }
         ],
         "summary": "Start user impersonation",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/operator/token-exchange": {
+      "post": {
+        "description": "ADR-0002. Root operators cross tenants by exchanging tokens, never by header. Returns a short-lived, access-only token whose `tenant` claim is the target tenant and whose subject is a real user of that tenant (targetUserId, else the tenant's admin), carrying act_sub/act_tenant for the operator. No refresh token, no session row, no cookie. The exchange is audited and revocable through the impersonation grant list (same jti revocation path). Requesting more than the configured maximum clamps the lifetime rather than failing.",
+        "operationId": "ExchangeOperatorToken",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExchangeOperatorTokenCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorTokenExchangeResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Exchange an operator token for a target tenant",
         "tags": [
           "Identity"
         ]

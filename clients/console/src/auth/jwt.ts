@@ -12,6 +12,8 @@ export type JwtClaims = {
   tenant?: string;
   permissions?: string[] | string;
   exp?: number;
+  /** Token id. For an acting token it is also the key of the revocable grant. */
+  jti?: string;
   /**
    * Actor claims set by the StartImpersonation flow. When present, the
    * current access token represents an impersonation session — the

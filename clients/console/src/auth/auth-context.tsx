@@ -1,11 +1,22 @@
-import { createContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { tokenStore } from "@/auth/token-store";
+import { actingStore, type ActingSession } from "@/auth/acting-store";
 import { decodeJwt, isTokenExpired, type JwtClaims } from "@/auth/jwt";
 import { endSession, issueToken } from "@/auth/api";
 import { refreshAccessToken } from "@/lib/api-client";
 import { getMyPermissions } from "@/api/identity";
-import { endImpersonation, startImpersonation } from "@/api/impersonation";
+import { endActingSession, exchangeOperatorToken, startImpersonation } from "@/api/operator";
 
 export type AuthUser = {
   id: string;
@@ -13,15 +24,6 @@ export type AuthUser = {
   name?: string;
   tenant?: string;
   permissions: string[];
-};
-
-export type ImpersonationInfo = {
-  /** The original operator's user id, taken from the act_sub claim. */
-  actorUserId: string;
-  /** The original operator's tenant, taken from the act_tenant claim. */
-  actorTenant?: string;
-  /** Display name for the original operator if the token carries act_name. */
-  actorName?: string;
 };
 
 export type AuthContextValue = {
@@ -40,24 +42,40 @@ export type AuthContextValue = {
    * permissions request is still in flight.
    */
   permissionsHydrated: boolean;
-  /** Truthy iff the current access token carries act_sub (impersonation mode). */
-  impersonation: ImpersonationInfo | null;
   login: (input: { email: string; password: string; tenant: string }) => Promise<void>;
   logout: () => void;
   /** Re-fetch the permission set for the signed-in user (e.g. after a role change). */
   refreshPermissions: () => Promise<void>;
-  /** Begin impersonating another user. Resolves once the new token is installed. */
-  beginImpersonation: (input: {
+
+  /**
+   * The session the user is currently acting through, or null. Their own session keeps
+   * running underneath — `user` above is still them — and the acting token lives in
+   * memory only (see acting-store), so a reload always lands back in their own account.
+   */
+  acting: ActingSession | null;
+  /** Exchange the operator's token for one that acts inside `tenantId` (root only). */
+  enterTenant: (input: {
+    tenantId: string;
+    tenantName?: string;
+    /** Act as this user rather than the tenant's own admin. */
+    targetUserId?: string;
+    reason: string;
+    durationMinutes?: number;
+  }) => Promise<ActingSession>;
+  /**
+   * Impersonate a user in the CALLER's own tenant. Same acting layer, different grant:
+   * crossing a tenant boundary is `enterTenant`, and the server refuses it here.
+   */
+  impersonateInOwnTenant: (input: {
     targetUserId: string;
     targetTenantId: string;
+    userName?: string;
+    tenantName?: string;
     reason?: string;
-  }) => Promise<void>;
-  /**
-   * Leave the tenant the operator entered and restore their own session, or sign
-   * out (→ /login) when there is no stashed session to return to.
-   * Resolves with `{ signedOut }` so the caller can route accordingly.
-   */
-  stopImpersonation: () => Promise<{ signedOut: boolean }>;
+    durationMinutes?: number;
+  }) => Promise<ActingSession>;
+  /** Stop acting: end the grant server-side (best effort) and drop the acting token. */
+  exitTenant: () => Promise<void>;
 };
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -79,15 +97,6 @@ function claimsToUser(claims: JwtClaims | null, permissions: string[]): AuthUser
     name,
     tenant: claims.tenant,
     permissions,
-  };
-}
-
-function claimsToImpersonation(claims: JwtClaims | null): ImpersonationInfo | null {
-  if (!claims?.act_sub) return null;
-  return {
-    actorUserId: claims.act_sub,
-    actorTenant: claims.act_tenant,
-    actorName: claims.act_name,
   };
 }
 
@@ -120,10 +129,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return tokenStore.getPermissions().length > 0;
   });
   const lastHydratedSubject = useRef<string | null>(null);
-  const [impersonation, setImpersonation] = useState<ImpersonationInfo | null>(() => {
-    const { claims, usable } = readStoredSession();
-    return usable ? claimsToImpersonation(claims) : null;
-  });
   // When the stored access token is missing or expired but a tenant is remembered,
   // attempt one silent refresh at boot before rendering. The refresh token itself
   // is an HttpOnly cookie this code cannot see (ADR-0002), so a remembered tenant —
@@ -156,8 +161,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Hydrate (or re-hydrate) the permission list from the server whenever the
-  // signed-in subject changes — covers cold-start, login, and impersonation
-  // swaps. Permissions live server-side per role, not in the JWT.
+  // signed-in subject changes — cold-start and login. Permissions live server-side
+  // per role, not in the JWT.
+  //
+  // Always asked for as the OPERATOR (AS_OPERATOR): while acting, this endpoint answers
+  // for the user being acted as, and caching a stranger's grants as "my permissions"
+  // would regate the operator's own chrome — hiding the very screens they entered from.
   useEffect(() => {
     if (!user) {
       lastHydratedSubject.current = null;
@@ -171,7 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     void (async () => {
       try {
-        const perms = await getMyPermissions();
+        const perms = await getMyPermissions({ asOperator: true });
         if (cancelled) return;
         // setPermissions emits → the subscribe listener rebuilds `user` with the list.
         tokenStore.setPermissions(perms);
@@ -191,7 +200,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const refresh = () => {
       const claims = decodeJwt(tokenStore.getAccessToken());
       setUser(claimsToUser(claims, tokenStore.getPermissions()));
-      setImpersonation(claimsToImpersonation(claims));
     };
     const unsubscribe = tokenStore.subscribe(refresh);
 
@@ -250,9 +258,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // neither of which this code can reach. Fire-and-forget: local state is cleared either way, so
     // a signed-out tab never waits on the network, and a failed call cannot strand the user.
     //
-    // While acting inside another tenant the access token's session belongs to the impersonated
-    // subject, not a device — the call is harmless (the server answers 204 and finds no `sid`),
-    // and stopImpersonation() handles that path on its own.
+    // It always names the signed-in user's own tenant and rides on their own session: the acting
+    // token, if any, is a separate in-memory credential that `actingStore.clear()` below disposes
+    // of. Its grant is left to expire — signing out is not the place to await a second round trip.
     const tenant = tokenStore.getTenant();
     if (tenant) {
       void endSession(tenant).catch(() => {
@@ -260,55 +268,117 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     }
 
+    // Stop acting first: the acting token is a separate credential and must not outlive
+    // the session that minted it, even in memory.
+    actingStore.clear();
     tokenStore.clear();
     queryClient.clear();
   }, [queryClient]);
 
-  const beginImpersonation = useCallback(
-    async (input: { targetUserId: string; targetTenantId: string; reason?: string }) => {
-      const response = await startImpersonation(input);
-      // Swap the active token. queryClient.clear() drops cached queries
-      // so the next render fetches with the new identity — otherwise
-      // user/role/permission caches from the actor session would leak.
-      tokenStore.beginImpersonation(response.accessToken, response.impersonatedTenantId);
+  // ── Acting layer (operator token exchange + impersonation, ADR-0002) ──
+  const acting = useSyncExternalStore(actingStore.subscribe, actingStore.get);
+
+  // An acting session can end without being asked to (grant revoked, token expired). The
+  // API client drops it and leaves a notice; surface that rather than silently switching
+  // identity under the operator's feet.
+  useEffect(
+    () =>
+      actingStore.subscribe(() => {
+        const notice = actingStore.consumeNotice();
+        if (notice) {
+          toast.warning("Stopped acting", { description: notice });
+          void queryClient.invalidateQueries();
+        }
+      }),
+    [queryClient],
+  );
+
+  // Everything cached was fetched under the previous credential, in the previous tenant.
+  const installActing = useCallback(
+    (session: ActingSession) => {
+      actingStore.start(session);
       queryClient.clear();
+      return session;
     },
     [queryClient],
   );
 
-  const stopImpersonation = useCallback(async (): Promise<{ signedOut: boolean }> => {
-    // No stash ⇒ nothing to return to (a session that began in another tab, or a
-    // cleared store). The exchanged token is disposable, so end INSTANTLY by
-    // signing out rather than blocking the UI on the server `end` call, which is
-    // fired best-effort for grant revocation and the audit record.
-    if (!tokenStore.hasImpersonationStash()) {
-      void endImpersonation().catch(() => {
-        /* best-effort: token expires shortly, nothing to recover here */
+  const enterTenant = useCallback(
+    async (input: {
+      tenantId: string;
+      tenantName?: string;
+      targetUserId?: string;
+      reason: string;
+      durationMinutes?: number;
+    }) => {
+      const exchanged = await exchangeOperatorToken({
+        targetTenantId: input.tenantId,
+        targetUserId: input.targetUserId,
+        reason: input.reason,
+        durationMinutes: input.durationMinutes,
       });
-      logout();
-      return { signedOut: true };
-    }
 
-    // We genuinely need the server-minted operator token to restore the original
-    // session, so await the call.
+      return installActing({
+        accessToken: exchanged.accessToken,
+        tenantId: exchanged.targetTenantId,
+        tenantName: input.tenantName,
+        userId: exchanged.targetUserId,
+        userName: exchanged.targetUserName ?? undefined,
+        expiresAt: exchanged.accessTokenExpiresAt,
+        jti: exchanged.jti,
+        grantId: exchanged.grantId,
+      });
+    },
+    [installActing],
+  );
+
+  const impersonateInOwnTenant = useCallback(
+    async (input: {
+      targetUserId: string;
+      targetTenantId: string;
+      userName?: string;
+      tenantName?: string;
+      reason?: string;
+      durationMinutes?: number;
+    }) => {
+      const response = await startImpersonation({
+        targetUserId: input.targetUserId,
+        targetTenantId: input.targetTenantId,
+        reason: input.reason,
+        durationMinutes: input.durationMinutes,
+      });
+
+      return installActing({
+        accessToken: response.accessToken,
+        tenantId: response.impersonatedTenantId,
+        tenantName: input.tenantName,
+        userId: response.impersonatedUserId,
+        userName: input.userName,
+        expiresAt: response.accessTokenExpiresAt,
+        // Same-tenant start returns no grant id; the token's own jti is what scopes the
+        // caches, and the grants list finds the row by subject.
+        jti: decodeJwt(response.accessToken)?.jti,
+      });
+    },
+    [installActing],
+  );
+
+  const exitTenant = useCallback(async () => {
     try {
-      const fresh = await endImpersonation();
-      tokenStore.endImpersonationWithFreshAccessToken(fresh.accessToken);
-      return { signedOut: false };
+      // Best effort: ends the grant, so the acting token dies immediately instead of
+      // lingering until expiry. Failing that, it expires on its own shortly.
+      await endActingSession();
     } catch {
-      // End endpoint failed (server unreachable / token invalid). Fall
-      // back to whatever we stashed locally; the operator may need to
-      // re-authenticate if the stashed access token has expired.
-      tokenStore.restoreStashedActor();
-      throw new Error("End impersonation failed; restored local session.");
+      /* ignore — the local drop below is what the user actually asked for */
     } finally {
+      actingStore.clear();
       queryClient.clear();
     }
-  }, [queryClient, logout]);
+  }, [queryClient]);
 
   const refreshPermissions = useCallback(async () => {
     try {
-      const perms = await getMyPermissions();
+      const perms = await getMyPermissions({ asOperator: true });
       tokenStore.setPermissions(perms);
     } catch {
       /* swallow — see hydration effect */
@@ -321,14 +391,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: user !== null,
       isInitializing,
       permissionsHydrated,
-      impersonation,
       login,
       logout,
-      beginImpersonation,
-      stopImpersonation,
       refreshPermissions,
+      acting,
+      enterTenant,
+      impersonateInOwnTenant,
+      exitTenant,
     }),
-    [user, isInitializing, permissionsHydrated, impersonation, login, logout, beginImpersonation, stopImpersonation, refreshPermissions],
+    [
+      user,
+      isInitializing,
+      permissionsHydrated,
+      login,
+      logout,
+      refreshPermissions,
+      acting,
+      enterTenant,
+      impersonateInOwnTenant,
+      exitTenant,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

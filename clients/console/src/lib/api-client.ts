@@ -1,7 +1,7 @@
 import createClient from "openapi-fetch";
 import { env } from "@/env";
 import { tokenStore } from "@/auth/token-store";
-import { decodeJwt } from "@/auth/jwt";
+import { actingStore, type ActingSession } from "@/auth/acting-store";
 import type { paths, components } from "@/api/schema";
 
 /**
@@ -60,31 +60,27 @@ export function isTenantDeactivatedError(error: unknown): boolean {
 }
 
 /**
- * True when the currently installed access token is an operator's token for
- * another tenant — it carries the `act_sub` actor claim (ADR-0002). Such a token
- * is access-only: there is no refresh cookie for the target tenant, so a 401 on
- * it must propagate instead of triggering a refresh that can only fail.
+ * Sentinel header meaning "send this with the OPERATOR's own token, not the acting one".
+ * `authFetch` strips it before the request leaves the client, so it never reaches the
+ * wire — openapi-fetch has no other channel for a per-call flag that only the transport
+ * cares about.
+ *
+ * Needed by the two exchange endpoints (an acting token carries `act_sub` and the server
+ * refuses to exchange it again — no nesting) and by anything that must stay attributed to
+ * the operator's own tenant, such as "my permissions".
  */
-export function isActingAsAnotherTenant(): boolean {
-  return decodeJwt(tokenStore.getAccessToken())?.act_sub != null;
-}
+export const AS_OPERATOR_HEADER = "X-Console-As-Operator";
+export const AS_OPERATOR = { [AS_OPERATOR_HEADER]: "1" } as const;
 
 /**
- * True when an error is a 401 fired against an *impersonation* session — i.e.
- * the operator's grant was revoked (via /impersonation/revoke) or the
- * short-lived token expired. Both surface as a 401 from the server's
- * OnTokenValidated hook (ConfigureJwtBearerOptions).
+ * The credential this request should carry, and the acting session it belongs to.
  *
- * Detection is deliberately message-agnostic: in Production the 401 body is
- * opaque (the "Impersonation grant revoked or ended" reason is dev-only), so we
- * key off the durable shape instead — a 401 while the currently installed access
- * token carries the actor claim. A global query/mutation error hook
- * (query-client.ts) uses this to route to the /impersonation-ended terminal page
- * instead of leaving a dead error banner under a half-loaded console.
+ * While acting, the acting token is the credential for everything — its `tenant` claim is
+ * the only thing that scopes the request (ADR-0002).
  */
-export function isImpersonationRevokedError(error: unknown): boolean {
-  if (!(error instanceof ApiRequestError) || error.status !== 401) return false;
-  return isActingAsAnotherTenant();
+function credentialFor(asOperator: boolean) {
+  const acting = asOperator ? null : actingStore.get();
+  return { acting, accessToken: acting?.accessToken ?? tokenStore.getAccessToken() };
 }
 
 /**
@@ -175,6 +171,9 @@ function isAnonymous(url: string): boolean {
 /**
  * The `fetch` every typed call runs on: bearer header, request timeout, and a
  * single-flight refresh-and-retry on 401. Concurrent 401s share one refresh.
+ *
+ * While an acting session is installed (`acting-store`) its token is the credential —
+ * unless the call opted out with `AS_OPERATOR`.
  */
 async function authFetch(input: Request): Promise<Response> {
   const anonymous = isAnonymous(input.url);
@@ -182,10 +181,21 @@ async function authFetch(input: Request): Promise<Response> {
     ? new Request(apiUrl(new URL(input.url).pathname + new URL(input.url).search), input)
     : input;
 
+  // Read the flag once, off the outgoing request, then never send it.
+  const asOperator = target.headers.get(AS_OPERATOR_HEADER) !== null;
+
+  // Captured before the first send so the 401 handling below judges the credential that
+  // was actually used, not whatever the store holds by the time the response lands.
+  // A holder object, not a `let`: the assignment happens inside `send`, and TypeScript's
+  // control-flow analysis would otherwise narrow the variable to `null` after it.
+  const sent: { acting: ActingSession | null } = { acting: null };
+
   const send = async (): Promise<Response> => {
     const request = target.clone();
+    request.headers.delete(AS_OPERATOR_HEADER);
     if (!anonymous) {
-      const accessToken = tokenStore.getAccessToken();
+      const { acting, accessToken } = credentialFor(asOperator);
+      sent.acting = acting;
       if (!accessToken) {
         // Not anonymous but the token is gone — likely a manual localStorage clear
         // AuthProvider missed. Surface a clean 401 so the UI flips to /login instead
@@ -209,7 +219,19 @@ async function authFetch(input: Request): Promise<Response> {
 
   let response = await send();
 
-  if (response.status === 401 && !anonymous && !isActingAsAnotherTenant()) {
+  if (response.status === 401 && !anonymous && sent.acting !== null) {
+    // A 401 on the ACTING token is not a session problem: that token is access-only, so
+    // there is nothing to renew — it means the grant was revoked or the short lifetime
+    // ran out. Drop back to the operator's own (still valid) session and say so, rather
+    // than spending their refresh cookie on a credential nothing can rescue.
+    const where = sent.acting.tenantName ?? sent.acting.tenantId;
+    actingStore.drop(
+      `Your session inside ${where} ended (revoked or expired). You are back in your own account.`,
+    );
+    return response;
+  }
+
+  if (response.status === 401 && !anonymous) {
     try {
       await sharedRefresh();
     } catch (error) {

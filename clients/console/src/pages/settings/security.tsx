@@ -51,6 +51,7 @@ import {
   revokeSession,
   type UserSessionDto,
 } from "@/api/sessions";
+import { useAuth } from "@/auth/use-auth";
 import { ApiRequestError } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
 
@@ -94,6 +95,10 @@ function apiErrorMessage(err: unknown, fallback: string): string {
 
 export function SecuritySettings() {
   const queryClient = useQueryClient();
+  // Credential changes are refused for an acting token (`DenyWhenActing` server-side,
+  // 403): an actor must not change the subject's password or 2FA on their behalf. Say so
+  // up front rather than letting the operator fill a form the API will reject.
+  const { acting } = useAuth();
 
   const profileQuery = useQuery({ queryKey: PROFILE_KEY, queryFn: getMyProfile });
   const twoFactorEnabled = profileQuery.data?.twoFactorEnabled ?? false;
@@ -151,8 +156,12 @@ export function SecuritySettings() {
 
   return (
     <div className="space-y-6 app-enter">
-      <PasswordCard />
-      <TwoFactorCard enabled={twoFactorEnabled} loading={profileQuery.isLoading} />
+      <PasswordCard acting={acting !== null} />
+      <TwoFactorCard
+        enabled={twoFactorEnabled}
+        loading={profileQuery.isLoading}
+        acting={acting !== null}
+      />
 
       {/* Active sessions — already wired to the backend. */}
       <Card>
@@ -266,7 +275,7 @@ export function SecuritySettings() {
 // Password card — Dialog-driven change-password flow
 // ─────────────────────────────────────────────────────────────────────────
 
-function PasswordCard() {
+function PasswordCard({ acting }: { acting: boolean }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -280,9 +289,17 @@ function PasswordCard() {
         </CardHeader>
         <CardContent className="flex items-center justify-between gap-4 px-6 pb-5 pt-1">
           <div className="text-sm text-[var(--color-muted-foreground)]">
-            We recommend a passphrase of 16+ characters with no reuse from other services.
+            {acting
+              ? "Not while you are acting as someone else — the server refuses a credential change from an actor."
+              : "We recommend a passphrase of 16+ characters with no reuse from other services."}
           </div>
-          <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setOpen(true)}
+            disabled={acting}
+            title={acting ? "Unavailable while acting as another user" : undefined}
+          >
             Change password
           </Button>
         </CardContent>
@@ -535,7 +552,15 @@ function ChangePasswordDialog({
 // Two-factor card — real enroll/verify/disable flow
 // ─────────────────────────────────────────────────────────────────────────
 
-function TwoFactorCard({ enabled, loading }: { enabled: boolean; loading: boolean }) {
+function TwoFactorCard({
+  enabled,
+  loading,
+  acting,
+}: {
+  enabled: boolean;
+  loading: boolean;
+  acting: boolean;
+}) {
   return (
     <Card>
       <CardHeader>
@@ -554,7 +579,13 @@ function TwoFactorCard({ enabled, loading }: { enabled: boolean; loading: boolea
         </CardDescription>
       </CardHeader>
       <CardContent className="px-6 pb-5 pt-1">
-        {loading ? (
+        {acting ? (
+          <p className="text-sm text-[var(--color-muted-foreground)]">
+            Enrolling or disabling two-factor is unavailable while you are acting as someone
+            else — it changes their credentials, so the server refuses it (403). Exit from the
+            banner first.
+          </p>
+        ) : loading ? (
           <Skeleton className="h-9 w-40" />
         ) : enabled ? (
           <TwoFactorDisable />

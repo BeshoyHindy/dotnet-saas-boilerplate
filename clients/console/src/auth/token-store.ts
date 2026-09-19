@@ -2,11 +2,10 @@ const ACCESS_KEY = "boilerplate.console.accessToken";
 const TENANT_KEY = "boilerplate.console.tenant";
 const PERMS_KEY = "boilerplate.console.permissions";
 
-// Impersonation stash. While an operator is inside another tenant, the live store
-// holds the exchanged access token; the operator's own token and tenant sit under
-// these keys so the End flow can restore them locally if the server call fails.
-const STASH_ACCESS_KEY = "boilerplate.console.impersonation.actorAccessToken";
-const STASH_TENANT_KEY = "boilerplate.console.impersonation.actorTenant";
+// There is deliberately no impersonation stash here any more. Acting as someone else
+// swaps no token in storage: the acting token lives in module memory (`acting-store`)
+// beside the untouched session below, so there is nothing to stash and nothing to
+// restore. See ADR-0002 and the acting-store docstring for why it must not be persisted.
 
 type Listener = () => void;
 
@@ -65,70 +64,8 @@ export const tokenStore = {
   clear() {
     localStorage.removeItem(ACCESS_KEY);
     localStorage.removeItem(PERMS_KEY);
-    // Also clear any impersonation stash so a fresh login doesn't
-    // inherit half of a previous operator's session.
-    localStorage.removeItem(STASH_ACCESS_KEY);
-    localStorage.removeItem(STASH_TENANT_KEY);
     emit();
   },
-
-  /**
-   * Swap the active token for an exchanged one representing a user in another
-   * tenant, keeping the operator's own token locally. The exchanged token is
-   * access-only server-side, and the API client refuses to refresh while it is
-   * installed (there is no refresh cookie for the target tenant).
-   */
-  beginImpersonation(impersonationAccessToken: string, impersonatedTenant: string | null) {
-    const access = localStorage.getItem(ACCESS_KEY);
-    const tenant = localStorage.getItem(TENANT_KEY);
-    if (access) localStorage.setItem(STASH_ACCESS_KEY, access);
-    if (tenant) localStorage.setItem(STASH_TENANT_KEY, tenant);
-
-    localStorage.setItem(ACCESS_KEY, impersonationAccessToken);
-    // Drop the operator's permissions — the impersonated subject has its own;
-    // the auth context re-hydrates on the subject change.
-    localStorage.removeItem(PERMS_KEY);
-    if (impersonatedTenant) localStorage.setItem(TENANT_KEY, impersonatedTenant);
-    emit();
-  },
-
-  /**
-   * Install the fresh actor access token returned by the End Impersonation
-   * endpoint and clear the stash. Use this on End success.
-   *
-   * End is access-only (the server cannot write a session row in the actor's
-   * tenant from the impersonated tenant's context), which costs nothing here:
-   * the operator's own session — and its refresh cookie — was never revoked.
-   */
-  endImpersonationWithFreshAccessToken(accessToken: string) {
-    const stashTenant = localStorage.getItem(STASH_TENANT_KEY);
-    localStorage.setItem(ACCESS_KEY, accessToken);
-    localStorage.removeItem(PERMS_KEY);
-    if (stashTenant) localStorage.setItem(TENANT_KEY, stashTenant);
-    localStorage.removeItem(STASH_ACCESS_KEY);
-    localStorage.removeItem(STASH_TENANT_KEY);
-    emit();
-  },
-
-  /**
-   * Last-resort local restore — used if the End endpoint fails. Reinstalls the
-   * stashed operator token so they at least have *some* session; if it has since
-   * expired, the next 401 refreshes it against their own tenant's cookie.
-   */
-  restoreStashedActor(): boolean {
-    const access = localStorage.getItem(STASH_ACCESS_KEY);
-    const tenant = localStorage.getItem(STASH_TENANT_KEY);
-    if (!access) return false;
-    localStorage.setItem(ACCESS_KEY, access);
-    localStorage.removeItem(PERMS_KEY);
-    if (tenant) localStorage.setItem(TENANT_KEY, tenant);
-    localStorage.removeItem(STASH_ACCESS_KEY);
-    localStorage.removeItem(STASH_TENANT_KEY);
-    emit();
-    return true;
-  },
-
-  hasImpersonationStash: () => localStorage.getItem(STASH_ACCESS_KEY) !== null,
 
   subscribe(listener: Listener) {
     listeners.add(listener);

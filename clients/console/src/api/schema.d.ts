@@ -490,8 +490,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * End user impersonation
-         * @description Returns a fresh access token for the original actor based on the act_sub/act_tenant claims embedded in the impersonation token. Access-only: a refresh token belongs to a session row in the actor's own tenant, which this call cannot write. Callable by any authenticated impersonation session.
+         * End the current acting session
+         * @description Marks the grant behind the caller's acting token (same-tenant impersonation or an exchanged operator token) as ended, so that token is rejected on its next request. Returns no token: the actor's own session was never taken away, so the client simply drops the acting one. Callable by any authenticated session carrying act_sub.
          */
         post: operations["EndImpersonation"];
         delete?: never;
@@ -531,7 +531,7 @@ export interface paths {
         put?: never;
         /**
          * Revoke an impersonation grant
-         * @description Marks the grant as revoked. Subsequent requests carrying the impersonation token are rejected by the JWT validation hook within ~1 second (cache TTL).
+         * @description Marks the grant as revoked. Subsequent requests carrying the impersonation token are rejected by the JWT validation hook immediately on the instance that handled the revoke, and within the local cache's expiration (up to 1 minute) on any other instance.
          */
         post: operations["RevokeImpersonationGrant"];
         delete?: never;
@@ -554,6 +554,26 @@ export interface paths {
          * @description Issues a short-lived access token representing the target user. The token carries actor claims (act_sub, act_tenant) identifying the original caller. Platform operators (root tenant) may impersonate any user; tenant admins can only impersonate users within their own tenant. No refresh token is issued.
          */
         post: operations["StartImpersonation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/operator/token-exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange an operator token for a target tenant
+         * @description ADR-0002. Root operators cross tenants by exchanging tokens, never by header. Returns a short-lived, access-only token whose `tenant` claim is the target tenant and whose subject is a real user of that tenant (targetUserId, else the tenant's admin), carrying act_sub/act_tenant for the operator. No refresh token, no session row, no cookie. The exchange is audited and revocable through the impersonation grant list (same jti revocation path). Requesting more than the configured maximum clamps the lifetime rather than failing.
+         */
+        post: operations["ExchangeOperatorToken"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1601,15 +1621,25 @@ export interface components {
             currentPassword: string;
         };
         EndImpersonationResponse: {
-            accessToken: string;
+            actorTenantId: string;
+            actorUserId: string;
             /** Format: date-time */
-            accessTokenExpiresAt: string;
+            endedAtUtc: string;
+            impersonatedTenantId: string;
+            impersonatedUserId: string;
         };
         EndSessionCommand: {
             refreshToken: null | string;
         };
         /** @enum {unknown} */
         ExceptionArea: "None" | "Api" | "Worker" | "Ui" | "Infra" | "Unknown" | null;
+        ExchangeOperatorTokenCommand: {
+            /** Format: int32 */
+            durationMinutes?: null | number;
+            reason: string;
+            targetTenantId: string;
+            targetUserId: null | string;
+        };
         FileAssetDto: {
             contentType: string;
             /** Format: date-time */
@@ -1727,6 +1757,19 @@ export interface components {
             source: string;
             title: string;
             type: string;
+        };
+        OperatorTokenExchangeResponse: {
+            accessToken: string;
+            /** Format: date-time */
+            accessTokenExpiresAt: string;
+            actorTenantId: string;
+            actorUserId: string;
+            /** Format: uuid */
+            grantId: string;
+            jti: string;
+            targetTenantId: string;
+            targetUserId: string;
+            targetUserName: null | string;
         };
         PagedResponseOfAuditSummaryDto: {
             hasNext: boolean;
@@ -2671,6 +2714,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     EnrollTwoFactor: {
@@ -2693,6 +2743,13 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2736,6 +2793,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     ChangePassword: {
@@ -2767,6 +2831,13 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3248,6 +3319,65 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ExchangeOperatorToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExchangeOperatorTokenCommand"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperatorTokenExchangeResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

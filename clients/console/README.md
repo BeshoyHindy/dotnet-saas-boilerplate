@@ -38,6 +38,22 @@ import { api, unwrap } from "@/lib/api-client";
 const user = unwrap(await api.GET("/api/v1/identity/users/{id}", { params: { path: { id } } }));
 ```
 
+## Acting as someone else
+
+Two ways in (ADR-0002, issue #9), one credential, and it is **never stored**:
+
+| | Endpoint | Who |
+|---|---|---|
+| Enter a tenant | `POST /api/v1/identity/operator/token-exchange` | root operators (`Permissions.Platform.Users.Impersonate`) |
+| Impersonate a user | `POST /api/v1/identity/impersonation/start` | same tenant only |
+| Stop | `POST /api/v1/identity/impersonation/end` | returns **no token** |
+
+The short-lived, access-only token lives in module memory (`src/auth/acting-store.ts`), beside the
+signed-in session it never replaces. So a reload drops you back into your own account, a 401 on it
+means "revoked or expired" rather than "refresh me", and it cannot be read out of localStorage. While
+it is installed, `ActingBanner` says so on every page and the credential screens (2FA, change
+password) are disabled — the API refuses them from an actor anyway.
+
 ## Scripts
 
 | Script | What it does |

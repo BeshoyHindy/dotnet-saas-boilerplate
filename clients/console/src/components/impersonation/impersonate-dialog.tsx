@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, keepPreviousData } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Check, Search, ShieldAlert, UserCog } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, DoorOpen, Search, ShieldAlert, UserCog } from "lucide-react";
 import { toast } from "sonner";
 import { searchUsers, type UserDto } from "@/api/identity";
 import { useNavigate } from "react-router-dom";
@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { EnterTenantDialog } from "@/components/tenants/enter-tenant-dialog";
 import { Monogram } from "@/components/monogram";
 import { ApiRequestError } from "@/lib/api-client";
 import { cn } from "@/lib/cn";
@@ -38,14 +39,19 @@ const DURATION_OPTIONS: DurationOption[] = [
 ];
 
 /**
- * ImpersonateDialog — two-step modal flow:
+ * ImpersonateDialog — two-step modal flow on the operator token exchange (ADR-0002, #9):
  *   1. Pick a user inside the target tenant (skipped if `prefillUser` is set)
- *   2. Enter reason + pick session duration → start
+ *   2. Enter reason + pick session duration → exchange
  *
- * On success, opens the dashboard origin in a NEW TAB with the impersonation
- * token in the URL hash. The dashboard's bootstrap reads the hash, installs
- * the token, and strips it from the URL before any render. Hash params are
- * never sent to the server and don't leak via referrer/HTTP logs.
+ * Both steps need the exchange, because a caller only ever sees and acts inside the
+ * tenant their token names:
+ *   - listing the tenant's users needs an acting token for that tenant, so the picker
+ *     asks the operator to ENTER the tenant first;
+ *   - choosing a user then performs a FRESH exchange from the operator's own token with
+ *     `targetUserId`, since an acting token may not be exchanged again (no nesting).
+ *
+ * The result is installed in place, in memory. There is one console (ADR-0004), so there
+ * is nowhere to hand a token off to — and nothing is written to storage.
  */
 export function ImpersonateDialog({
   open,
@@ -82,14 +88,15 @@ export function ImpersonateDialog({
             Tenant{" "}
             <code className="code-chip">{tenantName ?? tenantId}</code> ·{" "}
             {step === "pick"
-              ? "pick a user to impersonate."
-              : "session details. Token will be issued and opened in the dashboard."}
+              ? "pick a user to act as."
+              : "session details. The token is short-lived, audited and revocable."}
           </DialogDescription>
         </DialogHeader>
 
         {step === "pick" ? (
           <PickStep
             tenantId={tenantId}
+            tenantName={tenantName}
             onPick={(user) => {
               setSelected(user);
               setStep("configure");
@@ -123,15 +130,21 @@ export function ImpersonateDialog({
 
 function PickStep({
   tenantId,
+  tenantName,
   onPick,
   onCancel,
 }: {
   tenantId: string;
+  tenantName?: string;
   onPick: (user: UserDto) => void;
   onCancel: () => void;
 }) {
+  const { acting } = useAuth();
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
+  const [enterOpen, setEnterOpen] = useState(false);
+
+  const actingHere = acting?.tenantId === tenantId;
 
   useEffect(() => {
     const handle = setTimeout(() => setDebounced(search.trim()), 250);
@@ -139,11 +152,13 @@ function PickStep({
   }, [search]);
 
   const query = useQuery({
-    queryKey: ["impersonation", "users", tenantId, debounced],
+    // The acting session's jti is part of the key: users listed under one acting token
+    // must not be served from cache under another (or to the operator's own tenant).
+    queryKey: ["impersonation", "users", tenantId, acting?.jti ?? "none", debounced],
     queryFn: () =>
-      // No tenant filter: a caller cannot scope a request to another tenant
-      // (ADR-0002), so this searches the operator's own tenant. Picking a user
-      // inside another tenant needs the token exchange (issue #9).
+      // No tenant filter: a caller cannot scope a request to another tenant (ADR-0002).
+      // The search runs inside the tenant the CURRENT token names, which is why it is
+      // only enabled while acting inside the target one.
       searchUsers({
         search: debounced || undefined,
         pageSize: 25,
@@ -152,10 +167,51 @@ function PickStep({
         // is disabled — confusing to debug).
         isActive: true,
       }),
+    enabled: actingHere,
     placeholderData: keepPreviousData,
   });
 
   const users = query.data?.items ?? [];
+
+  if (!actingHere) {
+    return (
+      <>
+        <DialogBody className="space-y-3">
+          <div
+            role="status"
+            className="flex flex-wrap items-center gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-muted)] px-4 py-3 text-[13px] leading-relaxed text-[var(--color-muted-foreground)]"
+          >
+            <p className="min-w-0 flex-1">
+              Enter <code className="code-chip">{tenantName ?? tenantId}</code> to list its users —
+              a token only ever sees the tenant it names. You can leave again from the banner.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEnterOpen(true)}
+              data-testid="impersonate-enter-tenant"
+            >
+              <DoorOpen className="mr-1.5 h-3.5 w-3.5" />
+              Enter tenant
+            </Button>
+          </div>
+        </DialogBody>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel}>
+            Cancel
+          </Button>
+        </DialogFooter>
+
+        <EnterTenantDialog
+          open={enterOpen}
+          onOpenChange={setEnterOpen}
+          tenantId={tenantId}
+          tenantName={tenantName}
+        />
+      </>
+    );
+  }
 
   return (
     <>
@@ -265,21 +321,25 @@ function ConfigureStep({
   const trimmedReason = reason.trim();
   const reasonValid = trimmedReason.length >= 4;
 
-  const { beginImpersonation } = useAuth();
+  const { enterTenant } = useAuth();
   const navigate = useNavigate();
 
-  const mutation = useMutation<void, Error, void>({
+  const mutation = useMutation<unknown, Error, void>({
     mutationFn: () =>
-      // Installs the exchanged token in place and stashes the operator's own
-      // session; there is one console, so there is nowhere to hand off to.
-      beginImpersonation({
+      // A FRESH exchange from the operator's own token (`AS_OPERATOR` inside
+      // `exchangeOperatorToken`): the picker above ran under an acting token, and an
+      // acting token may not be exchanged again. The result replaces the acting session
+      // in memory — same tenant, now as the chosen user.
+      enterTenant({
+        tenantId,
+        tenantName,
         targetUserId: user.id ?? "",
-        targetTenantId: tenantId,
         reason: trimmedReason,
+        durationMinutes: minutes,
       }),
     onSuccess: () => {
-      toast.success(`Impersonation started · ${minutes} min`, {
-        description: `You are now acting as ${labelFor(user)}. End it from the banner at the top.`,
+      toast.success(`Acting as ${labelFor(user)} · up to ${minutes} min`, {
+        description: "End it from the banner at the top, or revoke the grant here.",
       });
       onDone();
       void navigate("/");
@@ -371,8 +431,8 @@ function ConfigureStep({
           <div>
             <strong className="font-medium">Everything you do is attributed to your account.</strong>
             {" "}The session token carries actor claims; the audit trail will show
-            both the user being impersonated and you as the actor. End from the dashboard
-            tab when done.
+            both the user being acted as and you as the actor. The token is never stored —
+            reloading the page returns you to your own account.
           </div>
         </div>
       </DialogBody>
@@ -392,7 +452,7 @@ function ConfigureStep({
             "Issuing token…"
           ) : (
             <>
-              <Check className="mr-1 h-3.5 w-3.5" /> Start {minutes}-min impersonation
+              <Check className="mr-1 h-3.5 w-3.5" /> Act as this user for {minutes} min
             </>
           )}
         </Button>

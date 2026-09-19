@@ -18,8 +18,10 @@ class-variance-authority (shadcn-style). Path alias `@` → `src` (`vite.config.
 - `unwrap` throws `ApiRequestError(status, message, problem)` on a non-OK response, parsing RFC 9457
   `application/problem+json` off `error`.
 - Auth header `Authorization: Bearer <access>` is added by the client's own `fetch`, and it
-  single-flights a refresh-and-retry on 401 — except while an exchanged (impersonation) token is
-  installed, which has no refresh cookie.
+  single-flights a refresh-and-retry on 401. **Except while acting** (`acting-store`): that token is
+  access-only with no refresh cookie, so a 401 drops the acting session instead — it never spends the
+  operator's refresh cookie on a credential nothing can renew. Opt a call out of the acting token with
+  `headers: AS_OPERATOR`; the client strips that sentinel header before the request leaves.
 - **No tenant header.** The server reads the tenant from the token's `tenant` claim (ADR-0002). The
   only place a tenant is named is the anonymous auth URLs, via `authPath(tenant, segment)`, and the
   tenant there must be the tenant **Id** from the claim — the refresh cookie's `Path` names it.
@@ -66,16 +68,31 @@ mutation.mutate({ text, clientId: crypto.randomUUID() });
 Login is `POST /api/v1/tenants/{tenant}/auth/token` — the tenant is a path segment, the one place a caller may name one. No `X-Client-App` header: the SuperAdmin/dashboard app boundary it fed has no meaning with one console. localStorage keys are `boilerplate.console.*` and hold the access token, the tenant Id and the permission set — never a refresh token.
 
 **Permissions are not in the JWT** (it carries role names). `AuthProvider` fetches them from
-`GET /api/v1/identity/permissions` on every subject change (including entering a tenant) and exposes
+`GET /api/v1/identity/permissions` on every subject change, always `AS_OPERATOR` (while acting the
+endpoint answers for the subject, and caching a stranger's grants would regate your own chrome), and exposes
 `permissionsHydrated` so gated UI does not flash. Gate a *route* with
 `<RouteGuard perms={[IdentityPermissions.Users.View]}>` using the constants in `src/lib/permissions.ts`
 — which holds only what routes gate on; the role editor reads the server's catalog endpoint. Gate a
 *nav item* with `perm`/`anyPerm` in `src/components/layout/nav-data.ts`. Mirror the permission the
 server endpoint enforces, never a broader one.
 
-**Entering a tenant** (operator): `useAuth().beginImpersonation(...)` installs the exchanged
-access-only token and stashes the operator's own session; `stopImpersonation()` restores it. It happens
-in place — there is no second app to hand off to.
+**Acting as someone else** (`src/auth/acting-store.ts`, ADR-0002 + issue #9). Two ways in, one way
+out, one in-memory credential:
+
+- `useAuth().enterTenant({ tenantId, reason, … })` — the operator token exchange,
+  `POST /identity/operator/token-exchange`, root only (`SystemPermissions.Platform.CrossTenantImpersonate`).
+  Pass `targetUserId` to act as a specific user rather than the tenant's admin.
+- `useAuth().impersonateInOwnTenant({ … })` — `POST /identity/impersonation/start`, **same tenant
+  only** since #9; a cross-tenant start is a 403 pointing at the exchange.
+- `useAuth().exitTenant()` — `POST /identity/impersonation/end`, which returns **no token**: your own
+  session was never taken away.
+
+The acting token lives in **module memory only, never localStorage**: it cannot be refreshed, it should
+not survive a browser restart, and a token naming someone else's tenant does not belong in a bucket
+every script on the origin can read. A reload therefore drops you back into your own account, by
+design. `ActingBanner` (in `AppShell`) is always visible while it is set. Credential screens — 2FA
+enroll/verify/disable, change password — are disabled while acting, mirroring the server's
+`DenyWhenActing` 403.
 
 ## Design system (Tailwind v4, shadcn-style)
 

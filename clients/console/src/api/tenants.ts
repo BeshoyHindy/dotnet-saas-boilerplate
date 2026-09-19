@@ -114,10 +114,11 @@ export async function retryTenantProvisioning(id: string): Promise<TenantProvisi
 // ─────────────────────────────────────────────────────────────────────────
 // Tenant theme / branding
 //
-// The theme endpoints are CURRENT-TENANT scoped server-side: they act on the
-// tenant the caller's token names (ADR-0002). An operator therefore edits another
-// tenant's branding only from inside that tenant — after entering it through the
-// impersonation/token exchange.
+// The theme endpoints are CURRENT-TENANT scoped server-side: they act on the tenant the
+// caller's token names, and a caller cannot name another one (ADR-0002). To edit tenant
+// X's branding, ENTER tenant X first (the operator token exchange, #9): the acting token
+// makes X the current tenant, so these same calls read and write X. TenantBrandingCard
+// gates on exactly that.
 // ─────────────────────────────────────────────────────────────────────────
 
 export type PaletteDto = Schemas["PaletteDto"];

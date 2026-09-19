@@ -90,7 +90,7 @@ export function UserDetailPage() {
   const { userId = "" } = useParams<{ userId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user: actor, beginImpersonation } = useAuth();
+  const { user: actor, impersonateInOwnTenant } = useAuth();
   const [dialog, setDialog] = useState<DialogState>({ mode: "closed" });
   const [impersonationReason, setImpersonationReason] = useState("");
   const [pending, setPending] = useState<Map<string, boolean>>(new Map());
@@ -263,9 +263,14 @@ export function UserDetailPage() {
     mutationFn: () => {
       if (!user?.id) throw new Error("Missing user id");
       if (!actor?.tenant) throw new Error("No tenant on current session");
-      return beginImpersonation({
+      // Same tenant by construction — this page only ever lists the caller's own users,
+      // and since #9 the server refuses a cross-tenant start outright (that is the
+      // operator token exchange, driven from the tenant registry).
+      return impersonateInOwnTenant({
         targetUserId: user.id,
         targetTenantId: actor.tenant,
+        userName: fullName(user),
+        tenantName: actor.tenant,
         reason: impersonationReason.trim() || undefined,
       });
     },

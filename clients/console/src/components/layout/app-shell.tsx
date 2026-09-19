@@ -1,7 +1,7 @@
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
-import { ImpersonationBanner } from "@/components/layout/impersonation-banner";
+import { ActingBanner } from "@/components/layout/acting-banner";
 import { ExpiryBanner } from "@/components/layout/expiry-banner";
 import {
   MobileNavProvider,
@@ -32,7 +32,7 @@ export function AppShell() {
         </a>
 
         <div className="flex h-screen flex-col overflow-hidden bg-[var(--color-background)] text-[var(--color-foreground)]">
-          <ImpersonationBanner />
+          <ActingBanner />
           <ExpiryBanner />
           <div className="flex min-h-0 flex-1">
             <Sidebar />

@@ -54,6 +54,17 @@ export async function installShellMocks(page: Page): Promise<void> {
   });
 }
 
+/**
+ * What a root operator holds. The tenant registry, the impersonation list and — root
+ * only — the cross-tenant token exchange behind "Enter tenant" (ADR-0002).
+ */
+export const OPERATOR_PERMISSIONS = [
+  "Permissions.Tenants.View",
+  "Permissions.Users.Impersonate",
+  "Permissions.Impersonation.View",
+  "Permissions.Platform.Users.Impersonate",
+] as const;
+
 /** Build a Playwright-shaped paged response body. */
 export function paged<T>(items: T[], overrides: Partial<{ pageNumber: number; pageSize: number; totalCount: number; totalPages: number }> = {}) {
   const pageSize = overrides.pageSize ?? 20;

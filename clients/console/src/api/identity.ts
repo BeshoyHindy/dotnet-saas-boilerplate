@@ -1,4 +1,4 @@
-import { api, unwrap, unwrapVoid, type Paged, type Schemas } from "@/lib/api-client";
+import { api, AS_OPERATOR, unwrap, unwrapVoid, type Paged, type Schemas } from "@/lib/api-client";
 
 // -----------------------------
 // Types — every one of them is the generated contract type (ADR-0004).
@@ -108,9 +108,19 @@ export async function setProfileImage(imageUrl: string | null): Promise<void> {
  * The signed-in user's effective permissions. The JWT carries only role names;
  * permissions are resolved server-side per role here. The auth context calls
  * this after login and on subject changes so gated UI reflects the live grants.
+ *
+ * Pass `asOperator` when the answer must describe the caller's OWN session: while acting
+ * as someone else this endpoint answers for that subject, and caching those as "my
+ * permissions" would regate the operator's own chrome with a stranger's grants.
  */
-export async function getMyPermissions(): Promise<string[]> {
-  return unwrap(await api.GET("/api/v1/identity/permissions", {})) ?? [];
+export async function getMyPermissions(options: { asOperator?: boolean } = {}): Promise<string[]> {
+  return (
+    unwrap(
+      await api.GET("/api/v1/identity/permissions", {
+        headers: options.asOperator ? AS_OPERATOR : undefined,
+      }),
+    ) ?? []
+  );
 }
 
 /** The authenticated user's full profile (name, email, phone, imageUrl, …). */

@@ -2,12 +2,15 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import {
   api,
   ApiRequestError,
+  AS_OPERATOR,
+  AS_OPERATOR_HEADER,
   authPath,
   isTenantDeactivatedError,
   unwrap,
   unwrapVoid,
 } from "@/lib/api-client";
 import { loadRuntimeConfig } from "@/env";
+import { actingStore, type ActingSession } from "@/auth/acting-store";
 
 function result<T>(init: { data?: T; error?: unknown; status: number }) {
   return {
@@ -143,6 +146,97 @@ describe("single-flight refresh", () => {
     await api.GET("/api/v1/identity/permissions", SAME_ORIGIN);
 
     expect(refreshCalls).toBe(2);
+  });
+});
+
+describe("the acting layer", () => {
+  const SAME_ORIGIN = { baseUrl: "http://localhost" } as const;
+
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+
+  const ACTING: ActingSession = {
+    accessToken: "acting-token",
+    tenantId: "acme",
+    tenantName: "Acme Corp",
+    userId: "u-9",
+    expiresAt: new Date(Date.now() + 900_000).toISOString(),
+  };
+
+  beforeEach(() => {
+    localStorage.setItem("boilerplate.console.accessToken", "operator-token");
+    localStorage.setItem("boilerplate.console.tenant", "root");
+  });
+
+  afterEach(() => {
+    actingStore.clear();
+    localStorage.clear();
+    vi.unstubAllGlobals();
+  });
+
+  /** The Authorization header of every request the stub saw. */
+  function recordBearers() {
+    const bearers: string[] = [];
+    const seenFlag: boolean[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: Request | string) => {
+        const request = input as Request;
+        bearers.push(request.headers.get("Authorization") ?? "");
+        seenFlag.push(request.headers.get(AS_OPERATOR_HEADER) !== null);
+        return json([]);
+      }),
+    );
+    return { bearers, seenFlag };
+  }
+
+  it("sends the acting token while acting", async () => {
+    actingStore.start(ACTING);
+    const { bearers } = recordBearers();
+
+    await api.GET("/api/v1/identity/permissions", SAME_ORIGIN);
+
+    expect(bearers).toEqual(["Bearer acting-token"]);
+  });
+
+  it("sends the operator's own token when the call opts out, and never leaks the flag", async () => {
+    actingStore.start(ACTING);
+    const { bearers, seenFlag } = recordBearers();
+
+    await api.GET("/api/v1/identity/permissions", { ...SAME_ORIGIN, headers: AS_OPERATOR });
+
+    expect(bearers).toEqual(["Bearer operator-token"]);
+    // The sentinel is a transport detail; it must never reach the wire.
+    expect(seenFlag).toEqual([false]);
+  });
+
+  it("drops the acting session on a 401 instead of spending the refresh cookie", async () => {
+    actingStore.start(ACTING);
+    let refreshCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: Request | string) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (url.includes("/auth/refresh")) {
+          refreshCalls += 1;
+          return json({ token: "should-not-happen" });
+        }
+        return json({ status: 401 }, 401);
+      }),
+    );
+
+    const result = await api.GET("/api/v1/identity/permissions", SAME_ORIGIN);
+
+    // The acting token is access-only: there is nothing to renew, so no refresh is tried.
+    expect(refreshCalls).toBe(0);
+    expect(result.response.status).toBe(401);
+    expect(actingStore.get()).toBeNull();
+    expect(actingStore.getNotice()).toContain("Acme Corp");
+    // The operator's own session is untouched.
+    expect(localStorage.getItem("boilerplate.console.accessToken")).toBe("operator-token");
   });
 });
 

@@ -33,46 +33,37 @@ describe("tokenStore", () => {
     expect(tokenStore.getPermissions()).toEqual([]);
   });
 
-  it("stashes the operator's session when entering a tenant and restores it on end", () => {
+  it("keeps no acting credential — that never touches storage (ADR-0002)", () => {
     tokenStore.setAccessToken("operator-token");
     tokenStore.setTenant("root");
     tokenStore.setPermissions(["Permissions.Tenants.View"]);
 
-    tokenStore.beginImpersonation("exchanged-token", "acme");
-
-    expect(tokenStore.getAccessToken()).toBe("exchanged-token");
-    expect(tokenStore.getTenant()).toBe("acme");
-    // The impersonated subject has its own grants; the operator's must not leak.
-    expect(tokenStore.getPermissions()).toEqual([]);
-    expect(tokenStore.hasImpersonationStash()).toBe(true);
-
-    tokenStore.endImpersonationWithFreshAccessToken("fresh-operator-token");
-
-    expect(tokenStore.getAccessToken()).toBe("fresh-operator-token");
-    expect(tokenStore.getTenant()).toBe("root");
-    expect(tokenStore.hasImpersonationStash()).toBe(false);
+    // Acting as someone else swaps nothing here: the acting token lives in module
+    // memory (acting-store), so the operator's own session is the only one on disk.
+    // The old impersonation stash is gone, and so is any way to resurrect a dead
+    // acting token after a reload.
+    expect(Object.keys(localStorage)).toEqual(
+      expect.arrayContaining([
+        "boilerplate.console.accessToken",
+        "boilerplate.console.tenant",
+        "boilerplate.console.permissions",
+      ]),
+    );
+    expect(Object.keys(localStorage)).toHaveLength(3);
+    expect(Object.keys(localStorage).some((key) => /impersonat|acting|actor/i.test(key))).toBe(
+      false,
+    );
   });
 
-  it("restores the stashed operator session when ending impersonation fails", () => {
+  it("clear() drops the whole session", () => {
     tokenStore.setAccessToken("operator-token");
     tokenStore.setTenant("root");
-    tokenStore.beginImpersonation("exchanged-token", "acme");
-
-    expect(tokenStore.restoreStashedActor()).toBe(true);
-    expect(tokenStore.getAccessToken()).toBe("operator-token");
-    expect(tokenStore.getTenant()).toBe("root");
-    expect(tokenStore.hasImpersonationStash()).toBe(false);
-  });
-
-  it("clear() drops the session and any half-finished impersonation", () => {
-    tokenStore.setAccessToken("operator-token");
-    tokenStore.setTenant("root");
-    tokenStore.beginImpersonation("exchanged-token", "acme");
+    tokenStore.setPermissions(["Permissions.Tenants.View"]);
 
     tokenStore.clear();
 
     expect(tokenStore.getAccessToken()).toBeNull();
-    expect(tokenStore.hasImpersonationStash()).toBe(false);
+    expect(tokenStore.getPermissions()).toEqual([]);
   });
 
   it("notifies subscribers on every mutation", () => {
