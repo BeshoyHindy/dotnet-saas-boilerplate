@@ -91,6 +91,22 @@ services:
     entrypoint: ["mc"]
     command: ["mb", "--ignore-existing", "local/${STORAGE_BUCKET:-boilerplate}"]
 
+  # One-shot: allow anonymous GET under `uploads/` — and nowhere else. Avatars
+  # and tenant branding are served as unsigned URLs (IStorageService.UploadAsync
+  # returns BuildPublicUrl), and a MinIO bucket is private by default, so they
+  # 403 in the browser without this. Files-module objects live under `tenants/`
+  # where public and private share a key space and visibility is a database
+  # column, so that prefix must stay closed.
+  minio-public-prefix:
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    restart: "no"
+    depends_on:
+      minio-init: { condition: service_completed_successfully }
+    environment:
+      MC_HOST_local: http://${MINIO_ROOT_USER:-boilerplate}:${MINIO_ROOT_PASSWORD:?run scripts/local-env.sh to generate .env}@minio:9000
+    entrypoint: ["mc"]
+    command: ["anonymous", "set", "download", "local/${STORAGE_BUCKET:-boilerplate}/uploads"]
+
   # Mail catcher: every message the API sends is trapped here instead of being
   # delivered. Web UI on http://localhost:8025.
   mailpit:
@@ -139,6 +155,7 @@ services:
       minio:      { condition: service_healthy }
       mailpit:    { condition: service_started }
       minio-init: { condition: service_completed_successfully }
+      minio-public-prefix: { condition: service_completed_successfully }
       migrator:   { condition: service_completed_successfully }
     environment:
       DOTNET_ENVIRONMENT: Production

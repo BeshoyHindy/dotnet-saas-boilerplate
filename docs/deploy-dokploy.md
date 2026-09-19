@@ -80,6 +80,24 @@ CI publishes three images to GHCR:
 Production must name a fixed version. `latest` makes a redeploy irreproducible —
 the same button press a week later brings up different code.
 
+> **Until the CI-workflows change lands**, the console image and the `dev-*`
+> tags above do not exist yet, and CI still builds the two .NET images without
+> the Dockerfile. Build and push them by hand meanwhile:
+>
+> ```bash
+> OWNER=<your-ghcr-owner>; TAG=<your-tag>
+> echo "$GHCR_TOKEN" | docker login ghcr.io -u "$OWNER" --password-stdin
+> docker build -f src/Host/Dockerfile --target api      -t "ghcr.io/$OWNER/boilerplate-api:$TAG" .
+> docker build -f src/Host/Dockerfile --target migrator -t "ghcr.io/$OWNER/boilerplate-db-migrator:$TAG" .
+> docker build clients/admin -t "ghcr.io/$OWNER/boilerplate-console:$TAG"
+> docker push "ghcr.io/$OWNER/boilerplate-api:$TAG"
+> docker push "ghcr.io/$OWNER/boilerplate-db-migrator:$TAG"
+> docker push "ghcr.io/$OWNER/boilerplate-console:$TAG"
+> ```
+>
+> Set `IMAGE_TAG` to whatever `$TAG` you used. Nothing else in this guide
+> changes.
+
 If the packages are private, add the credentials once under **Settings →
 Registry** in Dokploy (a GitHub personal access token with `read:packages`);
 Dokploy then authenticates the pulls.
@@ -162,11 +180,16 @@ in both.
 | `SMTP_USERNAME` / `SMTP_PASSWORD` | app | relay credentials | same |
 | `SMTP_SECURE_SOCKET` | app | `StartTls` | `StartTls` |
 | `APP_DEFAULT_TENANT` | app | `root` | `root` |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | app | blank, or a collector URL | same |
+| `OTEL_EXPORTER_ENABLED` | app | `false` | `false`, or `true` with a collector |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | app | blank | blank, or a collector URL |
 
 `STACK_NAME` is what keeps the two environments apart on one server: it prefixes
 every `dokploy-network` alias and every Traefik router, service and middleware
 name. Two environments sharing a `STACK_NAME` will fight over both.
+
+Telemetry needs **both** OTLP keys or neither: Production ships the exporter
+disabled, so an endpoint with `OTEL_EXPORTER_ENABLED=false` is dead
+configuration that looks live.
 
 `ALLOWED_HOSTS` is a semicolon-separated list and must contain `API_DOMAIN`.
 `*` is rejected outright. It is also the `Host` that Traefik's readiness probe
@@ -196,8 +219,9 @@ routing and the migrator gate would silently stop working.
 
 Paste the `[data]` and `[both]` variables into **Environment**, then **Deploy**.
 Watch the deployment log until it settles; `postgres`, `valkey` and `minio`
-should be running and `minio-init` should have exited 0 after creating the
-bucket.
+should be running, and `minio-init` and `minio-public-prefix` should each have
+exited 0 — the first creating the bucket, the second opening anonymous reads on
+the `uploads/` prefix that avatars and tenant branding are served from.
 
 Deploy this stack again only when a data-service image version changes. That is
 the whole point of the split: an application redeploy can never recreate,
@@ -264,9 +288,12 @@ all exit non-zero.
 
 ### Get the two identifiers
 
-**API token**: Dokploy UI → `/settings/profile` → API/CLI → generate. Store it
-as a repository secret; never put it on a command line (the script passes it to
-curl through a config file on stdin so it never reaches the process table).
+**API token**: Dokploy UI → **Settings → API Keys** (older builds put it under
+Settings → Profile → API/CLI) → generate. Store it as a repository secret and
+pass it only as `DOKPLOY_API_KEY`. The script has no `--api-key` flag on
+purpose and refuses one: `ps` is world-readable, so a token on an argv is
+visible to every other process on the runner. Internally it reaches curl
+through a config file on stdin rather than a `--header` argument.
 
 **Compose id**: open the compose service in the UI and read `composeId` out of
 the URL, or ask the API:
@@ -281,15 +308,15 @@ curl -s https://dokploy.example.com/api/project.all \
 
 ```bash
 export DOKPLOY_URL=https://dokploy.example.com
-export DOKPLOY_API_KEY=…            # repository secret
+export DOKPLOY_API_KEY=…            # repository secret — environment only
 export DOKPLOY_COMPOSE_ID=…         # the app stack's composeId
 
 deploy/dokploy/dokploy-deploy.sh --timeout 900 --interval 10
 ```
 
-Needs `curl` and `jq`. Flags: `--url`, `--compose-id`, `--api-key`, `--timeout`
-(default 900 s), `--interval` (default 10 s), `--title`; `--help` prints the
-lot.
+Needs `curl` and `jq`. Flags: `--url`, `--compose-id`, `--timeout` (default
+900 s), `--interval` (default 10 s), `--title`; `--help` prints the lot. The
+token is environment-only — there is no `--api-key`.
 
 To roll the image forward first, set `IMAGE_TAG` in the stack's Environment tab
 (by hand or through `compose.update`) and then run the script — Dokploy reads
@@ -329,6 +356,14 @@ Per ADR-0007, every merge into `develop` deploys staging, and a `v*` tag on
 `main` deploys production. A production deploy is therefore a tag, a fixed
 `IMAGE_TAG` and one run of the deploy script.
 
+**The branch and the tag decide different things.** The branch on the compose
+service is only where Dokploy reads the two YAML files from — it never builds
+anything, so `main` versus `develop` selects the *deployment shape*. What is
+actually run is `IMAGE_TAG`. So a production release is: merge the release into
+`main`, tag it, let CI publish `1.4.0`, then set `IMAGE_TAG=1.4.0` and deploy.
+Bumping the branch alone changes nothing about the running code, and bumping
+`IMAGE_TAG` alone is the normal case.
+
 **Rollback** is the previous tag: set `IMAGE_TAG` back and deploy. The data
 stack is untouched — but a migration that has already run is *not* rolled back
 by this, so a rollback across a destructive migration needs a restore, not a
@@ -348,12 +383,14 @@ deploy script itself. Two suites:
   interpolated from `IMAGE_TAG`, every data-service image pinned and never
   `:latest`, the migrator gate, the external network, the `/health/ready`
   load-balancer probe with `passhostheader`, no host port published, no literal
-  credential, and `.env.example` matching the interpolated variables in both
-  directions.
+  credential, anonymous storage reads scoped to `uploads/` and never widened to
+  the bucket or to `tenants/`, and `.env.example` matching the interpolated
+  variables in both directions.
 - **`dokploy-deploy.test.sh`** — the deploy script against a stubbed `curl`:
   success, failure, cancellation, timeout, an unregistered deployment, a
-  malformed body, an unknown status, HTTP errors, and *somebody else's*
-  deployment going green while ours is still running.
+  malformed body, a JSON object where an array was documented, an unknown
+  status, HTTP errors, a refused `--api-key`, and *somebody else's* deployment
+  going green while ours is still running.
 
 Also useful directly:
 
@@ -365,7 +402,31 @@ docker compose -f deploy/dokploy/app.compose.yml config -q
 (with an env file supplying the keys — the contract test generates a throwaway
 one for exactly this).
 
-## 9. When it does not work
+## 9. Hardening follow-up
+
+Two things this stack does are correct-but-broad, and worth tightening once a
+deployment is real:
+
+- **The API signs with the MinIO root credentials.** `Storage__S3__AccessKey` /
+  `SecretKey` are `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`, so the application
+  can create and delete buckets, not only objects in its own. The tighter shape
+  is a MinIO service account (`mc admin user svcacct add`) carrying a policy
+  scoped to `arn:aws:s3:::<bucket>/*` with just the object verbs the app uses —
+  `GetObject`, `PutObject`, `DeleteObject`, `ListBucket` — and those keys in the
+  app stack instead. Nothing in the compose files changes but the two values.
+- **Anonymous reads are open on `uploads/`.** That prefix holds avatars and
+  tenant branding, which are unsigned URLs by design. It is as narrow as the
+  code currently allows, but it is still public-by-prefix rather than
+  public-by-object; per-object ACLs would be narrower.
+
+Related, and an application-level gap rather than a deployment one: the Files
+module builds public URLs for `Visibility.Public` rows under `tenants/`, where
+public and private objects share a key space. That prefix is deliberately *not*
+anonymously readable — opening it would make `ChangeFileVisibility` unable to
+take access away again — so those public URLs will 403 until the module serves
+public files through a presigned URL or a per-object grant.
+
+## 10. When it does not work
 
 | Symptom | Cause |
 |---|---|
@@ -380,6 +441,8 @@ one for exactly this).
 | Password-reset links point at a container IP | Traefik is not passing the original `Host`. `passhostheader=true` must stay on the API's load-balancer labels — `X-Forwarded-Host` is deliberately never honoured, so that label is the only path for the real host. |
 | Uploads fail with a signature error | `STORAGE_DOMAIN` differs between the two stacks, or `Storage__S3__ServiceUrl` was pointed at an internal alias. The signature covers the host. |
 | `NoSuchBucket` on first upload | The data stack's `minio-init` did not run, or `STORAGE_BUCKET` differs between the two stacks. |
+| Avatars and tenant logos 403 | `minio-public-prefix` did not run. Redeploy the data stack; it is idempotent. Buckets are private by default and those URLs are unsigned. |
+| Traces and metrics never arrive | `OTEL_EXPORTER_ENABLED` is not `true`. The endpoint alone does nothing — Production ships the exporter disabled. |
 | `migrator` retries PostgreSQL and then fails | The data stack is not up, or `POSTGRES_PASSWORD` was changed against an existing volume. |
 | `api` never starts, no error of its own | The migrator exited non-zero. Read the migrator's log — the API is gated on it and is behaving correctly by not starting. |
 | Deploy script reports `timed out` while the UI shows success | The successful deployment is not the one the script started (another deploy of the same service). Check the deployment titles; the script's carries its `dpl-…` token. |

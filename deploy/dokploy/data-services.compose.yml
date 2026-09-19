@@ -136,6 +136,36 @@ services:
     networks:
       - dokploy-network
 
+  # ── One-shot: open anonymous reads on the `uploads/` prefix ONLY ────
+  # Avatars and tenant branding go through IStorageService.UploadAsync, which
+  # returns BuildPublicUrl(key) — an unsigned URL under `uploads/` that the
+  # browser fetches straight from MinIO in an <img src>. MinIO buckets are
+  # private by default, so without this grant every avatar and logo 403s.
+  #
+  # The prefix is deliberately `uploads/` and NOT the bucket. Files-module
+  # objects live under `tenants/…` where public and private files share one key
+  # space and visibility is a database column (FileAsset.Visibility), so opening
+  # that prefix would make ChangeFileVisibility meaningless: a file flipped back
+  # to Private would stay fetchable at its known URL forever. Widening this to
+  # `local/${STORAGE_BUCKET}` is a data leak, not a convenience — the contract
+  # test asserts the prefix for that reason.
+  #
+  # A separate one-shot rather than `mb && anonymous set` in one: the mc image is
+  # not guaranteed to ship a shell, and `entrypoint: ["mc"]` keeps both steps
+  # shell-free. Both are idempotent.
+  minio-public-prefix:
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    restart: "no"
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      MC_HOST_local: http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000
+    entrypoint: ["mc"]
+    command: ["anonymous", "set", "download", "local/${STORAGE_BUCKET}/uploads"]
+    networks:
+      - dokploy-network
+
 volumes:
   pg_data:
   valkey_data:

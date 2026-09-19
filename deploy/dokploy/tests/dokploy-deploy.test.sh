@@ -80,6 +80,7 @@ title=$(jq -r '.title' < "$state/payload.json")
 case "$step" in
   absent)       body='[]' ;;
   malformed)    body='<html>502 Bad Gateway</html>' ;;
+  not-an-array) body='{"code":"NOT_FOUND","message":"Not found","issues":[]}' ;;
   foreign-done) body=$(jq -nc --arg t "$title" '[{title:"Somebody else [dpl-other]",status:"done",createdAt:"2026-01-01"},{title:$t,status:"running",createdAt:"2026-01-02"}]') ;;
   *)            body=$(jq -nc --arg t "$title" --arg s "$step" '[{title:$t,status:$s,errorMessage:"compose up exited 1",createdAt:"2026-01-02"}]') ;;
 esac
@@ -95,7 +96,7 @@ chmod +x "$STUB_BIN/curl"
 API_KEY="not-a-real-dokploy-key-$$"
 
 # Per-case knobs, reset by `run` so one case can never leak into the next.
-SEQ="done"; TIMEOUT=5; DEPLOY_CODE=200; DEPLOY_BODY="true"; LIST_CODE=200
+SEQ="done"; TIMEOUT=5; INTERVAL=1; DEPLOY_CODE=200; DEPLOY_BODY="true"; LIST_CODE=200
 
 # run <label> — runs the script with the stub first on PATH.
 # Sets RUN_OUTPUT and RUN_STATUS.
@@ -109,10 +110,10 @@ run() {
     DOKPLOY_URL="https://dokploy.example.test" \
     DOKPLOY_COMPOSE_ID="cmp_123" \
     DOKPLOY_API_KEY="$API_KEY" \
-    "$SCRIPT" --interval 1 --timeout "$TIMEOUT" 2>&1
+    "$SCRIPT" --interval "$INTERVAL" --timeout "$TIMEOUT" 2>&1
   )"
   RUN_STATUS=$?
-  SEQ="done"; TIMEOUT=5; DEPLOY_CODE=200; DEPLOY_BODY="true"; LIST_CODE=200
+  SEQ="done"; TIMEOUT=5; INTERVAL=1; DEPLOY_CODE=200; DEPLOY_BODY="true"; LIST_CODE=200
 }
 
 # ── Happy path ───────────────────────────────────────────────────────
@@ -120,6 +121,12 @@ SEQ="running done"; run success
 assert_eq "a completed deployment exits 0" "0" "$RUN_STATUS"
 assert_contains "success is reported" "$RUN_OUTPUT" "finished successfully"
 refute_contains "the API key never reaches the output" "$RUN_OUTPUT" "$API_KEY"
+
+# The first poll happens before the first sleep: a budget shorter than one
+# interval must still be able to observe an already-finished deployment. This
+# run would block for a minute, and then fail, if the sleep came first.
+SEQ="done"; TIMEOUT=1; INTERVAL=60; run polls-before-sleeping
+assert_eq "an already-finished deployment is seen without waiting an interval" "0" "$RUN_STATUS"
 
 # ── Failure paths — every one of these must exit non-zero ────────────
 SEQ="error"; run failed
@@ -143,6 +150,14 @@ assert_contains "the missing deployment times out" "$RUN_OUTPUT" "timed out"
 SEQ="malformed"; run malformed
 assert_true "an unparseable response exits non-zero" test "$RUN_STATUS" -ne 0
 assert_contains "the parse failure is named" "$RUN_OUTPUT" "could not parse"
+
+# A JSON object rather than the documented array — an error payload, a proxy's
+# own answer. Without a shape check this reads as "no deployment yet" and only
+# surfaces as a timeout, which hides the real cause.
+SEQ="not-an-array"; run wrong-shape
+assert_true "a non-array deployment list exits non-zero" test "$RUN_STATUS" -ne 0
+assert_contains "the wrong shape is named" "$RUN_OUTPUT" "expected an array"
+refute_contains "a non-array answer is not reported as a timeout" "$RUN_OUTPUT" "timed out"
 
 SEQ="queued-somewhere-new"; run unknown-status
 assert_true "an unrecognised status exits non-zero" test "$RUN_STATUS" -ne 0
@@ -169,7 +184,15 @@ assert_contains "the status-query failure is named" "$RUN_OUTPUT" "deployment.al
 out=$(PATH="$STUB_BIN:$PATH" STUB_STATE="$WORK/state-args" DOKPLOY_URL="https://d.test" \
       DOKPLOY_COMPOSE_ID="cmp_123" "$SCRIPT" 2>&1); status=$?
 assert_true "a missing API key exits non-zero" test "$status" -ne 0
-assert_contains "the missing API key is named" "$out" "api-key"
+assert_contains "the missing API key is named" "$out" "DOKPLOY_API_KEY"
+
+# The token must never be acceptable on an argv: `ps` is world-readable, so the
+# flag is refused outright rather than quietly ignored.
+out=$(PATH="$STUB_BIN:$PATH" STUB_STATE="$WORK/state-args" DOKPLOY_URL="https://d.test" \
+      DOKPLOY_COMPOSE_ID="cmp_123" "$SCRIPT" --api-key "$API_KEY" 2>&1); status=$?
+assert_true "--api-key is rejected" test "$status" -ne 0
+assert_contains "the rejection points at the environment variable" "$out" "DOKPLOY_API_KEY"
+refute_contains "the rejected key is not echoed back" "$out" "$API_KEY"
 
 out=$(PATH="$STUB_BIN:$PATH" STUB_STATE="$WORK/state-args" DOKPLOY_URL="https://d.test" \
       DOKPLOY_API_KEY="$API_KEY" "$SCRIPT" 2>&1); status=$?

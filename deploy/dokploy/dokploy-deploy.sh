@@ -18,15 +18,19 @@
 # running | done | error | cancelled.
 #
 # Configuration (flags win over environment):
-#   --url, DOKPLOY_URL                    https://dokploy.example.com (no /api)
-#   --compose-id, DOKPLOY_COMPOSE_ID      Compose service id, from its URL
-#   --api-key,  DOKPLOY_API_KEY           API token; prefer the environment
-#   --timeout,  DOKPLOY_TIMEOUT_SECONDS   overall budget, default 900
-#   --interval, DOKPLOY_POLL_SECONDS      poll period, default 10
-#   --title,    DOKPLOY_DEPLOY_TITLE      human part of the deployment title
+#   --url,      DOKPLOY_URL                https://dokploy.example.com (no /api)
+#   --compose-id, DOKPLOY_COMPOSE_ID       Compose service id, from its URL
+#   --timeout,  DOKPLOY_TIMEOUT_SECONDS    overall budget, default 900
+#   --interval, DOKPLOY_POLL_SECONDS       poll period, default 10
+#   --title,    DOKPLOY_DEPLOY_TITLE       human part of the deployment title
 #
-# The API key is never printed, and never passed on a command line to curl
-# (`ps` is world-readable) — it goes in via a --config file on stdin.
+#   DOKPLOY_API_KEY                        API token — ENVIRONMENT ONLY
+#
+# There is deliberately no --api-key flag. `ps` is world-readable, so a token on
+# an argv is visible to every other process on the runner for the life of the
+# call, and it lands in shell history and in CI logs that echo their commands.
+# The key is never printed either, and reaches curl through a --config file on
+# stdin rather than a --header argument.
 set -euo pipefail
 
 readonly PROGRAM="${0##*/}"
@@ -56,7 +60,9 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --url)        DOKPLOY_URL="${2:-}"; shift 2 ;;
     --compose-id) DOKPLOY_COMPOSE_ID="${2:-}"; shift 2 ;;
-    --api-key)    DOKPLOY_API_KEY="${2:-}"; shift 2 ;;
+    # --api-key is refused rather than ignored: silently dropping it would leave
+    # the caller thinking they had authenticated.
+    --api-key)    die "--api-key is not accepted; pass the token in DOKPLOY_API_KEY (an argv is visible in ps)" ;;
     --timeout)    timeout_seconds="${2:-}"; shift 2 ;;
     --interval)   poll_seconds="${2:-}"; shift 2 ;;
     --title)      deploy_title="${2:-}"; shift 2 ;;
@@ -67,7 +73,7 @@ done
 
 [ -n "$DOKPLOY_URL" ]        || die "missing --url / DOKPLOY_URL"
 [ -n "$DOKPLOY_COMPOSE_ID" ] || die "missing --compose-id / DOKPLOY_COMPOSE_ID"
-[ -n "$DOKPLOY_API_KEY" ]    || die "missing --api-key / DOKPLOY_API_KEY"
+[ -n "$DOKPLOY_API_KEY" ]    || die "missing DOKPLOY_API_KEY (environment only; there is no --api-key flag)"
 command -v curl >/dev/null 2>&1 || die "curl is required"
 # jq rather than hand-rolled parsing: this script's whole value is deciding
 # correctly whether a deployment succeeded, and a regex over JSON that is wrong
@@ -143,8 +149,18 @@ deadline=$(( $(date -u +%s) + timeout_seconds ))
 status_url="${base_url}/api/deployment.allByCompose?composeId=${DOKPLOY_COMPOSE_ID}"
 last_reported=''
 
+first_poll=1
+
 while :; do
-  sleep "$poll_seconds"
+  # Poll before sleeping. A deployment that is already finished — a no-op
+  # redeploy, or a queue that ran while the trigger response was in flight —
+  # should not cost a full interval, and neither should a run whose budget is
+  # shorter than one interval.
+  if [ "$first_poll" -eq 1 ]; then
+    first_poll=0
+  else
+    sleep "$poll_seconds"
+  fi
 
   if ! call GET "$status_url"; then
     log "status query failed (transport); retrying"
@@ -157,9 +173,21 @@ while :; do
     *)   die "deployment.allByCompose returned HTTP ${http_status:-<none>}: ${http_body}" ;;
   esac
 
-  # `// empty` keeps a non-array or an array without our token from looking like
-  # a status; a body that is not JSON at all fails jq, which is a hard failure —
-  # an unreadable answer is not evidence of a healthy deployment.
+  # A body that is not JSON at all fails jq, which is a hard failure: an
+  # unreadable answer is not evidence of a healthy deployment.
+  if ! shape=$(printf '%s' "$http_body" | jq -r 'type' 2>/dev/null); then
+    die "could not parse the deployment list returned by Dokploy (not JSON): $(printf '%s' "$http_body" | head -c 200)"
+  fi
+
+  # deployment.allByCompose answers with an array. Anything else — an error
+  # object, a login page, a proxy's JSON — would make the `map(...)` below fail
+  # or, worse, quietly find nothing and look like "not registered yet" until the
+  # timeout. Name it instead.
+  if [ "$shape" != array ]; then
+    die "deployment.allByCompose returned a JSON ${shape}, expected an array: $(printf '%s' "$http_body" | head -c 200)"
+  fi
+
+  # `// empty` keeps an array without our token from looking like a status.
   if ! status=$(printf '%s' "$http_body" \
       | jq -r --arg token "$token" 'map(select(.title? // "" | contains($token))) | first | .status // empty' 2>/dev/null); then
     die "could not parse the deployment list returned by Dokploy"

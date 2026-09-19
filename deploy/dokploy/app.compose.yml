@@ -98,6 +98,9 @@ services:
       # StartTls is the default and the right one for a real relay; only a plain
       # local catcher needs None.
       MailOptions__Smtp__SecureSocket: ${SMTP_SECURE_SOCKET}
+      # appsettings.Production.json ships Exporter.Otlp.Enabled=false, so an
+      # endpoint on its own exports nothing. Both keys or neither.
+      OpenTelemetryOptions__Exporter__Otlp__Enabled: ${OTEL_EXPORTER_ENABLED}
       OpenTelemetryOptions__Exporter__Otlp__Endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}
     expose:
       - "8080"
