@@ -137,6 +137,7 @@ services:
       # filtering answers 400, so the backend would never come up healthy.
       - "traefik.http.services.${STACK_NAME}-api.loadbalancer.healthcheck.hostname=${API_DOMAIN}"
 
+  #if (frontend)
   # ── Console (React SPA served by nginx) ─────────────────────────────
   # Configured at container start: the entrypoint renders /config.json, the nginx
   # site and the Content-Security-Policy from these variables, so one image serves
@@ -187,6 +188,7 @@ services:
       - "traefik.http.services.${STACK_NAME}-console.loadbalancer.healthcheck.interval=10s"
       - "traefik.http.services.${STACK_NAME}-console.loadbalancer.healthcheck.timeout=5s"
       - "traefik.http.services.${STACK_NAME}-console.loadbalancer.healthcheck.hostname=${CONSOLE_DOMAIN}"
+  #endif
 
 networks:
   # Created by the Dokploy installer; Traefik watches it. Declared external so a

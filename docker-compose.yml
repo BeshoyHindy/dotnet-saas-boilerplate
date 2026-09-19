@@ -15,8 +15,10 @@
 # Real deployments configure the same images through Dokploy environment
 # variables (ADR-0005), not this file.
 #
+#if (aspire)
 # Aspire (`dotnet run --project src/Host/Boilerplate.AppHost`) is the day-to-day
 # inner-loop orchestrator; this file exists to exercise the shipped images.
+#endif
 
 name: boilerplate
 
@@ -197,6 +199,7 @@ services:
     # shell or curl to run one with. Probe from the host instead:
     #   curl -fsS http://localhost:8080/health/ready
 
+  #if (frontend)
   # The React console, served by nginx (ADR-0004). It proxies /api and /health to
   # the API on the compose network, so the browser only ever talks to one origin —
   # which is what lets the SameSite=Strict refresh cookie work without CORS
@@ -219,6 +222,7 @@ services:
     # which cannot bind a privileged port.
     ports:
       - "${APP_CONSOLE_PORT:-8081}:8080"
+  #endif
 
 volumes:
   pg_data:

@@ -80,7 +80,9 @@ jobs:
               - '.github/workflows/backend.yml'
             images:
               - 'src/**'
+              #if (frontend)
               - 'clients/console/**'
+              #endif
               - 'global.json'
               - '.github/workflows/backend.yml'
 
@@ -326,9 +328,8 @@ jobs:
   # /t:PublishContainer`, which produced a differently-based image than the one
   # src/Host/Dockerfile defines and reviewers read.
   #
-  # There is no NuGet.org publishing anywhere in this repo: the distribution
-  # artifact is the `dotnet new saas` template source, and template-smoke.yml
-  # (issue #20) proves the package still scaffolds.
+  # There is no NuGet.org publishing anywhere in this repo — container images
+  # are the only artifact CI produces.
   publish-images:
     name: Publish Image (${{ matrix.image }})
     needs: [changes]
@@ -361,11 +362,13 @@ jobs:
             context: .
             file: src/Host/Dockerfile
             target: migrator
+          #if (frontend)
           # The console SPA (ADR-0004).
           - image: boilerplate-console
             context: clients/console
             file: clients/console/Dockerfile
             target: ''
+          #endif
     steps:
       - name: Checkout
         uses: actions/checkout@v7

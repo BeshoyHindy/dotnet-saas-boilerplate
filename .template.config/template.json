@@ -15,23 +15,33 @@
         "language": "C#",
         "type": "solution"
     },
-    "identity": "Boilerplate.Templates",
+    "identity": "Boilerplate.Saas",
     "name": "Modular .NET SaaS Starter",
-    "description": "A production-ready full-stack starter: modular .NET 10 monolith (VSA, CQRS, multitenancy, Identity, Aspire) + two React 19 apps + Docker.",
+    "description": "A production-ready full-stack starter: modular .NET 10 monolith (VSA, CQRS, multitenancy, Identity, Aspire) + React client + Docker.",
     "shortName": "saas",
     "sourceName": "Boilerplate",
     "preferNameDirectory": true,
+    "guids": [
+        "0f2b2a2e-3d3c-4f0d-9d5f-2c9a1a9d6b71",
+        "9fe5df9a-b9b2-4202-bdb4-d30b01b71d1a"
+    ],
     "symbols": {
         "aspire": {
             "type": "parameter",
             "datatype": "bool",
-            "description": "Include the .NET Aspire AppHost project for orchestration.",
+            "description": "Include the .NET Aspire AppHost project for local orchestration.",
             "defaultValue": "true"
         },
         "frontend": {
             "type": "parameter",
             "datatype": "bool",
-            "description": "Include the React admin + dashboard client apps (clients/).",
+            "description": "Include the React client app(s) under clients/ and everything that serves them (console container, client CI, Aspire client resources).",
+            "defaultValue": "true"
+        },
+        "sandcastle": {
+            "type": "parameter",
+            "datatype": "bool",
+            "description": "Include the Sandcastle agent pipeline (.sandcastle/, sandcastle.config.mts and the root pnpm project that exists only for it).",
             "defaultValue": "true"
         },
         "skipRestore": {
@@ -64,62 +74,111 @@
         "sendgridFrom": {
             "type": "generated",
             "generator": "constant",
-            "parameters": { "value": "noreply@example.com" },
+            "parameters": {
+                "value": "noreply@example.com"
+            },
             "replaces": "sendgrid@example.com"
         },
         "lowerName": {
             "type": "derived",
             "valueSource": "name",
-            "valueTransform": "kebabForm",
+            "valueTransform": "lc"
+        },
+        "kebabName": {
+            "type": "derived",
+            "valueSource": "lowerName",
+            "valueTransform": "dashNorm",
             "replaces": "boilerplate"
         }
     },
     "forms": {
-        "lc": { "identifier": "lowerCaseInvariant" },
-        "dashNorm": { "identifier": "replace", "pattern": "[^a-zA-Z0-9]+", "replacement": "-" },
-        "kebabForm": { "identifier": "chain", "steps": ["lc", "dashNorm"] }
+        "lc": {
+            "identifier": "lowerCaseInvariant"
+        },
+        "dashNorm": {
+            "identifier": "replace",
+            "pattern": "[^a-z0-9]+",
+            "replacement": "-"
+        }
+    },
+    "specialCustomOperations": {
+        "**/.env.example": {
+            "flagPrefix": "#",
+            "operations": [
+                {
+                    "type": "conditional",
+                    "configuration": {
+                        "if": ["#if"],
+                        "else": ["#else"],
+                        "elseif": ["#elseif"],
+                        "endif": ["#endif"],
+                        "trim": true,
+                        "wholeLine": true,
+                        "evaluator": "C++"
+                    }
+                }
+            ]
+        }
     },
     "sources": [
         {
             "source": "./",
             "target": "./",
             "exclude": [
+                "**/.DS_Store",
                 ".template.config/**",
-                "**/.idea/**",
-                "**/.vscode/**",
-                "**/.vs/**",
-                ".github/**",
-                ".agents/**",
-                ".claude/**",
-                ".devcontainer/**",
+                ".git",
                 ".git/**",
-                "templates/**/*",
-                "demo/**",
-                "docs/**",
-                "nupkgs/**",
-                "scripts/**",
-                "clients/**/node_modules/**",
-                "clients/**/dist/**",
-                "clients/**/build/**",
-                "clients/**/test-results/**",
-                "clients/**/playwright-report/**",
-                "clients/**/.turbo/**",
-                "clients/**/coverage/**",
-                "clients/**/.env",
-                "clients/**/.env.*",
-                "**/*.filelist",
-                "**/*.user",
-                "**/images",
-                "**/*.lock.json",
-                "*.nuspec",
+                ".gitmodules",
+                ".claude",
+                ".claude/**",
+                "**/.idea/**",
+                "**/.vs/**",
+                "**/.vscode/**",
+                "**/.history/**",
+                ".devcontainer/**",
                 "**/bin/**",
                 "**/obj/**",
-                ".mcp.json",
-                "global.json",
-                "CLAUDE.md",
-                "GEMINI.md",
+                "**/artifacts/**",
+                "**/publish/**",
+                "**/node_modules/**",
+                "**/dist/**",
+                "**/build/**",
+                "**/.turbo/**",
+                "**/.next/**",
+                "**/TestResults/**",
+                "**/test-results/**",
+                "clients/**/test-results/**",
+                "clients/**/.pnpm-store/**",
+                "**/*.tsbuildinfo",
+                "**/playwright-report/**",
+                "**/coverage/**",
+                "**/coverage-report/**",
+                "**/audit-dlq/**",
+                "**/[Ll]og/**",
+                "**/[Ll]ogs/**",
+                "**/*.log",
+                "**/*.binlog",
+                "**/*.user",
+                "**/*.filelist",
+                "**/*.nupkg",
+                "**/*.snupkg",
+                "**/*.lock.json",
+                "nupkgs/**",
+                "**/.env",
+                "**/.env.local",
+                "**/.env.*.local",
+                "LICENSE",
                 "README.md",
-                "LICENSE"
+                "GEMINI.md",
+                ".agents/skills/**",
+                ".agents/workflows/**",
+                "skills-lock.json",
+                "docs/adr/0001-*",
+                ".github/workflows/brand-gate.yml",
+                ".github/workflows/template-smoke.yml",
+                "scripts/brand-gate.sh",
+                "scripts/template-smoke.sh"
             ],
             "rename": {
                 "README-template.md": "README.md"
@@ -134,7 +193,24 @@
                 {
                     "condition": "(!frontend)",
                     "exclude": [
-                        "clients/**"
+                        "clients/**",
+                        ".github/workflows/frontend.yml",
+                        ".agents/rules/frontend/**",
+                        "scripts/export-openapi.sh",
+                        "docs/adr/0004-*"
+                    ]
+                },
+                {
+                    "condition": "(!sandcastle)",
+                    "exclude": [
+                        ".sandcastle/**",
+                        "sandcastle.config.mts",
+                        "package.json",
+                        "pnpm-workspace.yaml",
+                        "pnpm-lock.yaml",
+                        "tsconfig.json",
+                        ".github/workflows/sandcastle.yml",
+                        "docs/adr/0006-*"
                     ]
                 }
             ]

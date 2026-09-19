@@ -27,7 +27,6 @@ clients/
 deploy/
 docs/
 scripts/
-templates/
 node_modules/
 *.md
 LICENSE

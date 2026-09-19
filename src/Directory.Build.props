@@ -45,12 +45,13 @@
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<Description>A production-ready modular .NET starter for building multi-tenant SaaS applications.</Description>
 		<!--
-		  Distribution model = SOURCE OWNERSHIP. Nothing under src/ ships to NuGet.org;
-		  the only published package is Boilerplate.Templates (the template, in
-		  templates/). The template scaffolds full, owned source; modules/framework are
-		  consumed via ProjectReference, never as binary NuGets. So pack is OFF for every
-		  project here, which prevents the module/framework projects from accidentally
-		  emitting orphan, mutually-unresolvable binary packages.
+		  Distribution model = SOURCE OWNERSHIP. Nothing here ships to NuGet.org at all:
+		  the distribution artifact is this repository itself, installed as a
+		  `dotnet new` template (`dotnet new install <path>`, ADR-0001). The template
+		  scaffolds full, owned source; modules/framework are consumed via
+		  ProjectReference, never as binary NuGets. So pack is OFF for every project
+		  here, which prevents the module/framework projects from accidentally emitting
+		  orphan, mutually-unresolvable binary packages.
 		-->
 		<IsPackable>false</IsPackable>
 	</PropertyGroup>

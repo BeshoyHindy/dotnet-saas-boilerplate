@@ -62,7 +62,13 @@ refute_match "no stack has a Dockerfile reference" "$both_text" '[Dd]ockerfile'
 
 # ── App images all come from IMAGE_TAG ───────────────────────────────
 app_images="$(printf '%s\n' "$app_text" | grep -E '^[[:space:]]*image:' | sed -E 's/^[[:space:]]*image:[[:space:]]*//')"
-assert_eq "app stack has three images" "3" "$(printf '%s\n' "$app_images" | grep -c .)"
+# Pinned, so a service that silently disappears fails the contract. The console
+# is the one service this stack may legitimately not have — `dotnet new saas
+# --frontend false` scaffolds an API-only product (ADR-0001) — so the expected
+# count follows it and everything else stays fixed.
+expected_app_images=2
+if grep -qE '^  console:' "$APP"; then expected_app_images=3; fi
+assert_eq "every app service is accounted for" "$expected_app_images" "$(printf '%s\n' "$app_images" | grep -c .)"
 while IFS= read -r image; do
   [ -n "$image" ] || continue
   assert_match "app image is registry/owner/name:\${IMAGE_TAG} — $image" "$image" \
@@ -70,7 +76,9 @@ while IFS= read -r image; do
 done <<< "$app_images"
 assert_contains "app pulls the published API image"      "$app_images" 'boilerplate-api:'
 assert_contains "app pulls the published migrator image" "$app_images" 'boilerplate-db-migrator:'
+#if (frontend)
 assert_contains "app pulls the console image"            "$app_images" 'boilerplate-console:'
+#endif
 assert_match "app images are always re-pulled" "$app_text" '^[[:space:]]*pull_policy:[[:space:]]*always'
 
 # ── Data-service images are pinned ───────────────────────────────────
@@ -142,6 +150,7 @@ assert_match "api terminates TLS with a cert resolver" "$api_block" 'tls\.certre
 assert_match "api redirects plain HTTP to HTTPS" "$api_block" 'redirectscheme\.scheme=https'
 assert_match "api load balancer targets the Kestrel port" "$api_block" 'loadbalancer\.server\.port=8080'
 
+#if (frontend)
 console_block="$(service_block "$APP" console)"
 assert_match "console is routed by Traefik" "$console_block" 'traefik\.enable=true'
 assert_match "console keeps the original Host header" "$console_block" 'loadbalancer\.passhostheader=true'
@@ -153,11 +162,13 @@ assert_match "console load balancer targets the unprivileged nginx port" "$conso
   'loadbalancer\.server\.port=8080'
 assert_match "console exposes the unprivileged nginx port" "$console_block" '^[[:space:]]*-[[:space:]]*"8080"'
 refute_match "console never names the privileged port" "$console_block" 'loadbalancer\.server\.port=80$'
+#endif
 
 # Traefik reports a middleware that two different containers define as a
 # configuration error, so every redirect middleware name must be unique.
 mw_names="$(printf '%s\n' "$both_text" | grep -oE 'traefik\.http\.middlewares\.[^.]+' | sort -u | wc -l | tr -d ' ')"
-assert_eq "each routed service owns its redirect middleware" "3" "$mw_names"
+routed="$(printf '%s\n' "$both_text" | grep -c 'traefik\.enable=true')"
+assert_eq "each routed service owns its redirect middleware" "$routed" "$mw_names"
 
 # ── Production fail-fast contract ────────────────────────────────────
 assert_match "api names the proxy network (ProxyOptions fails closed)" "$api_block" \
