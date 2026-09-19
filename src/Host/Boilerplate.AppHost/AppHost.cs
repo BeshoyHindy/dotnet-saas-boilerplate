@@ -14,8 +14,15 @@ var appPrefix = builder.Environment.ApplicationName
 // sidecar: the stack is the application and its dependencies, and a pgAdmin (or
 // RedisInsight) container is a tool a developer installs, not something a template
 // should start — and pay for in RAM — on every run.
+//
+// The volume name is versioned. Postgres only reads POSTGRES_PASSWORD when it initialises an
+// empty data directory, so a volume outlives the password it was created with: once the
+// persisted `postgres-password` parameter no longer matches (user-secrets reset, another
+// machine's volume, a regenerated Initial migration), every connection fails with "password
+// authentication failed", the migrator never starts, and the API and clients hang behind it.
+// Bump the suffix to start clean without deleting anyone's data; the old volume is left alone.
 var postgresServer = builder.AddPostgres("postgres")
-    .WithDataVolume($"{appPrefix}-postgres-data")
+    .WithDataVolume($"{appPrefix}-postgres-data-v2")
     .WithLifetime(ContainerLifetime.Persistent);
 
 var postgres = postgresServer.AddDatabase("boilerplate-db");
