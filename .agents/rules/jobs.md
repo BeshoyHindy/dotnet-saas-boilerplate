@@ -66,6 +66,7 @@ Examples in the tree: `PurgeOrphanedFiles`/`PurgeDeletedFiles` (Files), `AuditRe
 ## Gotchas
 
 - A recurring job is triggered by the scheduler with no tenant in scope, so **every recurring job must be `[SystemJob]`** — otherwise it throws at trigger time. Per-tenant recurring work is a `[SystemJob]` that fans out with `ITenantScope.RunForEachTenantAsync`.
-- The two Files purges and the audit retention sweep are `[SystemJob]`s that read whichever database the default connection points at; they do **not** reach a tenant that lives in a dedicated database. Fan out with `ITenantScope` if you need that.
+- A fan-out sweep catches **inside** the callback and logs the tenant id: `RunForEachTenantAsync` is fail-fast, so an uncaught failure on one tenant would leave the rest of the catalog unswept. The two Files purges and the audit retention sweep are written that way.
+- Inside a fan-out the tenant filter is already doing the scoping, so don't reach for `IgnoreQueryFilters()` — lift only the *named* filter you actually need (`IgnoreQueryFilters([QueryFilters.SoftDelete])` in `PurgeDeletedFilesJob`, because those rows are soft-deleted by definition). A blanket `IgnoreQueryFilters()` would drop the tenant filter too and make the sweep cross-tenant again.
 - The DbMigrator registers `NoOpJobService` whose methods **throw** — surfaces any accidental enqueue during migration. Don't enqueue from migration/seed paths.
 - A job class is a normal DI-resolved type (scope-per-job via `AppJobActivator`); inject what you need.
