@@ -1,11 +1,18 @@
 # Boilerplate
 
 A production-ready starter for multi-tenant SaaS: a modular .NET 10 monolith (vertical slices,
-CQRS via a source-generated mediator, EF Core 10 on PostgreSQL) plus two React 19 clients, wired
+CQRS via a source-generated mediator, EF Core 10 on PostgreSQL) plus one React 19 console, wired
 for local orchestration with .NET Aspire.
 
 `Boilerplate` is the placeholder root name. A new product renames it in one command
 (`dotnet new saas -n Acme`) — see [`docs/adr/0001-placeholder-namespace-and-dotnet-new-rename.md`](docs/adr/0001-placeholder-namespace-and-dotnet-new-rename.md).
+
+Three docs carry the rest:
+
+- [`CONTEXT.md`](CONTEXT.md) — the glossary: the words this project uses, and the ones it refuses.
+- [`docs/new-project-guide.md`](docs/new-project-guide.md) — scaffold, first run, the tenancy rules
+  for adding code, CI and the GitHub settings an owner must configure, known limits.
+- [`docs/deploy-dokploy.md`](docs/deploy-dokploy.md) — blank server to a healthy HTTPS deployment.
 
 ## Start a new product from it
 
@@ -32,10 +39,13 @@ symbol renames the lowercase/kebab form (`boilerplate` → `acme`: image names, 
 names, the compose project, npm scopes, JWT issuer and audience, `localStorage` key prefixes).
 The two `UserSecretsId` GUIDs are regenerated per scaffold, and the API and DbMigrator keep
 sharing one. A scaffold carries `AGENTS.md`, `CLAUDE.md`, `.agents/rules/`, `CONTRIBUTING.md`
-and `SECURITY.md` — a new project has to be workable by the same agent pipeline on day one.
+and `SECURITY.md` — a new project has to be workable by the same agent pipeline on day one — plus
+`CONTEXT.md`, `docs/agents/` and `docs/new-project-guide.md`, which are the vocabulary and the
+conventions that pipeline reads.
 What it deliberately does **not** carry: `LICENSE` (pick your own), `README.md` (replaced by
 [`README-template.md`](README-template.md)), the vendored `.agents/skills/` and
-`.agents/workflows/` with `skills-lock.json`, and ADR-0001 itself.
+`.agents/workflows/` with `skills-lock.json`, the brand gate and template smoke (this repository's
+own gates), and ADR-0001 itself.
 
 Run the whole thing locally — scaffold, build, test, brand-grep — with
 [`scripts/template-smoke.sh`](scripts/template-smoke.sh).
@@ -75,9 +85,21 @@ connection strings, S3 and SMTP credentials, the seeded admin password — comes
 parameters, environment variables or that same store, never from `appsettings*.json`.
 
 The Aspire dashboard is at <https://localhost:15888>; the API and its Scalar reference at
-<https://localhost:7030/scalar>; admin at <http://localhost:5173>; dashboard at
-<http://localhost:5174>; the Mailpit inbox at <http://localhost:8025>. Aspire starts PostgreSQL,
-Valkey, MinIO and Mailpit, runs the migrator to completion, then the API, then the clients.
+<https://localhost:7030/scalar>; the console at <http://localhost:5173>; the Mailpit inbox at
+<http://localhost:8025>. Aspire starts PostgreSQL, Valkey, MinIO and Mailpit, runs the migrator to
+completion, then the API, then the console.
+
+**Only one AppHost instance at a time.** MinIO binds fixed host ports 9000 and 9001, and its
+container is persistent — so a second checkout or worktree that has run the AppHost leaves
+containers holding those ports. The new `minio` container then comes up attached to no network,
+`minio-init` loops printing `waiting for minio...`, and since the API waits for that init to
+complete, neither the API nor the console ever starts. `docker ps` shows two `minio-*` containers;
+`docker logs <minio-init>` shows the loop. Remove the other instance's persistent containers
+(`minio`, `minio-init`, `postgres`, `redis`) and run again.
+
+Separately: the initial migrations were regenerated while this template was built, so a database
+migrated before that is incompatible and needs a fresh volume —
+`docker volume rm boilerplate-postgres-data` (destructive; local development data).
 
 The MinIO password and the seeded root admin password are Aspire parameters, generated on first run
 and persisted to the AppHost's user-secrets; read the current values from the Aspire dashboard. The
@@ -126,7 +148,7 @@ cd clients/console && pnpm test:e2e       # Playwright smoke suite
 | `src/Modules/{Name}/` | Bounded contexts (runtime project + `.Contracts`) |
 | `src/Host/` | API, AppHost, DbMigrator, Migrations |
 | `src/Tests/` | Unit, architecture (NetArchTest) and integration (Testcontainers) tests |
-| `clients/` | The two React apps |
+| `clients/console` | The React console; `clients/openapi/v1.json` is the contract it generates from |
 | `docker-compose.yml` | Runs the production images locally, with `.env.example` |
 | `deploy/dokploy/` | Dokploy compose stacks, env contract and deploy script |
 | `docs/adr/` | Architecture decision records |

@@ -521,3 +521,8 @@ clients/**/.env.local
 
 # Playwright
 playwright-report/
+
+# `docs/agents/` is tracked on purpose: AGENTS.md and `.agents/skills/` cite it.
+# Some agent tooling ships a global ignore for that path, which is why this negation
+# exists — a repository .gitignore wins over core.excludesFile.
+!docs/agents/
