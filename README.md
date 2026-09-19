@@ -101,9 +101,26 @@ Separately: the initial migrations were regenerated while this template was buil
 migrated before that is incompatible and needs a fresh volume —
 `docker volume rm boilerplate-postgres-data` (destructive; local development data).
 
-The MinIO password and the seeded root admin password are Aspire parameters, generated on first run
-and persisted to the AppHost's user-secrets; read the current values from the Aspire dashboard. The
-migrator seeds only the root tenant and its admin user — there is no demo data.
+The MinIO password, the seeded root admin password and the demo password are Aspire parameters,
+generated on first run and persisted to the AppHost's user-secrets; read the current values from the
+Aspire dashboard (Resources → Parameters).
+
+### Demo accounts
+
+The AppHost runs the migrator as `apply --seed --demo`, so a fresh stack comes up with two demo
+tenants to sign in to besides `root`:
+
+| Tenant | Accounts |
+|---|---|
+| `acme` (Acme Corp) | `admin@acme.com` (Admin), `manager@acme.com` (Manager), `support@acme.com` (Support), `alice@acme.com`, `bob@acme.com` (Basic) |
+| `globex` (Globex) | `admin@globex.com` (Admin), `dave@globex.com` (Basic) |
+
+All of them share one password: the `seed-demo-password` parameter in the Aspire dashboard. The root
+operator `admin@root.com` is **not** part of the demo set — it keeps `seed-admin-password`.
+
+Demo seeding is opt-in and refused outright in Production. Drop `--demo` from the migrator's args in
+`AppHost.cs` to stop seeding it; see [`docs/new-project-guide.md`](docs/new-project-guide.md) for
+what to do with the seeder when you start a real product.
 
 ## Run the container images locally
 
@@ -117,9 +134,12 @@ docker compose down -v
 This builds and runs the same `api`, `migrator` and console images a deployment uses, against
 PostgreSQL, Valkey, MinIO and a Mailpit mail catcher. The containers run as **Production**, so the
 same fail-fast guards apply as on a server: no placeholder secrets, no `AllowedHosts: *`. That is
-why the four secrets have no default in `docker-compose.yml` and `scripts/local-env.sh` generates
-them instead. Every other setting has a local default — see [`.env.example`](.env.example) for the
-full list. Real deployments configure these images through Dokploy environment variables (ADR-0005)
+why the secrets have no default in `docker-compose.yml` and `scripts/local-env.sh` generates them
+instead — including `SEED_DEMO_PASSWORD`, the one password the demo accounts above share. The
+`migrator` service is the single exception to Production here: it runs as Development, because demo
+seeding is refused in a Production host. Every other setting has a local default — see
+[`.env.example`](.env.example) for the full list. Real deployments configure these images through
+Dokploy environment variables (ADR-0005)
 — see [`docs/deploy-dokploy.md`](docs/deploy-dokploy.md), which takes a blank server to a healthy
 HTTPS deployment.
 

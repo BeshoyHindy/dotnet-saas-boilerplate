@@ -133,6 +133,14 @@ The one-shot host that applies migrations and seeds, run to completion before th
 never migrates.
 _Avoid_: migration runner, init container, bootstrapper.
 
+**Demo account**:
+One of the accounts the Migrator creates under `--demo`, in the `acme` and `globex` demo tenants, so
+a fresh stack can be signed into. They all share one configured password, they exist only outside
+Production, and they are the first thing a real product deletes. The root tenant's operator is not
+one of them.
+_Avoid_: test user, sample data, seed user (seeding also creates the root tenant and every tenant
+admin, which are not demo accounts), fixture.
+
 **Stack**:
 One deployable compose unit. There are two: the data-services stack (database, cache, object storage)
 and the app stack (migrator, API, console). Staging and production run the same two stacks with

@@ -14,6 +14,7 @@ using Boilerplate.Modules.Multitenancy.Contracts.v1.GetTenantStatus;
 using Boilerplate.Modules.Multitenancy.Data;
 using Boilerplate.Modules.Multitenancy.Features.v1.GetTenantStatus;
 using Boilerplate.DbMigrator;
+using Boilerplate.DbMigrator.DemoSeed;
 using Finbuckle.MultiTenant.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -56,6 +57,23 @@ if (string.IsNullOrWhiteSpace(builder.Configuration["DatabaseOptions:ConnectionS
         + "Set DatabaseOptions__ConnectionString to an elevated-DDL connection string before invoking the migrator.")
         .ConfigureAwait(false);
     return 1;
+}
+
+// Demo seeding is refused outright in Production and needs a password; ask both questions here,
+// before a single migration runs, so a misconfigured --demo costs nothing but an exit code.
+// The seeder asks them again (and checks the password against the policy) once the host is up.
+if (cli.Demo)
+{
+    try
+    {
+        DemoSeedGuard.EnsureEnvironmentAllowsDemoSeeding(builder.Environment);
+        _ = DemoSeedGuard.RequireConfiguredPassword(builder.Configuration);
+    }
+    catch (InvalidOperationException ex)
+    {
+        await Console.Error.WriteLineAsync($"[migrator] FAILED: {ex.Message}").ConfigureAwait(false);
+        return 1;
+    }
 }
 
 // Mirror the API's mediator registration so module handlers wire correctly —
@@ -248,6 +266,17 @@ try
                 await tenantService.SeedTenantAsync(tenant, CancellationToken.None).ConfigureAwait(false);
             }
         }
+    }
+
+    // ── Step 3 — (optional) demo accounts ────────────────────────────────
+    // Development affordance only: creates the acme/globex tenants and the people inside them, so
+    // a fresh stack has something to sign in as. Runs last, after every existing tenant is at head.
+    if (cli.Demo && cli.Command != "list-pending")
+    {
+        await Console.Out.WriteLineAsync("[migrator] seeding demo accounts…").ConfigureAwait(false);
+        var demoSeeder = new DemoSeeder(host.Services, host.Services.GetRequiredService<ILogger<DemoSeeder>>());
+        await demoSeeder.RunAsync(CancellationToken.None).ConfigureAwait(false);
+        await Console.Out.WriteLineAsync("[migrator] demo accounts ready").ConfigureAwait(false);
     }
 
     await Console.Out.WriteLineAsync("[migrator] finished successfully.").ConfigureAwait(false);

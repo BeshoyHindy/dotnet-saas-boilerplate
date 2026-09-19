@@ -111,6 +111,13 @@ exists "src/$NAME.slnx"
 exists "src/Host/$NAME.Api"
 exists "docker-compose.yml"
 exists "scripts/local-env.sh"
+# The demo accounts travel with the scaffold — a starter nobody can sign in to cannot be
+# evaluated — and the seeder is a renamed project, so this also proves sourceName reached it.
+exists "src/Host/$NAME.DbMigrator/DemoSeed/DemoSeeder.cs"
+grep -q -- '--demo' "$OUT/docker-compose.yml" \
+  || fail "docker-compose no longer seeds the demo accounts"
+grep -q 'SEED_DEMO_PASSWORD' "$OUT/scripts/local-env.sh" \
+  || fail "local-env.sh no longer generates the demo password"
 exists ".github/workflows/backend.yml"
 # The sandcastle pipeline has to be able to work a fresh scaffold, so the agent
 # and contributor conventions travel with it.

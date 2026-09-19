@@ -157,6 +157,8 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
                 ["RateLimitingOptions:Enabled"] = "false",
                 ["PasswordPolicy:EnforcePasswordExpiry"] = "false",
                 ["Seed:DefaultAdminPassword"] = TestConstants.DefaultPassword,
+                // Read by the migrator's demo seeder (DemoSeedTests drives it against this host).
+                ["Seed:DemoPassword"] = TestConstants.DemoPassword,
                 ["SecurityHeadersOptions:Enabled"] = "false",
                 ["Storage:Provider"] = "s3",
                 ["Storage:S3:Bucket"] = MinioBucket,
