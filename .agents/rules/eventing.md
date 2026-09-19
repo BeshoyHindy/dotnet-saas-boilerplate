@@ -7,6 +7,8 @@ Read before publishing/handling cross-module events. `src/BuildingBlocks/Eventin
 - **Domain events** (in-process, pre-commit) — inherit `DomainEvent` (record: `EventId`, `OccurredOnUtc`, `CorrelationId`, `TenantId`). Raised on aggregates (`IHasDomainEvents`).
 - **Integration events** (cross-module, async) — implement `IIntegrationEvent` (`Id`, `OccurredOnUtc`, `TenantId`, `CorrelationId`, `Source`). Handlers implement `IIntegrationEventHandler<T>` (single `HandleAsync(T, ct)`), are `sealed`, live in `Events/` or `IntegrationEventHandlers/`.
 
+Every integration event is published under a tenant (ADR-0002). An event published with a blank `TenantId` **throws on dispatch** unless its type implements `IGlobalIntegrationEvent` — the event-side `[SystemJob]`. A null `TenantId` used to mean both "platform-wide" and "somebody forgot", and nothing downstream could tell the two apart; declare the first, and the second stays a bug that fails loudly. A global handler that needs tenant data enters each tenant through `ITenantScope`.
+
 ## The Outbox is the only way to publish
 
 **Do not call `IEventBus` directly from a handler.** Publish via the outbox so the event commits with the business write and survives a crash:
@@ -68,7 +70,7 @@ Bus = `InMemoryEventBus`, always. ADR-0003 dropped the RabbitMQ provider (and `E
 ## Gotchas
 
 - **Renaming/moving an integration event type breaks deserialization** — the outbox stores the assembly-qualified type name; `Type.GetType()` returns null → the message dead-letters. Keep event type names/namespaces stable, or migrate dead rows.
-- **Background handlers carry no HTTP/tenant context.** An open-generic or background handler that reads a tenant-filtered DbContext must restore Finbuckle context first via `IMultiTenantContextSetter` (see `FinbuckleEventTenantScope`, `modules/multitenancy.md`).
+- **Handlers never restore the tenant themselves.** `IEventTenantScope.DispatchAsync` does it: it loads the event's tenant as a full record from the store, installs it, and hands the bus the DI scope the handlers are resolved from — so a handler's DbContext is built under the right tenant, with that tenant's connection string. Writing `IMultiTenantContextSetter` in a handler is a build failure (architecture test).
 - In-memory bus runs handlers **synchronously in the publisher's scope** — keep handler work minimal; exceptions surface to the originating request (relevant for Notifications consuming other modules' events). Via the outbox that scope is the dispatcher's, not the request's.
 - Set `UseHostedServiceDispatcher=false` to drive the outbox via Hangfire instead of the hosted service.
-- A background publisher must set the tenant context **before** `AddAsync` — otherwise, with per-tenant databases, the row lands in the wrong one (see `TenantExpiryScanJob`).
+- A background publisher must publish **inside** `ITenantScope.RunAsync`, resolving `IOutboxWriter` from that scope — otherwise, with per-tenant databases, the row lands in the wrong one and that tenant's dispatcher never sees it (see `TenantExpiryScanJob`).
