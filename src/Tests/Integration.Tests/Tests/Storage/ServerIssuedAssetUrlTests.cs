@@ -195,6 +195,34 @@ public sealed class ServerIssuedAssetUrlTests : IAsyncLifetime
         (await FetchAnonymouslyAsync(logo)).ShouldNotBe(HttpStatusCode.OK);
     }
 
+    /// <summary>
+    /// The bytes now ride on the theme save, so the extension check has to happen in the validator.
+    /// It used to happen inside <c>IStorageService.UploadAsync</c>, which throws
+    /// <c>InvalidOperationException</c> — a 500 for a caller's mistake, after the request had already
+    /// been let through. The save is rejected whole: the column keeps the logo it had and that
+    /// object is still fetchable.
+    /// </summary>
+    [Fact]
+    public async Task ARejectedBrandAsset_Should_Answer400_AndLeaveTheStoredLogoAlone()
+    {
+        using var adminClient = await AdminClientAsync();
+        var logo = await UploadBrandAssetAsync(adminClient, "logo", "keeper.png");
+
+        using var response = await adminClient.PutAsJsonAsync(ThemePath, new
+        {
+            brandAssets = new
+            {
+                logo = new { fileName = "payload.svg", contentType = "image/svg+xml", data = PngBytes },
+            },
+        });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest, await response.Content.ReadAsStringAsync());
+        (await response.Content.ReadAsStringAsync()).ShouldContain(".png", Case.Insensitive, "the ProblemDetails names the allow-list");
+
+        (await BrandAssetUrlAsync(adminClient, "logoUrl")).ShouldBe(logo, "a rejected save writes nothing");
+        (await FetchAnonymouslyAsync(logo)).ShouldBe(HttpStatusCode.OK, "and deletes nothing");
+    }
+
     #endregion
 
     #region Helpers
