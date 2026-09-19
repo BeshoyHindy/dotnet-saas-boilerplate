@@ -19,15 +19,7 @@ public class CircularReferenceTests
     // sorted and joined with " <-> " (the canonical form the detector reports), so an entry can never
     // cover a cycle it was not written for. These are tracked defects, not sanctioned design: the test
     // fails when an entry stops being a real cycle, so a fix cannot leave a stale exemption behind.
-    private static readonly string[] KnownModuleCycles = [
-        // Multitenancy -> Billing.Contracts and Billing -> Multitenancy.Contracts.
-        // Tracked by issue #5 "Remove Billing, Quota and Webhooks and break the Multitenancy-Billing cycle".
-        "Billing <-> Multitenancy",
-
-        // Identity -> Auditing.Contracts and Auditing -> Identity.Contracts.
-        // Tracked by issue #33 "Decide the fate of the Auditing-Identity module cycle".
-        "Auditing <-> Identity"
-    ];
+    private static readonly string[] KnownModuleCycles = [];
 
     [Fact]
     public void Solution_Should_Not_Have_Circular_Project_References()

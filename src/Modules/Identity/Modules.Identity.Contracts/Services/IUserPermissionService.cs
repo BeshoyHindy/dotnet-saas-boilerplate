@@ -1,19 +1,16 @@
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+
 namespace Boilerplate.Modules.Identity.Contracts.Services;
 
 /// <summary>
 /// Service for user permission operations.
 /// </summary>
-public interface IUserPermissionService
+public interface IUserPermissionService : IPermissionChecker
 {
     /// <summary>
     /// Gets all permissions for a user.
     /// </summary>
     Task<List<string>?> GetPermissionsAsync(string userId, CancellationToken cancellationToken);
-
-    /// <summary>
-    /// Checks if a user has a specific permission.
-    /// </summary>
-    Task<bool> HasPermissionAsync(string userId, string permission, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Invalidates the permission cache for a user.

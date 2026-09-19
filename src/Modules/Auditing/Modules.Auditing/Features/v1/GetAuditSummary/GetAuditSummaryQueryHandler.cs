@@ -1,11 +1,11 @@
 using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
 using Boilerplate.Modules.Auditing.Contracts;
 using Boilerplate.Modules.Auditing.Contracts.Authorization;
 using Boilerplate.Modules.Auditing.Contracts.Dtos;
 using Boilerplate.Modules.Auditing.Contracts.v1.GetAuditSummary;
 using Boilerplate.Modules.Auditing.Persistence;
-using Boilerplate.Modules.Identity.Contracts.Services;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,13 +18,13 @@ public sealed class GetAuditSummaryQueryHandler : IQueryHandler<GetAuditSummaryQ
 
     private readonly AuditDbContext _dbContext;
     private readonly ICurrentUser _currentUser;
-    private readonly IUserPermissionService _permissions;
+    private readonly IPermissionChecker _permissions;
     private readonly TimeProvider _timeProvider;
 
     public GetAuditSummaryQueryHandler(
         AuditDbContext dbContext,
         ICurrentUser currentUser,
-        IUserPermissionService permissions,
+        IPermissionChecker permissions,
         TimeProvider timeProvider)
     {
         _dbContext = dbContext;

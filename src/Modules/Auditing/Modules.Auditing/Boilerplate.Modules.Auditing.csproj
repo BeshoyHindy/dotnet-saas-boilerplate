@@ -10,7 +10,6 @@
 	  <ProjectReference Include="..\..\..\BuildingBlocks\Persistence\Boilerplate.BuildingBlocks.Persistence.csproj" />
 	  <ProjectReference Include="..\..\..\BuildingBlocks\Web\Boilerplate.BuildingBlocks.Web.csproj" />
 	  <ProjectReference Include="..\Modules.Auditing.Contracts\Boilerplate.Modules.Auditing.Contracts.csproj" />
-	  <ProjectReference Include="..\..\Identity\Modules.Identity.Contracts\Boilerplate.Modules.Identity.Contracts.csproj" />
 	</ItemGroup>
 
 </Project>
