@@ -48,10 +48,7 @@ public static class Extensions
                 o.UseNpgsqlConnection(dbOptions.ConnectionString);
             });
 
-            config.UseActivator(new AppJobActivator(provider.GetRequiredService<IServiceScopeFactory>()));
-            config.UseFilter(new AppJobFilter(provider));
-            config.UseFilter(new LogJobFilter());
-            config.UseFilter(new HangfireTelemetryFilter());
+            config.UseHeroJobPipeline(provider);
         });
 
         // Deferred stale lock cleanup — runs after app starts accepting requests
@@ -62,6 +59,26 @@ public static class Extensions
         return services;
     }
 
+
+    /// <summary>
+    /// Activator + filters, in one place: the tenant/user stamping on enqueue
+    /// (<see cref="AppJobFilter"/>) and the tenant scope on execution (<see cref="AppJobActivator"/>)
+    /// are what make ADR-0002 hold for background work. Exposed so a host that swaps Hangfire's
+    /// storage — the integration-test host runs it in memory — reconfigures storage <i>only</i>,
+    /// instead of quietly losing the pipeline and testing a job runtime nobody ships.
+    /// </summary>
+    public static IGlobalConfiguration UseHeroJobPipeline(this IGlobalConfiguration config, IServiceProvider provider)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        ArgumentNullException.ThrowIfNull(provider);
+
+        config.UseActivator(new AppJobActivator(provider));
+        config.UseFilter(new AppJobFilter(provider));
+        config.UseFilter(new LogJobFilter());
+        config.UseFilter(new HangfireTelemetryFilter());
+
+        return config;
+    }
 
     /// <summary>
     /// Mounts the Hangfire dashboard as a routed endpoint gated by

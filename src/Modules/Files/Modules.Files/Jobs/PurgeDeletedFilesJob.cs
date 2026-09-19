@@ -1,3 +1,4 @@
+using Boilerplate.BuildingBlocks.Jobs;
 using Boilerplate.BuildingBlocks.Storage.Services;
 using Boilerplate.Modules.Files.Data;
 using Hangfire;
@@ -11,6 +12,13 @@ namespace Boilerplate.Modules.Files.Jobs;
 /// Daily purge of soft-deleted FileAsset rows past the retention window. Hard-deletes the row and
 /// removes the bytes from storage.
 /// </summary>
+/// <remarks>
+/// <see cref="SystemJobAttribute"/>: a recurring maintenance sweep, triggered by the scheduler with
+/// no tenant in scope. It works across tenants by ignoring the query filters, so it sees every row
+/// in the database it is pointed at. It does <b>not</b> reach tenants that live in a dedicated
+/// database — see the note in <c>.agents/rules/jobs.md</c>.
+/// </remarks>
+[SystemJob]
 public sealed class PurgeDeletedFilesJob(
     FilesDbContext db,
     IStorageService storage,

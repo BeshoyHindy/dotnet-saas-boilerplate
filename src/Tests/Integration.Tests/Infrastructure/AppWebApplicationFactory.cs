@@ -3,6 +3,7 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
+using Boilerplate.BuildingBlocks.Jobs;
 using Boilerplate.BuildingBlocks.Jobs.Services;
 using Boilerplate.BuildingBlocks.Mailing;
 using Boilerplate.BuildingBlocks.Mailing.Services;
@@ -164,7 +165,15 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
                 services.Remove(service);
             }
 
-            services.AddHangfire(config => config.UseInMemoryStorage());
+            // Storage is swapped for the in-memory one; the ACTIVATOR AND FILTERS STAY THE PRODUCTION
+            // ONES. AddHangfire registers IGlobalConfiguration with AddSingleton, so this later call
+            // wins outright — without re-applying the pipeline the suite would exercise a job runtime
+            // with no tenant stamping and no tenant scope, i.e. not the one that ships.
+            services.AddHangfire((provider, config) =>
+            {
+                config.UseInMemoryStorage();
+                config.UseHeroJobPipeline(provider);
+            });
             services.AddHangfireServer(options =>
             {
                 options.SchedulePollingInterval = TimeSpan.FromSeconds(1);

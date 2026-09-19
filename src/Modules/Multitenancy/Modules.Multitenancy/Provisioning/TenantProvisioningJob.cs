@@ -1,7 +1,6 @@
-using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
 using Boilerplate.BuildingBlocks.Core.Exceptions;
-using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Jobs;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.Modules.Multitenancy.Contracts;
 using Boilerplate.Modules.Multitenancy.Services;
@@ -9,24 +8,29 @@ using Microsoft.Extensions.Logging;
 
 namespace Boilerplate.Modules.Multitenancy.Provisioning;
 
+/// <summary>
+/// Provisioning is named work <i>about</i> a tenant, not work <i>as</i> one: a root operator
+/// enqueues it, the target tenant is an argument, and the bookkeeping it writes lives in the
+/// untenanted tenant catalog. Hence <see cref="SystemJobAttribute"/>. The two steps that really
+/// must run as the tenant — migrate and seed — enter it through <c>ITenantScope</c> inside
+/// <see cref="ITenantService"/>.
+/// </summary>
+[SystemJob]
 public sealed class TenantProvisioningJob
 {
     private readonly ITenantProvisioningService _provisioningService;
     private readonly IMultiTenantStore<AppTenantInfo> _tenantStore;
-    private readonly IMultiTenantContextSetter _tenantContextSetter;
     private readonly ITenantService _tenantService;
     private readonly ILogger<TenantProvisioningJob> _logger;
 
     public TenantProvisioningJob(
         ITenantProvisioningService provisioningService,
         IMultiTenantStore<AppTenantInfo> tenantStore,
-        IMultiTenantContextSetter tenantContextSetter,
         ITenantService tenantService,
         ILogger<TenantProvisioningJob> logger)
     {
         _provisioningService = provisioningService;
         _tenantStore = tenantStore;
-        _tenantContextSetter = tenantContextSetter;
         _tenantService = tenantService;
         _logger = logger;
     }
@@ -40,8 +44,6 @@ public sealed class TenantProvisioningJob
         try
         {
             var runDatabase = await _provisioningService.MarkRunningAsync(tenantId, correlationId, currentStep, cancellationToken).ConfigureAwait(false);
-
-            _tenantContextSetter.MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
 
             if (runDatabase)
             {

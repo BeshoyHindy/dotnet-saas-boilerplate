@@ -1,3 +1,4 @@
+using Boilerplate.BuildingBlocks.Jobs;
 using Boilerplate.Modules.Auditing.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -11,6 +12,10 @@ namespace Boilerplate.Modules.Auditing.Persistence;
 /// the table — each event-type sweep loops until fewer than batch-size
 /// rows are deleted.
 /// </summary>
+/// <remarks>
+/// <see cref="SystemJobAttribute"/>: a recurring maintenance sweep scheduled with no tenant in scope.
+/// </remarks>
+[SystemJob]
 public sealed class AuditRetentionJob
 {
     private readonly AuditDbContext _db;

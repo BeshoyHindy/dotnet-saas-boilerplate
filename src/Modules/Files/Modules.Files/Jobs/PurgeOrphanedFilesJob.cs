@@ -1,3 +1,4 @@
+using Boilerplate.BuildingBlocks.Jobs;
 using Boilerplate.BuildingBlocks.Storage.Services;
 using Boilerplate.Modules.Files.Contracts.v1.DTOs;
 using Boilerplate.Modules.Files.Data;
@@ -12,6 +13,11 @@ namespace Boilerplate.Modules.Files.Jobs;
 /// Hourly purge of FileAsset rows stuck in PendingUpload past their UploadDeadline. Best-effort
 /// removal of any bytes that did make it to storage.
 /// </summary>
+/// <remarks>
+/// <see cref="SystemJobAttribute"/>: a recurring maintenance sweep, triggered by the scheduler with
+/// no tenant in scope, working across tenants via <c>IgnoreQueryFilters</c>.
+/// </remarks>
+[SystemJob]
 public sealed class PurgeOrphanedFilesJob(
     FilesDbContext db,
     IStorageService storage,

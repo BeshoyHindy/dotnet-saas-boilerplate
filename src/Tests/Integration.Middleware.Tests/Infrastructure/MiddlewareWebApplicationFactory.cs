@@ -3,6 +3,7 @@ using Amazon.S3;
 using Amazon.S3.Model;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
+using Boilerplate.BuildingBlocks.Jobs;
 using Boilerplate.BuildingBlocks.Jobs.Services;
 using Boilerplate.BuildingBlocks.Mailing;
 using Boilerplate.BuildingBlocks.Mailing.Services;
@@ -214,7 +215,12 @@ public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Prog
                 services.Remove(service);
             }
 
-            services.AddHangfire(config => config.UseInMemoryStorage());
+            // In-memory storage, production activator + filters (see AppWebApplicationFactory).
+            services.AddHangfire((provider, config) =>
+            {
+                config.UseInMemoryStorage();
+                config.UseHeroJobPipeline(provider);
+            });
             services.AddHangfireServer(options =>
             {
                 options.SchedulePollingInterval = TimeSpan.FromSeconds(1);
