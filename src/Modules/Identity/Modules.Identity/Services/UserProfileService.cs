@@ -94,7 +94,13 @@ internal sealed class UserProfileService(
         {
             var imageString = await storageService.UploadAsync<AppUser>(image, FileType.Image, cancellationToken);
             user.ImageUrl = new Uri(imageString, UriKind.RelativeOrAbsolute);
-            if (deleteCurrentImage && imageUri != null)
+
+            // Unconditionally, not `if (deleteCurrentImage)`: the validator rejects a request that
+            // sets both, so that condition was never true and every avatar change orphaned its
+            // predecessor's bytes forever. Replacing the column value is what makes the old object
+            // unreachable, so dropping it here is the whole of its lifecycle — the same thing
+            // TenantThemeService has always done for a brand asset.
+            if (imageUri != null)
             {
                 await storageService.RemoveIfOwnedAsync(imageUri.ToString(), cancellationToken);
             }
