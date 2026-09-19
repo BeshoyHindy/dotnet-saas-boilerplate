@@ -1,22 +1,17 @@
-﻿using Boilerplate.Modules.Identity.Contracts.DTOs;
-using System.Security.Claims;
+﻿using System.Security.Claims;
 
 namespace Boilerplate.Modules.Identity.Contracts.Services;
 
+/// <summary>
+/// Mints access tokens only. Refresh tokens belong to <see cref="ISessionService"/>: they are rows
+/// in the tenant-isolated session store, not signed artefacts, and minting one without a session
+/// would produce a credential nothing can revoke (ADR-0002).
+/// </summary>
 public interface ITokenService
 {
     /// <summary>
-    /// Issues a new access and refresh token for the specified subject.
-    /// </summary>
-    Task<TokenResponse> IssueAsync(
-        string subject,
-        IEnumerable<Claim> claims,
-        CancellationToken ct = default);
-
-    /// <summary>
-    /// Issues a short-lived access token without a refresh token. Used by flows (e.g. impersonation)
-    /// where refresh is deliberately disallowed. Pass <paramref name="lifetime"/> to override the
-    /// default <c>JwtOptions.AccessTokenMinutes</c> (impersonation uses this to let the operator
+    /// Issues an access token. Pass <paramref name="lifetime"/> to override the default
+    /// <c>JwtOptions.AccessTokenMinutes</c> (impersonation uses this to let the operator
     /// pick 10/15/30 min sessions).
     /// </summary>
     Task<(string AccessToken, DateTime ExpiresAtUtc)> IssueAccessOnlyAsync(

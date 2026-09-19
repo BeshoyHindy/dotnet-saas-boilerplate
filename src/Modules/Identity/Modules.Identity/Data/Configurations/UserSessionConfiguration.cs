@@ -25,6 +25,15 @@ public class UserSessionConfiguration : IEntityTypeConfiguration<UserSession>
             .HasMaxLength(256);
 
         builder
+            .Property(s => s.PreviousTokenHash)
+            .HasMaxLength(256);
+
+        builder
+            .Property(s => s.SecurityStamp)
+            .IsRequired()
+            .HasMaxLength(256);
+
+        builder
             .Property(s => s.IpAddress)
             .IsRequired()
             .HasMaxLength(45);
@@ -73,7 +82,11 @@ public class UserSessionConfiguration : IEntityTypeConfiguration<UserSession>
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasIndex(s => s.UserId);
-        builder.HasIndex(s => s.RefreshTokenHash);
+        // Unique: the hash is the identity of a live refresh token, so two rows sharing one would
+        // mean the compare-and-set could rotate the wrong session.
+        builder.HasIndex(s => s.RefreshTokenHash).IsUnique();
+        // The reuse-detection lookup rides this one.
+        builder.HasIndex(s => s.PreviousTokenHash);
         builder.HasIndex(s => s.ExpiresAt);
         builder.HasIndex(s => new { s.UserId, s.IsRevoked });
     }

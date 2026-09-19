@@ -272,7 +272,7 @@ public sealed class ImpersonationTests : IAsyncLifetime
     #region End
 
     [Fact]
-    public async Task End_Should_IssueActorTokens_When_SessionIsImpersonation()
+    public async Task End_Should_IssueActorAccessToken_When_SessionIsImpersonation()
     {
         // Arrange
         using var rootClient = await _auth.CreateRootAdminClientAsync();
@@ -283,13 +283,15 @@ public sealed class ImpersonationTests : IAsyncLifetime
         // Act
         var response = await endClient.PostAsync($"{ImpersonationBasePath}/end", content: null);
 
-        // Assert — returns a fresh access+refresh pair for the original actor.
+        // Assert — returns a fresh access token for the original actor. Access-only by design: a
+        // refresh token is a session row in the actor's tenant, which this call — running in the
+        // impersonated tenant's context — must not write (ADR-0002).
         // On failure the problem-detail body surfaces the underlying server exception in the test output.
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<TokenResult>(Json);
         body.ShouldNotBeNull();
         body.AccessToken.ShouldNotBeNullOrWhiteSpace();
-        body.RefreshToken.ShouldNotBeNullOrWhiteSpace();
+        body.RefreshToken.ShouldBeNull();
 
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(body.AccessToken);
         jwt.Subject.ShouldBe(_rootAdminUserId);

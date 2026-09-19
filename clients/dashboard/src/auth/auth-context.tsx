@@ -287,9 +287,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // tokens to restore the original dashboard session, so await the call.
     try {
       const fresh = await endImpersonation();
-      // Defence-in-depth: the End endpoint mints fresh tokens for the *original
-      // operator*. If that operator is a root SuperAdmin (e.g. a cross-app
-      // handoff that nonetheless left a stash), installing them would drop a
+      // Defence-in-depth: the End endpoint mints a fresh access token for the
+      // *original operator*. If that operator is a root SuperAdmin (e.g. a cross-app
+      // handoff that nonetheless left a stash), installing it would drop a
       // root account into the tenant dashboard — exactly what `login` forbids.
       // Sign out and route to /login instead of restoring.
       const claims = decodeJwt(fresh.accessToken);
@@ -297,7 +297,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout();
         return { signedOut: true };
       }
-      tokenStore.endImpersonationWithFreshTokens(fresh.accessToken, fresh.refreshToken);
+      tokenStore.endImpersonationWithFreshAccessToken(fresh.accessToken);
       return { signedOut: false };
     } catch {
       // End endpoint failed (server unreachable / token invalid). Fall

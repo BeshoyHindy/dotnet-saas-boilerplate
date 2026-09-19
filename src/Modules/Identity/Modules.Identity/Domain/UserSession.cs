@@ -3,6 +3,13 @@ using Boilerplate.Modules.Identity.Domain.Events;
 
 namespace Boilerplate.Modules.Identity.Domain;
 
+/// <summary>
+/// One row per signed-in device, tenant-isolated (ADR-0002). The row *is* the refresh token:
+/// the token itself is never stored, only <see cref="RefreshTokenHash"/>. Rotation moves the
+/// spent hash to <see cref="PreviousTokenHash"/> so a replay is recognisable and can burn the
+/// whole session, and <see cref="SecurityStamp"/> pins the session to the credential state it
+/// was minted against — a password change rotates the stamp and kills every session with it.
+/// </summary>
 public class UserSession : IHasDomainEvents
 {
     private readonly List<IDomainEvent> _domainEvents = [];
@@ -10,6 +17,17 @@ public class UserSession : IHasDomainEvents
     public Guid Id { get; private set; }
     public string UserId { get; private set; } = default!;
     public string RefreshTokenHash { get; private set; } = default!;
+
+    /// <summary>
+    /// The hash this session rotated away from. A hit here means the token was replayed.
+    /// Only ever written by the rotation <c>ExecuteUpdate</c>, hence <c>init</c> (EF materialization)
+    /// rather than a domain mutator that nothing would call.
+    /// </summary>
+    public string? PreviousTokenHash { get; init; }
+
+    /// <summary>The user's ASP.NET Identity security stamp at the moment this session was created.</summary>
+    public string SecurityStamp { get; private set; } = default!;
+
     public string IpAddress { get; private set; } = default!;
     public string UserAgent { get; private set; } = default!;
     public string? DeviceType { get; private set; }
@@ -38,8 +56,10 @@ public class UserSession : IHasDomainEvents
     public static UserSession Create(
         string userId,
         string refreshTokenHash,
+        string securityStamp,
         string ipAddress,
         string userAgent,
+        DateTime createdAt,
         DateTime expiresAt,
         string? deviceType = null,
         string? browser = null,
@@ -52,6 +72,7 @@ public class UserSession : IHasDomainEvents
             Id = Guid.NewGuid(),
             UserId = userId,
             RefreshTokenHash = refreshTokenHash,
+            SecurityStamp = securityStamp,
             IpAddress = ipAddress,
             UserAgent = userAgent,
             DeviceType = deviceType,
@@ -59,29 +80,17 @@ public class UserSession : IHasDomainEvents
             BrowserVersion = browserVersion,
             OperatingSystem = operatingSystem,
             OsVersion = osVersion,
-            CreatedAt = TimeProvider.System.GetUtcNow().UtcDateTime,
-            LastActivityAt = TimeProvider.System.GetUtcNow().UtcDateTime,
+            CreatedAt = createdAt,
+            LastActivityAt = createdAt,
             ExpiresAt = expiresAt
         };
     }
 
-    public void UpdateActivity()
-    {
-        LastActivityAt = TimeProvider.System.GetUtcNow().UtcDateTime;
-    }
-
-    public void UpdateRefreshToken(string refreshTokenHash, DateTime expiresAt)
-    {
-        RefreshTokenHash = refreshTokenHash;
-        ExpiresAt = expiresAt;
-        LastActivityAt = TimeProvider.System.GetUtcNow().UtcDateTime;
-    }
-
-    public void Revoke(string? revokedBy = null, string? reason = null, string? tenantId = null)
+    public void Revoke(DateTime revokedAt, string? revokedBy = null, string? reason = null, string? tenantId = null)
     {
         if (IsRevoked) return;
         IsRevoked = true;
-        RevokedAt = TimeProvider.System.GetUtcNow().UtcDateTime;
+        RevokedAt = revokedAt;
         RevokedBy = revokedBy;
         RevokedReason = reason;
 

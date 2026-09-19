@@ -2,14 +2,31 @@ using Boilerplate.Modules.Identity.Contracts.DTOs;
 
 namespace Boilerplate.Modules.Identity.Contracts.Services;
 
+/// <summary>
+/// The one session store (ADR-0002): a tenant-isolated row per signed-in device that *is* the
+/// refresh token. Minting and rotation live here rather than in the token service because both
+/// are database operations that must stay inside the tenant's query filter.
+/// </summary>
 public interface ISessionService
 {
-    Task<UserSessionDto> CreateSessionAsync(
+    /// <summary>
+    /// Opens a session for a device and mints its first refresh token. Throws when the session
+    /// cannot be written — a login that leaves no session row has no way to refresh and no way to
+    /// be revoked, so it must fail rather than succeed silently.
+    /// </summary>
+    Task<SessionTokenDto> CreateSessionAsync(
         string userId,
-        string refreshTokenHash,
         string ipAddress,
         string userAgent,
-        DateTime expiresAt,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Spends a refresh token and mints its successor in a single compare-and-set, so N concurrent
+    /// callers produce exactly one new token. Presenting a token that was already rotated away
+    /// revokes the session; see <see cref="SessionRotationStatus"/> for the failure modes.
+    /// </summary>
+    Task<SessionRotationDto> RotateRefreshTokenAsync(
+        string refreshToken,
         CancellationToken cancellationToken = default);
 
     Task<List<UserSessionDto>> GetUserSessionsAsync(
@@ -62,24 +79,6 @@ public interface ISessionService
         Guid sessionId,
         string revokedBy,
         string? reason = null,
-        CancellationToken cancellationToken = default);
-
-    Task UpdateSessionActivityAsync(
-        string refreshTokenHash,
-        CancellationToken cancellationToken = default);
-
-    Task UpdateSessionRefreshTokenAsync(
-        string oldRefreshTokenHash,
-        string newRefreshTokenHash,
-        DateTime newExpiresAt,
-        CancellationToken cancellationToken = default);
-
-    Task<bool> ValidateSessionAsync(
-        string refreshTokenHash,
-        CancellationToken cancellationToken = default);
-
-    Task<Guid?> GetSessionIdByRefreshTokenAsync(
-        string refreshTokenHash,
         CancellationToken cancellationToken = default);
 
     Task CleanupExpiredSessionsAsync(

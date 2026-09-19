@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Boilerplate.Migrations.PostgreSQL.Identity
 {
     [DbContext(typeof(IdentityDbContext))]
-    [Migration("20260918204127_InitialIdentity")]
+    [Migration("20260919084834_InitialIdentity")]
     partial class InitialIdentity
     {
         /// <inheritdoc />
@@ -157,12 +157,6 @@ namespace Boilerplate.Migrations.PostgreSQL.Identity
 
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("boolean");
-
-                    b.Property<string>("RefreshToken")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("RefreshTokenExpiryTime")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");
@@ -492,6 +486,10 @@ namespace Boilerplate.Migrations.PostgreSQL.Identity
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<string>("PreviousTokenHash")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
                     b.Property<string>("RefreshTokenHash")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -507,6 +505,11 @@ namespace Boilerplate.Migrations.PostgreSQL.Identity
                     b.Property<string>("RevokedReason")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<string>("SecurityStamp")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
                     b.Property<string>("TenantId")
                         .IsRequired()
@@ -526,9 +529,13 @@ namespace Boilerplate.Migrations.PostgreSQL.Identity
 
                     b.HasIndex("ExpiresAt");
 
-                    b.HasIndex("RefreshTokenHash");
+                    b.HasIndex("PreviousTokenHash");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("RefreshTokenHash", "TenantId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_UserSessions_RefreshTokenHash");
 
                     b.HasIndex("UserId", "IsRevoked");
 

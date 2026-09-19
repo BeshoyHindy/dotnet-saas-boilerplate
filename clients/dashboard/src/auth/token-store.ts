@@ -94,13 +94,22 @@ export const tokenStore = {
   },
 
   /**
-   * Replace the live tokens with a fresh actor pair returned by the End
-   * Impersonation endpoint, and clear the stash. Use this on End success.
+   * Install the fresh actor access token returned by the End Impersonation
+   * endpoint and clear the stash. Use this on End success.
+   *
+   * End is access-only (the server cannot write a session row in the actor's
+   * tenant from the impersonated tenant's context), so the operator's *stashed*
+   * refresh token comes back with them — their own session was never revoked.
    */
-  endImpersonationWithFreshTokens(accessToken: string, refreshToken: string) {
+  endImpersonationWithFreshAccessToken(accessToken: string) {
     const stashTenant = localStorage.getItem(STASH_TENANT_KEY);
+    const stashRefresh = localStorage.getItem(STASH_REFRESH_KEY);
     localStorage.setItem(ACCESS_KEY, accessToken);
-    localStorage.setItem(REFRESH_KEY, refreshToken);
+    if (stashRefresh) {
+      localStorage.setItem(REFRESH_KEY, stashRefresh);
+    } else {
+      localStorage.removeItem(REFRESH_KEY);
+    }
     localStorage.removeItem(PERMS_KEY);
     if (stashTenant) localStorage.setItem(TENANT_KEY, stashTenant);
     localStorage.removeItem(STASH_ACCESS_KEY);

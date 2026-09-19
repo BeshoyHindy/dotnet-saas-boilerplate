@@ -14,7 +14,8 @@ using NSubstitute;
 namespace Identity.Tests.Services;
 
 /// <summary>
-/// Tests for TokenService - issues JWT access tokens and opaque refresh tokens.
+/// Tests for TokenService — it issues JWT access tokens only; refresh tokens are session rows
+/// owned by <c>ISessionService</c> (ADR-0002).
 /// </summary>
 public sealed class TokenServiceTests : IDisposable
 {
@@ -65,73 +66,23 @@ public sealed class TokenServiceTests : IDisposable
     private static JwtSecurityToken ReadToken(string token) =>
         new JwtSecurityTokenHandler().ReadJwtToken(token);
 
-    #region IssueAsync Tests
+    #region IssueAccessOnlyAsync Tests
 
     [Fact]
-    public async Task IssueAsync_Should_ReturnTokenResponseWithAllFields()
+    public async Task IssueAccessOnlyAsync_Should_ProduceTokenWithIssuerAudienceAndClaims()
     {
         // Arrange
         var service = CreateService();
 
         // Act
-        var response = await service.IssueAsync("user-123", SampleClaims());
-
-        // Assert
-        response.ShouldNotBeNull();
-        response.AccessToken.ShouldNotBeNullOrWhiteSpace();
-        response.RefreshToken.ShouldNotBeNullOrWhiteSpace();
-        response.AccessTokenExpiresAt.ShouldBe(FixedNow.UtcDateTime.AddMinutes(30));
-        response.RefreshTokenExpiresAt.ShouldBe(FixedNow.UtcDateTime.AddDays(7));
-    }
-
-    [Fact]
-    public async Task IssueAsync_Should_RespectConfiguredLifetimes()
-    {
-        // Arrange
-        var service = CreateService(accessTokenMinutes: 5, refreshTokenDays: 30);
-
-        // Act
-        var response = await service.IssueAsync("user-123", SampleClaims());
-
-        // Assert
-        response.AccessTokenExpiresAt.ShouldBe(FixedNow.UtcDateTime.AddMinutes(5));
-        response.RefreshTokenExpiresAt.ShouldBe(FixedNow.UtcDateTime.AddDays(30));
-    }
-
-    [Fact]
-    public async Task IssueAsync_Should_ProduceTokenWithIssuerAudienceAndClaims()
-    {
-        // Arrange
-        var service = CreateService();
-
-        // Act
-        var response = await service.IssueAsync("user-123", SampleClaims());
-        var jwt = ReadToken(response.AccessToken);
+        var (accessToken, _) = await service.IssueAccessOnlyAsync("user-123", SampleClaims());
+        var jwt = ReadToken(accessToken);
 
         // Assert
         jwt.Issuer.ShouldBe(Issuer);
         jwt.Audiences.ShouldContain(Audience);
         jwt.Claims.ShouldContain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == "user-123");
         jwt.Claims.ShouldContain(c => c.Type == ClaimTypes.Email && c.Value == "user@example.com");
-    }
-
-    [Fact]
-    public async Task IssueAsync_Should_StampIssuedAtAndNotBefore_When_TokenIsMinted()
-    {
-        // Arrange
-        var service = CreateService();
-
-        // Act
-        var response = await service.IssueAsync("user-123", SampleClaims());
-        var jwt = ReadToken(response.AccessToken);
-
-        // Assert — `iat` dates the token, `nbf` stops it being valid before it was minted.
-        var issuedAt = jwt.Claims.Where(c => c.Type == JwtRegisteredClaimNames.Iat).ToList();
-        issuedAt.Count.ShouldBe(1, "exactly one iat claim must be emitted");
-        issuedAt[0].Value.ShouldBe(EpochTime.GetIntDate(FixedNow.UtcDateTime).ToString(CultureInfo.InvariantCulture));
-
-        jwt.ValidFrom.ShouldBe(FixedNow.UtcDateTime);
-        jwt.ValidTo.ShouldBe(FixedNow.UtcDateTime.AddMinutes(30));
     }
 
     [Fact]
@@ -144,43 +95,17 @@ public sealed class TokenServiceTests : IDisposable
         var (accessToken, _) = await service.IssueAccessOnlyAsync("user-123", SampleClaims(), TimeSpan.FromMinutes(5));
         var jwt = ReadToken(accessToken);
 
-        // Assert
-        jwt.Claims.Count(c => c.Type == JwtRegisteredClaimNames.Iat).ShouldBe(1);
+        // Assert — `iat` dates the token, `nbf` stops it being valid before it was minted.
+        var issuedAt = jwt.Claims.Where(c => c.Type == JwtRegisteredClaimNames.Iat).ToList();
+        issuedAt.Count.ShouldBe(1, "exactly one iat claim must be emitted");
+        issuedAt[0].Value.ShouldBe(EpochTime.GetIntDate(FixedNow.UtcDateTime).ToString(CultureInfo.InvariantCulture));
+
         jwt.ValidFrom.ShouldBe(FixedNow.UtcDateTime);
         jwt.ValidTo.ShouldBe(FixedNow.UtcDateTime.AddMinutes(5));
     }
 
     [Fact]
-    public async Task IssueAsync_Should_PreserveCallerClaims_When_IssuedAtIsAppended()
-    {
-        // Arrange
-        var service = CreateService();
-
-        // Act
-        var response = await service.IssueAsync("user-123", SampleClaims());
-        var jwt = ReadToken(response.AccessToken);
-
-        // Assert
-        jwt.Claims.ShouldContain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == "user-123");
-        jwt.Claims.ShouldContain(c => c.Type == ClaimTypes.Email && c.Value == "user@example.com");
-    }
-
-    [Fact]
-    public async Task IssueAsync_Should_ProduceUniqueRefreshTokens()
-    {
-        // Arrange
-        var service = CreateService();
-
-        // Act
-        var first = await service.IssueAsync("user-123", SampleClaims());
-        var second = await service.IssueAsync("user-123", SampleClaims());
-
-        // Assert - refresh token is a random GUID, so two issues must differ
-        first.RefreshToken.ShouldNotBe(second.RefreshToken);
-    }
-
-    [Fact]
-    public async Task IssueAsync_Should_ProduceTokenSignedWithConfiguredKey()
+    public async Task IssueAccessOnlyAsync_Should_ProduceTokenSignedWithConfiguredKey()
     {
         // Arrange - use the system clock so the issued token is valid against full validation (incl. lifetime)
         var options = Options.Create(new JwtOptions
@@ -194,7 +119,7 @@ public sealed class TokenServiceTests : IDisposable
         var service = new TokenService(options, _logger, _metrics, TimeProvider.System);
 
         // Act
-        var response = await service.IssueAsync("user-123", SampleClaims());
+        var (accessToken, _) = await service.IssueAccessOnlyAsync("user-123", SampleClaims());
 
         // Assert - signature, issuer and audience must validate against the configured signing key
         var handler = new JwtSecurityTokenHandler();
@@ -206,14 +131,10 @@ public sealed class TokenServiceTests : IDisposable
             ClockSkew = TimeSpan.FromMinutes(5)
         };
 
-        var validationResult = await handler.ValidateTokenAsync(response.AccessToken, validationParameters);
+        var validationResult = await handler.ValidateTokenAsync(accessToken, validationParameters);
 
         validationResult.IsValid.ShouldBeTrue();
     }
-
-    #endregion
-
-    #region IssueAccessOnlyAsync Tests
 
     [Fact]
     public async Task IssueAccessOnlyAsync_Should_UseConfiguredLifetime_When_NoOverride()

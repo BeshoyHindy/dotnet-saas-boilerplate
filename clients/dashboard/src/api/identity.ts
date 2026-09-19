@@ -361,10 +361,13 @@ export type ImpersonationResponse = {
   impersonatedTenantId: string;
 };
 
+/**
+ * Access-only: a refresh token is a session row in the *actor's* tenant, and the End call runs
+ * inside the impersonated tenant's context, so the server cannot mint one here (ADR-0002). The
+ * operator's own session was never revoked, so the client keeps its stashed refresh token.
+ */
 export type EndImpersonationResponse = {
   accessToken: string;
-  refreshToken: string;
-  refreshTokenExpiresAt: string;
   accessTokenExpiresAt: string;
 };
 

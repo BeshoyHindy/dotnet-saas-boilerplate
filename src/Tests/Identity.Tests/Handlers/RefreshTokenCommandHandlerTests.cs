@@ -1,4 +1,4 @@
-﻿using AutoFixture;
+using AutoFixture;
 using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.Modules.Auditing.Contracts;
 using Boilerplate.Modules.Identity.Contracts.DTOs;
@@ -16,7 +16,8 @@ using Boilerplate.BuildingBlocks.Core.Exceptions;
 namespace Identity.Tests.Handlers;
 
 /// <summary>
-/// Tests for RefreshTokenCommandHandler - handles token refresh flow.
+/// Tests for RefreshTokenCommandHandler — the rotation in the session store is the authority;
+/// the handler turns its outcome into tokens or a uniform 401.
 /// </summary>
 public sealed class RefreshTokenCommandHandlerTests
 {
@@ -47,16 +48,43 @@ public sealed class RefreshTokenCommandHandlerTests
         _fixture = new Fixture();
     }
 
+    private SessionRotationDto ArrangeRotation(string userId, Guid? sessionId = null, CancellationToken ct = default)
+    {
+        var rotation = new SessionRotationDto(
+            SessionRotationStatus.Rotated,
+            sessionId ?? Guid.NewGuid(),
+            userId,
+            _fixture.Create<string>(),
+            DateTime.UtcNow.AddDays(7));
+
+        _sessionService.RotateRefreshTokenAsync(Arg.Any<string>(), ct == default ? Arg.Any<CancellationToken>() : ct)
+            .Returns(rotation);
+
+        return rotation;
+    }
+
+    private (string AccessToken, DateTime ExpiresAt) ArrangeAccessToken(CancellationToken ct = default)
+    {
+        var issued = (_fixture.Create<string>(), DateTime.UtcNow.AddHours(1));
+        _tokenService.IssueAccessOnlyAsync(
+                Arg.Any<string>(),
+                Arg.Any<IEnumerable<Claim>>(),
+                Arg.Any<TimeSpan?>(),
+                ct == default ? Arg.Any<CancellationToken>() : ct)
+            .Returns(issued);
+        return issued;
+    }
+
     #region Handle - Happy Path Tests
 
     [Fact]
     public async Task Handle_Should_ReturnNewTokens_When_RefreshTokenIsValid()
     {
         // Arrange
-        var oldAccessToken = CreateValidJwtToken("user123", "test@example.com");
-        var command = new RefreshTokenCommand(oldAccessToken, "valid-refresh-token");
+        const string userId = "user123";
+        var oldAccessToken = CreateValidJwtToken(userId, "test@example.com");
+        var command = new RefreshTokenCommand(oldAccessToken, "root.valid-refresh-token");
 
-        var userId = "user123";
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, userId),
@@ -64,98 +92,118 @@ public sealed class RefreshTokenCommandHandlerTests
             new(ClaimTypes.Email, "test@example.com")
         };
 
-        var newToken = new TokenResponse(
-            AccessToken: _fixture.Create<string>(),
-            RefreshToken: _fixture.Create<string>(),
-            RefreshTokenExpiresAt: DateTime.UtcNow.AddDays(7),
-            AccessTokenExpiresAt: DateTime.UtcNow.AddHours(1));
-
         _requestContext.ClientId.Returns("test-client");
 
-        _identityService.ValidateRefreshTokenAsync(command.RefreshToken, Arg.Any<CancellationToken>())
+        var rotation = ArrangeRotation(userId);
+        _identityService.BuildClaimsForRefreshAsync(userId, Arg.Any<CancellationToken>())
             .Returns((userId, claims));
-
-        _sessionService.ValidateSessionAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(true);
-
-        _tokenService.IssueAsync(userId, claims, Arg.Any<CancellationToken>())
-            .Returns(newToken);
+        var issued = ArrangeAccessToken();
 
         // Act
         var result = await _sut.Handle(command, CancellationToken.None);
 
         // Assert
         result.ShouldNotBeNull();
-        result.Token.ShouldBe(newToken.AccessToken);
-        result.RefreshToken.ShouldBe(newToken.RefreshToken);
-        result.RefreshTokenExpiryTime.ShouldBe(newToken.RefreshTokenExpiresAt);
+        result.Token.ShouldBe(issued.AccessToken);
+        result.RefreshToken.ShouldBe(rotation.RefreshToken);
+        result.RefreshTokenExpiryTime.ShouldBe(rotation.RefreshTokenExpiresAt);
+    }
+
+    [Fact]
+    public async Task Handle_Should_KeepTheSessionIdInTheSidClaim_When_TokenIsRotated()
+    {
+        // Arrange
+        var userId = _fixture.Create<string>();
+        var command = new RefreshTokenCommand("access-token", "root.refresh-token");
+        var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, userId) };
+
+        _requestContext.ClientId.Returns("test-client");
+
+        var rotation = ArrangeRotation(userId);
+        _identityService.BuildClaimsForRefreshAsync(userId, Arg.Any<CancellationToken>())
+            .Returns((userId, claims));
+        ArrangeAccessToken();
+
+        // Act
+        await _sut.Handle(command, CancellationToken.None);
+
+        // Assert — rotation replaces the token but never the session, so `sid` is stable.
+        await _tokenService.Received(1).IssueAccessOnlyAsync(
+            userId,
+            Arg.Is<IEnumerable<Claim>>(c => c.Any(x =>
+                x.Type == JwtRegisteredClaimNames.Sid && x.Value == rotation.SessionId.ToString())),
+            null,
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task Handle_Should_CallAllServicesWithCorrectParameters_When_RefreshTokenIsValid()
     {
         // Arrange
-        var command = new RefreshTokenCommand("access-token", "refresh-token");
+        var command = new RefreshTokenCommand("access-token", "root.refresh-token");
         var userId = _fixture.Create<string>();
         var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, userId) };
-        var newToken = _fixture.Create<TokenResponse>();
 
         _requestContext.ClientId.Returns("test-client");
 
-        _identityService.ValidateRefreshTokenAsync(command.RefreshToken, Arg.Any<CancellationToken>())
+        ArrangeRotation(userId);
+        _identityService.BuildClaimsForRefreshAsync(userId, Arg.Any<CancellationToken>())
             .Returns((userId, claims));
-
-        _sessionService.ValidateSessionAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(true);
-
-        _tokenService.IssueAsync(userId, claims, Arg.Any<CancellationToken>())
-            .Returns(newToken);
+        var issued = ArrangeAccessToken();
 
         // Act
         await _sut.Handle(command, CancellationToken.None);
 
         // Assert
-        await _identityService.Received(1).ValidateRefreshTokenAsync(command.RefreshToken, Arg.Any<CancellationToken>());
-        await _sessionService.Received(1).ValidateSessionAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
-        await _tokenService.Received(1).IssueAsync(userId, claims, Arg.Any<CancellationToken>());
-        await _identityService.Received(1).StoreRefreshTokenAsync(userId, newToken.RefreshToken, newToken.RefreshTokenExpiresAt, Arg.Any<CancellationToken>());
-        await _sessionService.Received(1).UpdateSessionRefreshTokenAsync(Arg.Any<string>(), Arg.Any<string>(), newToken.RefreshTokenExpiresAt, Arg.Any<CancellationToken>());
+        await _sessionService.Received(1).RotateRefreshTokenAsync(command.RefreshToken, Arg.Any<CancellationToken>());
+        await _identityService.Received(1).BuildClaimsForRefreshAsync(userId, Arg.Any<CancellationToken>());
         await _securityAudit.Received(1).TokenRevokedAsync(userId, "test-client", "RefreshTokenRotated", Arg.Any<CancellationToken>());
-        await _securityAudit.Received(1).TokenIssuedAsync(userId, Arg.Any<string>(), "test-client", Arg.Any<string>(), newToken.AccessTokenExpiresAt, Arg.Any<CancellationToken>());
+        await _securityAudit.Received(1).TokenIssuedAsync(userId, Arg.Any<string>(), "test-client", Arg.Any<string>(), issued.ExpiresAt, Arg.Any<CancellationToken>());
     }
 
     #endregion
 
-    #region Handle - Invalid Refresh Token Tests
+    #region Handle - Rotation Failure Tests
 
-    [Fact]
-    public async Task Handle_Should_ThrowUnauthorizedException_When_RefreshTokenIsInvalid()
+    [Theory]
+    [InlineData(SessionRotationStatus.NotFound, "InvalidRefreshToken")]
+    [InlineData(SessionRotationStatus.Reused, "RefreshTokenReuseDetected")]
+    [InlineData(SessionRotationStatus.Revoked, "SessionRevoked")]
+    [InlineData(SessionRotationStatus.Expired, "RefreshTokenExpired")]
+    [InlineData(SessionRotationStatus.SecurityStampChanged, "SecurityStampChanged")]
+    [InlineData(SessionRotationStatus.Superseded, "RefreshTokenSuperseded")]
+    public async Task Handle_Should_Throw_And_AuditTheReason_When_RotationFails(
+        SessionRotationStatus status, string expectedReason)
     {
         // Arrange
-        var command = new RefreshTokenCommand("access-token", "invalid-refresh-token");
+        var command = new RefreshTokenCommand("access-token", "root.refresh-token");
+        var userId = _fixture.Create<string>();
 
         _requestContext.ClientId.Returns("test-client");
 
-        _identityService.ValidateRefreshTokenAsync(command.RefreshToken, Arg.Any<CancellationToken>())
-            .Returns((ValueTuple<string, IReadOnlyList<Claim>>?)null);
+        _sessionService.RotateRefreshTokenAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(SessionRotationDto.Failed(status, Guid.NewGuid(), userId));
 
-        // Act & Assert
+        // Act & Assert — one message for every failure mode, so the caller learns nothing extra.
         var exception = await Should.ThrowAsync<UnauthorizedException>(
             async () => await _sut.Handle(command, CancellationToken.None));
 
         exception.Message.ShouldBe("Invalid refresh token.");
+        await _securityAudit.Received(1).TokenRevokedAsync(userId, "test-client", expectedReason, Arg.Any<CancellationToken>());
+        await _tokenService.DidNotReceive().IssueAccessOnlyAsync(
+            Arg.Any<string>(), Arg.Any<IEnumerable<Claim>>(), Arg.Any<TimeSpan?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Handle_Should_AuditTokenRevocation_When_RefreshTokenIsInvalid()
+    public async Task Handle_Should_AuditWithUnknownSubject_When_TokenMatchesNoSession()
     {
         // Arrange
-        var command = new RefreshTokenCommand("access-token", "invalid-refresh-token");
+        var command = new RefreshTokenCommand("access-token", "root.invalid-refresh-token");
 
         _requestContext.ClientId.Returns("test-client");
 
-        _identityService.ValidateRefreshTokenAsync(command.RefreshToken, Arg.Any<CancellationToken>())
-            .Returns((ValueTuple<string, IReadOnlyList<Claim>>?)null);
+        _sessionService.RotateRefreshTokenAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(SessionRotationDto.Failed(SessionRotationStatus.NotFound));
 
         // Act
         await Should.ThrowAsync<UnauthorizedException>(
@@ -165,55 +213,25 @@ public sealed class RefreshTokenCommandHandlerTests
         await _securityAudit.Received(1).TokenRevokedAsync("unknown", "test-client", "InvalidRefreshToken", Arg.Any<CancellationToken>());
     }
 
-    #endregion
-
-    #region Handle - Session Validation Tests
-
     [Fact]
-    public async Task Handle_Should_ThrowUnauthorizedException_When_SessionIsRevoked()
+    public async Task Handle_Should_Throw_When_UserCannotBeResolvedAfterRotation()
     {
         // Arrange
-        var command = new RefreshTokenCommand("access-token", "valid-refresh-token");
+        var command = new RefreshTokenCommand("access-token", "root.refresh-token");
         var userId = _fixture.Create<string>();
-        var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, userId) };
 
         _requestContext.ClientId.Returns("test-client");
 
-        _identityService.ValidateRefreshTokenAsync(command.RefreshToken, Arg.Any<CancellationToken>())
-            .Returns((userId, claims));
-
-        _sessionService.ValidateSessionAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(false);
+        ArrangeRotation(userId);
+        _identityService.BuildClaimsForRefreshAsync(userId, Arg.Any<CancellationToken>())
+            .Returns((ValueTuple<string, IEnumerable<Claim>>?)null);
 
         // Act & Assert
         var exception = await Should.ThrowAsync<UnauthorizedException>(
             async () => await _sut.Handle(command, CancellationToken.None));
 
-        exception.Message.ShouldBe("Session has been revoked.");
-    }
-
-    [Fact]
-    public async Task Handle_Should_AuditSessionRevocation_When_SessionIsRevoked()
-    {
-        // Arrange
-        var command = new RefreshTokenCommand("access-token", "valid-refresh-token");
-        var userId = _fixture.Create<string>();
-        var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, userId) };
-
-        _requestContext.ClientId.Returns("test-client");
-
-        _identityService.ValidateRefreshTokenAsync(command.RefreshToken, Arg.Any<CancellationToken>())
-            .Returns((userId, claims));
-
-        _sessionService.ValidateSessionAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(false);
-
-        // Act
-        await Should.ThrowAsync<UnauthorizedException>(
-            async () => await _sut.Handle(command, CancellationToken.None));
-
-        // Assert
-        await _securityAudit.Received(1).TokenRevokedAsync(userId, "test-client", "SessionRevoked", Arg.Any<CancellationToken>());
+        exception.Message.ShouldBe("Invalid refresh token.");
+        await _securityAudit.Received(1).TokenRevokedAsync(userId, "test-client", "UserNotFound", Arg.Any<CancellationToken>());
     }
 
     #endregion
@@ -225,17 +243,15 @@ public sealed class RefreshTokenCommandHandlerTests
     {
         // Arrange
         var wrongAccessToken = CreateValidJwtToken("different-user", "other@example.com");
-        var command = new RefreshTokenCommand(wrongAccessToken, "valid-refresh-token");
-        var userId = "original-user";
+        var command = new RefreshTokenCommand(wrongAccessToken, "root.valid-refresh-token");
+        const string userId = "original-user";
         var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, userId) };
 
         _requestContext.ClientId.Returns("test-client");
 
-        _identityService.ValidateRefreshTokenAsync(command.RefreshToken, Arg.Any<CancellationToken>())
+        ArrangeRotation(userId);
+        _identityService.BuildClaimsForRefreshAsync(userId, Arg.Any<CancellationToken>())
             .Returns((userId, claims));
-
-        _sessionService.ValidateSessionAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(true);
 
         // Act & Assert
         var exception = await Should.ThrowAsync<UnauthorizedException>(
@@ -264,33 +280,26 @@ public sealed class RefreshTokenCommandHandlerTests
     public async Task Handle_Should_PassCancellationToken_ToAllServices()
     {
         // Arrange
-        var command = new RefreshTokenCommand("access-token", "refresh-token");
+        var command = new RefreshTokenCommand("access-token", "root.refresh-token");
         var userId = _fixture.Create<string>();
         var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, userId) };
-        var newToken = _fixture.Create<TokenResponse>();
         using var cts = new CancellationTokenSource();
         var cancellationToken = cts.Token;
 
         _requestContext.ClientId.Returns("test-client");
 
-        _identityService.ValidateRefreshTokenAsync(command.RefreshToken, cancellationToken)
+        ArrangeRotation(userId, ct: cancellationToken);
+        _identityService.BuildClaimsForRefreshAsync(userId, cancellationToken)
             .Returns((userId, claims));
-
-        _sessionService.ValidateSessionAsync(Arg.Any<string>(), cancellationToken)
-            .Returns(true);
-
-        _tokenService.IssueAsync(userId, claims, cancellationToken)
-            .Returns(newToken);
+        ArrangeAccessToken(cancellationToken);
 
         // Act
         await _sut.Handle(command, cancellationToken);
 
         // Assert
-        await _identityService.Received(1).ValidateRefreshTokenAsync(command.RefreshToken, cancellationToken);
-        await _sessionService.Received(1).ValidateSessionAsync(Arg.Any<string>(), cancellationToken);
-        await _tokenService.Received(1).IssueAsync(userId, claims, cancellationToken);
-        await _identityService.Received(1).StoreRefreshTokenAsync(userId, newToken.RefreshToken, newToken.RefreshTokenExpiresAt, cancellationToken);
-        await _sessionService.Received(1).UpdateSessionRefreshTokenAsync(Arg.Any<string>(), Arg.Any<string>(), newToken.RefreshTokenExpiresAt, cancellationToken);
+        await _sessionService.Received(1).RotateRefreshTokenAsync(command.RefreshToken, cancellationToken);
+        await _identityService.Received(1).BuildClaimsForRefreshAsync(userId, cancellationToken);
+        await _tokenService.Received(1).IssueAccessOnlyAsync(userId, Arg.Any<IEnumerable<Claim>>(), null, cancellationToken);
     }
 
     #endregion

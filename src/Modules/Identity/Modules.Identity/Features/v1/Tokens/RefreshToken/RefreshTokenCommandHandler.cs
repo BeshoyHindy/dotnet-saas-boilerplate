@@ -1,5 +1,6 @@
-﻿using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.Modules.Auditing.Contracts;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
 using Boilerplate.Modules.Identity.Contracts.Services;
 using Boilerplate.BuildingBlocks.Core.Exceptions;
 using Boilerplate.Modules.Identity.Contracts.v1.Tokens.RefreshToken;
@@ -44,26 +45,28 @@ public sealed class RefreshTokenCommandHandler
 
         var clientId = _requestContext.ClientId;
 
-        // Validate refresh token and rebuild subject + claims
-        var validated = await _identityService
-            .ValidateRefreshTokenAsync(request.RefreshToken, cancellationToken);
+        // Rotation is the authority: it resolves the session, proves the token is the live one and
+        // spends it, all inside the tenant's query filter. Nothing downstream re-validates the token.
+        var rotation = await _sessionService.RotateRefreshTokenAsync(request.RefreshToken, cancellationToken);
 
+        if (rotation.Status != SessionRotationStatus.Rotated)
+        {
+            await _securityAudit.TokenRevokedAsync(
+                rotation.UserId ?? "unknown", clientId!, RevocationReason(rotation.Status), cancellationToken);
+
+            // One message for every failure mode: the caller learns only that the token is no good,
+            // never whether it was unknown, expired, replayed or beaten by a concurrent refresh.
+            throw new UnauthorizedException("Invalid refresh token.");
+        }
+
+        var validated = await _identityService.BuildClaimsForRefreshAsync(rotation.UserId!, cancellationToken);
         if (validated is null)
         {
-            await _securityAudit.TokenRevokedAsync("unknown", clientId!, "InvalidRefreshToken", cancellationToken);
+            await _securityAudit.TokenRevokedAsync(rotation.UserId!, clientId!, "UserNotFound", cancellationToken);
             throw new UnauthorizedException("Invalid refresh token.");
         }
 
         var (subject, claims) = validated.Value;
-
-        // Check if the session associated with this refresh token is still valid
-        var refreshTokenHash = TokenFingerprint.Sha256Short(request.RefreshToken);
-        var isSessionValid = await _sessionService.ValidateSessionAsync(refreshTokenHash, cancellationToken);
-        if (!isSessionValid)
-        {
-            await _securityAudit.TokenRevokedAsync(subject, clientId!, "SessionRevoked", cancellationToken);
-            throw new UnauthorizedException("Session has been revoked.");
-        }
 
         // Optionally, cross-check the provided access token subject
         var handler = new JwtSecurityTokenHandler();
@@ -94,33 +97,37 @@ public sealed class RefreshTokenCommandHandler
         // Audit previous token revocation by rotation (no raw tokens)
         await _securityAudit.TokenRevokedAsync(subject, clientId!, "RefreshTokenRotated", cancellationToken);
 
-        // Issue new tokens
-        var newToken = await _tokenService.IssueAsync(subject, claims, cancellationToken);
-
-        // Persist rotated refresh token for this user
-        await _identityService.StoreRefreshTokenAsync(subject, newToken.RefreshToken, newToken.RefreshTokenExpiresAt, cancellationToken);
-
-        // Update the session with the new refresh token hash
-        var newRefreshTokenHash = TokenFingerprint.Sha256Short(newToken.RefreshToken);
-        await _sessionService.UpdateSessionRefreshTokenAsync(
-            refreshTokenHash,
-            newRefreshTokenHash,
-            newToken.RefreshTokenExpiresAt,
+        // `sid` is the session row's id, which rotation deliberately leaves alone — the device keeps
+        // one identity for its whole life, so consumers can correlate across refreshes.
+        var (accessToken, accessTokenExpiresAt) = await _tokenService.IssueAccessOnlyAsync(
+            subject,
+            claims.Append(new Claim(JwtRegisteredClaimNames.Sid, rotation.SessionId.ToString())),
+            lifetime: null,
             cancellationToken);
 
         // Audit the newly issued token with a fingerprint
-        var fingerprint = TokenFingerprint.Sha256Short(newToken.AccessToken);
+        var fingerprint = TokenFingerprint.Sha256Short(accessToken);
         await _securityAudit.TokenIssuedAsync(
             userId: subject,
             userName: claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? string.Empty,
             clientId: clientId!,
             tokenFingerprint: fingerprint,
-            expiresUtc: newToken.AccessTokenExpiresAt,
+            expiresUtc: accessTokenExpiresAt,
             ct: cancellationToken);
 
         return new RefreshTokenCommandResponse(
-            Token: newToken.AccessToken,
-            RefreshToken: newToken.RefreshToken,
-            RefreshTokenExpiryTime: newToken.RefreshTokenExpiresAt);
+            Token: accessToken,
+            RefreshToken: rotation.RefreshToken!,
+            RefreshTokenExpiryTime: rotation.RefreshTokenExpiresAt);
     }
+
+    private static string RevocationReason(SessionRotationStatus status) => status switch
+    {
+        SessionRotationStatus.Reused => "RefreshTokenReuseDetected",
+        SessionRotationStatus.Revoked => "SessionRevoked",
+        SessionRotationStatus.Expired => "RefreshTokenExpired",
+        SessionRotationStatus.SecurityStampChanged => "SecurityStampChanged",
+        SessionRotationStatus.Superseded => "RefreshTokenSuperseded",
+        _ => "InvalidRefreshToken",
+    };
 }

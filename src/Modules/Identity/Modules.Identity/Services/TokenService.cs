@@ -1,5 +1,4 @@
 ﻿using Boilerplate.Modules.Identity.Authorization.Jwt;
-using Boilerplate.Modules.Identity.Contracts.DTOs;
 using Boilerplate.Modules.Identity.Contracts.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -24,26 +23,6 @@ public sealed class TokenService : ITokenService
         _logger = logger;
         _metrics = metrics;
         _timeProvider = timeProvider;
-    }
-
-    public Task<TokenResponse> IssueAsync(
-        string subject,
-        IEnumerable<Claim> claims,
-        CancellationToken ct = default)
-    {
-        var (accessToken, accessTokenExpiry) = BuildAccessToken(subject, claims, lifetime: null);
-
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
-        var refreshToken = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-        var refreshTokenExpiry = now.AddDays(_options.RefreshTokenDays);
-
-        var response = new TokenResponse(
-            AccessToken: accessToken,
-            RefreshToken: refreshToken,
-            RefreshTokenExpiresAt: refreshTokenExpiry,
-            AccessTokenExpiresAt: accessTokenExpiry);
-
-        return Task.FromResult(response);
     }
 
     public Task<(string AccessToken, DateTime ExpiresAtUtc)> IssueAccessOnlyAsync(
