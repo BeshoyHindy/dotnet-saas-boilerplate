@@ -11,7 +11,7 @@ public sealed class GlobalExceptionHandlerTests
     private static async Task<HttpContext> HandleAsync(Exception exception)
     {
         var context = new DefaultHttpContext();
-        context.Request.Path = "/api/v1/identity/forgot-password";
+        context.Request.Path = "/api/v1/tenants/root/auth/forgot-password";
         context.Response.Body = new MemoryStream();
 
         var handler = new GlobalExceptionHandler(NullLogger<GlobalExceptionHandler>.Instance);
@@ -19,13 +19,15 @@ public sealed class GlobalExceptionHandlerTests
         return context;
     }
 
-    // Regression for #1245: a missing required `tenant` header surfaces as a BadHttpRequestException
-    // during binding and must render with its own status (400), not the generic 500 fallback.
+    // Regression for #1245: a missing required bound parameter surfaces as a
+    // BadHttpRequestException during binding and must render with its own status (400), not the
+    // generic 500 fallback. (The original trigger — a missing `tenant` header — is gone with
+    // ADR-0002; the mapping it exposed still needs guarding.)
     [Fact]
     public async Task TryHandleAsync_Should_Map_BadHttpRequestException_To_ItsStatusCode()
     {
         var exception = new BadHttpRequestException(
-            "Required parameter \"string tenant\" was not provided from header.");
+            "Required parameter \"string code\" was not provided from query string.");
 
         var context = await HandleAsync(exception);
 
