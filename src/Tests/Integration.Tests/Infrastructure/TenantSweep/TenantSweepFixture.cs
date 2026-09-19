@@ -12,7 +12,8 @@ namespace Integration.Tests.Infrastructure.TenantSweep;
 /// tells those apart from permission metadata.
 ///
 /// <para>Built lazily behind <see cref="GetAsync"/> rather than as an xUnit collection fixture:
-/// provisioning two tenants and seeding a dozen rows costs about a minute, and a collection fixture
+/// provisioning two tenants and seeding a couple of dozen rows costs about ten seconds (the whole
+/// sweep class runs in roughly twelve, host startup included), and a collection fixture
 /// cannot take <see cref="AppWebApplicationFactory"/> (itself a collection fixture) as a constructor
 /// argument. The sweep therefore joins the suite's existing collection — sharing the one
 /// Testcontainers host instead of starting a second — and builds this on first use.</para>

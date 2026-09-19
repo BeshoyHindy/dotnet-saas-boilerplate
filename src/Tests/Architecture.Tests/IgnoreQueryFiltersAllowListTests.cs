@@ -166,6 +166,13 @@ public sealed partial class IgnoreQueryFiltersAllowListTests
     /// The file's code with comments removed. The doc comments on <c>ModelBuilderExtensions</c> and
     /// <c>QueryFilters</c> spell the call out on purpose — teaching the named-filter form is their
     /// job — and a scan that counted prose would punish the documentation.
+    ///
+    /// <para><b>Known limitation.</b> The stripping is not string-literal aware: a <c>//</c> inside a
+    /// string (a URL, say) takes the rest of that line with it. Left as is deliberately — making it
+    /// literal-aware means a scanner that also understands verbatim, raw and interpolated strings,
+    /// which is more machinery than the risk warrants. The failure mode is a missed call on the same
+    /// line as such a literal, which no call site in this codebase has; the counts pinned above would
+    /// still move the moment one appeared on a line of its own.</para>
     /// </summary>
     private static string Code(string file)
     {

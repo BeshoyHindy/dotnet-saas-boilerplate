@@ -28,7 +28,7 @@ var perms = await cache.GetOrCreateAsync(
 
 `HybridCache` does **not** prefix keys with the ambient tenant. Every key that holds tenant data carries the tenant because the `CacheKeys` helper puts it there (`TenantTheme(tenantId)`, `IdempotencyEntry(tenantId, key)`) or because the id in it is already tenant-unique (`UserPermissions(userId)`). That is isolation by convention, and convention is exactly what ADR-0002 set out to replace.
 
-So, until the building block does it (tracked separately — see the tenant-isolation sweep ticket):
+So, until the building block does it — tracked as its own ticket on the map, *Prefix cache keys with the tenant inside the Caching building block* (#77):
 
 - **Never invent a cache key that holds tenant data without the tenant in it.** Add it to `CacheKeys.cs` with the tenant id as a parameter, the way the existing ones do.
 - Genuinely global entries — `DefaultTheme`, `ImpersonationGrantStatus(jti)` (grants are `IGlobalEntity`) — are the exception, not the default. If you cannot say in one line why an entry is global, it is not.

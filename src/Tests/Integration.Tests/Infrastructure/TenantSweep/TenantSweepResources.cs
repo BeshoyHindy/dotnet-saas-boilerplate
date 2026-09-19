@@ -43,6 +43,12 @@ public enum ResourceKind
 
     /// <summary>A read notification: shown whenever the inbox is not filtered to unread only.</summary>
     ReadNotification,
+
+    /// <summary>
+    /// A registered user who has not confirmed their e-mail — the only state in which
+    /// <c>POST identity/users/{id}/resend-confirmation-email</c> does its work rather than refusing.
+    /// </summary>
+    UnconfirmedUser,
 }
 
 /// <summary>
@@ -161,6 +167,11 @@ public static class TenantSweepRegistry
         new Dictionary<(string, string), ResourceKind>
         {
             [("POST api/v{version:apiVersion}/files/{id:guid}/restore", "id")] = ResourceKind.TrashedFile,
+
+            // Resending a confirmation to a confirmed user is refused before anything happens, so the
+            // positive control could never show that the route reaches the caller's own row.
+            [("POST api/v{version:apiVersion}/identity/users/{id:guid}/resend-confirmation-email", "id")] =
+                ResourceKind.UnconfirmedUser,
         };
 
     /// <summary>The resource one parameter of one route addresses: the override first, then the key.</summary>
@@ -241,8 +252,9 @@ public static class TenantSweepBodies
 }
 
 /// <summary>
-/// The two places where the sweep's headline rule — "another tenant's id must answer 404" — is the
-/// wrong question, written down with the reason rather than quietly skipped.
+/// Every place where one of the sweep's rules — "another tenant's id must answer 404", "a list must
+/// answer 2xx", "the caller's own row must answer a success" — is the wrong question, written down
+/// with the reason rather than quietly skipped.
 /// </summary>
 public static class TenantSweepExceptions
 {
@@ -278,7 +290,8 @@ public static class TenantSweepExceptions
     /// flight. A platform operator who could not reach it could not stop it. Tenant admins still get
     /// 404 for another tenant's grant — that part the sweep does enforce.
     ///
-    /// <c>Tenant</c> is the catalog itself, and every route that takes one is root-only anyway.
+    /// <c>Tenant</c> is deliberately absent: every route that takes one is root-only, and the root
+    /// pass skips those already, so listing it here would be a rule that never fires.
     /// </summary>
     /// <summary>
     /// The list endpoints that answer a tenant admin with something other than 2xx, and why. Every
@@ -305,7 +318,28 @@ public static class TenantSweepExceptions
         };
 
     public static IReadOnlySet<ResourceKind> PlatformWideKinds { get; } =
-        new HashSet<ResourceKind> { ResourceKind.ImpersonationGrant, ResourceKind.Tenant };
+        new HashSet<ResourceKind> { ResourceKind.ImpersonationGrant };
+
+    /// <summary>
+    /// Positive controls that answer with a client error even against the caller's own row, with the
+    /// exact status expected and why that status still proves the row was reached.
+    ///
+    /// The bar for an entry is high: the answer must be one the route could <i>not</i> give for
+    /// another tenant's id (those all 404), so it is evidence of a lookup that succeeded and a state
+    /// that refused — not of a request that died before the lookup, which is what a 400 or a 415
+    /// usually means and which would make the sweep's own 404 prove nothing.
+    /// </summary>
+    public static IReadOnlyDictionary<string, (int Status, string Reason)> ControlsThatAnswerFromState { get; } =
+        new Dictionary<string, (int, string)>(StringComparer.Ordinal)
+        {
+            ["PATCH api/v{version:apiVersion}/files/{id:guid}/visibility"] =
+                (409, "the seeded file is still PendingUpload — the sweep creates file rows through " +
+                      "the upload-url endpoint and never pushes bytes through MinIO — and the handler " +
+                      "reads the row's status to say so, which is the reach this control is after"),
+            ["POST api/v{version:apiVersion}/files/{id:guid}/finalize"] =
+                (409, "same row, same reason: \"upload not received\" is the handler reporting on a " +
+                      "file it found and inspected"),
+        };
 }
 
 /// <summary>
@@ -355,6 +389,7 @@ internal static class TenantSweepSeeder
         ids[ResourceKind.RevokedSession] = await SeedRevokedSessionAsync(
             auth, adminClient, user, tenantId, ids[ResourceKind.Session]);
         ids[ResourceKind.DeactivatedUser] = await SeedDeactivatedUserAsync(factory, adminClient, tenantId, marker);
+        ids[ResourceKind.UnconfirmedUser] = await SeedUnconfirmedUserAsync(adminClient, marker);
         ids[ResourceKind.ReadNotification] = await SeedReadNotificationAsync(
             factory, adminClient, tenantId, adminUserId, marker);
 
@@ -616,6 +651,35 @@ internal static class TenantSweepSeeder
     }
 
     /// <summary>
+    /// A user who has registered and not confirmed. Everything else the sweep seeds is confirmed,
+    /// and the resend-confirmation route refuses a confirmed user before it looks at anything — so
+    /// without this row its positive control could not tell "reached the caller's own user" from
+    /// "died early", which is the same thing its 404 for tenant B would mean.
+    /// </summary>
+    private static async Task<string> SeedUnconfirmedUserAsync(HttpClient adminClient, string marker)
+    {
+        var unique = Guid.NewGuid().ToString("N")[..8];
+
+        using var response = await adminClient.PostAsJsonAsync(
+            $"{TestConstants.IdentityBasePath}/register",
+            new
+            {
+                firstName = "sweep",
+                lastName = "Unconfirmed",
+                email = $"sweepnew{marker}-{unique}@xchg.com",
+                userName = $"sweepnew{marker}{unique}",
+                password = "Test@1234!",
+                confirmPassword = "Test@1234!",
+            });
+        response.StatusCode.ShouldBe(
+            HttpStatusCode.Created,
+            $"registering the sweep's unconfirmed user failed: {await response.Content.ReadAsStringAsync()}");
+
+        var registered = await response.Content.ReadFromJsonAsync<RegisteredUser>(Json);
+        return registered!.UserId;
+    }
+
+    /// <summary>
     /// A notification already marked read, for the same reason: "read" is a state the inbox shows
     /// only when it is not filtered to unread, and the sweep should have one to look for.
     /// </summary>
@@ -673,6 +737,8 @@ internal static class TenantSweepSeeder
     private sealed record AuditProbe(string Id, string CorrelationId, string TraceId);
 
     private sealed record IdDto(string Id);
+
+    private sealed record RegisteredUser(string UserId);
 
     private sealed record ProfileDto(string Id);
 

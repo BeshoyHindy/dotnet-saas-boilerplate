@@ -115,6 +115,12 @@ public sealed class TenantEndpointSweepTests
     ///
     /// Destructive verbs are excluded here and controlled separately below, on rows minted for the
     /// purpose — a DELETE control that succeeds would delete the very row the other cases probe.
+    ///
+    /// <para><b>The control demands a success, not merely "not a 404".</b> Accepting anything but
+    /// 401/403/404 let a 400 (validator rejected the body), a 415 (no body at all where one is
+    /// required) or a 500 stand in for a reached row — and each of those means the request died
+    /// before the lookup, which is precisely the state the sweep's own 404 would be indistinguishable
+    /// from.</para>
     /// </summary>
     [Fact]
     public async Task Positive_Control_Tenant_A_Reaches_Its_Own_Resources()
@@ -128,21 +134,38 @@ public sealed class TenantEndpointSweepTests
             var (path, routeValues) = Substitute(endpoint, sweep.A);
             using var response = await SendAsync(sweep.A.AdminClient, endpoint, path, routeValues, sweep.A);
 
-            if (response.StatusCode is HttpStatusCode.NotFound
-                or HttpStatusCode.Unauthorized
-                or HttpStatusCode.Forbidden)
+            // A handful of routes refuse the caller's own row on its STATE, with a status they could
+            // never give for another tenant's id. Each is declared with the exact status expected.
+            TenantSweepExceptions.ControlsThatAnswerFromState.TryGetValue(endpoint.Name, out var declared);
+            bool refusedAsDeclared = declared.Status == (int)response.StatusCode && declared.Status != 0;
+
+            if ((int)response.StatusCode >= 400 && !refusedAsDeclared)
             {
                 failures.Add(
                     $"{endpoint.Name}\n      called as {endpoint.Method} {path}\n" +
-                    $"      got {(int)response.StatusCode} {response.StatusCode} for the tenant's OWN resource\n" +
+                    $"      got {(int)response.StatusCode} {response.StatusCode} for the tenant's OWN resource" +
+                    (declared.Status == 0
+                        ? string.Empty
+                        : $" (declared as {declared.Status}: {declared.Reason})") + "\n" +
                     $"      body: {Truncate(await response.Content.ReadAsStringAsync())}");
             }
         }
 
+        var stale = TenantSweepExceptions.ControlsThatAnswerFromState.Keys
+            .Where(name => !ResourceEndpoints(sweep).Any(e => string.Equals(e.Name, name, StringComparison.Ordinal)))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToList();
+        failures.AddRange(stale.Select(name =>
+            $"{name}\n      is declared in " +
+            $"{nameof(TenantSweepExceptions)}.{nameof(TenantSweepExceptions.ControlsThatAnswerFromState)} " +
+            "but is not a route any more — delete the entry"));
+
         failures.ShouldBeEmpty(
-            "the cross-tenant sweep is only meaningful if the same request succeeds against the " +
-            "caller's own row. A 404 here means the sweep's 404 proves nothing — usually a wrong " +
-            $"{nameof(ResourceKind)} in the registry or a missing body sample.\n  " +
+            "the cross-tenant sweep is only meaningful if the same request SUCCEEDS against the " +
+            "caller's own row. A 404 here means the sweep's 404 proves nothing; a 400 or 415 means the " +
+            "request never reached the lookup, which proves just as little — usually a wrong " +
+            $"{nameof(ResourceKind)} in the registry or a missing body sample in " +
+            $"{nameof(TenantSweepBodies)}.\n  " +
             string.Join("\n  ", failures));
     }
 
