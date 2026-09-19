@@ -136,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     void (async () => {
       try {
-        const perms = await getMyPermissions();
+        const perms = await getMyPermissions({ asOperator: true });
         if (cancelled) return;
         tokenStore.setPermissions(perms);
         // setPermissions emits, the subscribe listener will rebuild `user`
@@ -270,7 +270,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshPermissions = useCallback(async () => {
     try {
-      const perms = await getMyPermissions();
+      const perms = await getMyPermissions({ asOperator: true });
       tokenStore.setPermissions(perms);
     } catch {
       /* swallow — see hydration effect */
