@@ -117,6 +117,29 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
         {
             // Idempotent across factory re-creations.
         }
+
+        // The same grant the deploy stacks apply (`mc anonymous set download …/uploads`, pinned by
+        // deploy/dokploy/tests/compose-contract.test.sh): anonymous GET on the `uploads/` prefix and
+        // nowhere else. Without it the durable avatar and brand-asset URLs the API hands back would
+        // 403 here, and a test could not tell a working link from a broken one. The `tenants/`
+        // prefix staying closed is the other half — it is what the Files public-URL tests lean on.
+        await client.PutBucketPolicyAsync(new PutBucketPolicyRequest
+        {
+            BucketName = MinioBucket,
+            Policy = $$"""
+                {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                    {
+                      "Effect": "Allow",
+                      "Principal": { "AWS": ["*"] },
+                      "Action": ["s3:GetObject"],
+                      "Resource": ["arn:aws:s3:::{{MinioBucket}}/uploads/*"]
+                    }
+                  ]
+                }
+                """
+        });
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)

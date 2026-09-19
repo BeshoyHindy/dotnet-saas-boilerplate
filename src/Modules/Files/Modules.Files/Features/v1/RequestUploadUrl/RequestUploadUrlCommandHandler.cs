@@ -1,6 +1,7 @@
 using System.Net;
 using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Storage.Keys;
 using Boilerplate.BuildingBlocks.Storage.Services;
 using Boilerplate.Modules.Files.Contracts;
 using Boilerplate.Modules.Files.Contracts.v1.Commands;
@@ -25,7 +26,10 @@ public sealed class RequestUploadUrlCommandHandler(
     {
         ArgumentNullException.ThrowIfNull(cmd);
 
-        var tenantId = currentUser.GetTenant() ?? throw new UnauthorizedException("invalid tenant");
+        // Not used to build the key any more — the Storage block prefixes it from the ambient
+        // tenant (ADR-0002). Still checked here so a principal without a tenant claim is refused
+        // before anything is written, as it always was.
+        _ = currentUser.GetTenant() ?? throw new UnauthorizedException("invalid tenant");
         var userId = currentUser.GetUserId();
         if (userId == Guid.Empty)
         {
@@ -64,9 +68,12 @@ public sealed class RequestUploadUrlCommandHandler(
             throw new ForbiddenException("Not allowed to attach files to this owner.");
         }
 
-        // Generate id + storage key + presigned URL.
+        // Generate id + storage key + presigned URL. The key we persist is whatever the block hands
+        // back for this tenant-relative path in the private space — an opaque handle, never one we
+        // compose a tenant into ourselves.
         var id = Guid.CreateVersion7();
-        var storageKey = StorageKeyBuilder.Build(tenantId, cmd.OwnerType, id, cmd.FileName, DateTimeOffset.UtcNow);
+        var relativePath = StorageKeyBuilder.Build(cmd.OwnerType, id, cmd.FileName, DateTimeOffset.UtcNow);
+        var storageKey = storage.ComposeKey(StorageSpace.Private, relativePath);
         var ttl = TimeSpan.FromMinutes(options.Value.UploadUrlTtlMinutes);
         var presigned = await storage.GenerateUploadUrlAsync(storageKey, cmd.ContentType, category.MaxBytes, ttl, cancellationToken).ConfigureAwait(false);
 

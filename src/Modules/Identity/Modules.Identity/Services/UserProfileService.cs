@@ -84,18 +84,30 @@ internal sealed class UserProfileService(
         Uri imageUri = user.ImageUrl ?? null!;
         // image is optional: text-only edits forward a null FileUploadRequest, so guard before
         // dereferencing Data or the common no-image update path NREs.
+        //
+        // The previous value is dropped with RemoveIfOwnedAsync, not RemoveAsync: ImageUrl is a URL
+        // column, and what is in it may not be one of this tenant's keys at all — PUT
+        // /identity/profile/image lets a user store any URL, and a development database predating
+        // tenant-prefixed keys still holds flat `uploads/{type}/…` values. Neither is ours to
+        // delete, and neither should turn saving a profile into a 500.
         if (image?.Data != null)
         {
             var imageString = await storageService.UploadAsync<AppUser>(image, FileType.Image, cancellationToken);
             user.ImageUrl = new Uri(imageString, UriKind.RelativeOrAbsolute);
-            if (deleteCurrentImage && imageUri != null)
+
+            // Unconditionally, not `if (deleteCurrentImage)`: the validator rejects a request that
+            // sets both, so that condition was never true and every avatar change orphaned its
+            // predecessor's bytes forever. Replacing the column value is what makes the old object
+            // unreachable, so dropping it here is the whole of its lifecycle — the same thing
+            // TenantThemeService has always done for a brand asset.
+            if (imageUri != null)
             {
-                await storageService.RemoveAsync(imageUri.ToString(), cancellationToken);
+                await storageService.RemoveIfOwnedAsync(imageUri.ToString(), cancellationToken);
             }
         }
         else if (deleteCurrentImage && imageUri != null)
         {
-            await storageService.RemoveAsync(imageUri.ToString(), cancellationToken);
+            await storageService.RemoveIfOwnedAsync(imageUri.ToString(), cancellationToken);
             user.ImageUrl = null;
         }
 

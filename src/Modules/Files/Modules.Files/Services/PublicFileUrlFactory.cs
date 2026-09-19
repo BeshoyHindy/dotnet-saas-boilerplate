@@ -9,12 +9,12 @@ namespace Boilerplate.Modules.Files.Services;
 /// Builds the <c>publicUrl</c> the Files read endpoints hand back for a <see cref="Visibility.Public"/>
 /// asset — a <b>short-lived presigned GET</b>, minted on every read and never persisted.
 /// <para>
-/// Why not an unsigned bucket URL: Files objects live under <c>tenants/{tenantId}/…</c>
-/// (<see cref="StorageKeyBuilder"/>), a key space public and private files share where visibility is
-/// only a database column. The deploy stacks grant anonymous read on <c>uploads/</c> and nowhere else
-/// (avatars and tenant theme assets), because widening the grant to <c>tenants/</c> would publish every
-/// private file and turn <c>PATCH /files/{id}/visibility</c> into a no-op. So the signature — not the
-/// bucket policy — carries the access, and the TTL bounds it.
+/// Why not an unsigned bucket URL: Files objects live in the Storage block's
+/// <see cref="Boilerplate.BuildingBlocks.Storage.Keys.StorageSpace.Private"/> space, which public
+/// and private files share and where visibility is only a database column. The deploy stacks grant
+/// anonymous read on the public space alone (avatars and tenant theme assets), because widening
+/// that grant would publish every private file and turn <c>PATCH /files/{id}/visibility</c> into a
+/// no-op. So the signature — not the bucket policy — carries the access, and the TTL bounds it.
 /// </para>
 /// <para>
 /// Revocation: flipping Public → Private stops URL issuance immediately, but a signature already

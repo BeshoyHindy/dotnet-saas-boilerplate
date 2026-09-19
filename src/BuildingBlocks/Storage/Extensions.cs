@@ -1,11 +1,13 @@
 using Amazon;
 using Amazon.Runtime;
 using Amazon.S3;
+using Boilerplate.BuildingBlocks.Storage.Keys;
 using Boilerplate.BuildingBlocks.Storage.Local;
 using Boilerplate.BuildingBlocks.Storage.S3;
 using Boilerplate.BuildingBlocks.Storage.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace Boilerplate.BuildingBlocks.Storage;
@@ -14,6 +16,7 @@ public static class Extensions
 {
     public static IServiceCollection AddHeroLocalFileStorage(this IServiceCollection services)
     {
+        AddTenantStorageKeys(services);
         services.AddScoped<IStorageService, LocalStorageService>();
         return services;
     }
@@ -22,6 +25,8 @@ public static class Extensions
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
+
+        AddTenantStorageKeys(services);
 
         var provider = configuration["Storage:Provider"]?.ToLowerInvariant();
 
@@ -74,6 +79,15 @@ public static class Extensions
 
         return services;
     }
+
+    /// <summary>
+    /// Singleton, like the Finbuckle accessor it wraps (which is itself backed by an
+    /// <c>AsyncLocal</c>): the ambient tenant is read on every call, never captured, so one
+    /// instance is correct inside a request, inside a job's tenant scope, and across the tenant
+    /// switches a per-tenant fan-out makes.
+    /// </summary>
+    private static void AddTenantStorageKeys(IServiceCollection services) =>
+        services.TryAddSingleton<ITenantStorageKeys, TenantStorageKeys>();
 
     private static void RegisterStorageService<TInner>(
         IServiceCollection services,

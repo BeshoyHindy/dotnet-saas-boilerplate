@@ -150,11 +150,15 @@ public sealed class PurgeJobsTests
             new MultiTenantContext<AppTenantInfo>(tenant);
     }
 
-    private async Task<bool> ObjectExistsAsync(string storageKey)
+    private Task<bool> ObjectExistsAsync(string storageKey)
     {
-        using var scope = _factory.Services.CreateScope();
-        var storage = scope.ServiceProvider.GetRequiredService<IStorageService>();
-        return await storage.ExistsAsync(storageKey);
+        // Through ITenantScope, not a bare DI scope: object keys are tenant-prefixed by the Storage
+        // block, and it refuses to answer for a key with no ambient tenant to own it (#78) — the
+        // same rule the purge jobs themselves live by.
+        return _factory.Services.GetRequiredService<ITenantScope>().RunAsync(
+            TestConstants.RootTenantId,
+            (services, ct) => services.GetRequiredService<IStorageService>().ExistsAsync(storageKey, ct),
+            CancellationToken.None);
     }
 
     private async Task<bool> RowExistsIgnoringFiltersAsync(Guid id)

@@ -118,6 +118,12 @@ assert_match "migrator gets the migrations assembly" "$migrator_block" 'Database
 # objects live under `tenants/` where public and private share a key space and
 # visibility is a database column, so widening this grant to the bucket would
 # silently publish every private file and make ChangeFileVisibility a no-op.
+#
+# Within `uploads/` the objects are tenant-prefixed by the Storage block
+# (`uploads/tenants/{tenantId}/…`, ADR-0002 / issue #78), but this grant stays at
+# the top level: one one-shot has to cover tenants provisioned long after the
+# stack was deployed. So the assertions below pin both edges — the grant is not
+# the whole bucket, and it is not narrowed to one tenant either.
 init_block="$(service_block "$DATA" minio-init)"
 public_block="$(service_block "$DATA" minio-public-prefix)"
 assert_match "the bucket is created once, idempotently" "$init_block" 'command:.*mb.*--ignore-existing.*\$\{STORAGE_BUCKET\}'
@@ -126,6 +132,8 @@ assert_match "the grant is scoped to the uploads/ prefix" "$public_block" \
   'local/\$\{STORAGE_BUCKET\}/uploads'
 refute_match "the grant is never the whole bucket" "$public_block" \
   '"local/\$\{STORAGE_BUCKET\}"\]'
+refute_match "the grant stops at the uploads/ top level" "$public_block" \
+  'uploads/[A-Za-z0-9$]'
 refute_match "the grant never reaches the tenants/ prefix" "$data_text" 'download.*tenants'
 assert_match "the grant runs after the bucket exists" "$public_block" \
   'condition:[[:space:]]*service_completed_successfully'

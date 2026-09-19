@@ -1,14 +1,48 @@
 using Boilerplate.BuildingBlocks.Shared.Storage;
 using Boilerplate.BuildingBlocks.Storage.DTOs;
+using Boilerplate.BuildingBlocks.Storage.Keys;
 
 namespace Boilerplate.BuildingBlocks.Storage.Services;
 
+/// <summary>
+/// <b>Object keys are tenant-prefixed by this block, never by caller convention</b> (ADR-0002).
+/// Callers name an object with a tenant-<i>relative</i> path plus a <see cref="StorageSpace"/> —
+/// through <see cref="ComposeKey"/> or <see cref="UploadAsync{T}"/> — and get back an opaque handle
+/// they may persist. Nothing outside this block writes a tenant id or a key root; an architecture
+/// test scans for it.
+///
+/// <para>Every method below that <i>takes</i> a stored handle refuses one the ambient tenant does
+/// not own — <see cref="StorageKeyNotOwnedException"/> (404 on HTTP paths, so there is no existence
+/// oracle) raised before any call reaches the backend. With no ambient tenant at all they throw
+/// <see cref="MissingStorageTenantException"/>; there is no tenant-less key space to fall back to.
+/// A handle may be given back as the key itself or as the URL a previous
+/// <see cref="BuildPublicUrl"/>/<see cref="GenerateDownloadUrlAsync"/> returned — mapping that URL
+/// back to a key is this block's job, not the caller's.</para>
+/// </summary>
 public interface IStorageService
 {
+    /// <summary>
+    /// Writes <paramref name="request"/> into the <see cref="StorageSpace.Public"/> space as
+    /// <c>uploads/tenants/{tenantId}/{typeName}/{guid}_{file}</c> and returns the durable unsigned
+    /// URL for it (see <see cref="BuildPublicUrl"/>) — what <c>AppUser.ImageUrl</c> and
+    /// <c>TenantTheme</c>'s brand-asset columns persist.
+    /// </summary>
     Task<string> UploadAsync<T>(
         FileUploadRequest request,
         FileType fileType,
         CancellationToken cancellationToken = default) where T : class;
+
+    /// <summary>
+    /// Turns a tenant-relative path into the physical key for <paramref name="space"/>, prefixed
+    /// with the ambient tenant. The result is opaque: persist it, hand it back to the methods here,
+    /// and never parse or build one yourself.
+    /// </summary>
+    /// <exception cref="MissingStorageTenantException">There is no ambient tenant.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="relativePath"/> is empty, absolute, or contains a <c>.</c>/<c>..</c> segment,
+    /// an empty segment, or any character outside <c>[A-Za-z0-9._-/]</c>.
+    /// </exception>
+    string ComposeKey(StorageSpace space, string relativePath);
 
     Task<FileDownloadResponse?> DownloadAsync(
         string path,
@@ -25,6 +59,19 @@ public interface IStorageService
     Task<long> GetSizeAsync(string path, CancellationToken cancellationToken = default);
 
     Task RemoveAsync(string path, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Best-effort counterpart to <see cref="RemoveAsync"/> for "replace this asset, then drop the
+    /// one it replaced": deletes <paramref name="storedHandle"/> only when it is a key the ambient
+    /// tenant owns, and otherwise <b>skips it and logs</b> instead of throwing. Returns whether a
+    /// delete was attempted.
+    ///
+    /// <para>The handle being skipped is the realistic one: a development database written before
+    /// keys carried a tenant still holds flat <c>uploads/{typeName}/…</c> values, and
+    /// <c>PUT /identity/profile/image</c> lets a user store any URL at all. Neither should turn a
+    /// profile save into a 500, and neither is ours to delete.</para>
+    /// </summary>
+    Task<bool> RemoveIfOwnedAsync(string? storedHandle, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Mint a short-lived presigned PUT URL the browser uses to upload bytes directly to S3-compatible storage.

@@ -150,6 +150,13 @@ services:
   # `local/${STORAGE_BUCKET}` is a data leak, not a convenience — the contract
   # test asserts the prefix for that reason.
   #
+  # Within `uploads/` the objects are themselves tenant-prefixed —
+  # `uploads/tenants/{tenantId}/…`, composed by the Storage block (ADR-0002,
+  # issue #78). That is a property of the keys, not of this grant: it stays at
+  # the `uploads/` top level so one one-shot covers every tenant, including the
+  # ones provisioned after the stack was deployed. Narrowing it to a single
+  # tenant would 403 every other tenant's branding.
+  #
   # A separate one-shot rather than `mb && anonymous set` in one: the mc image is
   # not guaranteed to ship a shell, and `entrypoint: ["mc"]` keeps both steps
   # shell-free. Both are idempotent.

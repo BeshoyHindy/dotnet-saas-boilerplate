@@ -1,7 +1,9 @@
 using Boilerplate.BuildingBlocks.Shared.Storage;
 using Boilerplate.BuildingBlocks.Storage;
+using Boilerplate.BuildingBlocks.Storage.Keys;
 using Boilerplate.BuildingBlocks.Storage.Local;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Framework.Tests.Storage;
 
@@ -10,6 +12,7 @@ public sealed class LocalStorageServiceTests : IDisposable
     private sealed class Probe { }
 
     private readonly string _root;
+    private readonly AmbientTenantStorageKeys _keys = new("acme");
     private readonly LocalStorageService _sut;
 
     public LocalStorageServiceTests()
@@ -21,7 +24,7 @@ public sealed class LocalStorageServiceTests : IDisposable
         environment.WebRootPath.Returns(_root);
         environment.ContentRootPath.Returns(_root);
 
-        _sut = new LocalStorageService(environment);
+        _sut = new LocalStorageService(environment, _keys, NullLogger<LocalStorageService>.Instance);
     }
 
     private static FileUploadRequest PngRequest(string fileName = "avatar.png")
@@ -35,7 +38,7 @@ public sealed class LocalStorageServiceTests : IDisposable
     #region Happy Path
 
     [Fact]
-    public async Task UploadAsync_Should_PersistFileAndReturnRelativePath_When_ValidImage()
+    public async Task UploadAsync_Should_PersistFileUnderTheTenantsPublicPrefix_When_ValidImage()
     {
         // Arrange
         var request = PngRequest();
@@ -43,11 +46,24 @@ public sealed class LocalStorageServiceTests : IDisposable
         // Act
         var path = await _sut.UploadAsync<Probe>(request, FileType.Image);
 
-        // Assert
-        path.ShouldStartWith("uploads/probe/");
+        // Assert — `uploads/` stays outermost (it is what the deploy bucket policy publishes) and
+        // the tenant is a directory level inside it.
+        path.ShouldStartWith("uploads/tenants/acme/probe/");
         path.ShouldContain("_avatar.png");
         path.ShouldNotContain("\\");
         File.Exists(Path.Combine(_root, path.Replace('/', Path.DirectorySeparatorChar))).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task UploadAsync_Should_ProduceDifferentPaths_When_TwoTenantsUploadTheSameFile()
+    {
+        var acme = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image);
+
+        _keys.Current = "globex";
+        var globex = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image);
+
+        acme.ShouldStartWith("uploads/tenants/acme/");
+        globex.ShouldStartWith("uploads/tenants/globex/");
     }
 
     [Fact]
@@ -72,16 +88,47 @@ public sealed class LocalStorageServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task DownloadAsync_Should_ServeTheContentTypeDerivedFromTheExtension_NotTheClientHeader()
+    {
+        // Local never persists the client's Content-Type — download derives it from the file name
+        // via FileExtensionContentTypeProvider — so a client claiming "evil.png" is text/html can't
+        // get that header served back (#78 hardening item 4; this provider needed no code change,
+        // only pinning that it already holds).
+        var request = PngRequest();
+        request.ContentType = "text/html";
+
+        var path = await _sut.UploadAsync<Probe>(request, FileType.Image);
+        var download = await _sut.DownloadAsync(path);
+
+        download!.ContentType.ShouldBe("image/png");
+        await download.Stream.DisposeAsync();
+    }
+
+    [Fact]
     public async Task RemoveAsync_Should_DeleteFile_When_FileExists()
     {
         // Arrange
         var path = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image);
         var diskPath = path.Replace('/', Path.DirectorySeparatorChar);
 
-        // Act
+        // Act — a backslash-separated form of the same key still resolves (Windows callers).
         await _sut.RemoveAsync(diskPath);
 
         // Assert
+        (await _sut.ExistsAsync(path)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task RemoveAsync_Should_AcceptThePersistedPublicUrl_When_ReplacingAnAsset()
+    {
+        // What AppUser.ImageUrl and TenantTheme persist is BuildPublicUrl's output, not the key.
+        // Mapping it back is the block's job; a caller must not have to.
+        var path = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image);
+        var url = _sut.BuildPublicUrl(path);
+
+        url.ShouldBe($"/{path}");
+        await _sut.RemoveAsync(url);
+
         (await _sut.ExistsAsync(path)).ShouldBeFalse();
     }
 
@@ -100,6 +147,97 @@ public sealed class LocalStorageServiceTests : IDisposable
         metadata.ContentType.ShouldBe("image/png");
     }
 
+    [Fact]
+    public void ComposeKey_Should_PrefixTheAmbientTenant_In_BothSpaces()
+    {
+        _sut.ComposeKey(StorageSpace.Private, "myfiles/2026/09/ab/x.pdf")
+            .ShouldBe("tenants/acme/myfiles/2026/09/ab/x.pdf");
+        _sut.ComposeKey(StorageSpace.Public, "probe/x.png")
+            .ShouldBe("uploads/tenants/acme/probe/x.png");
+    }
+
+    #endregion
+
+    #region Cross-tenant refusal
+
+    [Fact]
+    public async Task EveryKeyTakingOperation_Should_Refuse_AnotherTenantsRealKey()
+    {
+        // Arrange — tenant A stores a file, then tenant B comes along holding its exact key.
+        var key = await _sut.UploadAsync<Probe>(PngRequest("secret.png"), FileType.Image);
+        var diskPath = Path.Combine(_root, key.Replace('/', Path.DirectorySeparatorChar));
+        _keys.Current = "globex";
+
+        // Act & Assert — every entry point refuses, and none of them touches the disk.
+        await Should.ThrowAsync<StorageKeyNotOwnedException>(() => _sut.DownloadAsync(key));
+        await Should.ThrowAsync<StorageKeyNotOwnedException>(() => _sut.ExistsAsync(key));
+        await Should.ThrowAsync<StorageKeyNotOwnedException>(() => _sut.GetSizeAsync(key));
+        await Should.ThrowAsync<StorageKeyNotOwnedException>(() => _sut.RemoveAsync(key));
+        await Should.ThrowAsync<StorageKeyNotOwnedException>(() => _sut.HeadObjectAsync(key));
+        await Should.ThrowAsync<StorageKeyNotOwnedException>(
+            () => _sut.GenerateUploadUrlAsync(key, "image/png", 1024, TimeSpan.FromMinutes(5)));
+        await Should.ThrowAsync<StorageKeyNotOwnedException>(
+            () => _sut.GenerateDownloadUrlAsync(key, TimeSpan.FromMinutes(5)));
+        Should.Throw<StorageKeyNotOwnedException>(() => _sut.BuildPublicUrl(key));
+
+        File.Exists(diskPath).ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("tenants/globex/myfiles/2026/09/ab/report.pdf")]  // another tenant's key
+    [InlineData("uploads/tenants/acme-2/probe/x.png")]            // a tenant id ours is a prefix of
+    [InlineData("tenants/acme/../globex/x.png")]                  // traversal
+    // One leading slash is the persisted server-relative URL and is mapped back to the key on
+    // purpose (see RemoveAsync_Should_AcceptThePersistedPublicUrl…); a second one is not.
+    [InlineData("//tenants/acme/x.png")]
+    [InlineData("///tenants/acme/x.png")]
+    [InlineData("tenants//acme/x.png")]
+    [InlineData("tenants/acme/..%2f..%2fglobex/x.png")]           // encoded separators
+    [InlineData("Tenants/acme/x.png")]                            // case games
+    [InlineData("uploads/probe/legacy.png")]                      // pre-#78 flat key
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task RemoveAsync_Should_Refuse_AKeyOutsideTheTenantsPrefixes(string key)
+    {
+        await Should.ThrowAsync<StorageKeyNotOwnedException>(() => _sut.RemoveAsync(key));
+    }
+
+    [Fact]
+    public async Task RemoveIfOwnedAsync_Should_SkipRatherThanThrow_When_TheHandleIsNotOurs()
+    {
+        // The "replace my avatar" path: a development database from before #78 still holds flat
+        // keys, and the profile endpoint lets a user store any URL at all. Neither is ours to
+        // delete, and neither may turn a profile save into a 500.
+        (await _sut.RemoveIfOwnedAsync("uploads/probe/legacy_avatar.png")).ShouldBeFalse();
+        (await _sut.RemoveIfOwnedAsync("https://cdn.example.com/avatars/me.png")).ShouldBeFalse();
+        (await _sut.RemoveIfOwnedAsync("tenants/globex/probe/theirs.png")).ShouldBeFalse();
+        (await _sut.RemoveIfOwnedAsync(null)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task RemoveIfOwnedAsync_Should_Delete_When_TheHandleIsOurs()
+    {
+        var key = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image);
+
+        (await _sut.RemoveIfOwnedAsync(_sut.BuildPublicUrl(key))).ShouldBeTrue();
+
+        (await _sut.ExistsAsync(key)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task EveryOperation_Should_Throw_When_ThereIsNoAmbientTenant()
+    {
+        // No fallback key space, ever: work with no tenant has to enter one through ITenantScope.
+        _keys.Current = null;
+
+        await Should.ThrowAsync<MissingStorageTenantException>(
+            () => _sut.UploadAsync<Probe>(PngRequest(), FileType.Image));
+        await Should.ThrowAsync<MissingStorageTenantException>(() => _sut.ExistsAsync("tenants/acme/x.png"));
+        await Should.ThrowAsync<MissingStorageTenantException>(() => _sut.RemoveAsync("tenants/acme/x.png"));
+        await Should.ThrowAsync<MissingStorageTenantException>(() => _sut.RemoveIfOwnedAsync("tenants/acme/x.png"));
+        Should.Throw<MissingStorageTenantException>(() => _sut.ComposeKey(StorageSpace.Private, "x.png"));
+    }
+
     #endregion
 
     #region URL generation
@@ -108,7 +246,8 @@ public sealed class LocalStorageServiceTests : IDisposable
     public async Task GenerateUploadUrlAsync_Should_ReturnLocalTokenUrl_When_KeyProvided()
     {
         // Act
-        var result = await _sut.GenerateUploadUrlAsync("uploads/probe/file.png", "image/png", 1024, TimeSpan.FromMinutes(5));
+        var result = await _sut.GenerateUploadUrlAsync(
+            "uploads/tenants/acme/probe/file.png", "image/png", 1024, TimeSpan.FromMinutes(5));
 
         // Assert
         result.Url.Scheme.ShouldBe("local");
@@ -117,14 +256,25 @@ public sealed class LocalStorageServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GenerateUploadUrlAsync_Should_MintATokenNoOtherTenantCanRedeem()
+    {
+        // The token is a bearer string, so what confines it is the key it carries.
+        var result = await _sut.GenerateUploadUrlAsync(
+            "uploads/tenants/acme/probe/file.png", "image/png", 1024, TimeSpan.FromMinutes(5));
+        var token = result.Url.AbsoluteUri["local://upload/".Length..];
+
+        LocalStorageService.SharedTokenStore.Consume(token, "globex").ShouldBeNull();
+    }
+
+    [Fact]
     public async Task GenerateDownloadUrlAsync_Should_ReturnRelativeUrl_When_KeyProvided()
     {
-        // Act
-        var uri = await _sut.GenerateDownloadUrlAsync("/uploads/probe/file.png", TimeSpan.FromMinutes(5));
+        // Act — the persisted server-relative form (one leading slash) maps back to the key.
+        var uri = await _sut.GenerateDownloadUrlAsync("/uploads/tenants/acme/probe/file.png", TimeSpan.FromMinutes(5));
 
         // Assert
         uri.IsAbsoluteUri.ShouldBeFalse();
-        uri.OriginalString.ShouldBe("/uploads/probe/file.png");
+        uri.OriginalString.ShouldBe("/uploads/tenants/acme/probe/file.png");
     }
 
     [Fact]
@@ -136,8 +286,9 @@ public sealed class LocalStorageServiceTests : IDisposable
         //
         // The visibility gate therefore lives one level up, in the Files module
         // (PublicFileUrlFactory never mints a URL for a Private asset), not here. This test pins that
-        // the provider treats both alike so nobody mistakes local behaviour for enforcement.
-        const string key = "tenants/root/myfiles/2026/05/0f7b/secret.pdf";
+        // the provider treats both alike so nobody mistakes local behaviour for enforcement. What it
+        // does *not* treat alike is another tenant's key — see the refusal tests above.
+        const string key = "tenants/acme/myfiles/2026/05/0f7b/secret.pdf";
 
         var publicUrl = await _sut.GenerateDownloadUrlAsync(key, TimeSpan.FromMinutes(5), "inline; filename=\"secret.pdf\"");
         var privateUrl = await _sut.GenerateDownloadUrlAsync(key, TimeSpan.FromMinutes(5));
@@ -151,10 +302,10 @@ public sealed class LocalStorageServiceTests : IDisposable
     public void BuildPublicUrl_Should_NormalizeToServerRelativePath_When_KeyHasBackslashes()
     {
         // Act
-        var url = _sut.BuildPublicUrl("uploads\\probe\\file.png");
+        var url = _sut.BuildPublicUrl("uploads\\tenants\\acme\\probe\\file.png");
 
         // Assert
-        url.ShouldBe("/uploads/probe/file.png");
+        url.ShouldBe("/uploads/tenants/acme/probe/file.png");
     }
 
     #endregion
@@ -189,25 +340,29 @@ public sealed class LocalStorageServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ExistsAsync_Should_ReturnFalse_When_PathBlank()
+    public async Task ReadOperations_Should_Refuse_When_PathBlank()
     {
-        (await _sut.ExistsAsync(" ")).ShouldBeFalse();
-        (await _sut.GetSizeAsync(" ")).ShouldBe(0);
-        (await _sut.DownloadAsync(" ")).ShouldBeNull();
-        (await _sut.HeadObjectAsync(" ")).ShouldBeNull();
+        // A blank handle names no object this tenant owns, so it gets the same refusal a foreign
+        // key gets rather than a quiet "absent" that hides a caller bug.
+        await Should.ThrowAsync<StorageKeyNotOwnedException>(() => _sut.ExistsAsync(" "));
+        await Should.ThrowAsync<StorageKeyNotOwnedException>(() => _sut.GetSizeAsync(" "));
+        await Should.ThrowAsync<StorageKeyNotOwnedException>(() => _sut.DownloadAsync(" "));
+        await Should.ThrowAsync<StorageKeyNotOwnedException>(() => _sut.HeadObjectAsync(" "));
     }
 
     [Fact]
-    public async Task DownloadAsync_Should_ReturnNull_When_FileMissing()
+    public async Task ReadOperations_Should_ReturnAbsent_When_OwnedKeyIsMissing()
     {
-        (await _sut.DownloadAsync("uploads/probe/missing.png")).ShouldBeNull();
+        (await _sut.DownloadAsync("uploads/tenants/acme/probe/missing.png")).ShouldBeNull();
+        (await _sut.ExistsAsync("uploads/tenants/acme/probe/missing.png")).ShouldBeFalse();
+        (await _sut.GetSizeAsync("uploads/tenants/acme/probe/missing.png")).ShouldBe(0);
+        (await _sut.HeadObjectAsync("uploads/tenants/acme/probe/missing.png")).ShouldBeNull();
     }
 
     [Fact]
-    public async Task RemoveAsync_Should_NotThrow_When_PathBlankOrMissing()
+    public async Task RemoveAsync_Should_NotThrow_When_OwnedKeyIsMissing()
     {
-        await Should.NotThrowAsync(() => _sut.RemoveAsync(string.Empty));
-        await Should.NotThrowAsync(() => _sut.RemoveAsync("uploads/probe/missing.png"));
+        await Should.NotThrowAsync(() => _sut.RemoveAsync("uploads/tenants/acme/probe/missing.png"));
     }
 
     #endregion
