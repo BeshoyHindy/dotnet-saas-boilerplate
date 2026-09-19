@@ -46,8 +46,9 @@ public static class CacheKeys
     public const string TenantTheme = "theme";
 
     /// <summary>
-    /// Key for the theme flagged as the default for new tenants. Tenant-scoped like everything else:
-    /// the row it caches is read through the tenant query filter, so the answer is the tenant's own.
+    /// Key for the theme flagged as the default for new tenants. The row it caches lives in the
+    /// unfiltered tenant-catalog context — one row, shared by every tenant, not a per-tenant query —
+    /// so it is written through <see cref="GlobalHybridCache"/> rather than the tenant-scoped cache.
     /// </summary>
     public const string DefaultTheme = "theme:default";
 

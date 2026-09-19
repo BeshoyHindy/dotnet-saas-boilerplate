@@ -58,6 +58,14 @@ crosses the boundary.
 Cross-tenant invalidation is *per tenant*, run under `ITenantScope.RunAsync` — which is how
 `RolePermissionSyncHostedService` already drives `RolePermissionSyncer`.
 
+HybridCache treats the tag `"*"` as "flush everything", but scoping rewrites it like any other tag:
+`RemoveByTagAsync("*")` from a tenant becomes `RemoveByTagAsync("t:{id}:*")` (or `"g:*"` through
+`GlobalHybridCache`), which matches no physical tag anyone has ever set — so it evicts nothing at
+all, not even the caller's own entries. The isolation half of that is correct (tenant A's `"*"`
+cannot reach tenant B's or the global cache's entries) but it is not a flush-all: there is no wildcard
+that survives scoping, and no way through this block to flush one tenant's whole cache in a single
+call. Flushing a tenant is still invalidating its known tags one by one, under `ITenantScope.RunAsync`.
+
 ## Genuinely global entries
 
 Inject **`GlobalHybridCache`**. Keys and tags land in the `g:` namespace, disjoint from every
@@ -98,10 +106,16 @@ keeps `IDistributedCache` to a stale-failing allow-list (that probe, and the Red
   Redis configured — including the integration test host — nothing reaches L2 at all, and anything
   that reads L2 directly sees nothing.
 - **HybridCache does not write bare JSON to L2.** It writes a framed payload (version byte, expiry,
-  key, tags, then the value). Anything reading those bytes directly has to account for that.
+  key, tags, then the value). Anything reading those bytes directly has to account for that — the
+  idempotency filter's direct `IDistributedCache` probe does not, so replay currently fails against a
+  real Redis L2 (see below).
 - Don't reach for `IDistributedCache` directly — it skips the tenant prefix, the telemetry and the
   tag bookkeeping. The allow-list above is the whole set of exceptions.
 
 ## Related, tracked separately
 
 Storage paths are not yet tenant-prefixed by the building block — that is #78.
+
+*Make idempotent replay work against a real distributed cache* — the idempotency probe reads L2 by
+key through `IDistributedCache`, which returns HybridCache's framed payload rather than the bare
+JSON the filter expects, so replay against a real Redis L2 currently fails. Not fixed here.

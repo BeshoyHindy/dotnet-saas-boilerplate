@@ -64,11 +64,20 @@ public sealed partial class CacheTenantScopingTests
     /// key. Keys live in <c>CacheKeys</c>; this makes that a rule rather than a habit.
     /// </summary>
     /// <remarks>
-    /// Limits, stated so nobody mistakes this for more than it is: it matches a literal or an
-    /// interpolated string appearing directly as the first argument of a cache call. A key assembled
-    /// into a local variable a few lines earlier, or returned from a helper, is invisible to it. The
+    /// Statement-aware, not line-aware: it finds the call token, walks to its matching closing
+    /// parenthesis — across as many lines as the statement takes, strings and comments accounted for
+    /// so a stray <c>(</c> or <c>"</c> inside either does not confuse the walk — and looks at the
+    /// first meaningful token after the comments are stripped. This repo routinely wraps a cache call
+    /// across several lines with the key on its own continuation line (see e.g. the historical shape
+    /// of <c>TenantThemeService.GetThemeAsync</c>), which a same-line regex cannot see; walking to the
+    /// matching paren closes that gap.
+    /// <para>
+    /// One limit remains, stated so nobody mistakes this for more than it is: a key assembled into a
+    /// local variable a few lines earlier, or returned from a helper, is still invisible — the check
+    /// only looks at the literal token immediately at the start of the call's argument list. The
     /// reflection test above is what closes that gap for the keys the kit actually uses, since they
     /// all come from <c>CacheKeys</c>.
+    /// </para>
     /// </remarks>
     [Fact]
     public void No_Production_Code_Outside_TheBlock_Should_Inline_A_CacheKey_Or_Tag()
@@ -77,18 +86,29 @@ public sealed partial class CacheTenantScopingTests
 
         foreach (var file in ProductionSourceFiles().Where(f => !Relative(f).StartsWith(CachingBlock, StringComparison.Ordinal)))
         {
-            var lines = File.ReadAllLines(file);
-            for (var i = 0; i < lines.Length; i++)
+            var text = File.ReadAllText(file);
+
+            foreach (var call in FindCacheCallSites(text))
             {
-                if (IsComment(lines[i]))
+                var firstArgIndex = SkipWhitespaceAndComments(text, call.OpenParenIndex + 1);
+                if (firstArgIndex >= call.CloseParenIndex)
                 {
                     continue;
                 }
 
-                if (InlineCacheKeyRegex().IsMatch(lines[i]))
+                // The longest string-literal prefix ($@" / @$") is three characters — probing that
+                // much (or less, near the closing paren) is enough to tell a literal from an
+                // identifier without re-scanning the whole argument list.
+                var probeLength = Math.Min(3, call.CloseParenIndex - firstArgIndex);
+                var probe = text.Substring(firstArgIndex, probeLength);
+                if (!StringLiteralStartRegex().IsMatch(probe))
                 {
-                    offenders.Add($"{Relative(file)}:{i + 1}  {lines[i].Trim()}");
+                    continue;
                 }
+
+                var lineNumber = LineNumberAt(text, firstArgIndex);
+                var lineText = LineTextAt(text, lineNumber);
+                offenders.Add($"{Relative(file)}:{lineNumber}  {lineText.Trim()}");
             }
         }
 
@@ -229,13 +249,169 @@ public sealed partial class CacheTenantScopingTests
     [GeneratedRegex(@"[Tt]enant", RegexOptions.CultureInvariant)]
     private static partial Regex TenantWordRegex();
 
-    /// <summary>
-    /// A cache call whose first argument is a string literal or an interpolated string.
-    /// </summary>
+    /// <summary>The token that opens a cache call, up to and including its opening parenthesis.</summary>
     [GeneratedRegex(
-        @"\.(GetOrCreateAsync|SetAsync|RemoveAsync|RemoveByTagAsync)\s*(<[^()]*>)?\s*\(\s*\$?""",
+        @"\.(GetOrCreateAsync|SetAsync|RemoveAsync|RemoveByTagAsync)\s*(<[^()]*>)?\s*\(",
         RegexOptions.CultureInvariant)]
-    private static partial Regex InlineCacheKeyRegex();
+    private static partial Regex CacheCallTokenRegex();
+
+    /// <summary>A string literal or interpolated string opening: an optional <c>$</c>/<c>@</c> prefix then <c>"</c>.</summary>
+    [GeneratedRegex(@"^(\$@?|@\$?)?""", RegexOptions.CultureInvariant)]
+    private static partial Regex StringLiteralStartRegex();
+
+    private readonly record struct CacheCallSite(int OpenParenIndex, int CloseParenIndex);
+
+    /// <summary>
+    /// Finds every cache call in <paramref name="text"/> and, for each, the span between its opening
+    /// and matching closing parenthesis — however many lines that spans. Strings and comments inside
+    /// are walked over (not parsed), just enough that a <c>(</c> or <c>)</c> inside either does not
+    /// throw off the depth count.
+    /// </summary>
+    private static IEnumerable<CacheCallSite> FindCacheCallSites(string text)
+    {
+        foreach (Match match in CacheCallTokenRegex().Matches(text))
+        {
+            var openParenIndex = match.Index + match.Length - 1;
+            var closeParenIndex = FindMatchingCloseParen(text, openParenIndex);
+            if (closeParenIndex >= 0)
+            {
+                yield return new CacheCallSite(openParenIndex, closeParenIndex);
+            }
+        }
+    }
+
+    /// <summary>Walks from just after an opening parenthesis to its match, skipping over string and char literals and comments.</summary>
+    private static int FindMatchingCloseParen(string text, int openParenIndex)
+    {
+        var depth = 1;
+        var i = openParenIndex + 1;
+        while (i < text.Length && depth > 0)
+        {
+            switch (text[i])
+            {
+                case '(':
+                    depth++;
+                    i++;
+                    break;
+                case ')':
+                    depth--;
+                    i++;
+                    break;
+                case '"':
+                    i = SkipStringLiteral(text, i);
+                    break;
+                case '\'':
+                    i = SkipCharLiteral(text, i);
+                    break;
+                case '/' when i + 1 < text.Length && text[i + 1] == '/':
+                    var lineEnd = text.IndexOf('\n', i);
+                    i = lineEnd < 0 ? text.Length : lineEnd + 1;
+                    break;
+                case '/' when i + 1 < text.Length && text[i + 1] == '*':
+                    var blockEnd = text.IndexOf("*/", i + 2, StringComparison.Ordinal);
+                    i = blockEnd < 0 ? text.Length : blockEnd + 2;
+                    break;
+                default:
+                    i++;
+                    break;
+            }
+        }
+
+        return depth == 0 ? i - 1 : -1;
+    }
+
+    /// <summary>Skips a regular, interpolated, verbatim or interpolated-verbatim string, returning the index just past its closing quote.</summary>
+    private static int SkipStringLiteral(string text, int quoteIndex)
+    {
+        var verbatim = quoteIndex > 0 && text[quoteIndex - 1] == '@';
+        var i = quoteIndex + 1;
+        while (i < text.Length)
+        {
+            if (text[i] == '"')
+            {
+                if (verbatim && i + 1 < text.Length && text[i + 1] == '"')
+                {
+                    i += 2;
+                    continue;
+                }
+                return i + 1;
+            }
+
+            if (!verbatim && text[i] == '\\' && i + 1 < text.Length)
+            {
+                i += 2;
+                continue;
+            }
+
+            i++;
+        }
+
+        return i;
+    }
+
+    private static int SkipCharLiteral(string text, int quoteIndex)
+    {
+        var i = quoteIndex + 1;
+        i += i < text.Length && text[i] == '\\' ? 2 : 1;
+        if (i < text.Length && text[i] == '\'')
+        {
+            i++;
+        }
+
+        return i;
+    }
+
+    /// <summary>Skips whitespace, then <c>//</c> and <c>/* */</c> comments, repeating until neither remains.</summary>
+    private static int SkipWhitespaceAndComments(string text, int start)
+    {
+        var i = start;
+        while (i < text.Length)
+        {
+            if (char.IsWhiteSpace(text[i]))
+            {
+                i++;
+                continue;
+            }
+
+            if (text[i] == '/' && i + 1 < text.Length && text[i + 1] == '/')
+            {
+                var lineEnd = text.IndexOf('\n', i);
+                i = lineEnd < 0 ? text.Length : lineEnd + 1;
+                continue;
+            }
+
+            if (text[i] == '/' && i + 1 < text.Length && text[i + 1] == '*')
+            {
+                var blockEnd = text.IndexOf("*/", i + 2, StringComparison.Ordinal);
+                i = blockEnd < 0 ? text.Length : blockEnd + 2;
+                continue;
+            }
+
+            break;
+        }
+
+        return i;
+    }
+
+    private static int LineNumberAt(string text, int index)
+    {
+        var line = 1;
+        for (var i = 0; i < index && i < text.Length; i++)
+        {
+            if (text[i] == '\n')
+            {
+                line++;
+            }
+        }
+
+        return line;
+    }
+
+    private static string LineTextAt(string text, int lineNumber)
+    {
+        var lines = text.Split('\n');
+        return lineNumber >= 1 && lineNumber <= lines.Length ? lines[lineNumber - 1] : string.Empty;
+    }
 
     #endregion
 }

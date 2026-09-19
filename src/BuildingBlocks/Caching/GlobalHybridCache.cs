@@ -16,11 +16,13 @@ namespace Boilerplate.BuildingBlocks.Caching;
 /// so a global entry can never be read or evicted through a tenant-scoped call and vice versa.
 /// </para>
 /// <para>
-/// Two entries in the kit qualify today: the impersonation-grant revocation marker (keyed by a
+/// Entries in the kit that qualify today: the impersonation-grant revocation marker (keyed by a
 /// globally unique <c>jti</c>, read from the JWT <c>OnTokenValidated</c> hook which runs <i>before</i>
-/// tenant resolution, and backing an <c>IGlobalEntity</c>), and the defensive tenant-less branch of
-/// the idempotency filter. Reach for this type when both of those things are true of your entry:
-/// the data is not a tenant's, and the read can happen with no tenant established.
+/// tenant resolution, and backing an <c>IGlobalEntity</c>), the defensive tenant-less branch of the
+/// idempotency filter, and the default-theme row (<c>TenantThemeService</c>) — a single platform-wide
+/// record read from the unfiltered tenant-catalog context, not a per-tenant query. Reach for this
+/// type when either of two things is true of your entry: the data is not a tenant's, or the read can
+/// happen with no tenant established.
 /// </para>
 /// </remarks>
 public sealed class GlobalHybridCache : HybridCache

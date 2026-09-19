@@ -258,6 +258,42 @@ public sealed class TenantScopedHybridCacheTests
         (await ReadOrDefaultAsync(h, "k2")).ShouldBe("b2");
     }
 
+    /// <summary>
+    /// HybridCache treats the tag <c>"*"</c> as "flush everything" — but scoping rewrites tags like
+    /// any other, so tenant A's <c>"*"</c> becomes the physical tag <c>"t:alpha:*"</c>, which no entry
+    /// was ever tagged with. The isolation outcome is right (A's wildcard cannot reach B's entries or
+    /// the global cache), but it is not a flush-all: it evicts nothing at all, not even A's own
+    /// entries. There is no wildcard that survives scoping.
+    /// </summary>
+    [Fact]
+    public async Task RemoveByTagAsync_Wildcard_Should_Evict_Nothing_NotEvenTheCallersOwnEntries()
+    {
+        using var h = Build();
+
+        h.Tenant.TenantId = TenantA;
+        await h.Cache.SetAsync("k1", "a1", tags: ["themes"]);
+        await h.Cache.SetAsync("k2", "a2", tags: ["permissions"]);
+        h.Tenant.TenantId = TenantB;
+        await h.Cache.SetAsync("k1", "b1", tags: ["themes"]);
+        h.Tenant.TenantId = null;
+        await h.Global.SetAsync("k1", "global-1", tags: ["themes"]);
+
+        h.Tenant.TenantId = TenantA;
+        await h.Cache.RemoveByTagAsync("*");
+
+        (await ReadOrDefaultAsync(h, "k1")).ShouldBe("a1",
+            "the physical tag \"t:alpha:*\" matches nothing anyone ever set, so even A's own entries survive.");
+        (await ReadOrDefaultAsync(h, "k2")).ShouldBe("a2");
+
+        h.Tenant.TenantId = TenantB;
+        (await ReadOrDefaultAsync(h, "k1")).ShouldBe("b1", "A's wildcard must not reach B's entries either.");
+
+        h.Tenant.TenantId = null;
+        var stillGlobal = await h.Global.GetOrCreateAsync(
+            "k1", 0, static (s, ct) => ValueTask.FromResult("should-not-run"));
+        stillGlobal.ShouldBe("global-1", "nor the global cache's.");
+    }
+
     #endregion
 
     #region No tenant throws — never a fallback
