@@ -12,6 +12,8 @@
 
 `AddHeroStorage(config)` reads `Storage:Provider` **eagerly at registration**: `"s3"` → `S3StorageService` (supports MinIO via `ServiceUrl` + `ForcePathStyle`), else `LocalStorageService`. The chosen implementation is registered directly as `IStorageService`.
 
+**Production refuses to boot on Local.** `ProductionConfigurationGuard` fails fast unless `Storage:Provider=s3` (with a `Storage:S3:Bucket`) or the deployment opts in with `Storage:AllowLocalProviderInProduction=true` — Local serves every object anonymously out of `wwwroot`, which would publish private Files objects. `appsettings.Production.json` ships `s3`; compose and Dokploy set it too.
+
 ## Presigned upload flow (preferred for user uploads)
 
 Don't stream large files through the API. The pattern (see Files module):

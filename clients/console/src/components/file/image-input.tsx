@@ -1,107 +1,139 @@
-import { useEffect, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 import { Image as ImageIcon, Loader2, Upload, X, Link as LinkIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
-import { useFileUpload, formatBytes } from "@/hooks/use-file-upload";
-import { getFileMetadata, Visibility } from "@/api/files";
-import { ApiRequestError } from "@/lib/api-client";
+import { formatBytes } from "@/hooks/use-file-upload";
+import type { Schemas } from "@/lib/api-client";
+
+/** The wire shape every module endpoint that accepts an image takes (`FileUploadRequest`). */
+export type ImageUpload = Schemas["FileUploadRequest"];
 
 type Props = {
   /** Current image URL (or empty). The component is fully controlled. */
   value: string;
-  onChange: (next: string) => void;
   /**
-   * Owner binding for the upload. The Files module's per-OwnerType IFileAccessPolicy
-   * decides who can attach what. For product images, ownerType="Product" + the product id.
+   * A picked image, as raw bytes for the OWNING module's endpoint (profile PUT, tenant theme
+   * PUT, …). Those write through `IStorageService.UploadAsync` into the `uploads/` prefix — the
+   * one key space the deploy stacks publish — and hand back a durable, unsigned URL.
    */
-  ownerType: string;
-  ownerId?: string | null;
-  /** Allowed extensions (lower-case w/ leading dot). Server enforces too. */
+  onUpload: (image: ImageUpload) => void;
+  /** A pasted URL, or "" when the user clears the image. The caller decides what "" means. */
+  onChange: (next: string) => void;
+  /** The caller's save is in flight. */
+  busy?: boolean;
+  /** Allowed extensions (lower-case w/ leading dot). Server enforces the same list. */
   allowedExtensions?: string[];
   maxBytes?: number;
-  /** Visual treatment for the preview tile — "square" for products, "circle" for avatars. */
+  /** Visual treatment for the preview tile — "square" for logos, "circle" for avatars. */
   shape?: "square" | "circle";
   className?: string;
 };
 
-const IMAGE_EXTS = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
+/**
+ * `FileTypeMetadata.GetRules(FileType.Image)` server-side. Anything else is rejected there, so
+ * offering it here would only produce a 400 after the bytes have been sent.
+ */
+const IMAGE_EXTS = [".jpg", ".jpeg", ".png", ".ico"];
 
 /**
- * ImageInput — composite control that lets a user either upload a new image
- * (presigned PUT to S3/MinIO) OR paste an external URL. After a successful
- * upload the component fetches the FileAsset metadata to retrieve the durable
- * `publicUrl` and forwards it through `onChange`.
+ * The transport is a JSON array of bytes (`List<byte>`), which inflates ~4x, and Kestrel caps a
+ * request body at 10 MB (`RequestLimitsOptions`). 2 MB of image is a generous avatar/logo and
+ * leaves room under that ceiling; the server's own 5 MB rule is the backstop.
+ */
+const MAX_BYTES = 2 * 1024 * 1024;
+
+/**
+ * ImageInput — pick an image (uploaded as bytes through the owning module's own endpoint) or
+ * paste a URL you host elsewhere.
+ *
+ * It does NOT go through the Files module. A Files `publicUrl` is a presigned GET that expires in
+ * minutes (see `.agents/rules/modules/files.md`), so persisting one on an entity column — an
+ * avatar, a tenant logo — stores a link that is dead by the time anyone loads the page (issue #72).
  */
 export function ImageInput({
   value,
+  onUpload,
   onChange,
-  ownerType,
-  ownerId,
+  busy = false,
   allowedExtensions = IMAGE_EXTS,
-  maxBytes = 10 * 1024 * 1024,
+  maxBytes = MAX_BYTES,
   shape = "square",
   className,
 }: Props) {
   const [mode, setMode] = useState<"upload" | "url">("upload");
-  const { upload, progress, isUploading, reset } = useFileUpload({
-    ownerType,
-    ownerId,
-    category: "Image",
-    visibility: Visibility.Public, // public so we get a durable URL we can persist on the entity
-    allowedExtensions,
-    maxBytes,
-  });
+  const [reading, setReading] = useState(false);
 
-  // After upload+finalize, fetch metadata so we get the durable publicUrl.
-  const resolveUrl = useMutation({
-    mutationFn: async (fileAssetId: string) => {
-      const dto = await getFileMetadata(fileAssetId);
-      if (!dto.publicUrl) {
-        throw new Error("Server returned no publicUrl for this file.");
-      }
-      return dto.publicUrl;
-    },
-  });
+  // Local preview of the just-picked file, shown until the caller's save round-trips a real URL.
+  // It is tagged with the `value` it was taken against, so a new `value` retires it by derivation
+  // rather than through a reset effect.
+  const [preview, setPreview] = useState<{ url: string; forValue: string } | null>(null);
+  const previewRef = useRef<string | null>(null);
+  const setPreviewUrl = (next: { url: string; forValue: string } | null) => {
+    if (previewRef.current) URL.revokeObjectURL(previewRef.current);
+    previewRef.current = next?.url ?? null;
+    setPreview(next);
+  };
+  useEffect(() => () => setPreviewUrl(null), []);
+
+  // Likewise for a load failure: remember which src failed instead of resetting a flag on change.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
   const handlePick = () => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = "image/*";
+    input.accept = allowedExtensions.join(",");
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
+
+      const dot = file.name.lastIndexOf(".");
+      const ext = dot > 0 ? file.name.slice(dot).toLowerCase() : "";
+      if (!allowedExtensions.includes(ext)) {
+        toast.error(`"${ext || file.name}" is not an accepted image type`, {
+          description: `Use ${allowedExtensions.join(", ")}.`,
+        });
+        return;
+      }
+      if (file.size > maxBytes) {
+        toast.error("Image is too large", {
+          description: `${formatBytes(file.size)} — the limit is ${formatBytes(maxBytes)}.`,
+        });
+        return;
+      }
+
+      setReading(true);
       try {
-        const asset = await upload(file);
-        const url = await resolveUrl.mutateAsync(asset.id);
-        onChange(url);
-        toast.success("Image uploaded");
-        // Clear progress so the dropzone re-arms for another upload.
-        setTimeout(reset, 1500);
-      } catch (e) {
-        const message =
-          e instanceof ApiRequestError
-            ? (e.problem?.detail ?? e.problem?.title ?? e.message)
-            : e instanceof Error
-              ? e.message
-              : "Upload failed";
-        toast.error(message);
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        setPreviewUrl({ url: URL.createObjectURL(file), forValue: value });
+        onUpload({
+          fileName: file.name,
+          contentType: file.type || "application/octet-stream",
+          // List<byte> on the wire: a plain array of numbers, not base64.
+          data: Array.from(bytes),
+        });
+      } catch {
+        toast.error("Could not read that file");
+      } finally {
+        setReading(false);
       }
     };
     input.click();
   };
 
-  const hasImage = value.length > 0;
-  const isWorking = isUploading || resolveUrl.isPending;
+  // The picked file wins until the caller's `value` changes; then the fresh URL takes over.
+  const src = preview && preview.forValue === value ? preview.url : value;
+  const isWorking = busy || reading;
+  // Show the placeholder (not a broken-image icon) when the current src fails to load — e.g. a
+  // seeded default-avatar URL that 404s.
+  const showImage = src.length > 0 && failedSrc !== src;
   const tileClass = shape === "circle" ? "rounded-full" : "rounded-xl";
 
-  // Show the placeholder (not a broken-image icon) when the current URL fails to
-  // load — e.g. a seeded default-avatar URL that 404s. Reset on every URL change.
-  const [imgFailed, setImgFailed] = useState(false);
-  useEffect(() => setImgFailed(false), [value]);
-  const showImage = hasImage && !imgFailed;
+  const clear = () => {
+    setPreviewUrl(null);
+    onChange("");
+  };
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -125,9 +157,9 @@ export function ImageInput({
         >
           {showImage ? (
             <img
-              src={value}
+              src={src}
               alt=""
-              onError={() => setImgFailed(true)}
+              onError={() => setFailedSrc(src)}
               className={cn("h-full w-full object-cover", tileClass)}
             />
           ) : isWorking ? (
@@ -147,15 +179,10 @@ export function ImageInput({
                 {showImage ? "Replace image" : "Choose image"}
               </Button>
               {showImage && !isWorking && (
-                <Button type="button" size="sm" variant="outline" onClick={() => onChange("")}>
+                <Button type="button" size="sm" variant="outline" onClick={clear}>
                   <X className="h-3.5 w-3.5" />
                   Remove
                 </Button>
-              )}
-              {isUploading && progress && (
-                <span className="text-[11px] tabular-nums text-[var(--color-muted-foreground)]">
-                  {progress.percent}% · {formatBytes(progress.loaded)} / {formatBytes(progress.totalBytes)}
-                </span>
               )}
             </div>
           ) : (
@@ -165,12 +192,15 @@ export function ImageInput({
               onChange={(e) => onChange(e.target.value)}
               placeholder="https://…"
               maxLength={512}
+              spellCheck={false}
+              autoComplete="off"
+              className="font-mono text-[12.5px]"
             />
           )}
 
           <p className="text-xs text-[var(--color-muted-foreground)]">
             {mode === "upload"
-              ? `JPG/PNG/WebP/GIF · up to ${formatBytes(maxBytes)}`
+              ? `${allowedExtensions.join(" / ")} · up to ${formatBytes(maxBytes)}`
               : "Direct link to an image you host elsewhere."}
           </p>
         </div>

@@ -19,6 +19,8 @@ public sealed class ProductionConfigurationGuardTests
             ["CachingOptions:Redis"] = "cache:6379",
             ["JwtOptions:SigningKey"] = "8Kq2f1nT0xVb9aMw3hLp6ZcR5yGdE7jU4sNiOo1v",
             ["AllowedHosts"] = "api.example.com",
+            ["Storage:Provider"] = "s3",
+            ["Storage:S3:Bucket"] = "boilerplate",
         };
 
         foreach (var (key, value) in overrides)
@@ -119,9 +121,72 @@ public sealed class ProductionConfigurationGuardTests
         failures.ShouldContain(f => f.Contains("AllowedHosts", StringComparison.Ordinal) && f.Contains("Missing required", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData("local")]
+    [InlineData("Local")]
+    [InlineData("")]
+    public void Inspect_Should_RejectLocalStorage_When_ProductionHasNotOptedIn(string provider)
+    {
+        // Act — Local serves every object anonymously out of wwwroot, publishing private files.
+        var failures = ProductionConfigurationGuard.Inspect(Config(("Storage:Provider", provider)));
+
+        // Assert
+        failures.ShouldContain(f =>
+            f.Contains("Storage:Provider", StringComparison.Ordinal) &&
+            f.Contains("Storage:AllowLocalProviderInProduction", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Inspect_Should_AllowLocalStorage_When_TheDeploymentOptsInExplicitly()
+    {
+        // Act
+        var failures = ProductionConfigurationGuard.Inspect(Config(
+            ("Storage:Provider", "local"),
+            ("Storage:AllowLocalProviderInProduction", "true")));
+
+        // Assert — an explicit opt-in is the only way past the rule.
+        failures.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Inspect_Should_ReportMissingBucket_When_ProviderIsS3()
+    {
+        // Act
+        var failures = ProductionConfigurationGuard.Inspect(Config(("Storage:S3:Bucket", "")));
+
+        // Assert
+        failures.ShouldContain(f => f.Contains("Storage:S3:Bucket", StringComparison.Ordinal));
+    }
+
     #endregion
 
     #region Edge Cases
+
+    [Fact]
+    public void Inspect_Should_NotRequireABucket_When_LocalStorageIsOptedInto()
+    {
+        // Act — the opted-in Local deployment has no object store to name.
+        var failures = ProductionConfigurationGuard.Inspect(Config(
+            ("Storage:Provider", "local"),
+            ("Storage:AllowLocalProviderInProduction", "true"),
+            ("Storage:S3:Bucket", "")));
+
+        // Assert
+        failures.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Inspect_Should_RejectLocalStorage_When_TheOptInIsNotABoolean()
+    {
+        // Act — "yes" is not an opt-in; only a parseable true opens the door.
+        var failures = ProductionConfigurationGuard.Inspect(Config(
+            ("Storage:Provider", "local"),
+            ("Storage:AllowLocalProviderInProduction", "yes")));
+
+        // Assert
+        failures.ShouldContain(f => f.Contains("Storage:Provider", StringComparison.Ordinal));
+    }
+
 
     [Fact]
     public void Inspect_Should_IgnoreUnsetOptionalSecrets_When_TheHostDoesNotUseThem()

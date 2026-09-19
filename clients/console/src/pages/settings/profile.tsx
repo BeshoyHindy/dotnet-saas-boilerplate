@@ -8,7 +8,7 @@ import { ApiRequestError } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ImageInput } from "@/components/file/image-input";
+import { ImageInput, type ImageUpload } from "@/components/file/image-input";
 import { SettingsSection } from "@/pages/settings/settings-layout";
 
 const PROFILE_KEY = ["identity", "me"] as const;
@@ -85,19 +85,47 @@ export function ProfileSettings() {
     (profile?.lastName ?? "") !== lastName ||
     (profile?.phoneNumber ?? "") !== phone;
 
-  const imageMutation = useMutation({
-    mutationFn: (url: string | null) => setProfileImage(url),
+  const imageError = (e: unknown) => {
+    const message =
+      e instanceof ApiRequestError
+        ? (e.problem?.detail ?? e.problem?.title ?? e.message)
+        : "Failed to update profile image";
+    toast.error(message);
+  };
+
+  /**
+   * The avatar rides on the profile PUT as raw bytes. The server writes it with
+   * `IStorageService.UploadAsync` into the `uploads/` prefix — public-read by design — and stores
+   * the durable unsigned URL it returns. It deliberately does NOT go through the Files module,
+   * whose `publicUrl` is a presigned GET that expires in minutes (issue #72).
+   */
+  const uploadMutation = useMutation({
+    mutationFn: (image: ImageUpload) => updateMyProfile({ image }),
     onSuccess: () => {
       toast.success("Profile image updated");
       queryClient.invalidateQueries({ queryKey: PROFILE_KEY });
     },
-    onError: (e: unknown) => {
-      const message =
-        e instanceof ApiRequestError
-          ? (e.problem?.detail ?? e.problem?.title ?? e.message)
-          : "Failed to update profile image";
-      toast.error(message);
+    onError: imageError,
+  });
+
+  /** Clearing also deletes the stored object, so an orphan does not linger in the bucket. */
+  const clearMutation = useMutation({
+    mutationFn: () => updateMyProfile({ deleteCurrentImage: true }),
+    onSuccess: () => {
+      toast.success("Profile image removed");
+      queryClient.invalidateQueries({ queryKey: PROFILE_KEY });
     },
+    onError: imageError,
+  });
+
+  /** "Paste URL" mode: an image the user hosts elsewhere, persisted as-is. */
+  const imageUrlMutation = useMutation({
+    mutationFn: (url: string) => setProfileImage(url),
+    onSuccess: () => {
+      toast.success("Profile image updated");
+      queryClient.invalidateQueries({ queryKey: PROFILE_KEY });
+    },
+    onError: imageError,
   });
 
   return (
@@ -120,9 +148,13 @@ export function ProfileSettings() {
       >
         <ImageInput
           value={profile?.imageUrl ?? ""}
-          onChange={(next) => imageMutation.mutate(next.length > 0 ? next : null)}
-          ownerType="User"
-          ownerId={profile?.id ?? null}
+          onUpload={(image) => uploadMutation.mutate(image)}
+          onChange={(next) =>
+            next.length > 0 ? imageUrlMutation.mutate(next) : clearMutation.mutate()
+          }
+          busy={
+            uploadMutation.isPending || clearMutation.isPending || imageUrlMutation.isPending
+          }
           shape="circle"
         />
       </SettingsSection>

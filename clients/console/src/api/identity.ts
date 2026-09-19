@@ -97,8 +97,9 @@ export async function resendUserConfirmationEmail(userId: string): Promise<void>
 }
 
 /**
- * Persist a durable avatar URL on the authenticated user. Typically the publicUrl returned
- * by the Files module after a presigned upload; pass null/empty to clear.
+ * Persist an avatar URL the user hosts elsewhere (the picker's "Paste URL" mode); pass null to
+ * clear. Uploaded avatars do NOT come through here — they ride on `updateMyProfile({ image })`,
+ * which stores the bytes under `uploads/` and derives the durable URL server-side.
  */
 export async function setProfileImage(imageUrl: string | null): Promise<void> {
   unwrapVoid(await api.PUT("/api/v1/identity/profile/image", { body: { imageUrl } }));
@@ -265,13 +266,21 @@ export type UpdateProfileInput = {
   firstName?: string | null;
   lastName?: string | null;
   phoneNumber?: string | null;
+  /**
+   * A new avatar, as raw bytes. The server uploads it with `IStorageService.UploadAsync` into the
+   * `uploads/` prefix and persists the durable unsigned URL that comes back. This is the ONE way
+   * the console uploads an avatar: a Files-module `publicUrl` is a presigned GET that expires in
+   * minutes, so storing one on the column stores a dead link (issue #72).
+   */
+  image?: Schemas["FileUploadRequest"] | null;
+  /** Delete the current avatar — clears the column AND removes the stored object. */
+  deleteCurrentImage?: boolean;
 };
 
 /**
- * Updates the authenticated user's profile. Image and email changes go through their
- * own dedicated endpoints — this is for the editable profile fields surfaced in
- * settings/profile. Reads the current profile first so unset optional fields keep
- * their existing values instead of being nulled.
+ * Updates the authenticated user's profile. Email changes go through their own dedicated
+ * endpoint. Reads the current profile first so unset optional fields keep their existing
+ * values instead of being nulled.
  */
 export async function updateMyProfile(input: UpdateProfileInput): Promise<void> {
   const profile = await getMyProfile();
@@ -283,10 +292,8 @@ export async function updateMyProfile(input: UpdateProfileInput): Promise<void> 
         lastName: input.lastName ?? profile.lastName ?? null,
         phoneNumber: input.phoneNumber ?? profile.phoneNumber ?? null,
         email: profile.email,
-        // The profile PUT doubles as the raw-bytes avatar upload; this form only edits
-        // the text fields, so it explicitly carries no image and deletes nothing.
-        image: null,
-        deleteCurrentImage: false,
+        image: input.image ?? null,
+        deleteCurrentImage: input.deleteCurrentImage ?? false,
       },
     }),
   );

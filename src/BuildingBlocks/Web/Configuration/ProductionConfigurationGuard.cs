@@ -74,6 +74,8 @@ public static class ProductionConfigurationGuard
             .Where(key => !string.IsNullOrWhiteSpace(configuration[key]) && PlaceholderSecret.Looks(configuration[key]))
             .Select(key => $"Configuration '{key}' still holds a template placeholder; supply a real secret via environment variables or a secret store."));
 
+        failures.AddRange(InspectStorage(configuration));
+
         // Host filtering is driven by this key; "*" (the framework default) accepts any Host header,
         // which lets a poisoned Host reach link generation and password-reset URLs.
         var allowedHosts = configuration["AllowedHosts"];
@@ -88,5 +90,40 @@ public static class ProductionConfigurationGuard
         }
 
         return failures;
+    }
+
+    /// <summary>
+    /// Storage rules for Production. The Local provider writes into <c>wwwroot</c> and serves every
+    /// object through <c>UseStaticFiles</c> — no signing, no visibility check — so a Production host
+    /// running it publishes every Files-module object anonymously. It is dev-only; a deployment that
+    /// genuinely wants it (a single-node box with no object store, behind its own gate) must say so
+    /// with <c>Storage:AllowLocalProviderInProduction=true</c>. The bucket check keeps the s3 default
+    /// honest: without it the miswiring only surfaces on the first upload.
+    /// </summary>
+    private static IEnumerable<string> InspectStorage(IConfiguration configuration)
+    {
+        var provider = configuration["Storage:Provider"];
+        var isS3 = string.Equals(provider, "s3", StringComparison.OrdinalIgnoreCase);
+
+        if (isS3)
+        {
+            if (string.IsNullOrWhiteSpace(configuration["Storage:S3:Bucket"]))
+            {
+                yield return "Missing required configuration 'Storage:S3:Bucket'; the s3 storage provider cannot address a bucket without it.";
+            }
+
+            yield break;
+        }
+
+        if (bool.TryParse(configuration["Storage:AllowLocalProviderInProduction"], out var optedIn) && optedIn)
+        {
+            yield break;
+        }
+
+        var named = string.IsNullOrWhiteSpace(provider) ? "<unset>" : provider;
+        yield return
+            $"Configuration 'Storage:Provider' is '{named}', which selects the Local provider. Local storage serves every " +
+            "object anonymously from wwwroot with no signing and no visibility enforcement, publishing private files. " +
+            "Set 'Storage:Provider' to 's3', or opt in explicitly with 'Storage:AllowLocalProviderInProduction=true'.";
     }
 }
