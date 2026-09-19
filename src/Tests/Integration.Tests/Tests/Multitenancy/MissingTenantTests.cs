@@ -10,10 +10,10 @@ namespace Integration.Tests.Tests.Multitenancy;
 /// is left that could resolve a tenant from anything the caller chooses to send.
 ///
 /// Asserted twice over, because the two facts differ. The routing table must not contain the retired
-/// patterns at all; and over HTTP those paths must no longer behave like anonymous endpoints. They
-/// answer 401 rather than 404 because the host configures a <c>FallbackPolicy</c>, which the
-/// authorization middleware also applies to requests matching no endpoint — pre-existing behaviour,
-/// unrelated to tenant resolution.
+/// patterns at all; and over HTTP those paths must answer like any other unmapped route. They answer
+/// 404 (not 401): the host's catch-all fallback endpoint (issue #47) intercepts requests matching no
+/// endpoint before the <c>FallbackPolicy</c> authorization policy would otherwise turn them into a
+/// 401 — unrelated to tenant resolution.
 /// </summary>
 [Collection(AppCollectionDefinition.Name)]
 public sealed class MissingTenantTests
@@ -66,7 +66,7 @@ public sealed class MissingTenantTests
     [InlineData("/api/v1/identity/forgot-password")]
     [InlineData("/api/v1/identity/reset-password")]
     [InlineData("/api/v1/identity/self-register")]
-    public async Task RetiredHeaderRoutes_Should_NotAnswerAnonymously(string path)
+    public async Task RetiredHeaderRoutes_Should_Return404(string path)
     {
         using var client = _factory.CreateClient();
 
@@ -75,6 +75,6 @@ public sealed class MissingTenantTests
             new { email = TestConstants.RootAdminEmail, password = TestConstants.DefaultPassword });
 
         response.IsSuccessStatusCode.ShouldBeFalse();
-        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 }
