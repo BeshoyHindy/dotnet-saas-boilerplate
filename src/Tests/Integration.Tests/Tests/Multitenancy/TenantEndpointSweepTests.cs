@@ -378,6 +378,13 @@ public sealed class TenantEndpointSweepTests
     /// After the sweep has fired every verb — including DELETE and PATCH — at tenant B's ids, tenant
     /// B's rows must still be there and still readable with B's own token. A 404 that was really a
     /// successful delete would otherwise pass every test above.
+    ///
+    /// <para>The bulk revoke gets a behavioural proof rather than a counted one. <c>POST
+    /// identity/users/{userId}/sessions/revoke-all</c> answers 200 with <c>revokedCount: 0</c> for
+    /// another tenant's user, and that zero is the handler's own account of itself. What the caller
+    /// of ADR-0002 actually cares about is whether tenant B's user is still logged in — so the
+    /// refresh token of B's seeded session is rotated here, with B's own tenant in the route. A
+    /// revoked session cannot rotate.</para>
     /// </summary>
     [Fact]
     public async Task Tenant_B_Rows_Are_Untouched_After_The_Sweep()
@@ -392,17 +399,49 @@ public sealed class TenantEndpointSweepTests
             using var _ = await SendAsync(sweep.A.AdminClient, endpoint, path, routeValues, sweep.A);
         }
 
+        // And the bulk revoke, which is not a DELETE and so is not in the loop above.
+        using (var revokeAll = await sweep.A.AdminClient.PostAsync(
+            $"{TestConstants.IdentityBasePath}/users/{sweep.B[ResourceKind.User]}/sessions/revoke-all",
+            content: null))
+        {
+            _output.WriteLine(
+                $"revoke-all against tenant B's user → {(int)revokeAll.StatusCode}: " +
+                Truncate(await revokeAll.Content.ReadAsStringAsync()));
+        }
+
         var missing = new List<string>();
 
-        foreach (var (kind, path) in ReadBackPaths(sweep.B))
+        foreach (var (kind, path, mustContain) in ReadBackPaths(sweep.B))
         {
             using var response = await sweep.B.AdminClient.GetAsync(path);
+            var body = await response.Content.ReadAsStringAsync();
+
             if (!response.IsSuccessStatusCode)
             {
                 missing.Add(
                     $"{kind} at GET {path} → {(int)response.StatusCode} {response.StatusCode}: " +
-                    Truncate(await response.Content.ReadAsStringAsync()));
+                    Truncate(body));
             }
+            else if (!body.Contains(mustContain, StringComparison.OrdinalIgnoreCase))
+            {
+                missing.Add(
+                    $"{kind} at GET {path} answered 200 but no longer carries {mustContain}: " +
+                    Truncate(body));
+            }
+        }
+
+        // The session B's user is actually holding: rotating its refresh token is what proves the
+        // cross-tenant revoke-all did nothing, in the only currency that matters to that user.
+        using var rotated = await _factory.CreateClient().PostAsJsonAsync(
+            $"{TestConstants.AuthBasePath(sweep.B.TenantId)}/refresh",
+            new { refreshToken = sweep.B.Member.RefreshToken });
+
+        if (!rotated.IsSuccessStatusCode)
+        {
+            missing.Add(
+                "the session of tenant B's user no longer rotates its refresh token → " +
+                $"{(int)rotated.StatusCode} {rotated.StatusCode}: " +
+                Truncate(await rotated.Content.ReadAsStringAsync()));
         }
 
         missing.ShouldBeEmpty(
@@ -566,15 +605,38 @@ public sealed class TenantEndpointSweepTests
 
     /// <summary>
     /// Read-back probes for the "tenant B is untouched" assertion: one GET per seeded row, chosen so
-    /// the check fails if the row was deleted rather than merely hidden.
+    /// the check fails if the row was deleted rather than merely hidden. Each probe names the id it
+    /// must still find, so a row that vanished from a list is caught as surely as one whose GET 404s.
+    ///
+    /// The last four are lists because the rows have no by-id route of their own: a session, a
+    /// notification, an impersonation grant and a file in the trash are each read back through the
+    /// collection that shows them. The trash probe is the one that answers the restore route — a
+    /// cross-tenant restore that worked would take the file out of that list.
     /// </summary>
-    private static IEnumerable<(ResourceKind Kind, string Path)> ReadBackPaths(SeededTenant tenant)
+    private static IEnumerable<(ResourceKind Kind, string Path, string MustContain)> ReadBackPaths(
+        SeededTenant tenant)
     {
-        yield return (ResourceKind.User, $"/api/v1/identity/users/{tenant[ResourceKind.User]}");
-        yield return (ResourceKind.Role, $"/api/v1/identity/roles/{tenant[ResourceKind.Role]}");
-        yield return (ResourceKind.Group, $"/api/v1/identity/groups/{tenant[ResourceKind.Group]}");
-        yield return (ResourceKind.File, $"/api/v1/files/{tenant[ResourceKind.File]}");
-        yield return (ResourceKind.Audit, $"/api/v1/audits/{tenant[ResourceKind.Audit]}");
+        yield return (ResourceKind.User,
+            $"/api/v1/identity/users/{tenant[ResourceKind.User]}", tenant[ResourceKind.User]);
+        yield return (ResourceKind.Role,
+            $"/api/v1/identity/roles/{tenant[ResourceKind.Role]}", tenant[ResourceKind.Role]);
+        yield return (ResourceKind.Group,
+            $"/api/v1/identity/groups/{tenant[ResourceKind.Group]}", tenant[ResourceKind.Group]);
+        yield return (ResourceKind.File,
+            $"/api/v1/files/{tenant[ResourceKind.File]}", tenant[ResourceKind.File]);
+        yield return (ResourceKind.Audit,
+            $"/api/v1/audits/{tenant[ResourceKind.Audit]}", tenant[ResourceKind.Audit]);
+
+        // includeInactive is left off on purpose: the sessions list then shows live sessions only,
+        // so finding the id there proves the session was not revoked, not merely that the row exists.
+        yield return (ResourceKind.Session,
+            "/api/v1/identity/sessions?pageNumber=1&pageSize=100", tenant[ResourceKind.Session]);
+        yield return (ResourceKind.Notification,
+            "/api/v1/notifications?page=1&pageSize=100", tenant[ResourceKind.Notification]);
+        yield return (ResourceKind.ImpersonationGrant,
+            "/api/v1/identity/impersonation/grants?take=100", tenant[ResourceKind.ImpersonationGrant]);
+        yield return (ResourceKind.TrashedFile,
+            "/api/v1/files/trash?pageNumber=1&pageSize=100", tenant[ResourceKind.TrashedFile]);
     }
 
     private static string Truncate(string body) =>

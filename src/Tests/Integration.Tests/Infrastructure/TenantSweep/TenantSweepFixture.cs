@@ -107,6 +107,7 @@ public sealed class TenantSweepFixture
             TenantId = tenantId,
             AdminEmail = adminEmail,
             AdminUserId = seeded.AdminUserId,
+            Member = seeded.Member,
             Marker = marker,
             AdminClient = client,
             Ids = seeded.Ids,

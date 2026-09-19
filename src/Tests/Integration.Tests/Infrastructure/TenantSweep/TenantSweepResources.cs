@@ -65,6 +65,13 @@ public sealed class SeededTenant
     /// this to mint a session the control is actually allowed to delete.
     /// </summary>
     public required string AdminUserId { get; init; }
+
+    /// <summary>
+    /// The ordinary (non-admin) user seeded in this tenant, with the refresh token of the session
+    /// the sweep probes. The token is what turns "the row is still there" into "the session still
+    /// works": after tenant A has fired a bulk revoke at this user, rotating it must still succeed.
+    /// </summary>
+    public required SweptUser Member { get; init; }
     public required string Marker { get; init; }
     public required HttpClient AdminClient { get; init; }
     public required IReadOnlyDictionary<ResourceKind, string> Ids { get; init; }
@@ -81,7 +88,14 @@ public sealed class SeededTenant
 /// </summary>
 /// <param name="Ids">One live row per <see cref="ResourceKind"/>.</param>
 /// <param name="AdminUserId">The user behind the admin token.</param>
-public sealed record SeededRows(IReadOnlyDictionary<ResourceKind, string> Ids, string AdminUserId);
+/// <param name="Member">The tenant's ordinary user, and the refresh token of their live session.</param>
+public sealed record SeededRows(
+    IReadOnlyDictionary<ResourceKind, string> Ids,
+    string AdminUserId,
+    SweptUser Member);
+
+/// <summary>A seeded user, with a working refresh token for the session the sweep probes.</summary>
+public sealed record SweptUser(string UserId, string Email, string Password, string RefreshToken);
 
 /// <summary>
 /// Maps a route's <see cref="ResourceParameter.RegistryKey"/> (preceding literal segment + parameter
@@ -328,7 +342,8 @@ internal static class TenantSweepSeeder
         ids[ResourceKind.Notification] = await SeedNotificationAsync(
             factory, tenantId, adminUserId, $"sweep-notification-{marker}", marker);
         ids[ResourceKind.ImpersonationGrant] = await SeedImpersonationGrantAsync(adminClient, tenantId, user.UserId);
-        ids[ResourceKind.Session] = await SeedSessionAsync(auth, adminClient, user, tenantId);
+        var session = await SeedSessionAsync(auth, adminClient, user, tenantId);
+        ids[ResourceKind.Session] = session.SessionId;
         ids[ResourceKind.Tenant] = tenantId;
 
         // Rows in a non-default state. Without these, the list half of the sweep only ever reads the
@@ -348,7 +363,10 @@ internal static class TenantSweepSeeder
         ids[ResourceKind.AuditCorrelation] = audit.CorrelationId;
         ids[ResourceKind.AuditTrace] = audit.TraceId;
 
-        return new SeededRows(ids, adminUserId);
+        return new SeededRows(
+            ids,
+            adminUserId,
+            new SweptUser(user.UserId, user.Email, user.Password, session.RefreshToken));
     }
 
     /// <summary>The id of the user whose token <paramref name="client"/> carries.</summary>
@@ -494,11 +512,15 @@ internal static class TenantSweepSeeder
     /// <summary>
     /// A UserSession row: logging the seeded user in mints one. Read back through the tenant
     /// sessions list so the id is the one the API itself would hand a caller.
+    ///
+    /// The refresh token that login returned is kept: it is the only way to ask the question the
+    /// bulk-revoke probe really raises — not "is the row still listed" but "does the session still
+    /// work" — by rotating it after tenant A has fired revoke-all at this user.
     /// </summary>
-    private static async Task<string> SeedSessionAsync(
+    private static async Task<(string SessionId, string RefreshToken)> SeedSessionAsync(
         AuthHelper auth, HttpClient adminClient, TenantFixture.TestUser user, string tenantId)
     {
-        await TenantFixture.GetTokenWithRetryAsync(auth, user.Email, user.Password, tenantId);
+        var token = await TenantFixture.GetTokenWithRetryAsync(auth, user.Email, user.Password, tenantId);
 
         using var response = await adminClient.GetAsync(
             $"{TestConstants.IdentityBasePath}/sessions?pageNumber=1&pageSize=200");
@@ -511,7 +533,7 @@ internal static class TenantSweepSeeder
             ?? page.Items.FirstOrDefault()
             ?? throw new InvalidOperationException($"no UserSession materialised in tenant {tenantId}");
 
-        return session.Id;
+        return (session.Id, token.RefreshToken);
     }
 
     /// <summary>
