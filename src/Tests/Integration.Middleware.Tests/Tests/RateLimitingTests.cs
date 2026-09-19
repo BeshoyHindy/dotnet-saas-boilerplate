@@ -28,8 +28,7 @@ public sealed class RateLimitingTests
 
     private static async Task<HttpResponseMessage> IssueBadTokenAsync(HttpClient client)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/issue");
-        request.Headers.Add("tenant", TestConstants.RootTenantId);
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.RootAuthBasePath}/token");
         request.Content = JsonContent.Create(new { email = "nobody@example.com", password = "wrong-password" });
         return await client.SendAsync(request);
     }

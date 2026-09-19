@@ -1,12 +1,34 @@
 using Integration.Tests.Infrastructure;
+using Microsoft.AspNetCore.Routing;
 
 namespace Integration.Tests.Tests.Multitenancy;
 
-// Regression for #1245: a missing required `tenant` header on anonymous tenant-scoped endpoints throws
-// BadHttpRequestException (400) during binding — must surface as 400, not fall through to a generic 500.
+/// <summary>
+/// The anonymous, tenant-scoped endpoints exist only under <c>/api/v1/tenants/{tenant}/auth/...</c>
+/// (ADR-0002). Their old un-tenanted <c>/api/v1/identity/...</c> forms — which took the tenant from a
+/// header and returned 400 when it was absent (issue #1245) — are deleted, not redirected: no route
+/// is left that could resolve a tenant from anything the caller chooses to send.
+///
+/// Asserted twice over, because the two facts differ. The routing table must not contain the retired
+/// patterns at all; and over HTTP those paths must no longer behave like anonymous endpoints. They
+/// answer 401 rather than 404 because the host configures a <c>FallbackPolicy</c>, which the
+/// authorization middleware also applies to requests matching no endpoint — pre-existing behaviour,
+/// unrelated to tenant resolution.
+/// </summary>
 [Collection(AppCollectionDefinition.Name)]
 public sealed class MissingTenantTests
 {
+    /// <summary>The route suffixes that used to take the tenant from a header.</summary>
+    private static readonly string[] RetiredRouteSuffixes =
+    {
+        "identity/token/issue",
+        "identity/token/refresh",
+        "identity/forgot-password",
+        "identity/reset-password",
+        "identity/confirm-email",
+        "identity/self-register",
+    };
+
     private readonly AppWebApplicationFactory _factory;
 
     public MissingTenantTests(AppWebApplicationFactory factory)
@@ -15,47 +37,44 @@ public sealed class MissingTenantTests
     }
 
     [Fact]
-    public async Task ForgotPassword_Should_Return400_When_TenantHeaderMissing()
+    public void RetiredHeaderRoutes_Should_NotBeRegistered()
     {
-        using var client = _factory.CreateClient(); // anonymous, NO tenant header
+        _ = _factory.Server;
 
-        var response = await client.PostAsJsonAsync(
-            $"{TestConstants.IdentityBasePath}/forgot-password",
-            new { email = "nobody@example.com" });
+        var patterns = _factory.Services
+            .GetRequiredService<EndpointDataSource>()
+            .Endpoints
+            .OfType<RouteEndpoint>()
+            .Select(e => e.RoutePattern.RawText)
+            .Where(raw => raw is not null)
+            .ToList();
 
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        var survivors = RetiredRouteSuffixes
+            .Where(suffix => patterns.Exists(
+                raw => raw!.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        survivors.ShouldBeEmpty(
+            "ADR-0002 moved every anonymous tenant-scoped endpoint under " +
+            "api/v1/tenants/{tenant}/auth/. These header-era routes must not exist:\n  - " +
+            string.Join("\n  - ", survivors));
     }
 
-    [Fact]
-    public async Task ResetPassword_Should_Return400_When_TenantHeaderMissing()
+    [Theory]
+    [InlineData("/api/v1/identity/token/issue")]
+    [InlineData("/api/v1/identity/token/refresh")]
+    [InlineData("/api/v1/identity/forgot-password")]
+    [InlineData("/api/v1/identity/reset-password")]
+    [InlineData("/api/v1/identity/self-register")]
+    public async Task RetiredHeaderRoutes_Should_NotAnswerAnonymously(string path)
     {
-        using var client = _factory.CreateClient(); // anonymous, NO tenant header
+        using var client = _factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
-            $"{TestConstants.IdentityBasePath}/reset-password",
-            new { email = "nobody@example.com", token = "x", password = "Test@1234!" });
+            path,
+            new { email = TestConstants.RootAdminEmail, password = TestConstants.DefaultPassword });
 
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-    }
-
-    [Fact]
-    public async Task SelfRegister_Should_Return400_When_TenantHeaderMissing()
-    {
-        using var client = _factory.CreateClient(); // anonymous, NO tenant header
-        var uniqueId = Guid.NewGuid().ToString("N")[..8];
-
-        var response = await client.PostAsJsonAsync(
-            $"{TestConstants.IdentityBasePath}/self-register",
-            new
-            {
-                firstName = "Self",
-                lastName = "Reg",
-                email = $"self-{uniqueId}@example.com",
-                userName = $"selfreg-{uniqueId}",
-                password = "Test@1234!",
-                confirmPassword = "Test@1234!"
-            });
-
-        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        response.IsSuccessStatusCode.ShouldBeFalse();
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 }

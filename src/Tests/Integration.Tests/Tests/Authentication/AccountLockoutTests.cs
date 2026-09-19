@@ -106,8 +106,7 @@ public sealed class AccountLockoutTests
     private async Task<HttpResponseMessage> AttemptLoginAsync(string email, string password)
     {
         using var client = _factory.CreateClient();
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/issue");
-        request.Headers.Add("tenant", TestConstants.RootTenantId);
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.RootAuthBasePath}/token");
         request.Content = JsonContent.Create(new { email, password });
         return await client.SendAsync(request);
     }

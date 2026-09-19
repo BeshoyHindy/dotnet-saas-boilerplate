@@ -47,6 +47,15 @@ export function describeError(err: unknown): string {
 
 type RequestInitEx = RequestInit & { skipAuth?: boolean; timeoutMs?: number };
 
+/**
+ * The anonymous, tenant-scoped auth routes. The tenant travels in the path because
+ * no token exists yet on these calls (ADR-0002); every other request carries its
+ * tenant inside the signed token, so the client never names a tenant on the wire.
+ */
+export function authPath(tenant: string, segment: string): string {
+  return `/api/v1/tenants/${encodeURIComponent(tenant)}/auth/${segment}`;
+}
+
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 let refreshPromise: Promise<void> | null = null;
@@ -60,13 +69,12 @@ export async function refreshAccessToken() {
 
   // Server's RefreshTokenCommand requires both `token` (the current, possibly
   // expired access token, used to cross-check the subject) and `refreshToken`.
-  // Tenant header must match the token's tenant or refresh fails.
+  // Refresh is anonymous, so the tenant rides in the route.
   const tenant = tokenStore.getTenant() ?? env.defaultTenant;
-  const response = await fetch(`${env.apiBase}/api/v1/identity/token/refresh`, {
+  const response = await fetch(`${env.apiBase}${authPath(tenant, "refresh")}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(tenant ? { tenant } : {}),
     },
     body: JSON.stringify({ token: accessToken, refreshToken }),
     signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
@@ -132,11 +140,6 @@ export async function apiFetch<T = unknown>(
         detail: "Your session is no longer available. Please sign in again.",
       });
     }
-  }
-
-  const tenant = tokenStore.getTenant() ?? env.defaultTenant;
-  if (tenant && !mergedHeaders.has("tenant")) {
-    mergedHeaders.set("tenant", tenant);
   }
 
   const url = path.startsWith("http") ? path : `${env.apiBase}${path}`;

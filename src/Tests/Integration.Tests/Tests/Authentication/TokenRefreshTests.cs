@@ -20,8 +20,7 @@ public sealed class TokenRefreshTests
         // Arrange
         var originalToken = await _auth.GetRootAdminTokenAsync();
         using var client = _factory.CreateClient();
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/refresh");
-        request.Headers.Add("tenant", TestConstants.RootTenantId);
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.RootAuthBasePath}/refresh");
         request.Content = JsonContent.Create(new
         {
             token = originalToken.AccessToken,
@@ -45,8 +44,7 @@ public sealed class TokenRefreshTests
         // Arrange
         var originalToken = await _auth.GetRootAdminTokenAsync();
         using var client = _factory.CreateClient();
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/refresh");
-        request.Headers.Add("tenant", TestConstants.RootTenantId);
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.RootAuthBasePath}/refresh");
         request.Content = JsonContent.Create(new
         {
             token = originalToken.AccessToken,

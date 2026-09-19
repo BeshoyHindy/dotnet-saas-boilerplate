@@ -1,6 +1,7 @@
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.Modules.Identity.Contracts.DTOs;
 using Boilerplate.Modules.Identity.Contracts.v1.Tokens.TokenGeneration;
+using Finbuckle.MultiTenant.Abstractions;
 using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -8,7 +9,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using System.ComponentModel;
 
 namespace Boilerplate.Modules.Identity.Features.v1.Tokens.TokenGeneration;
 
@@ -29,14 +29,19 @@ public static class GenerateTokenEndpoint
     {
         ArgumentNullException.ThrowIfNull(endpoint);
 
-        return endpoint.MapPost("/token/issue",
+        return endpoint.MapPost("/token",
             [AllowAnonymous] async Task<Results<Ok<TokenResponse>, UnauthorizedHttpResult, ProblemHttpResult>>
             ([FromBody] GenerateTokenCommand command,
-            [DefaultValue("root")][FromHeader] string tenant,
             [FromHeader(Name = AppHeader)] string? app,
+            [FromServices] IMultiTenantContextAccessor<AppTenantInfo> tenantAccessor,
             [FromServices] IMediator mediator,
             CancellationToken ct) =>
             {
+                // The tenant comes from the {tenant} route segment via tenant resolution — never from a
+                // caller-supplied header. An unknown tenant resolves to null and the command fails 401,
+                // which is exactly what a wrong password returns.
+                var tenant = tenantAccessor.MultiTenantContext?.TenantInfo?.Id;
+
                 if (IsRootViaDashboard(tenant, app))
                 {
                     return TypedResults.Problem(
@@ -52,7 +57,7 @@ public static class GenerateTokenEndpoint
             })
             .WithName("IssueJwtTokens")
             .WithSummary("Issue JWT access and refresh tokens")
-            .WithDescription("Submit credentials to receive a JWT access token and a refresh token. Provide the 'tenant' header to select the tenant context (defaults to 'root'). The 'X-Client-App' header (admin|dashboard) is used to enforce the SuperAdmin / dashboard boundary.")
+            .WithDescription("Submit credentials to receive a JWT access token and a refresh token. The tenant is taken from the '{tenant}' route segment. The 'X-Client-App' header (admin|dashboard) is used to enforce the SuperAdmin / dashboard boundary.")
             .Produces<TokenResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden)
@@ -60,7 +65,7 @@ public static class GenerateTokenEndpoint
             .Produces(StatusCodes.Status500InternalServerError);
     }
 
-    private static bool IsRootViaDashboard(string tenant, string? app)
+    private static bool IsRootViaDashboard(string? tenant, string? app)
     {
         return string.Equals(tenant, MultitenancyConstants.Root.Id, StringComparison.OrdinalIgnoreCase)
             && string.Equals(app, AppDashboard, StringComparison.OrdinalIgnoreCase);

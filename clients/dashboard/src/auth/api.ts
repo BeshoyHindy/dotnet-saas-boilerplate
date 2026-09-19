@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, authPath } from "@/lib/api-client";
 
 export type TokenResponse = {
   accessToken: string;
@@ -12,14 +12,16 @@ export function issueToken(input: {
   password: string;
   tenant: string;
 }) {
-  return apiFetch<TokenResponse>("/api/v1/identity/token/issue", {
+  // The tenant is part of the login URL, not a header: it is the one place the
+  // caller may name a tenant, and only while no token exists yet (ADR-0002).
+  return apiFetch<TokenResponse>(authPath(input.tenant, "token"), {
     method: "POST",
     body: JSON.stringify({ email: input.email, password: input.password }),
     // X-Client-App tells the API this credential request originated from the
     // tenant dashboard. The server uses it to enforce the SuperAdmin / app
     // boundary — a root-tenant login submitted with X-Client-App=dashboard is
     // rejected with 403 instead of receiving a usable token.
-    headers: { tenant: input.tenant, "X-Client-App": "dashboard" },
+    headers: { "X-Client-App": "dashboard" },
     skipAuth: true,
   });
 }

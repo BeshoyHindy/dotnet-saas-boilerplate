@@ -25,7 +25,6 @@ public sealed class RefreshTokenRevocationTests
         // Arrange - Login and get tokens
         var tokenPair = await _auth.GetRootAdminTokenAsync();
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
         client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", tokenPair.AccessToken);
 
         // Get current sessions
@@ -43,8 +42,7 @@ public sealed class RefreshTokenRevocationTests
         revokeResponse.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         // Assert - Try to refresh token
-        var refreshRequest = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/refresh");
-        refreshRequest.Headers.Add("tenant", TestConstants.RootTenantId);
+        var refreshRequest = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.RootAuthBasePath}/refresh");
         refreshRequest.Content = JsonContent.Create(new
         {
             token = tokenPair.AccessToken,

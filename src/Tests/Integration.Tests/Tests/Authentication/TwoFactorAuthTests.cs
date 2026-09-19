@@ -151,8 +151,7 @@ public sealed class TwoFactorAuthTests
     private async Task<HttpClient> SignInAsync(string email, string password, string? twoFactorCode = null)
     {
         using var loginClient = _factory.CreateClient();
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/issue");
-        request.Headers.Add("tenant", TestConstants.RootTenantId);
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.RootAuthBasePath}/token");
         request.Content = JsonContent.Create(new { email, password, twoFactorCode });
         var response = await loginClient.SendAsync(request);
         response.EnsureSuccessStatusCode();
@@ -163,15 +162,13 @@ public sealed class TwoFactorAuthTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token!.AccessToken);
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
         return client;
     }
 
     private async Task<HttpResponseMessage> LoginAsync(string email, string password, string? twoFactorCode = null)
     {
         using var client = _factory.CreateClient();
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/issue");
-        request.Headers.Add("tenant", TestConstants.RootTenantId);
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.RootAuthBasePath}/token");
         request.Content = JsonContent.Create(new { email, password, twoFactorCode });
         return await client.SendAsync(request);
     }

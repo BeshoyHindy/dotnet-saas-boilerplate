@@ -39,11 +39,10 @@ public sealed class PasswordResetTests
         var encodedToken = await GenerateResetTokenAsync(email);
 
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         // Act
         var response = await client.PostAsJsonAsync(
-            $"{TestConstants.IdentityBasePath}/reset-password",
+            $"{TestConstants.RootAuthBasePath}/reset-password",
             new { email, password = newPassword, token = encodedToken });
 
         // Assert
@@ -73,11 +72,10 @@ public sealed class PasswordResetTests
         var garbageToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes("not-a-real-token"));
 
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         // Act
         var response = await client.PostAsJsonAsync(
-            $"{TestConstants.IdentityBasePath}/reset-password",
+            $"{TestConstants.RootAuthBasePath}/reset-password",
             new { email, password = "Whatever123!", token = garbageToken });
 
         // Assert — request is rejected and, critically, nothing changed.
@@ -93,11 +91,10 @@ public sealed class PasswordResetTests
         var garbageToken = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes("token"));
 
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         // Act
         var response = await client.PostAsJsonAsync(
-            $"{TestConstants.IdentityBasePath}/reset-password",
+            $"{TestConstants.RootAuthBasePath}/reset-password",
             new { email = $"ghost_{Guid.NewGuid():N}@test.com", password = "Whatever123!", token = garbageToken });
 
         // Assert

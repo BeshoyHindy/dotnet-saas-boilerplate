@@ -1,5 +1,6 @@
 using Finbuckle.MultiTenant.Abstractions;
 using Boilerplate.BuildingBlocks.Core.Context;
+using Boilerplate.BuildingBlocks.Shared.Constants;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.Modules.Auditing.Contracts;
 using Microsoft.AspNetCore.Http;
@@ -35,10 +36,11 @@ public sealed class HttpAuditScope : IAuditScope
         _currentUser = currentUser;
     }
 
+    // No header fallback (ADR-0002): the resolved tenant already derives from the token claim, and a
+    // caller-supplied header must never be able to relabel an audit row.
     public string? TenantId =>
         _tenant.MultiTenantContext?.TenantInfo?.Id
-        ?? _http.HttpContext?.User?.FindFirstValue(MultitenancyConstants.Identifier)
-        ?? _http.HttpContext?.Request?.Headers[MultitenancyConstants.Identifier].FirstOrDefault()
+        ?? _http.HttpContext?.User?.FindFirstValue(ClaimConstants.Tenant)
         ?? _http.HttpContext?.Items["TenantId"] as string
         ?? _currentUser?.GetTenant();
 

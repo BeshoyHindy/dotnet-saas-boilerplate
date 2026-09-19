@@ -36,7 +36,6 @@ public sealed class NotificationsEndpointTests
     public async Task ListNotifications_Should_Return401_When_Unauthenticated()
     {
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         using var response = await client.GetAsync($"{NotificationsBasePath}/");
 
@@ -47,7 +46,6 @@ public sealed class NotificationsEndpointTests
     public async Task GetUnreadCount_Should_Return401_When_Unauthenticated()
     {
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         using var response = await client.GetAsync($"{NotificationsBasePath}/unread-count");
 
@@ -58,7 +56,6 @@ public sealed class NotificationsEndpointTests
     public async Task MarkNotificationRead_Should_Return401_When_Unauthenticated()
     {
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         using var response = await client.PostAsync(
             $"{NotificationsBasePath}/{Guid.NewGuid()}/read", content: null);
@@ -70,7 +67,6 @@ public sealed class NotificationsEndpointTests
     public async Task MarkAllNotificationsRead_Should_Return401_When_Unauthenticated()
     {
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         using var response = await client.PostAsync($"{NotificationsBasePath}/read-all", content: null);
 

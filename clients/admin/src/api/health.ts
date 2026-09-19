@@ -16,9 +16,9 @@ export type HealthResult = {
 };
 
 /**
- * Health probes are anonymous — bypass the apiClient so we don't drag the
- * tenant header / auth token into a public endpoint, and so we can read
- * the body on a 503 (apiClient would throw before parsing).
+ * Health probes are anonymous — bypass the apiClient so we don't drag the auth
+ * token into a public endpoint, and so we can read the body on a 503 (apiClient
+ * would throw before parsing).
  */
 async function fetchHealth(path: string, timeoutMs = 8_000): Promise<HealthResult> {
   const url = `${env.apiBase}${path}`;

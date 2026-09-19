@@ -31,8 +31,7 @@ public sealed class TokenGenerationTests
     public async Task GenerateToken_Should_Return401_When_PasswordIsIncorrect()
     {
         using var client = _factory.CreateClient();
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/issue");
-        request.Headers.Add("tenant", TestConstants.RootTenantId);
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.RootAuthBasePath}/token");
         request.Content = JsonContent.Create(new
         {
             email = TestConstants.RootAdminEmail,
@@ -48,8 +47,7 @@ public sealed class TokenGenerationTests
     public async Task GenerateToken_Should_Return401_When_EmailDoesNotExist()
     {
         using var client = _factory.CreateClient();
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/issue");
-        request.Headers.Add("tenant", TestConstants.RootTenantId);
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.RootAuthBasePath}/token");
         request.Content = JsonContent.Create(new
         {
             email = "nonexistent@example.com",
@@ -65,8 +63,7 @@ public sealed class TokenGenerationTests
     public async Task GenerateToken_Should_Return400_When_EmailIsEmpty()
     {
         using var client = _factory.CreateClient();
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/issue");
-        request.Headers.Add("tenant", TestConstants.RootTenantId);
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.RootAuthBasePath}/token");
         request.Content = JsonContent.Create(new
         {
             email = "",
@@ -96,10 +93,14 @@ public sealed class TokenGenerationTests
     }
 
     [Fact]
-    public async Task GenerateToken_Should_Fail_When_TenantHeaderIsMissing()
+    public async Task GenerateToken_Should_Return401_When_TenantIsUnknown()
     {
+        // An unknown {tenant} resolves to no tenant at all, and the login handler treats that the
+        // same way it treats a wrong password: a bare 401 that reveals nothing about which tenants
+        // exist (ADR-0002 replaces the old missing-`tenant`-header 400).
         using var client = _factory.CreateClient();
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/issue");
+        var request = new HttpRequestMessage(
+            HttpMethod.Post, $"{TestConstants.AuthBasePath($"no-such-tenant-{Guid.NewGuid():N}")}/token");
         request.Content = JsonContent.Create(new
         {
             email = TestConstants.RootAdminEmail,
@@ -108,6 +109,6 @@ public sealed class TokenGenerationTests
 
         var response = await client.SendAsync(request);
 
-        response.IsSuccessStatusCode.ShouldBeFalse();
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 }

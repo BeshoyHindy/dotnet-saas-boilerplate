@@ -50,7 +50,7 @@ The dev server proxies `/api`, `/openapi`, and `/scalar` to `VITE_API_BASE_URL` 
 | Variable              | Default                  | Purpose                                       |
 |-----------------------|--------------------------|-----------------------------------------------|
 | `VITE_API_BASE_URL`   | `http://localhost:5030`  | API origin used by the dev proxy              |
-| `VITE_DEFAULT_TENANT` | `root`                   | Default tenant header for unauthenticated calls |
+| `VITE_DEFAULT_TENANT` | `root`                   | Tenant pre-filled on the sign-in form and used in anonymous auth URLs |
 
 ## Architecture
 
@@ -74,7 +74,7 @@ src/
 
 ## Authentication flow
 
-Identical to the admin app: JWT in `localStorage`, `Authorization: Bearer` + `tenant` headers, single-flight refresh on 401 via `POST /api/v1/identity/token/refresh`. Keys are namespaced `boilerplate.dashboard.*` so both apps can run side-by-side without clobbering each other's session.
+Identical to the admin app: sign in at `POST /api/v1/tenants/{tenant}/auth/token`, JWT in `localStorage`, `Authorization: Bearer` on every call (and no tenant header — the server reads the token's `tenant` claim, ADR-0002), single-flight refresh on 401 via `POST /api/v1/tenants/{tenant}/auth/refresh`. Keys are namespaced `boilerplate.dashboard.*` so both apps can run side-by-side without clobbering each other's session.
 
 ## Production build
 

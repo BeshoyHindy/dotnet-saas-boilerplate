@@ -1,5 +1,4 @@
 ﻿using Boilerplate.BuildingBlocks.Eventing;
-using Finbuckle.MultiTenant.AspNetCore.Extensions;
 using Boilerplate.BuildingBlocks.Web;
 using Boilerplate.BuildingBlocks.Web.Configuration;
 using Boilerplate.BuildingBlocks.Web.Modules;
@@ -70,10 +69,9 @@ builder.Services.AddHostedService<Boilerplate.Api.OrphanedOutboxRecurringJobClea
 
 var app = builder.Build();
 
-// Finbuckle tenant resolution, deliberately before UseHeroPlatform (and so before
-// UseAuthentication): resolution is header-driven, not claim-driven. This only installs the
-// resolution middleware — per-tenant databases are migrated by the DbMigrator host.
-app.UseMultiTenant();
+// Tenant resolution is NOT installed here: it has to run after UseAuthentication(), so
+// MultitenancyModule.ConfigureMiddleware() calls UseMultiTenant() from inside
+// UseModuleMiddlewares(). See ADR-0002.
 app.UseHeroPlatform(p =>
 {
     p.MapModules = true;

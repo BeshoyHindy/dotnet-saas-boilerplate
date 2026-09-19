@@ -1,4 +1,3 @@
-using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.Modules.Identity.Contracts.v1.Users.ForgotPassword;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
@@ -14,7 +13,6 @@ public static class ForgotPasswordEndpoint
     {
         return endpoints.MapPost("/forgot-password", async (
             HttpRequest request,
-            [FromHeader(Name = MultitenancyConstants.Identifier)] string tenant,
             [FromBody] ForgotPasswordCommand command,
             IMediator mediator,
             CancellationToken cancellationToken) =>
@@ -24,7 +22,7 @@ public static class ForgotPasswordEndpoint
         })
         .WithName("RequestPasswordReset")
         .WithSummary("Request password reset")
-        .WithDescription("Generate a password reset token and send it via email.")
+        .WithDescription("Generate a password reset token and send it via email. The tenant is taken from the '{tenant}' route segment.")
         .AllowAnonymous()
         .Produces(StatusCodes.Status200OK);
     }

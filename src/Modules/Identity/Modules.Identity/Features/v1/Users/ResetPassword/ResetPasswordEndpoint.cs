@@ -1,4 +1,3 @@
-using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.Modules.Identity.Contracts.v1.Users.ResetPassword;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
@@ -14,7 +13,6 @@ public static class ResetPasswordEndpoint
     {
         return endpoints.MapPost("/reset-password",
             async ([FromBody] ResetPasswordCommand command,
-            [FromHeader(Name = MultitenancyConstants.Identifier)] string tenant,
             IMediator mediator,
             CancellationToken cancellationToken) =>
         {
@@ -23,7 +21,7 @@ public static class ResetPasswordEndpoint
         })
         .WithName("ResetPassword")
         .WithSummary("Reset password")
-        .WithDescription("Reset the user's password using the provided verification token.")
+        .WithDescription("Reset the user's password using the provided verification token. The tenant is taken from the '{tenant}' route segment.")
         .AllowAnonymous()
         .Produces(StatusCodes.Status200OK);
     }

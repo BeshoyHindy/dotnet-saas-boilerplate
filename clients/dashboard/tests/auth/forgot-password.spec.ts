@@ -14,22 +14,23 @@ test.describe("forgot-password page", () => {
     await expect(page.getByRole("button", { name: /send reset link/i })).toBeVisible();
   });
 
-  test("posts to /forgot-password with the tenant header on submit", async ({ page }) => {
-    const captured = captureRequest(page, "**/api/v1/identity/forgot-password");
+  test("posts to the tenant-scoped /forgot-password route on submit", async ({ page }) => {
+    const captured = captureRequest(page, "**/api/v1/tenants/*/auth/forgot-password");
 
     await page.goto("/forgot-password");
     await page.getByLabel("Email").fill("alice@acme.com");
     await page.getByLabel("Tenant").fill("acme");
     await page.getByRole("button", { name: /send reset link/i }).click();
 
-    const { body, headers } = await captured.value();
+    const { body, headers, url } = await captured.value();
     expect(body).toMatchObject({ email: "alice@acme.com" });
-    // Tenant header must override the default for cross-tenant reset flows.
-    expect(headers.tenant).toBe("acme");
+    // The tenant is a path segment, not a header (ADR-0002).
+    expect(url).toContain("/api/v1/tenants/acme/auth/forgot-password");
+    expect(headers.tenant).toBeUndefined();
   });
 
   test("shows the 'check your inbox' success state after 200", async ({ page }) => {
-    await mockJsonResponse(page, "**/api/v1/identity/forgot-password", '""');
+    await mockJsonResponse(page, "**/api/v1/tenants/*/auth/forgot-password", '""');
 
     await page.goto("/forgot-password");
     await page.getByLabel("Email").fill("bob@globex.com");
@@ -50,7 +51,7 @@ test.describe("forgot-password page", () => {
   });
 
   test("surfaces server errors (5xx / tenant-not-resolvable) on the form", async ({ page }) => {
-    await mockProblemDetails(page, "**/api/v1/identity/forgot-password", 500, {
+    await mockProblemDetails(page, "**/api/v1/tenants/*/auth/forgot-password", 500, {
       title: "Tenant resolution failed",
       detail: "No tenant matching the supplied identifier.",
     });

@@ -18,7 +18,7 @@ test.describe("confirm-email page", () => {
   test("auto-fires the GET on mount and shows the success state on 2xx", async ({ page }) => {
     await mockJsonResponse(
       page,
-      "**/api/v1/identity/confirm-email**",
+      "**/api/v1/tenants/*/auth/confirm-email**",
       '"Your email is confirmed."',
     );
 
@@ -30,7 +30,7 @@ test.describe("confirm-email page", () => {
   });
 
   test("surfaces server errors as an actionable failure state", async ({ page }) => {
-    await mockProblemDetails(page, "**/api/v1/identity/confirm-email**", 400, {
+    await mockProblemDetails(page, "**/api/v1/tenants/*/auth/confirm-email**", 400, {
       title: "Invalid token",
       detail: "The confirmation token is no longer valid.",
     });
@@ -52,7 +52,7 @@ test.describe("confirm-email page", () => {
   test("'continue to sign in' link routes to /login", async ({ page }) => {
     await mockJsonResponse(
       page,
-      "**/api/v1/identity/confirm-email**",
+      "**/api/v1/tenants/*/auth/confirm-email**",
       '"Your email is confirmed."',
     );
 

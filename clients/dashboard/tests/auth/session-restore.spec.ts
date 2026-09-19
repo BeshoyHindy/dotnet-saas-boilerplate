@@ -63,7 +63,7 @@ async function seedExpiredSession(page: Page) {
 test.describe("session restore — expired access token at boot", () => {
   test("routes to /login when the silent refresh fails", async ({ page }) => {
     await seedExpiredSession(page);
-    await page.route("**/api/v1/identity/token/refresh", (route) =>
+    await page.route("**/api/v1/tenants/*/auth/refresh", (route) =>
       route.fulfill({
         status: 401,
         headers: { "Content-Type": "application/problem+json" },
@@ -84,7 +84,7 @@ test.describe("session restore — expired access token at boot", () => {
     await page.route("**/api/v1/**", (route) =>
       route.fulfill({ status: 200, headers: { "Content-Type": "application/json" }, body: "{}" }),
     );
-    await page.route("**/api/v1/identity/token/refresh", (route) =>
+    await page.route("**/api/v1/tenants/*/auth/refresh", (route) =>
       route.fulfill({
         status: 200,
         headers: { "Content-Type": "application/json" },

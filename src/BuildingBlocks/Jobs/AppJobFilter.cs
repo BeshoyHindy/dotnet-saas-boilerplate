@@ -41,7 +41,7 @@ public class AppJobFilter : IClientFilter
         var tenantInfo = mtAccessor?.MultiTenantContext?.TenantInfo;
         if (tenantInfo is not null)
         {
-            context.SetJobParameter(MultitenancyConstants.Identifier, tenantInfo);
+            context.SetJobParameter(JobParameterNames.Tenant, tenantInfo);
         }
 
         var userId = httpContext.User.GetUserId();

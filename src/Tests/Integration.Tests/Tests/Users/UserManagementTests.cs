@@ -31,7 +31,6 @@ public sealed class UserManagementTests
     public async Task GetProfile_Should_Return401_When_NotAuthenticated()
     {
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         var response = await client.GetAsync($"{TestConstants.IdentityBasePath}/profile");
 

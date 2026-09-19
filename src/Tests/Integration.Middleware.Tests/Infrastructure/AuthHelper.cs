@@ -33,8 +33,8 @@ public sealed class AuthHelper
         CancellationToken ct = default)
     {
         using var client = _factory.CreateClient();
-        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.IdentityBasePath}/token/issue");
-        request.Headers.Add("tenant", tenant);
+        // The tenant is in the route, never a header (ADR-0002).
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.AuthBasePath(tenant)}/token");
         request.Content = JsonContent.Create(new { email, password });
 
         var response = await client.SendAsync(request, ct).ConfigureAwait(false);
@@ -51,7 +51,6 @@ public sealed class AuthHelper
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", token.AccessToken);
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
         return client;
     }
 
@@ -65,7 +64,6 @@ public sealed class AuthHelper
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", token.AccessToken);
-        client.DefaultRequestHeaders.Add("tenant", tenant);
         return client;
     }
 }

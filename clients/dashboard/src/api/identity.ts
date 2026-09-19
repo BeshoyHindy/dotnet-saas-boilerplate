@@ -1,4 +1,4 @@
-import { apiFetch, type PagedResponse } from "@/lib/api-client";
+import { apiFetch, authPath, type PagedResponse } from "@/lib/api-client";
 
 // -----------------------------
 // Types
@@ -418,7 +418,7 @@ export async function updateMyProfile(input: UpdateProfileInput): Promise<void> 
 }
 
 // -----------------------------
-// Password reset trio (anonymous; require explicit tenant header)
+// Password reset trio (anonymous; the tenant is a path segment)
 // -----------------------------
 
 /**
@@ -432,10 +432,9 @@ export async function requestPasswordReset(input: {
   email: string;
   tenant: string;
 }): Promise<void> {
-  await apiFetch<string>(`/api/v1/identity/forgot-password`, {
+  await apiFetch<string>(authPath(input.tenant, "forgot-password"), {
     method: "POST",
     skipAuth: true,
-    headers: { tenant: input.tenant },
     body: JSON.stringify({ email: input.email }),
   });
 }
@@ -453,10 +452,9 @@ export async function resetPassword(input: {
   token: string;
   tenant: string;
 }): Promise<void> {
-  await apiFetch<string>(`/api/v1/identity/reset-password`, {
+  await apiFetch<string>(authPath(input.tenant, "reset-password"), {
     method: "POST",
     skipAuth: true,
-    headers: { tenant: input.tenant },
     body: JSON.stringify({
       email: input.email,
       password: input.password,
@@ -466,10 +464,9 @@ export async function resetPassword(input: {
 }
 
 /**
- * Confirm-email link landing. The server expects (userId, code, tenant)
- * as query parameters — these come from the email-confirmation link
- * produced by the registration flow. Returns the server's confirmation
- * message on 2xx.
+ * Confirm-email link landing. The tenant is a path segment; (userId, code) come
+ * as query parameters from the email-confirmation link produced by the
+ * registration flow. Returns the server's confirmation message on 2xx.
  */
 export async function confirmEmail(input: {
   userId: string;
@@ -479,12 +476,10 @@ export async function confirmEmail(input: {
   const qs = new URLSearchParams({
     userId: input.userId,
     code: input.code,
-    tenant: input.tenant,
   }).toString();
-  return apiFetch<string>(`/api/v1/identity/confirm-email?${qs}`, {
+  return apiFetch<string>(`${authPath(input.tenant, "confirm-email")}?${qs}`, {
     method: "GET",
     skipAuth: true,
-    headers: { tenant: input.tenant },
   });
 }
 

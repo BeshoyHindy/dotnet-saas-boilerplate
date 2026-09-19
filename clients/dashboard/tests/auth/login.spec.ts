@@ -67,22 +67,23 @@ test.describe("login — page chrome", () => {
 test.describe("login — manual sign in", () => {
   test.beforeEach(async ({ page }) => {
     await setConfig(page);
-    await mockJsonResponse(page, "**/api/v1/identity/token/issue", TOKEN_RESPONSE);
+    await mockJsonResponse(page, "**/api/v1/tenants/*/auth/token", TOKEN_RESPONSE);
   });
 
-  test("POSTs credentials with the tenant header", async ({ page }) => {
+  test("POSTs credentials to the tenant auth route", async ({ page }) => {
     await page.goto("/login");
     await page.getByLabel("Tenant").fill("acme");
     await page.getByLabel("Email").fill("alice@acme.com");
     await page.getByLabel("Password", { exact: true }).fill("Password123!");
 
     const reqPromise = page.waitForRequest(
-      (r) => r.url().includes("/api/v1/identity/token/issue") && r.method() === "POST",
+      (r) => r.url().includes("/auth/token") && r.method() === "POST",
     );
     await page.getByRole("button", { name: /^sign in$/i }).click();
     const req = await reqPromise;
 
-    expect(req.headers().tenant).toBe("acme");
+    expect(req.url()).toContain("/api/v1/tenants/acme/auth/token");
+    expect(req.headers().tenant).toBeUndefined();
     expect(JSON.parse(req.postData() ?? "{}")).toMatchObject({
       email: "alice@acme.com",
       password: "Password123!",
@@ -90,7 +91,7 @@ test.describe("login — manual sign in", () => {
   });
 
   test("surfaces a server error without leaving the page", async ({ page }) => {
-    await mockProblemDetails(page, "**/api/v1/identity/token/issue", 401, {
+    await mockProblemDetails(page, "**/api/v1/tenants/*/auth/token", 401, {
       title: "Unauthorized",
       detail: "Invalid credentials.",
     });

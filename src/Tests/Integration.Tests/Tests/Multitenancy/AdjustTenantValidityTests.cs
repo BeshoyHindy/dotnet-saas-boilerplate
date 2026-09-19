@@ -106,7 +106,6 @@ public sealed class AdjustTenantValidityTests
     public async Task AdjustValidity_Should_Return401_When_NotAuthenticated()
     {
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         var response = await client.PostAsJsonAsync(
             $"{TestConstants.TenantsBasePath}/anytenant/adjust-validity",

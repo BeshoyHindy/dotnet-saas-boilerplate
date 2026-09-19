@@ -28,6 +28,7 @@ using Boilerplate.Modules.Multitenancy.Features.v1.TenantProvisioning.RetryTenan
 using Boilerplate.Modules.Multitenancy.Features.v1.RenewTenant;
 using Boilerplate.Modules.Multitenancy.Features.v1.UpdateTenantTheme;
 using Boilerplate.Modules.Multitenancy.Provisioning;
+using Boilerplate.Modules.Multitenancy.Resolution;
 using Boilerplate.Modules.Multitenancy.Services;
 using Hangfire;
 using Hangfire.Common;
@@ -101,21 +102,11 @@ public sealed class MultitenancyModule : IModule
                     await Task.CompletedTask;
                 };
             })
-            // ── Strategy chain — first non-null identifier wins (registration order) ──
-            // ClaimStrategy no-ops here: UseMultiTenant() runs BEFORE UseAuthentication(), so User is
-            // anonymous at resolution. Tenant stays header-driven; root override is post-auth middleware below.
-            .WithClaimStrategy(ClaimConstants.Tenant)
-            .WithHeaderStrategy(MultitenancyConstants.Identifier)
-            .WithDelegateStrategy(async context =>
-            {
-                if (context is not HttpContext httpContext) return null;
-
-                if (!httpContext.Request.Query.TryGetValue("tenant", out var tenantIdentifier) ||
-                    string.IsNullOrEmpty(tenantIdentifier))
-                    return null;
-
-                return await Task.FromResult(tenantIdentifier.ToString());
-            })
+            // ── One strategy, no chain (ADR-0002) ─────────────────────────────
+            // Authenticated → the token's `tenant` claim; anonymous → the {tenant} route value on the
+            // endpoints marked [TenantFromRoute]. The caller can never name a tenant on the wire, so
+            // there is no header/query/host input left to compensate for.
+            .WithStrategy<TokenOrRouteTenantStrategy>(ServiceLifetime.Singleton)
             .WithDistributedCacheStore(TimeSpan.FromMinutes(60))
             .WithStore<EFCoreStore<TenantDbContext, AppTenantInfo>>(ServiceLifetime.Scoped);
 
@@ -136,82 +127,71 @@ public sealed class MultitenancyModule : IModule
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        // ── Root-operator header override ──────────────────────────────
-        // A "root"-claim caller scopes one request to another tenant via the `tenant` header (post-auth, since
-        // Finbuckle's pre-auth chain has no User). Gated on claim==root + header set != root + target exists.
+        // ── Tenant resolution ──────────────────────────────────────────
+        // Deliberately here and not in the host: module middleware runs inside UseModuleMiddlewares(),
+        // i.e. after UseRouting() and UseAuthentication(). Resolution therefore sees the authenticated
+        // principal (for the `tenant` claim) and the matched endpoint (for the anonymous auth routes).
+        // Multitenancy's AppModule order (200) puts this ahead of every module that needs the tenant.
+        app.UseMultiTenant();
+
+        // ── Token-without-tenant guard ─────────────────────────────────
+        // One token, one tenant (ADR-0002). A validly signed token whose `tenant` claim is missing,
+        // blank, or names a tenant the store no longer knows must not proceed with an ambient tenant
+        // of "none" — that would silently run tenant-filtered queries against nothing. 401, same as
+        // any other unusable credential.
         app.Use(async (ctx, next) =>
         {
-            var callerTenant = ctx.User?.FindFirstValue(ClaimConstants.Tenant);
-            if (string.Equals(callerTenant, MultitenancyConstants.Root.Id, StringComparison.Ordinal))
+            if (ctx.User?.Identity?.IsAuthenticated == true &&
+                ctx.RequestServices.GetRequiredService<IMultiTenantContextAccessor<AppTenantInfo>>()
+                    .MultiTenantContext?.TenantInfo is null)
             {
-                var headerValue = ctx.Request.Headers[MultitenancyConstants.Identifier].FirstOrDefault();
-                if (!string.IsNullOrEmpty(headerValue) &&
-                    !string.Equals(headerValue, MultitenancyConstants.Root.Id, StringComparison.Ordinal))
-                {
-                    var store = ctx.RequestServices.GetRequiredService<IMultiTenantStore<AppTenantInfo>>();
-                    var target = await store.GetAsync(headerValue).ConfigureAwait(false);
-                    if (target is not null)
-                    {
-                        var setter = ctx.RequestServices.GetRequiredService<IMultiTenantContextSetter>();
-                        setter.MultiTenantContext = new MultiTenantContext<AppTenantInfo>(target);
-                    }
-                }
+                throw new UnauthorizedException("The access token does not identify a valid tenant.");
             }
+
             await next(ctx).ConfigureAwait(false);
         });
 
         // ── Deactivated-tenant guard ───────────────────────────────────
-        // Finbuckle resolves inactive tenants normally, so this post-auth guard rejects any request (incl.
-        // anonymous login/refresh) with a non-root inactive tenant; root operators are exempt.
+        // Finbuckle resolves inactive tenants normally, so this guard rejects any request (incl. the
+        // anonymous login/refresh routes) with a non-root inactive tenant; root operators are exempt.
         app.Use(async (ctx, next) =>
         {
-            var callerTenant = ctx.User?.FindFirstValue(ClaimConstants.Tenant);
-            var isOperator = string.Equals(callerTenant, MultitenancyConstants.Root.Id, StringComparison.Ordinal);
-            if (!isOperator)
-            {
-                var accessor = ctx.RequestServices.GetRequiredService<IMultiTenantContextAccessor<AppTenantInfo>>();
-                var tenant = accessor.MultiTenantContext?.TenantInfo;
+            var accessor = ctx.RequestServices.GetRequiredService<IMultiTenantContextAccessor<AppTenantInfo>>();
+            var tenant = accessor.MultiTenantContext?.TenantInfo;
 
-                // Claim strategy no-ops pre-auth, so a JWT-only (no header) request may have no resolved
-                // tenant here — fall back to the caller's claim.
-                if (tenant is null && !string.IsNullOrEmpty(callerTenant))
+            // The resolved tenant is the only input now — no claim fallback is needed, because
+            // resolution already ran post-authentication and used the claim itself.
+            if (tenant is not null &&
+                !string.Equals(tenant.Id, MultitenancyConstants.Root.Id, StringComparison.Ordinal))
+            {
+                if (!tenant.IsActive)
                 {
-                    var store = ctx.RequestServices.GetRequiredService<IMultiTenantStore<AppTenantInfo>>();
-                    tenant = await store.GetAsync(callerTenant).ConfigureAwait(false);
+                    throw new ForbiddenException("This tenant has been deactivated. Contact your administrator.");
                 }
 
-                if (tenant is not null &&
-                    !string.Equals(tenant.Id, MultitenancyConstants.Root.Id, StringComparison.Ordinal))
+                // Expiry is enforced on every request (not just at login) with a grace period:
+                // a tenant past ValidUpto still works until ValidUpto + grace, then is hard-blocked.
+                var graceDays = ctx.RequestServices
+                    .GetRequiredService<IOptions<TenantValidityOptions>>().Value.GracePeriodDays;
+                var nowUtc = ctx.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime;
+                var graceEndsUtc = tenant.ValidUpto.AddDays(graceDays);
+                if (nowUtc > graceEndsUtc)
                 {
-                    if (!tenant.IsActive)
-                    {
-                        throw new ForbiddenException("This tenant has been deactivated. Contact your administrator.");
-                    }
+                    throw new ForbiddenException("This tenant's subscription has expired. Please renew to continue.");
+                }
 
-                    // Expiry is enforced on every request (not just at login) with a grace period:
-                    // a tenant past ValidUpto still works until ValidUpto + grace, then is hard-blocked.
-                    var graceDays = ctx.RequestServices
-                        .GetRequiredService<IOptions<TenantValidityOptions>>().Value.GracePeriodDays;
-                    var nowUtc = ctx.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime;
-                    var graceEndsUtc = tenant.ValidUpto.AddDays(graceDays);
-                    if (nowUtc > graceEndsUtc)
+                // Inside the grace period: surface days-left so clients can warn. Set via OnStarting so
+                // the header survives even when an exception handler rewrites the response.
+                if (nowUtc > tenant.ValidUpto)
+                {
+                    var daysLeft = (int)Math.Ceiling((graceEndsUtc - nowUtc).TotalDays);
+                    var headerValue = daysLeft.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    ctx.Response.OnStarting(static state =>
                     {
-                        throw new ForbiddenException("This tenant's subscription has expired. Please renew to continue.");
-                    }
-
-                    // Inside the grace period: surface days-left so clients can warn. Set via OnStarting so
-                    // the header survives even when an exception handler rewrites the response.
-                    if (nowUtc > tenant.ValidUpto)
-                    {
-                        var daysLeft = (int)Math.Ceiling((graceEndsUtc - nowUtc).TotalDays);
-                        var headerValue = daysLeft.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                        ctx.Response.OnStarting(static state =>
-                        {
-                            var (response, value) = ((HttpResponse, string))state;
-                            response.Headers["X-Subscription-Grace"] = value;
-                            return Task.CompletedTask;
-                        }, (ctx.Response, headerValue));
-                    }
+                        var (response, value) = ((HttpResponse, string))state;
+                        response.Headers["X-Subscription-Grace"] = value;
+                        return Task.CompletedTask;
+                    }, (ctx.Response, headerValue));
                 }
             }
 

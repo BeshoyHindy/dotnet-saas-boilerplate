@@ -34,7 +34,7 @@ public class AppJobActivator : JobActivator
 
         private void ReceiveParameters()
         {
-            var tenantInfo = _context.GetJobParameter<AppTenantInfo>(MultitenancyConstants.Identifier);
+            var tenantInfo = _context.GetJobParameter<AppTenantInfo>(JobParameterNames.Tenant);
             if (tenantInfo is not null)
             {
                 _scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()

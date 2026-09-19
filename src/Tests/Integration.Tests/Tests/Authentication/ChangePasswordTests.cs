@@ -81,7 +81,6 @@ public sealed class ChangePasswordTests
     {
         // Arrange
         using var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         // Act
         var response = await client.PostAsJsonAsync(

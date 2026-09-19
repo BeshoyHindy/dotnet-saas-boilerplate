@@ -16,4 +16,12 @@ public static class TestConstants
     public const string IdentityBasePath = "/api/v1/identity";
     public const string TenantsBasePath = "/api/v1/tenants";
     public const string AuditsBasePath = "/api/v1/audits";
+
+    /// <summary>
+    /// The anonymous, tenant-scoped auth routes. The tenant travels in the path because no
+    /// token exists yet on these calls (ADR-0002); every other call carries it in the token.
+    /// </summary>
+    public static string AuthBasePath(string tenant) => $"{TenantsBasePath}/{tenant}/auth";
+
+    public static string RootAuthBasePath => AuthBasePath(RootTenantId);
 }

@@ -31,8 +31,8 @@ export function getMyStatus() {
 //
 // The theme endpoints are CURRENT-TENANT scoped server-side — they read the
 // request's tenant (resolved from the caller's token) and act on that row.
-// Unlike the admin app, the dashboard never targets a *different* tenant, so
-// we send NO `tenant:` header: every call operates on the signed-in tenant.
+// No client can target a *different* tenant any more (ADR-0002): every call
+// operates on the tenant named by the signed-in token.
 //
 // Types mirror clients/admin/src/api/tenants.ts (the two Vite apps duplicate
 // by design — no cross-app imports). Keep the shapes in sync if the server
