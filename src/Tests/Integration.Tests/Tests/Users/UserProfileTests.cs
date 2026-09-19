@@ -5,9 +5,10 @@ using Integration.Tests.Tests.Sessions;
 namespace Integration.Tests.Tests.Users;
 
 /// <summary>
-/// Covers the self-service profile surface: UpdateUser (PUT /profile) and
-/// SetProfileImage (PUT /profile/image). Both force the target id to the
-/// authenticated user, so any signed-in user may edit their own profile.
+/// Covers the self-service profile surface: UpdateUser (PUT /profile), which forces the target id to
+/// the authenticated user, so any signed-in user may edit their own profile — and is now the only
+/// way an avatar is set or cleared (#83; the owner-scoped deletes it performs are asserted end to
+/// end in <c>Tests/Storage/ServerIssuedAssetUrlTests</c>).
 /// </summary>
 [Collection(AppCollectionDefinition.Name)]
 public sealed class UserProfileTests
@@ -158,66 +159,47 @@ public sealed class UserProfileTests
 
     #endregion
 
-    #region SetProfileImage (PUT /profile/image)
+    #region The avatar column takes no URL from anyone (#83)
 
     [Fact]
-    public async Task SetProfileImage_Should_PersistImageUrl_When_AuthenticatedUserSetsAvatar()
+    public async Task SetProfileImageByUrl_Should_NoLongerExist()
     {
-        // Arrange
+        // PUT /profile/image took any string up to 2048 characters and wrote it to AppUser.ImageUrl.
+        // It is gone rather than validated: an avatar is uploaded on the profile PUT and removed with
+        // its delete flag, which is the whole surface. 404 — nothing is mapped here.
         using var adminClient = await _auth.CreateRootAdminClientAsync();
-        var user = await IdentityUserSeeder.CreateLoginableUserAsync(_factory, adminClient, "img-set");
+        var user = await IdentityUserSeeder.CreateLoginableUserAsync(_factory, adminClient, "img-gone");
         using var userClient = await _auth.CreateAuthenticatedClientAsync(user.Email, user.Password);
-        const string imageUrl = "https://cdn.example.com/avatars/me.png";
 
-        // Act
         var response = await userClient.PutAsJsonAsync(
-            $"{TestConstants.IdentityBasePath}/profile/image", new { imageUrl });
+            $"{TestConstants.IdentityBasePath}/profile/image",
+            new { imageUrl = "https://cdn.example.com/avatars/me.png" });
 
-        // Assert
-        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
-
-        var profile = await userClient.GetAsync($"{TestConstants.IdentityBasePath}/profile");
-        var dto = await profile.DeserializeAsync<UserDto>();
-        dto.ImageUrl.ShouldBe(imageUrl);
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }
 
     [Fact]
-    public async Task SetProfileImage_Should_ClearImage_When_NullUrlProvided()
+    public async Task UpdateProfile_Should_IgnoreAnImageUrlField_When_TheBodyCarriesOne()
     {
-        // Arrange — set then clear.
+        // Ignored, not rejected: `imageUrl` is not a member of the update command at all, so the
+        // deserializer drops it. The guarantee being asserted is about the column, not the status.
         using var adminClient = await _auth.CreateRootAdminClientAsync();
-        var user = await IdentityUserSeeder.CreateLoginableUserAsync(_factory, adminClient, "img-clear");
+        var user = await IdentityUserSeeder.CreateLoginableUserAsync(_factory, adminClient, "img-ignored");
         using var userClient = await _auth.CreateAuthenticatedClientAsync(user.Email, user.Password);
 
-        await userClient.PutAsJsonAsync(
-            $"{TestConstants.IdentityBasePath}/profile/image",
-            new { imageUrl = "https://cdn.example.com/avatars/temp.png" });
+        var response = await userClient.PutAsJsonAsync(
+            $"{TestConstants.IdentityBasePath}/profile", new
+            {
+                firstName = "Ada",
+                imageUrl = "https://cdn.example.com/avatars/me.png",
+            });
 
-        // Act
-        var clear = await userClient.PutAsJsonAsync(
-            $"{TestConstants.IdentityBasePath}/profile/image", new { imageUrl = (string?)null });
-
-        // Assert
-        clear.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var profile = await userClient.GetAsync($"{TestConstants.IdentityBasePath}/profile");
         var dto = await profile.DeserializeAsync<UserDto>();
-        dto.ImageUrl.ShouldBeNull();
-    }
-
-    [Fact]
-    public async Task SetProfileImage_Should_Return401_When_NotAuthenticated()
-    {
-        // Arrange
-        using var client = _factory.CreateClient();
-
-        // Act
-        var response = await client.PutAsJsonAsync(
-            $"{TestConstants.IdentityBasePath}/profile/image",
-            new { imageUrl = "https://cdn.example.com/x.png" });
-
-        // Assert
-        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        dto.FirstName.ShouldBe("Ada");
+        dto.ImageUrl.ShouldBeNull("only an upload may write this column");
     }
 
     #endregion

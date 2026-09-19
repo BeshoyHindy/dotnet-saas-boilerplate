@@ -7,24 +7,16 @@ using Boilerplate.BuildingBlocks.Storage.Services;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Text.RegularExpressions;
 
 namespace Boilerplate.BuildingBlocks.Storage.S3;
 
-internal sealed partial class S3StorageService : IStorageService
+internal sealed class S3StorageService : IStorageService
 {
     private readonly IAmazonS3 _s3;
     private readonly S3StorageOptions _options;
     private readonly ITenantStorageKeys _keys;
     private readonly ILogger<S3StorageService> _logger;
     private readonly FileExtensionContentTypeProvider _contentTypeProvider;
-
-    // Source-generated, compiled once — the inline Regex.Replace calls re-parsed the pattern on every upload.
-    [GeneratedRegex("[^a-z0-9]")]
-    private static partial Regex FolderSanitizer();
-
-    [GeneratedRegex(@"[^a-zA-Z0-9_\.-]")]
-    private static partial Regex FileNameSanitizer();
 
     public S3StorageService(
         IAmazonS3 s3,
@@ -70,7 +62,7 @@ internal sealed partial class S3StorageService : IStorageService
             "or a URL's bucket/prefix segment would be stripped as if it were the key's own first segment.");
     }
 
-    public async Task<string> UploadAsync<T>(FileUploadRequest request, FileType fileType, CancellationToken cancellationToken = default) where T : class
+    public async Task<string> UploadAsync<T>(FileUploadRequest request, FileType fileType, string owner, CancellationToken cancellationToken = default) where T : class
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -87,7 +79,9 @@ internal sealed partial class S3StorageService : IStorageService
             throw new InvalidOperationException($"File exceeds max size of {rules.MaxSizeInMB} MB.");
         }
 
-        var key = BuildKey<T>(SanitizeFileName(request.FileName));
+        // The layout — owner type, owner, guid, file name — is the key block's, not this provider's,
+        // so both providers place an object exactly where RemoveIfOwnedAsync<T> will look for it.
+        var key = _keys.ComposeAsset(typeof(T).Name, owner, request.FileName);
 
         using var stream = new MemoryStream([.. request.Data]);
 
@@ -120,6 +114,25 @@ internal sealed partial class S3StorageService : IStorageService
     {
         if (!TryAuthorizeHandle(storedHandle, out var key))
         {
+            return false;
+        }
+
+        await RemoveAuthorizedAsync(key, cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    public async Task<bool> RemoveIfOwnedAsync<T>(string? storedHandle, string owner, CancellationToken cancellationToken = default)
+        where T : class
+    {
+        if (!_keys.TryAuthorizeOwnedAsset(typeof(T).Name, owner, ToLogicalKey(storedHandle), out var key))
+        {
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation(
+                    "Skipping S3 object {Handle}: not an asset {OwnerType} {Owner} owns in tenant {TenantId}.",
+                    storedHandle, typeof(T).Name, owner, _keys.TenantId);
+            }
+
             return false;
         }
 
@@ -386,12 +399,6 @@ internal sealed partial class S3StorageService : IStorageService
 
     public string ComposeKey(StorageSpace space, string relativePath) => _keys.Compose(space, relativePath);
 
-    private string BuildKey<T>(string fileName) where T : class
-    {
-        var folder = FolderSanitizer().Replace(typeof(T).Name.ToLowerInvariant(), "_");
-        return _keys.Compose(StorageSpace.Public, $"{folder}/{Guid.NewGuid():N}_{fileName}");
-    }
-
     public string BuildPublicUrl(string storageKey)
     {
         var key = ToPhysicalKey(AuthorizeHandle(storageKey));
@@ -508,10 +515,5 @@ internal sealed partial class S3StorageService : IStorageService
 
         var prefix = trimmed + "/";
         return value.StartsWith(prefix, StringComparison.Ordinal) ? value[prefix.Length..] : value;
-    }
-
-    private static string SanitizeFileName(string fileName)
-    {
-        return FileNameSanitizer().Replace(fileName, "_");
     }
 }

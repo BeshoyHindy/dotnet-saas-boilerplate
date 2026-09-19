@@ -2,7 +2,10 @@ using Boilerplate.BuildingBlocks.Caching;
 using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.BuildingBlocks.Core.Exceptions;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Storage;
+using Boilerplate.BuildingBlocks.Storage;
 using Boilerplate.BuildingBlocks.Storage.Services;
+using Boilerplate.Modules.Multitenancy.Contracts.Dtos;
 using Boilerplate.Modules.Multitenancy.Data;
 using Boilerplate.Modules.Multitenancy.Domain;
 using Finbuckle.MultiTenant;
@@ -133,6 +136,137 @@ public sealed class TenantThemeServiceTests
 
     #endregion
 
+    #region UpdateThemeAsync — brand assets are server-issued, per slot (#83)
+
+    [Fact]
+    public async Task UpdateThemeAsync_Should_UploadEachAsset_UnderItsOwnSlot()
+    {
+        using var db = CreateSqliteDb();
+        var tenantAccessor = new MutableMultiTenantContextAccessor();
+        SeedTheme(db, TenantAlpha, isDefault: false);
+        var storage = StorageReturning("uploads/tenants/alpha/tenanttheme/x/new.png");
+
+        using var harness = BuildCacheHarness(tenantAccessor);
+        var sut = CreateSut(db, harness, tenantAccessor, storage);
+        tenantAccessor.SetTenant(TenantAlpha);
+
+        await sut.UpdateThemeAsync(TenantAlpha, new TenantThemeUpdateDto
+        {
+            BrandAssets = new BrandAssetUploadsDto
+            {
+                Logo = Png(),
+                LogoDark = Png(),
+                Favicon = Png(),
+            },
+        });
+
+        // The slot is the owner: it is what a later delete is scoped to, so replacing the logo can
+        // never remove the favicon — or a user's avatar, which is a key this tenant owns too.
+        await storage.Received(1).UploadAsync<TenantTheme>(
+            Arg.Any<FileUploadRequest>(), FileType.Image, "logo", Arg.Any<CancellationToken>());
+        await storage.Received(1).UploadAsync<TenantTheme>(
+            Arg.Any<FileUploadRequest>(), FileType.Image, "logo-dark", Arg.Any<CancellationToken>());
+        await storage.Received(1).UploadAsync<TenantTheme>(
+            Arg.Any<FileUploadRequest>(), FileType.Image, "favicon", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UpdateThemeAsync_Should_DropThePreviousAsset_OwnerScoped_NotTenantWide()
+    {
+        using var db = CreateSqliteDb();
+        var tenantAccessor = new MutableMultiTenantContextAccessor();
+        var theme = SeedTheme(db, TenantAlpha, isDefault: false);
+        theme.LogoUrl = "https://cdn.example.com/someone-elses/avatar.png";
+        await db.SaveChangesAsync();
+        var storage = StorageReturning("uploads/tenants/alpha/tenanttheme/logo/new.png");
+
+        using var harness = BuildCacheHarness(tenantAccessor);
+        var sut = CreateSut(db, harness, tenantAccessor, storage);
+        tenantAccessor.SetTenant(TenantAlpha);
+
+        await sut.UpdateThemeAsync(TenantAlpha, new TenantThemeUpdateDto
+        {
+            BrandAssets = new BrandAssetUploadsDto { Logo = Png() },
+        });
+
+        // The value being replaced goes to the owner-scoped delete, which answers "no" for anything
+        // this slot did not write — the tenant-wide overload would have said "yes, that is our key".
+        await storage.Received(1).RemoveIfOwnedAsync<TenantTheme>(
+            "https://cdn.example.com/someone-elses/avatar.png", "logo", Arg.Any<CancellationToken>());
+        await storage.DidNotReceive().RemoveIfOwnedAsync(
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UpdateThemeAsync_Should_LeaveTheAssetColumnsAlone_When_NoUploadOrDeleteIsRequested()
+    {
+        // The write model has no URL fields at all, so a palette-only save cannot move an asset —
+        // and must not clear one either.
+        using var db = CreateSqliteDb();
+        var tenantAccessor = new MutableMultiTenantContextAccessor();
+        var theme = SeedTheme(db, TenantAlpha, isDefault: false);
+        theme.LogoUrl = "uploads/tenants/alpha/tenanttheme/logo/existing.png";
+        await db.SaveChangesAsync();
+        var storage = StorageReturning("unused");
+
+        using var harness = BuildCacheHarness(tenantAccessor);
+        var sut = CreateSut(db, harness, tenantAccessor, storage);
+        tenantAccessor.SetTenant(TenantAlpha);
+
+        await sut.UpdateThemeAsync(TenantAlpha, new TenantThemeUpdateDto
+        {
+            LightPalette = new PaletteDto { Primary = "#123456" },
+        });
+
+        var saved = await db.TenantThemes.AsNoTracking().SingleAsync(t => t.TenantId == TenantAlpha);
+        saved.PrimaryColor.ShouldBe("#123456");
+        saved.LogoUrl.ShouldBe("uploads/tenants/alpha/tenanttheme/logo/existing.png");
+        storage.ReceivedCalls().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task UpdateThemeAsync_Should_ClearTheColumn_AndDeleteTheObject_When_ADeleteFlagIsSet()
+    {
+        using var db = CreateSqliteDb();
+        var tenantAccessor = new MutableMultiTenantContextAccessor();
+        var theme = SeedTheme(db, TenantAlpha, isDefault: false);
+        theme.FaviconUrl = "uploads/tenants/alpha/tenanttheme/favicon/old.png";
+        await db.SaveChangesAsync();
+        var storage = StorageReturning("unused");
+
+        using var harness = BuildCacheHarness(tenantAccessor);
+        var sut = CreateSut(db, harness, tenantAccessor, storage);
+        tenantAccessor.SetTenant(TenantAlpha);
+
+        await sut.UpdateThemeAsync(TenantAlpha, new TenantThemeUpdateDto
+        {
+            BrandAssets = new BrandAssetUploadsDto { DeleteFavicon = true },
+        });
+
+        await storage.Received(1).RemoveIfOwnedAsync<TenantTheme>(
+            "uploads/tenants/alpha/tenanttheme/favicon/old.png", "favicon", Arg.Any<CancellationToken>());
+        var saved = await db.TenantThemes.AsNoTracking().SingleAsync(t => t.TenantId == TenantAlpha);
+        saved.FaviconUrl.ShouldBeNull();
+    }
+
+    private static IStorageService StorageReturning(string uploadedUrl)
+    {
+        var storage = Substitute.For<IStorageService>();
+        storage.UploadAsync<TenantTheme>(
+                Arg.Any<FileUploadRequest>(), Arg.Any<FileType>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(uploadedUrl);
+        return storage;
+    }
+
+    private static FileUploadRequest Png() => new()
+    {
+        FileName = "asset.png",
+        ContentType = "image/png",
+        Data = [137, 80, 78, 71],
+    };
+
+    #endregion
+
     #region Test doubles and helpers
 
     private static SqliteOwnedTenantDbContext CreateSqliteDb()
@@ -169,13 +303,17 @@ public sealed class TenantThemeServiceTests
         return new CacheHarness(provider);
     }
 
-    private static TenantThemeService CreateSut(TenantDbContext db, CacheHarness harness, IMultiTenantContextAccessor<AppTenantInfo> tenantAccessor)
+    private static TenantThemeService CreateSut(
+        TenantDbContext db,
+        CacheHarness harness,
+        IMultiTenantContextAccessor<AppTenantInfo> tenantAccessor,
+        IStorageService? storage = null)
         => new(
             harness.Cache,
             harness.GlobalCache,
             db,
             tenantAccessor,
-            Substitute.For<IStorageService>(),
+            storage ?? Substitute.For<IStorageService>(),
             NullLogger<TenantThemeService>.Instance,
             Substitute.For<ICurrentUser>());
 

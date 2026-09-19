@@ -28,6 +28,14 @@ public sealed class TenantThemeService : ITenantThemeService
     // per-tenant tag; the cache now scopes tags to the ambient tenant itself, so the tag is a constant.
     private static readonly string[] ThemeTags = [CacheKeys.Tags.Themes];
 
+    // The owner segment each brand asset is stored under, inside the tenant's public space (#83).
+    // Slot-level, not tenant-level, so replacing the logo can only delete a previous logo — never the
+    // favicon, and never a user's avatar. These are storage *owner* names, not key roots: the block
+    // still composes the key.
+    private const string LogoOwner = "logo";
+    private const string LogoDarkOwner = "logo-dark";
+    private const string FaviconOwner = "favicon";
+
     private readonly HybridCache _cache;
     private readonly GlobalHybridCache _globalCache;
     private readonly TenantDbContext _dbContext;
@@ -133,7 +141,7 @@ public sealed class TenantThemeService : ITenantThemeService
 
     private readonly record struct TenantFactoryState(TenantDbContext DbContext, string TenantId);
 
-    public async Task UpdateThemeAsync(string tenantId, TenantThemeDto theme, CancellationToken ct = default)
+    public async Task UpdateThemeAsync(string tenantId, TenantThemeUpdateDto theme, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
         ArgumentNullException.ThrowIfNull(theme);
@@ -165,29 +173,37 @@ public sealed class TenantThemeService : ITenantThemeService
     }
 
     /// <remarks>
-    /// The brand-asset columns hold URLs, not keys, and a URL in one of them may not be a key of
-    /// this tenant's at all: the editor accepts a pasted address, and a development database
-    /// predating tenant-prefixed keys still holds flat <c>uploads/{type}/…</c> values. So the
-    /// previous value is dropped with <c>RemoveIfOwnedAsync</c>, which skips and logs anything the
-    /// ambient tenant does not own rather than failing the whole theme save.
+    /// <b>Each slot is its own owner.</b> An asset is uploaded under the slot it is for
+    /// (<see cref="LogoOwner"/>, <see cref="LogoDarkOwner"/>, <see cref="FaviconOwner"/>) and the
+    /// value it replaces is dropped with the owner-scoped <c>RemoveIfOwnedAsync&lt;TenantTheme&gt;</c>,
+    /// which deletes only an object a previous upload <i>for that same slot</i> produced (#83). The
+    /// tenant-wide check is not enough on its own: a user's avatar is a key this tenant owns too, so
+    /// before the URL input was removed a tenant admin could park one in <c>LogoUrl</c> and have the
+    /// next save delete someone's face.
+    ///
+    /// <para>What that skips over is exactly what exists in the wild: a column written when the
+    /// editor still accepted a pasted address, and a development database predating tenant-prefixed
+    /// keys that still holds flat <c>uploads/{type}/…</c> values. Both are logged and left alone
+    /// rather than failing the whole theme save, and the column is then overwritten with a
+    /// server-issued value.</para>
     ///
     /// <para>The tenant this writes for is always the ambient one — the endpoint takes no tenant
     /// and a root operator editing another tenant's branding arrives on an exchanged token whose
     /// <c>tenant</c> claim is the target (ADR-0002) — so the keys the block composes below land in
     /// the right place without a tenant parameter anywhere in the storage API.</para>
     /// </remarks>
-    private async Task HandleBrandAssetUploadsAsync(BrandAssetsDto assets, TenantTheme entity, CancellationToken ct)
+    private async Task HandleBrandAssetUploadsAsync(BrandAssetUploadsDto assets, TenantTheme entity, CancellationToken ct)
     {
         // Handle logo upload (same pattern as profile picture)
         if (assets.Logo?.Data is { Count: > 0 })
         {
             var oldLogoUrl = entity.LogoUrl;
-            entity.LogoUrl = await _storageService.UploadAsync<TenantTheme>(assets.Logo, FileType.Image, ct).ConfigureAwait(false);
-            await _storageService.RemoveIfOwnedAsync(oldLogoUrl, ct).ConfigureAwait(false);
+            entity.LogoUrl = await _storageService.UploadAsync<TenantTheme>(assets.Logo, FileType.Image, LogoOwner, ct).ConfigureAwait(false);
+            await _storageService.RemoveIfOwnedAsync<TenantTheme>(oldLogoUrl, LogoOwner, ct).ConfigureAwait(false);
         }
         else if (assets.DeleteLogo && !string.IsNullOrEmpty(entity.LogoUrl))
         {
-            await _storageService.RemoveIfOwnedAsync(entity.LogoUrl, ct).ConfigureAwait(false);
+            await _storageService.RemoveIfOwnedAsync<TenantTheme>(entity.LogoUrl, LogoOwner, ct).ConfigureAwait(false);
             entity.LogoUrl = null;
         }
 
@@ -195,12 +211,12 @@ public sealed class TenantThemeService : ITenantThemeService
         if (assets.LogoDark?.Data is { Count: > 0 })
         {
             var oldLogoUrl = entity.LogoDarkUrl;
-            entity.LogoDarkUrl = await _storageService.UploadAsync<TenantTheme>(assets.LogoDark, FileType.Image, ct).ConfigureAwait(false);
-            await _storageService.RemoveIfOwnedAsync(oldLogoUrl, ct).ConfigureAwait(false);
+            entity.LogoDarkUrl = await _storageService.UploadAsync<TenantTheme>(assets.LogoDark, FileType.Image, LogoDarkOwner, ct).ConfigureAwait(false);
+            await _storageService.RemoveIfOwnedAsync<TenantTheme>(oldLogoUrl, LogoDarkOwner, ct).ConfigureAwait(false);
         }
         else if (assets.DeleteLogoDark && !string.IsNullOrEmpty(entity.LogoDarkUrl))
         {
-            await _storageService.RemoveIfOwnedAsync(entity.LogoDarkUrl, ct).ConfigureAwait(false);
+            await _storageService.RemoveIfOwnedAsync<TenantTheme>(entity.LogoDarkUrl, LogoDarkOwner, ct).ConfigureAwait(false);
             entity.LogoDarkUrl = null;
         }
 
@@ -208,12 +224,12 @@ public sealed class TenantThemeService : ITenantThemeService
         if (assets.Favicon?.Data is { Count: > 0 })
         {
             var oldFaviconUrl = entity.FaviconUrl;
-            entity.FaviconUrl = await _storageService.UploadAsync<TenantTheme>(assets.Favicon, FileType.Image, ct).ConfigureAwait(false);
-            await _storageService.RemoveIfOwnedAsync(oldFaviconUrl, ct).ConfigureAwait(false);
+            entity.FaviconUrl = await _storageService.UploadAsync<TenantTheme>(assets.Favicon, FileType.Image, FaviconOwner, ct).ConfigureAwait(false);
+            await _storageService.RemoveIfOwnedAsync<TenantTheme>(oldFaviconUrl, FaviconOwner, ct).ConfigureAwait(false);
         }
         else if (assets.DeleteFavicon && !string.IsNullOrEmpty(entity.FaviconUrl))
         {
-            await _storageService.RemoveIfOwnedAsync(entity.FaviconUrl, ct).ConfigureAwait(false);
+            await _storageService.RemoveIfOwnedAsync<TenantTheme>(entity.FaviconUrl, FaviconOwner, ct).ConfigureAwait(false);
             entity.FaviconUrl = null;
         }
     }
@@ -354,7 +370,15 @@ public sealed class TenantThemeService : ITenantThemeService
         };
     }
 
-    private static void MapDtoToEntity(TenantThemeDto dto, TenantTheme entity)
+    /// <summary>
+    /// Copies the writable half of a theme onto the entity. <b>The brand-asset columns are not in
+    /// it</b>: they are written only by <see cref="HandleBrandAssetUploadsAsync"/>, from what the
+    /// Storage block returned. This used to copy <c>dto.BrandAssets.LogoUrl</c> and friends straight
+    /// across — with a <c>data:</c>-prefix check as the only filter — which is what let a client
+    /// name any URL at all, including another object of this tenant's (#83). The write model no
+    /// longer carries those fields, so there is nothing here to copy.
+    /// </summary>
+    private static void MapDtoToEntity(TenantThemeUpdateDto dto, TenantTheme entity)
     {
         // Light Palette
         entity.PrimaryColor = dto.LightPalette.Primary;
@@ -377,21 +401,6 @@ public sealed class TenantThemeService : ITenantThemeService
         entity.DarkWarningColor = dto.DarkPalette.Warning;
         entity.DarkSuccessColor = dto.DarkPalette.Success;
         entity.DarkInfoColor = dto.DarkPalette.Info;
-
-        // Brand Assets - URLs are handled by HandleBrandAssetUploadsAsync
-        // Only copy URL if it's a real URL (not a data URL preview)
-        if (!string.IsNullOrEmpty(dto.BrandAssets.LogoUrl) && !dto.BrandAssets.LogoUrl.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
-        {
-            entity.LogoUrl = dto.BrandAssets.LogoUrl;
-        }
-        if (!string.IsNullOrEmpty(dto.BrandAssets.LogoDarkUrl) && !dto.BrandAssets.LogoDarkUrl.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
-        {
-            entity.LogoDarkUrl = dto.BrandAssets.LogoDarkUrl;
-        }
-        if (!string.IsNullOrEmpty(dto.BrandAssets.FaviconUrl) && !dto.BrandAssets.FaviconUrl.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
-        {
-            entity.FaviconUrl = dto.BrandAssets.FaviconUrl;
-        }
 
         // Typography
         entity.FontFamily = dto.Typography.FontFamily;

@@ -67,7 +67,6 @@ using Boilerplate.Modules.Identity.Features.v1.Users.RegisterUser;
 using Boilerplate.Modules.Identity.Features.v1.Users.ResetPassword;
 using Boilerplate.Modules.Identity.Features.v1.Users.SearchUsers;
 using Boilerplate.Modules.Identity.Features.v1.Users.SelfRegistration;
-using Boilerplate.Modules.Identity.Features.v1.Users.SetProfileImage;
 using Boilerplate.Modules.Identity.Features.v1.Users.ToggleUserStatus;
 using Boilerplate.Modules.Identity.Features.v1.Users.UpdateUser;
 using Boilerplate.Modules.Identity.Services;
@@ -274,8 +273,9 @@ public class IdentityModule : IModule
         group.MapSearchUsersEndpoint();
         group.MapRegisterUserEndpoint();
         group.MapToggleUserStatusEndpoint();
+        // No "set my avatar URL" endpoint: an avatar is uploaded on MapUpdateUserEndpoint (bytes in,
+        // server-issued URL out) and removed with its `deleteCurrentImage` flag (#83).
         group.MapUpdateUserEndpoint();
-        group.MapSetProfileImageEndpoint();
 
         // sessions - user endpoints
         group.MapGetMySessionsEndpoint();

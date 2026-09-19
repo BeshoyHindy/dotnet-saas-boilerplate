@@ -14,14 +14,14 @@ public static class UpdateTenantThemeEndpoint
 {
     public static RouteHandlerBuilder Map(IEndpointRouteBuilder endpoints)
     {
-        return endpoints.MapPut("/theme", async (TenantThemeDto theme, IMediator mediator, CancellationToken cancellationToken) =>
+        return endpoints.MapPut("/theme", async (TenantThemeUpdateDto theme, IMediator mediator, CancellationToken cancellationToken) =>
             {
                 await mediator.Send(new UpdateTenantThemeCommand(theme), cancellationToken);
                 return TypedResults.NoContent();
             })
             .WithName("UpdateTenantTheme")
             .WithSummary("Update current tenant theme")
-            .WithDescription("Update the theme settings for the current tenant, including colors, typography, and layout.")
+            .WithDescription("Update the theme settings for the current tenant: colors, typography, layout, and the brand assets. A brand asset is uploaded as bytes or removed with its delete flag — the asset URLs are response-only, so a client cannot point one at an object the server did not issue for that asset.")
             .RequirePermission(MultitenancyPermissions.Tenants.UpdateTheme)
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status400BadRequest)
