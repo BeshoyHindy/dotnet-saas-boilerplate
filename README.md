@@ -17,7 +17,9 @@ for local orchestration with .NET Aspire.
   the API never migrates at startup), `Boilerplate.AppHost` (Aspire orchestrator).
 - **Clients**: `clients/admin` (operator console) and `clients/dashboard` (tenant app) — React 19 +
   Vite + TypeScript, TanStack Query, React Router, Radix + Tailwind.
-- **Deploy**: Docker Compose (`deploy/docker`) and Dokploy (`deploy/dokploy`).
+- **Deploy**: one multi-target image definition (`src/Host/Dockerfile`, targets `api` and
+  `migrator`), a root `docker-compose.yml` that runs those images locally, and Dokploy
+  (`deploy/dokploy`).
 
 ## Prerequisites
 
@@ -41,7 +43,37 @@ parameters, environment variables or that same store, never from `appsettings*.j
 
 The Aspire dashboard is at <https://localhost:15888>; the API and its Scalar reference at
 <https://localhost:7030/scalar>; admin at <http://localhost:5173>; dashboard at
-<http://localhost:5174>. The migrator seeds demo tenants and accounts on first run.
+<http://localhost:5174>; the Mailpit inbox at <http://localhost:8025>. Aspire starts PostgreSQL,
+Valkey, MinIO and Mailpit, runs the migrator to completion, then the API, then the clients.
+
+The MinIO password and the seeded root admin password are Aspire parameters, generated on first run
+and persisted to the AppHost's user-secrets; read the current values from the Aspire dashboard. The
+migrator seeds only the root tenant and its admin user — there is no demo data.
+
+## Run the container images locally
+
+```bash
+bash scripts/local-env.sh                  # once — writes .env with generated secrets
+docker compose up --build                  # API :8080, console :8081, Mailpit inbox :8025
+curl -fsS http://localhost:8080/health/ready
+docker compose down -v
+```
+
+This builds and runs the same `api`, `migrator` and console images a deployment uses, against
+PostgreSQL, Valkey, MinIO and a Mailpit mail catcher. The containers run as **Production**, so the
+same fail-fast guards apply as on a server: no placeholder secrets, no `AllowedHosts: *`. That is
+why the four secrets have no default in `docker-compose.yml` and `scripts/local-env.sh` generates
+them instead. Every other setting has a local default — see [`.env.example`](.env.example) for the
+full list. Real deployments configure these images through Dokploy environment variables (ADR-0005).
+
+| Symptom | Likely cause |
+|---|---|
+| `POSTGRES_PASSWORD ... run scripts/local-env.sh` at `docker compose up` | No `.env` yet. Run the script; the error names the missing variable. |
+| `Production configuration is not usable: Missing required configuration 'AllowedHosts'` | The API refuses to answer for any Host header in Production. List the hostnames it serves, semicolon-separated; `*` is rejected. |
+| `Production configuration is not usable: … still holds a template placeholder` | A secret carries a sample value such as `changeme` or `dev-only`. Regenerate with `bash scripts/local-env.sh --force`. |
+| `ProxyOptions: Enabled is true but nothing is trusted` | Production enables forwarded headers for a Traefik deployment and deliberately trusts no one by default. This compose file publishes the API directly, so it sets `ProxyOptions__Enabled=false`; behind a real proxy, name the proxy's network instead. |
+| Console shows a CORS error | `APP_CONSOLE_URL` does not match the origin the browser actually uses; it is the API's CORS allow-list entry. |
+| `migrator` retries Postgres for 2 minutes then fails | Usually a `POSTGRES_PASSWORD` change against an existing `pg_data` volume. `docker compose down -v` (destructive) and start over. |
 
 ## Test
 
@@ -60,7 +92,8 @@ cd clients/dashboard && npm run test:e2e  # Playwright
 | `src/Host/` | API, AppHost, DbMigrator, Migrations |
 | `src/Tests/` | Unit, architecture (NetArchTest) and integration (Testcontainers) tests |
 | `clients/` | The two React apps |
-| `deploy/` | Docker Compose, Dokploy |
+| `docker-compose.yml` | Runs the production images locally, with `.env.example` |
+| `deploy/` | Dokploy deployment configuration |
 | `docs/adr/` | Architecture decision records |
 
 ## Contributing

@@ -7,6 +7,7 @@ using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
 using Boilerplate.BuildingBlocks.Storage;
 using Boilerplate.BuildingBlocks.Storage.Local;
 using Boilerplate.BuildingBlocks.Storage.Services;
+using Boilerplate.BuildingBlocks.Web;
 using Boilerplate.BuildingBlocks.Web.Modules;
 using Boilerplate.Modules.Identity.Authorization;
 using Boilerplate.Modules.Identity.Authorization.Jwt;
@@ -162,7 +163,12 @@ public class IdentityModule : IModule
         //metrics
         services.AddSingleton<IdentityMetrics>();
 
-        services.ConfigureJwtAuth();
+        // Skipped only by hosts that never authenticate a caller (the DbMigrator), which would
+        // otherwise need a signing key purely to satisfy JwtOptions.ValidateOnStart().
+        if (builder.GetHeroPlatformOptions().EnableAuthentication)
+        {
+            services.ConfigureJwtAuth();
+        }
     }
 
     public void MapEndpoints(IEndpointRouteBuilder endpoints)

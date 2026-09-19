@@ -24,6 +24,10 @@ paths = [
   # Local runtime state, gitignored like bin/obj: audit dead-letter dumps contain hashes of real
   # request data from a dev run, and are never committed.
   '''(^|/)audit-dlq/''',
+  # The .env that scripts/local-env.sh generates for docker-compose. It holds real (if disposable)
+  # local secrets by design and is gitignored — flagging it would make the gate fail on every
+  # machine that has ever run the local stack. .env.example, which is committed, is still scanned.
+  '''^\.env$''',
 ]
 
 regexes = [
