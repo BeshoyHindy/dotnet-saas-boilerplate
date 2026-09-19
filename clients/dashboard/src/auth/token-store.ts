@@ -93,36 +93,15 @@ export const tokenStore = {
     emit();
   },
 
-  /**
-   * Install the fresh actor access token returned by the End Impersonation
-   * endpoint and clear the stash. Use this on End success.
-   *
-   * End is access-only (the server cannot write a session row in the actor's
-   * tenant from the impersonated tenant's context), so the operator's *stashed*
-   * refresh token comes back with them — their own session was never revoked.
-   */
-  endImpersonationWithFreshAccessToken(accessToken: string) {
-    const stashTenant = localStorage.getItem(STASH_TENANT_KEY);
-    const stashRefresh = localStorage.getItem(STASH_REFRESH_KEY);
-    localStorage.setItem(ACCESS_KEY, accessToken);
-    if (stashRefresh) {
-      localStorage.setItem(REFRESH_KEY, stashRefresh);
-    } else {
-      localStorage.removeItem(REFRESH_KEY);
-    }
-    localStorage.removeItem(PERMS_KEY);
-    if (stashTenant) localStorage.setItem(TENANT_KEY, stashTenant);
-    localStorage.removeItem(STASH_ACCESS_KEY);
-    localStorage.removeItem(STASH_REFRESH_KEY);
-    localStorage.removeItem(STASH_TENANT_KEY);
-    emit();
-  },
+  /** Read the stashed actor access token without consuming the stash (for claims inspection). */
+  peekStashedActorAccessToken: () => localStorage.getItem(STASH_ACCESS_KEY),
 
   /**
-   * Last-resort local restore — used if the End endpoint fails. Reinstall
-   * the stashed actor tokens so the operator at least has *some* session
-   * (the original access token may itself be expired by now, in which
-   * case auto-refresh with the stashed refresh token kicks in).
+   * Come back to the operator's own session. Since #9 this is THE end-impersonation path: the
+   * server hands back no token (their session was never taken away), so the stash — access token
+   * plus the refresh token that renews it — is what restores them. Strictly better than the
+   * access-only token End used to mint, which nothing could renew. If the stashed access token
+   * has expired meanwhile, auto-refresh picks it up on the next request.
    */
   restoreStashedActor(): boolean {
     const access = localStorage.getItem(STASH_ACCESS_KEY);

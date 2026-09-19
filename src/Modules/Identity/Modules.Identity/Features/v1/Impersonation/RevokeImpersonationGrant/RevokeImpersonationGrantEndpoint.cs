@@ -25,7 +25,7 @@ public static class RevokeImpersonationGrantEndpoint
                     new RevokeImpersonationGrantCommand(id, body?.Reason), ct)))
             .WithName("RevokeImpersonationGrant")
             .WithSummary("Revoke an impersonation grant")
-            .WithDescription("Marks the grant as revoked. Subsequent requests carrying the impersonation token are rejected by the JWT validation hook within ~1 second (cache TTL).")
+            .WithDescription("Marks the grant as revoked. Subsequent requests carrying the impersonation token are rejected by the JWT validation hook immediately on the instance that handled the revoke, and within the local cache's expiration (up to 1 minute) on any other instance.")
             .RequirePermission(IdentityPermissions.Impersonation.Revoke)
             .Produces<ImpersonationGrantDto>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)

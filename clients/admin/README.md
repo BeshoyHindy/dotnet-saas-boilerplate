@@ -83,6 +83,31 @@ src/
 3. The API client attaches `Authorization: Bearer <access>` on every call and sends no tenant of its own: the server reads the token's `tenant` claim.
 4. On `401`, a single-flight refresh call hits `POST /api/v1/tenants/{tenant}/auth/refresh`, retries the original request, and logs the user out if the refresh fails.
 
+## Acting inside another tenant
+
+A token names exactly one tenant and a caller may never name another (ADR-0002), so an operator
+who needs to work inside a customer tenant *exchanges* their token for one that acts there.
+
+1. **Enter tenant** (tenant detail page, the Branding card, or the impersonation picker) asks for
+   a reason and calls `POST /api/v1/identity/operator/token-exchange`. Root tenant plus the
+   root-only `Permissions.Platform.Users.Impersonate` are required; every exchange is audited.
+2. What comes back is **access-only**: no refresh token, no cookie, no session row, and a lifetime
+   the server clamps to `OperatorExchange:MaxMinutes`. It is held **in memory only**
+   (`src/auth/acting-store.ts`) — never `localStorage` — so a reload returns you to your own
+   account and a dead credential can never be resurrected.
+3. While acting, `apiFetch` sends the exchanged token for everything. `asOperator: true` opts a
+   call back to the operator's own token; the exchange itself uses it, because an acting token
+   may not be exchanged again. The operator's own session is untouched and keeps refreshing.
+4. The banner under the topbar names the tenant, the user being acted as, and the time left.
+   **Exit** ends the grant server-side (`POST /api/v1/identity/impersonation/end`, which returns
+   no token) and drops the acting token — nothing has to be re-minted to come back.
+5. If the grant is revoked or the token expires, the next `401` is **not** refreshed — there is
+   nothing to refresh. The client falls back to the operator's own session and says so.
+
+Impersonating a specific user in another tenant is the same mechanism: enter the tenant to list
+its users, then pick one — that performs a fresh exchange (from the operator's own token) with
+`targetUserId` and hands the resulting token to the dashboard tab.
+
 ## Styling
 
 - Tailwind 4 CSS-first config lives in `src/styles/globals.css` (no `tailwind.config.ts`).

@@ -167,6 +167,17 @@ public static class Audit
             return this;
         }
 
+        /// <summary>
+        /// Records who is *really* behind an activity when the request carried an acting token
+        /// (act_sub/act_tenant). No-op for ordinary sessions and for non-activity payloads.
+        /// </summary>
+        public Builder WithActor(string? actorSubject, string? actorTenant)
+        {
+            if (_payload is ActivityEventPayload p && !string.IsNullOrEmpty(actorSubject))
+                _payload = p with { ActorSubject = actorSubject, ActorTenant = actorTenant };
+            return this;
+        }
+
         // Finalize + publish ----------------------------------------------------
 
         public async ValueTask WriteAsync(CancellationToken ct = default)

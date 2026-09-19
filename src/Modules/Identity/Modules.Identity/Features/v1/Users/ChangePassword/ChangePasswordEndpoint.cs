@@ -27,8 +27,11 @@ public static class ChangePasswordEndpoint
         .RequireAuthorization()
         // Self-service: changes the caller's own password after re-confirming the current one.
         .RequireAuthenticatedOnly()
+        // Changes the subject's own credentials — an actor must not do this on their behalf.
+        .DenyWhenActing()
         .Produces(StatusCodes.Status200OK)
         .Produces(StatusCodes.Status401Unauthorized)
-        .Produces(StatusCodes.Status400BadRequest);
+        .Produces(StatusCodes.Status400BadRequest)
+        .Produces(StatusCodes.Status403Forbidden);
     }
 }

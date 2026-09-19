@@ -1,0 +1,74 @@
+@baseUrl = https://localhost:7030
+@tenant = root
+@targetTenant = acme
+
+### 0. Sign in as a root operator (the exchange is root-only)
+# @name operatorToken
+POST {{baseUrl}}/api/v1/tenants/{{tenant}}/auth/token
+Content-Type: application/json
+
+{
+  "email": "admin@root.com",
+  "password": "Password123!"
+}
+
+### 1. Exchange the operator token for one that acts inside {{targetTenant}}
+# ADR-0002: root operators cross tenants by exchanging tokens, never by header. The issued token's
+# `tenant` claim is the target and its subject is a real user of that tenant (targetUserId, else
+# the tenant's admin), so permissions there work unchanged. Access-only: no refresh token, no
+# cookie, no session row. A longer duration than the server's maximum is clamped, not refused.
+# @name exchange
+POST {{baseUrl}}/api/v1/identity/operator/token-exchange
+Content-Type: application/json
+Authorization: Bearer {{operatorToken.response.body.accessToken}}
+
+{
+  "targetTenantId": "{{targetTenant}}",
+  "targetUserId": null,
+  "reason": "Customer ticket #4821 — verifying their branding",
+  "durationMinutes": 15
+}
+
+### 2. Use the exchanged token — this lists {{targetTenant}}'s users, not root's
+GET {{baseUrl}}/api/v1/identity/users
+Authorization: Bearer {{exchange.response.body.accessToken}}
+
+### 3. A forged tenant header changes nothing (the claim is the only input)
+GET {{baseUrl}}/api/v1/identity/users
+Authorization: Bearer {{exchange.response.body.accessToken}}
+tenant: root
+
+### 4. Read + write the target tenant's branding while acting
+GET {{baseUrl}}/api/v1/tenants/theme
+Authorization: Bearer {{exchange.response.body.accessToken}}
+
+### 5. Exit the tenant — ends the grant, returns no token
+# The operator's own session was never touched, so there is nothing to restore: the client simply
+# stops sending the exchanged token, which is dead from here on.
+POST {{baseUrl}}/api/v1/identity/impersonation/end
+Authorization: Bearer {{exchange.response.body.accessToken}}
+
+### 6. Or revoke the grant from the operator side (same effect, different door)
+POST {{baseUrl}}/api/v1/identity/impersonation/grants/{{exchange.response.body.grantId}}/revoke
+Content-Type: application/json
+Authorization: Bearer {{operatorToken.response.body.accessToken}}
+
+{
+  "reason": "done for the day"
+}
+
+### 7. The exchange appears in the unified grant list
+GET {{baseUrl}}/api/v1/identity/impersonation/grants?Status=Active&ImpersonatedTenantId={{targetTenant}}
+Authorization: Bearer {{operatorToken.response.body.accessToken}}
+
+### 8. Same-tenant impersonation (NOT cross-tenant — that is the exchange above)
+POST {{baseUrl}}/api/v1/identity/impersonation/start
+Content-Type: application/json
+Authorization: Bearer {{operatorToken.response.body.accessToken}}
+
+{
+  "targetUserId": "<a user in YOUR OWN tenant>",
+  "targetTenantId": "{{tenant}}",
+  "reason": "reproducing a support ticket",
+  "durationMinutes": 15
+}

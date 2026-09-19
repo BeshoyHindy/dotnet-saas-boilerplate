@@ -30,7 +30,7 @@ public sealed class SecurityAudit : ISecurityAudit
             subjectId: userId, clientId: clientId, authMethod: "", reasonCode: reason, claims: null,
             severity: AuditSeverity.Information, source: "Identity", ct);
 
-    public ValueTask ImpersonationStartedAsync(string actorUserId, string actorTenantId, string targetUserId, string targetTenantId, string clientId, string ip, string userAgent, string reason, CancellationToken ct = default)
+    public ValueTask ImpersonationStartedAsync(string actorUserId, string actorTenantId, string targetUserId, string targetTenantId, string clientId, string ip, string userAgent, string reason, string? jti = null, DateTime? expiresAtUtc = null, CancellationToken ct = default)
         => _audit.WriteSecurityAsync(SecurityAction.ImpersonationStarted,
             subjectId: actorUserId, clientId: clientId, authMethod: "Impersonation", reasonCode: reason,
             claims: new Dictionary<string, object?>
@@ -39,7 +39,10 @@ public sealed class SecurityAudit : ISecurityAudit
                 ["targetUser"] = targetUserId,
                 ["targetTenant"] = targetTenantId,
                 ["ip"] = ip,
-                ["userAgent"] = userAgent
+                ["userAgent"] = userAgent,
+                // jti joins this row to the revocable grant; expiry bounds the acting window.
+                ["jti"] = jti,
+                ["expiresAt"] = expiresAtUtc
             },
             severity: AuditSeverity.Warning, source: "Identity", ct);
 

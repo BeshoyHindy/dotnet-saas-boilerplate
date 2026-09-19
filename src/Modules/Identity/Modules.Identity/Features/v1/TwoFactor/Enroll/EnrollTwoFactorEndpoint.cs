@@ -22,7 +22,10 @@ public static class EnrollTwoFactorEndpoint
             .RequireAuthorization()
             // Self-service: enrolls the caller's own authenticator.
             .RequireAuthenticatedOnly()
+            // Changes the subject's own credentials — an actor must not do this on their behalf.
+            .DenyWhenActing()
             .Produces<TwoFactorEnrollmentResponse>(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status401Unauthorized);
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
     }
 }

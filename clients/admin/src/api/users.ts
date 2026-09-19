@@ -29,13 +29,11 @@ export type SearchUsersParams = {
   isActive?: boolean;
   emailConfirmed?: boolean;
   roleId?: string;
-  /**
-   * Target tenant for the impersonation picker. Currently inert: since ADR-0002
-   * the tenant comes from the caller's token alone, so the search runs inside the
-   * operator's own tenant until the operator token-exchange endpoint lands.
-   */
-  tenantId?: string;
 };
+
+// There is no `tenantId` filter, by design: the search runs inside the tenant the caller's token
+// names (ADR-0002). To list another tenant's users, enter that tenant first — the exchanged token
+// scopes the search for you (see the impersonation picker).
 
 export type RegisterUserInput = {
   firstName: string;
@@ -60,9 +58,17 @@ const IDENTITY = "/api/v1/identity";
  * role names — permissions are resolved server-side per role on this endpoint,
  * so client-side route guards must call it after login (and after a refresh
  * if grants may have changed).
+ *
+ * Pass `asOperator` when the answer must describe the OPERATOR's own session: while acting inside
+ * another tenant this endpoint answers for the user being acted as, and caching those as "my
+ * permissions" would regate the operator's own UI with a stranger's grants.
  */
-export async function getMyPermissions(): Promise<string[]> {
-  return (await apiFetch<string[] | null>(`${IDENTITY}/permissions`)) ?? [];
+export async function getMyPermissions(options: { asOperator?: boolean } = {}): Promise<string[]> {
+  return (
+    (await apiFetch<string[] | null>(`${IDENTITY}/permissions`, {
+      asOperator: options.asOperator,
+    })) ?? []
+  );
 }
 
 export async function getMyProfile(): Promise<UserDto> {

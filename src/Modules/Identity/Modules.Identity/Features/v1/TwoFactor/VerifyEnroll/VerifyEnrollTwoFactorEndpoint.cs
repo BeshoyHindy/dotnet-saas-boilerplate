@@ -21,8 +21,11 @@ public static class VerifyEnrollTwoFactorEndpoint
             .RequireAuthorization()
             // Self-service: confirms the caller's own enrollment.
             .RequireAuthenticatedOnly()
+            // Enables the subject's own 2FA — an actor must not do this on their behalf.
+            .DenyWhenActing()
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status401Unauthorized);
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
     }
 }

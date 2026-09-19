@@ -76,6 +76,12 @@ src/
 
 Identical to the admin app: sign in at `POST /api/v1/tenants/{tenant}/auth/token`, JWT in `localStorage`, `Authorization: Bearer` on every call (and no tenant header — the server reads the token's `tenant` claim, ADR-0002), single-flight refresh on 401 via `POST /api/v1/tenants/{tenant}/auth/refresh`. Keys are namespaced `boilerplate.dashboard.*` so both apps can run side-by-side without clobbering each other's session.
 
+### Impersonation
+
+A session opened by an operator — a tenant admin impersonating one of their own users, or a token handed off from the admin app — carries `act_sub`/`act_tenant` and has **no refresh token**; the operator's original tokens sit stashed under `boilerplate.dashboard.impersonation.*`.
+
+Ending it (`POST /api/v1/identity/impersonation/end`) returns **no token**: the operator's own session was never taken away, so the tab restores it from that stash, refresh token included. If the grant is revoked mid-session the API starts answering `401`, which routes to `/impersonation-ended` instead of attempting a refresh that cannot succeed.
+
 ## Production build
 
 `npm run build` emits `dist/`. Deploy behind any static host; forward `/api/*` to the backend and serve `index.html` as the SPA fallback.

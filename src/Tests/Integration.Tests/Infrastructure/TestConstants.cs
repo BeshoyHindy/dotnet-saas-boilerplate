@@ -10,6 +10,12 @@ public static class TestConstants
     public const string JwtAudience = "boilerplate.clients";
     public const string JwtSigningKey = "integration-test-signing-key-that-is-at-least-32-chars-long!!";
 
+    /// <summary>
+    /// Ceiling the test host configures for acting tokens (operator exchange + impersonation).
+    /// Deliberately below the shipped default so the server-side clamp is observable.
+    /// </summary>
+    public const int OperatorExchangeMaxMinutes = 20;
+
     public const string IdentityBasePath = "/api/v1/identity";
     public const string TenantsBasePath = "/api/v1/tenants";
     public const string AuditsBasePath = "/api/v1/audits";

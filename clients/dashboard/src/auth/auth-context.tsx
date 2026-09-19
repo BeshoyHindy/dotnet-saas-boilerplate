@@ -301,30 +301,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { signedOut: true };
     }
 
-    // Intra-app impersonation: we genuinely need the server-minted operator
-    // tokens to restore the original dashboard session, so await the call.
+    // Intra-app impersonation: the operator's own tokens are stashed locally and were never
+    // revoked, so coming back is a purely local restore. Since #9 End returns no token at all —
+    // it only ends the grant — which is strictly better than what it used to hand back: the
+    // stash carries a REFRESH token, whereas an access-only token could not be renewed.
     try {
-      const fresh = await endImpersonation();
-      // Defence-in-depth: the End endpoint mints a fresh access token for the
-      // *original operator*. If that operator is a root SuperAdmin (e.g. a cross-app
-      // handoff that nonetheless left a stash), installing it would drop a
-      // root account into the tenant dashboard — exactly what `login` forbids.
-      // Sign out and route to /login instead of restoring.
-      const claims = decodeJwt(fresh.accessToken);
-      if (claims?.tenant === "root") {
-        logout();
-        return { signedOut: true };
-      }
-      tokenStore.endImpersonationWithFreshAccessToken(fresh.accessToken);
-      return { signedOut: false };
+      await endImpersonation();
+      return { signedOut: restoreOperatorSession() };
     } catch {
-      // End endpoint failed (server unreachable / token invalid). Fall
-      // back to whatever we stashed locally; the operator may need to
-      // re-authenticate if the stashed access token has expired.
-      tokenStore.restoreStashedActor();
-      throw new Error("End impersonation failed; restored local session.");
+      // End failed (server unreachable, or the grant is already dead). The stash is still the
+      // way home, and the impersonation token expires by itself shortly.
+      return { signedOut: restoreOperatorSession() };
     } finally {
       queryClient.clear();
+    }
+
+    // Defence-in-depth: a root SuperAdmin must never land signed-in inside the tenant dashboard
+    // (exactly what `login` forbids), so if the stashed session is a root one, sign out instead.
+    function restoreOperatorSession(): boolean {
+      const stashedClaims = decodeJwt(tokenStore.peekStashedActorAccessToken());
+      if (stashedClaims?.tenant === "root") {
+        logout();
+        return true;
+      }
+      tokenStore.restoreStashedActor();
+      return false;
     }
   }, [queryClient, logout]);
 

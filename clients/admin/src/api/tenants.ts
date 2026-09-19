@@ -142,10 +142,10 @@ export async function retryTenantProvisioning(id: string): Promise<TenantProvisi
 // Tenant theme / branding
 //
 // The theme endpoints are CURRENT-TENANT scoped server-side: they act on the
-// tenant the caller's token names. Since ADR-0002 an operator cannot scope a
-// request to another tenant, so `tenantId` below only labels the query cache —
-// the call reads and writes the operator's own tenant until the operator
-// token-exchange endpoint lands.
+// tenant the caller's token names, and a caller cannot name another one
+// (ADR-0002). To edit tenant X's branding, ENTER tenant X first (#9's operator
+// token exchange): the acting token makes X the current tenant, so these same
+// calls read and write X. TenantBrandingCard gates on exactly that.
 // ─────────────────────────────────────────────────────────────────────────
 
 export type PaletteDto = {
