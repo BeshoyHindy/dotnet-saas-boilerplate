@@ -31,7 +31,7 @@ function handleGlobalError(error: unknown) {
  * whatever session (or lack of one) comes next. Every "this session is over" path
  * (logout, a dead refresh, a token-gone 401, boot's failed silent refresh) must call
  * this instead of clearing `tokenStore`/`actingStore` by hand — see
- * `.agents/rules/frontend/console.md`.
+ * `.agents/rules/frontend/clients.md` (the rule) and `console.md` (the acting session it also drops).
  */
 export function endSessionLocally(): void {
   actingStore.clear();

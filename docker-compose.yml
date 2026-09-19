@@ -178,8 +178,11 @@ services:
       CachingOptions__Redis: valkey:6379
       CachingOptions__EnableSsl: "false"
       JwtOptions__SigningKey: ${JWT_SIGNING_KEY:?run scripts/local-env.sh to generate .env}
-      OriginOptions__OriginUrl: ${APP_CONSOLE_URL:-http://localhost:8081}
-      CorsOptions__AllowedOrigins__0: ${APP_CONSOLE_URL:-http://localhost:8081}
+      # Mailed links (password reset, email confirmation) go to a tenant's users, so the
+      # origin the API writes into them is the DASHBOARD's, never the operator console's.
+      OriginOptions__OriginUrl: ${APP_DASHBOARD_URL:-http://localhost:8081}
+      CorsOptions__AllowedOrigins__0: ${APP_DASHBOARD_URL:-http://localhost:8081}
+      CorsOptions__AllowedOrigins__1: ${APP_CONSOLE_URL:-http://localhost:8082}
       AllowedHosts: ${ALLOWED_HOSTS:-localhost;127.0.0.1;api}
       # Nothing fronts the API here — it is published straight onto a host port — so forwarded
       # headers must not be honoured. appsettings.Production.json enables them for a Traefik
@@ -209,11 +212,32 @@ services:
     #   curl -fsS http://localhost:8080/health/ready
 
   #if (frontend)
-  # The React console, served by nginx (ADR-0004). It proxies /api and /health to
-  # the API on the compose network, so the browser only ever talks to one origin —
-  # which is what lets the SameSite=Strict refresh cookie work without CORS
+  # The two React clients (ADR-0008), each its own image served by nginx. Each proxies
+  # /api and /health to the API on the compose network, so a browser only ever talks to
+  # one origin — which is what lets the SameSite=Strict refresh cookie work without CORS
   # credentials. APP_API_URL is therefore an INTERNAL address, not a browser one;
   # `api` is in the API's AllowedHosts list because nginx forwards that Host.
+  #
+  # The dashboard: the app a tenant's own users sign in to.
+  dashboard:
+    build:
+      context: clients/dashboard
+    image: boilerplate/dashboard:local
+    restart: unless-stopped
+    depends_on:
+      api: { condition: service_started }
+    environment:
+      APP_API_URL: http://api:8080
+      # The browser fetches presigned URLs straight from MinIO, so the client's
+      # Content-Security-Policy has to name that origin.
+      APP_STORAGE_URL: http://localhost:${MINIO_API_PORT:-9000}
+      APP_DEFAULT_TENANT: ${APP_DEFAULT_TENANT:-root}
+    # 8080 in the container: the images run nginx as an unprivileged user, which
+    # cannot bind a privileged port.
+    ports:
+      - "${APP_DASHBOARD_PORT:-8081}:8080"
+
+  # The console: the operator tool. Same image shape, different app.
   console:
     build:
       context: clients/console
@@ -223,14 +247,13 @@ services:
       api: { condition: service_started }
     environment:
       APP_API_URL: http://api:8080
-      # The browser fetches presigned URLs straight from MinIO, so the console's
-      # Content-Security-Policy has to name that origin.
       APP_STORAGE_URL: http://localhost:${MINIO_API_PORT:-9000}
+      # Operators live in the root tenant; the console's sign-in form has no tenant field.
       APP_DEFAULT_TENANT: ${APP_DEFAULT_TENANT:-root}
-    # 8080 in the container: the console image runs nginx as an unprivileged user,
-    # which cannot bind a privileged port.
+      # Only so a tenant user who lands here can be pointed at the app that is theirs.
+      APP_DASHBOARD_URL: ${APP_DASHBOARD_URL:-http://localhost:8081}
     ports:
-      - "${APP_CONSOLE_PORT:-8081}:8080"
+      - "${APP_CONSOLE_PORT:-8082}:8080"
   #endif
 
 volumes:

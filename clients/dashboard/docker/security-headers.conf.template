@@ -1,0 +1,15 @@
+# Security headers, included from every location that serves a response.
+#
+# nginx's `add_header` does NOT inherit into a location that declares one of its
+# own, so this file is included per-location rather than set once on the server.
+# `always` keeps them on error responses too.
+#
+# The Content-Security-Policy is rendered by the entrypoint (nginx.conf.template)
+# because it has to name the object-storage origin, which is deployment-specific.
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "DENY" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+add_header Cross-Origin-Opener-Policy "same-origin" always;
+add_header Cross-Origin-Resource-Policy "same-origin" always;
+add_header Permissions-Policy "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()" always;
+add_header Content-Security-Policy "${APP_CSP}" always;

@@ -7,7 +7,7 @@ import { defineConfig, devices } from "@playwright/test";
  * and an operator entering a tenant — the three journeys that must not break silently.
  * Everything below page level belongs in the Vitest units next to the source.
  *
- * Tests run against a Vite dev server on port 5173 with API calls intercepted via
+ * Tests run against a Vite dev server on port 5174 with API calls intercepted via
  * `page.route()`, so no backend, no database and no seeding are involved.
  *
  * Usage:
@@ -16,6 +16,15 @@ import { defineConfig, devices } from "@playwright/test";
  *   pnpm test:e2e -- --headed      # watch the browser drive
  *   pnpm test:e2e -- login.spec    # filter by file
  */
+/**
+ * The dev server this suite drives. Fixed by default — the app's own port — but
+ * overridable, because a machine may already be running this client (another checkout,
+ * or the AppHost) and Playwright's `reuseExistingServer` would otherwise happily drive
+ * THAT server and report failures against code you did not write.
+ */
+const PORT = Number(process.env.PLAYWRIGHT_PORT ?? 5174);
+const BASE_URL = `http://localhost:${PORT}`;
+
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
@@ -25,7 +34,7 @@ export default defineConfig({
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
 
   use: {
-    baseURL: "http://localhost:5173",
+    baseURL: BASE_URL,
     trace: "on-first-retry",
     actionTimeout: 10_000,
     navigationTimeout: 15_000,
@@ -41,8 +50,14 @@ export default defineConfig({
   // Boot the Vite dev server before any test runs. `reuseExistingServer` means a
   // re-run picks up an already-running dev server (faster local iteration).
   webServer: {
-    command: "pnpm dev",
-    url: "http://localhost:5173",
+    command: `pnpm exec vite --port ${PORT} --strictPort`,
+    // The suite mocks every call it cares about with `page.route()`. Anything it does NOT
+    // mock must fail to connect rather than reach a real API: a developer (or CI runner)
+    // with the AppHost up would otherwise have unmocked requests answered by a live
+    // server, whose 401 on a fake seeded JWT ends the session and drops the spec on
+    // /login. Port 9 is the discard port — nothing listens there.
+    env: { VITE_API_BASE_URL: "http://127.0.0.1:9" },
+    url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
     stdout: "ignore",

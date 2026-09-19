@@ -21,13 +21,13 @@ dotnet test src/Boilerplate.slnx                    # tests (integration suite n
 ```
 
 <!--#if (frontend) -->
-The console lives under `clients/console` — `pnpm install && pnpm dev`.
+The two clients live under `clients/dashboard` (tenant app, port 5173) and `clients/console` (operator tool, port 5174) — `pnpm install && pnpm dev` in either (ADR-0008).
 <!--#endif -->
 
 ## Pull requests
 
 - Branch from and target `develop` as `feature/<slug>`; `main` only receives `release/*` and `hotfix/*` merges (ADR-0007).
-- Follow [Conventional Commits](https://www.conventionalcommits.org) — match the existing history (`feat(console): ...`, `fix(identity): ...`).
+- Follow [Conventional Commits](https://www.conventionalcommits.org) — match the existing history (`feat(dashboard): ...`, `fix(identity): ...`).
 - Add tests. The build runs with `TreatWarningsAsErrors=true`; analyzer warnings must be fixed.
 - Don't touch `src/BuildingBlocks/` without prior discussion — wide blast radius.
 - Architecture rules (module boundaries, file layout, coding style) are documented in [AGENTS.md](AGENTS.md), `.agents/rules/` and `docs/adr/`. Apply them. Name things the way [CONTEXT.md](CONTEXT.md) does.

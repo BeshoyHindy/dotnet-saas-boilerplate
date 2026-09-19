@@ -1,0 +1,264 @@
+import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { Command } from "cmdk";
+import { LogOut, Monitor, Moon, Palette, Search, Sun } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useAuth } from "@/auth/use-auth";
+import { useTheme } from "@/components/theme/theme-provider";
+import { accents } from "@/components/theme/appearance-options";
+import { navigationGroups } from "@/components/command-palette/palette-actions";
+import { cn } from "@/lib/cn";
+
+/**
+ * Command palette dialog — separated from the provider so cmdk + the full
+ * action graph (lucide icons, accent options, navigate logic) are
+ * code-split into their own chunk. The provider in command-palette.tsx
+ * lazy-imports this module on first ⌘K, keeping the main shell shipping
+ * a smaller bundle for cold start.
+ */
+
+type ActionItem = {
+  id: string;
+  label: string;
+  hint?: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  /** Free-form keywords for fuzzy matching. */
+  keywords?: string[];
+  shortcut?: string;
+  perform: () => void;
+  /**
+   * Permission gates — same semantics as NavSpec in layout/nav-data.ts: the item
+   * is hidden unless the user holds `perm` AND at least one of `anyPerm`. Each
+   * value mirrors what the destination page's API (or the create action's
+   * endpoint) enforces server-side, so the palette never offers a guaranteed 403.
+   */
+  perm?: string;
+  anyPerm?: readonly string[];
+};
+
+type ActionGroup = {
+  heading: string;
+  items: ActionItem[];
+};
+
+export function CommandPaletteDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (next: boolean) => void;
+}) {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const { setMode, setAccent } = useTheme();
+  const permissions = useMemo(() => user?.permissions ?? [], [user]);
+
+  // Build the action set fresh each time the palette opens. The ones
+  // that navigate close the palette; the ones that mutate appearance
+  // don't, so the user can preview multiple choices.
+  const groups = useMemo<ActionGroup[]>(() => {
+    const close = () => onOpenChange(false);
+    const go = (path: string) => () => {
+      navigate(path);
+      close();
+    };
+    // Mirrors isNavItemVisible in layout/nav-data.ts.
+    const visible = (item: ActionItem) => {
+      if (item.perm && !permissions.includes(item.perm)) return false;
+      if (item.anyPerm && !item.anyPerm.some((p) => permissions.includes(p))) return false;
+      return true;
+    };
+    const allGroups: ActionGroup[] = [
+      // The navigating entries live at module scope (navigationGroups) so their targets
+      // are data a test can check; only the closure that performs them is built here.
+      ...navigationGroups.map((group) => ({
+        heading: group.heading,
+        items: group.items.map((item) => ({ ...item, perform: go(item.to) })),
+      })),
+      {
+        heading: "Theme",
+        items: [
+          {
+            id: "theme-light",
+            label: "Switch to light",
+            Icon: Sun,
+            keywords: ["bright", "day"],
+            perform: () => setMode("light"),
+          },
+          {
+            id: "theme-dark",
+            label: "Switch to dark",
+            Icon: Moon,
+            keywords: ["night", "oled"],
+            perform: () => setMode("dark"),
+          },
+          {
+            id: "theme-system",
+            label: "Follow system theme",
+            Icon: Monitor,
+            keywords: ["auto"],
+            perform: () => setMode("system"),
+          },
+        ],
+      },
+      {
+        heading: "Accent",
+        items: accents.map((a) => ({
+          id: `accent-${a.id}`,
+          label: `Set accent: ${a.label}`,
+          hint: a.description,
+          Icon: Palette,
+          keywords: ["color", "brand", a.id],
+          perform: () => setAccent(a.id),
+        })),
+      },
+      {
+        heading: "Session",
+        items: [
+          {
+            id: "sess-logout",
+            label: "Sign out",
+            hint: "End this session",
+            Icon: LogOut,
+            keywords: ["logout", "exit", "quit"],
+            perform: () => {
+              close();
+              logout();
+            },
+          },
+        ],
+      },
+    ];
+    // Drop items the user can't access, then drop any group left empty —
+    // same shape as visibleSections() in layout/nav-data.ts.
+    return allGroups
+      .map((g) => ({ ...g, items: g.items.filter(visible) }))
+      .filter((g) => g.items.length > 0);
+  }, [navigate, onOpenChange, setMode, setAccent, logout, permissions]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className={cn(
+          "max-w-[640px] p-0 sm:max-w-[640px]",
+          "bg-[var(--color-popover)]",
+        )}
+      >
+        <DialogTitle className="sr-only">Command palette</DialogTitle>
+        <DialogDescription className="sr-only">
+          Search across pages, account actions, theme and accent. Use arrow keys to navigate; Enter to select.
+        </DialogDescription>
+
+        <Command
+          loop
+          className="flex flex-col"
+          // cmdk sets [cmdk-...] data attrs we hook into with selectors below.
+        >
+          {/* Search row — mirrors EntitySearch shape (rounded-xl, soft icon left). */}
+          <div className="flex items-center gap-2.5 border-b border-border px-4 py-3">
+            <Search className="h-[18px] w-[18px] shrink-0 text-[oklch(from_var(--color-muted-foreground)_l_c_h_/_0.5)]" aria-hidden />
+            <Command.Input
+              placeholder="Type a command or search…"
+              aria-label="Search commands"
+              className={cn(
+                "h-7 flex-1 bg-transparent text-[14px] tracking-tight placeholder:text-[var(--color-muted-foreground)]",
+                "focus:outline-none focus-visible:outline-none focus-visible:shadow-none",
+              )}
+              autoFocus
+            />
+            <kbd className="rounded border border-border bg-[var(--color-muted)] px-1.5 py-px text-[10px] tracking-tight text-[var(--color-muted-foreground)]">
+              Esc
+            </kbd>
+          </div>
+
+          {/* Results */}
+          <Command.List className="max-h-[420px] overflow-y-auto px-2 py-2">
+            <Command.Empty className="px-4 py-12 text-center">
+              <p className="text-sm font-medium tracking-tight">No matches</p>
+              <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
+                Try a different keyword — page name, entity, theme, accent, or sign-out.
+              </p>
+            </Command.Empty>
+
+            {groups.map((group) => (
+              <Command.Group
+                key={group.heading}
+                heading={group.heading}
+                className={cn(
+                  // Heading text styling via cmdk's nested rendering.
+                  "[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:pt-3",
+                  "[&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold",
+                  "[&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider",
+                  "[&_[cmdk-group-heading]]:text-[var(--color-muted-foreground)]",
+                )}
+              >
+                {group.items.map((item) => (
+                  <CommandRow key={item.id} item={item} />
+                ))}
+              </Command.Group>
+            ))}
+          </Command.List>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between border-t border-border px-4 py-2.5">
+            <div className="flex items-center gap-3 text-[11px] text-[var(--color-muted-foreground)]">
+              <span className="flex items-center gap-1">
+                <kbd className="rounded border border-border bg-[var(--color-muted)] px-1 py-px text-[9px]">↑</kbd>
+                <kbd className="rounded border border-border bg-[var(--color-muted)] px-1 py-px text-[9px]">↓</kbd>
+                navigate
+              </span>
+              <span className="flex items-center gap-1">
+                <kbd className="rounded border border-border bg-[var(--color-muted)] px-1 py-px text-[9px]">↵</kbd>
+                select
+              </span>
+            </div>
+            <span className="text-[11px] text-[var(--color-muted-foreground)]">
+              v0.1
+            </span>
+          </div>
+        </Command>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CommandRow({ item }: { item: ActionItem }) {
+  const { Icon, label, hint, keywords, perform } = item;
+  return (
+    <Command.Item
+      value={[label, hint, ...(keywords ?? [])].filter(Boolean).join(" ")}
+      onSelect={perform}
+      className={cn(
+        "group/cmd flex cursor-default select-none items-center gap-3 rounded-md px-2.5 py-2 text-sm",
+        "transition-colors duration-[var(--duration-fast)] ease-[var(--ease-out-cubic)]",
+        "outline-none focus:outline-none focus-visible:outline-none focus-visible:shadow-none",
+        "hover:bg-[oklch(from_var(--color-accent)_l_c_h_/_0.4)]",
+        "data-[selected=true]:bg-[var(--color-primary-soft)] data-[selected=true]:text-[var(--color-foreground)]",
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "grid h-7 w-7 shrink-0 place-items-center rounded-md",
+          "bg-[var(--color-muted)] text-[var(--color-muted-foreground)]",
+          "transition-colors group-data-[selected=true]/cmd:bg-[var(--color-primary-soft)] group-data-[selected=true]/cmd:text-[var(--color-primary)]",
+        )}
+      >
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate font-medium tracking-tight">{label}</span>
+        {hint && (
+          <span className="truncate text-[11px] text-[var(--color-muted-foreground)]">
+            {hint}
+          </span>
+        )}
+      </span>
+    </Command.Item>
+  );
+}

@@ -1,0 +1,694 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Activity,
+  ArrowRight,
+  ArrowUpRight,
+  Calendar,
+  ChevronRight,
+  FolderOpen,
+  RefreshCw,
+  ScrollText,
+  Server,
+  ShieldCheck,
+  Sparkles,
+  UsersRound,
+  X,
+} from "lucide-react";
+import {
+  getMyStatus,
+  type TenantExpiryState,
+  type TenantStatusDto,
+} from "@/api/tenants";
+import {
+  AuditEventType,
+  AuditSeverity,
+  AUDIT_EVENT_TYPE_LABELS,
+  severityRank,
+  listAudits,
+  type AuditSummaryDto,
+} from "@/api/audits";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EntityDetailSection } from "@/components/list";
+import { useAuth } from "@/auth/use-auth";
+import { cn } from "@/lib/cn";
+
+// ────────────────────────────────────────────────────────────────────────
+// Shaping helpers — pure, tested via memoization at the call sites.
+// ────────────────────────────────────────────────────────────────────────
+
+const numberFmt = new Intl.NumberFormat("en-US");
+const formatNumber = (n: number) => numberFmt.format(n);
+
+/** Whole days from now until `iso`, floored at 0. */
+function daysUntil(iso: string, now: Date = new Date()): number {
+  const target = Date.parse(iso);
+  if (!Number.isFinite(target)) return 0;
+  return Math.max(0, Math.ceil((target - now.getTime()) / 86_400_000));
+}
+
+/**
+ * Time-of-day greeting. Three buckets — morning (<12), afternoon (<17),
+ * evening (rest). Mirrors the dentalOS dashboard greeting helper so the
+ * tone of voice matches across products.
+ */
+function getGreeting(): "Good morning" | "Good afternoon" | "Good evening" {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+function relativeTime(iso: string, now: number = Date.now()): string {
+  const delta = Math.max(0, Math.floor((now - Date.parse(iso)) / 1000));
+  if (delta < 60) return `${delta}s`;
+  const m = Math.floor(delta / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
+}
+
+/**
+ * Derive the "Valid for" stat-card view from the tenant's expiry state — the
+ * same source of truth the Subscription page's ValidityBody reads. Drives the
+ * card tone (success/warning/danger) and the days-left target so an in-grace
+ * or expired tenant sees the warning instead of a healthy number.
+ */
+function validityView(status: TenantStatusDto | undefined): {
+  tone: StatTone;
+  state: TenantExpiryState | undefined;
+  /** ISO the card counts down to (validUpto when active, graceEnds when in grace). */
+  targetUtc: string | null;
+  daysLeft: number | null;
+} {
+  if (!status) {
+    return { tone: "success", state: undefined, targetUtc: null, daysLeft: null };
+  }
+  if (status.expiryState === "Expired") {
+    return { tone: "danger", state: "Expired", targetUtc: null, daysLeft: 0 };
+  }
+  if (status.expiryState === "InGrace") {
+    const target = status.graceEndsUtc || null;
+    return {
+      tone: "warning",
+      state: "InGrace",
+      targetUtc: target,
+      daysLeft: target ? daysUntil(target) : 0,
+    };
+  }
+  // Active.
+  const target = status.validUpto || null;
+  return {
+    tone: "success",
+    state: "Active",
+    targetUtc: target,
+    daysLeft: target ? daysUntil(target) : null,
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// StatCard — flat, calm, four-up. Icon tile on the left, label + big
+// tabular-nums value stacked on the right. Tone tints the icon plate.
+// ────────────────────────────────────────────────────────────────────────
+
+type StatTone = "primary" | "success" | "warning" | "danger" | "info";
+
+const STAT_TONE_BG: Record<StatTone, string> = {
+  primary: "bg-[oklch(from_var(--color-primary)_l_c_h_/_0.10)] text-[var(--color-primary)]",
+  success: "bg-[oklch(from_var(--color-success)_l_c_h_/_0.10)] text-[var(--color-success)]",
+  warning: "bg-[oklch(from_var(--color-warning)_l_c_h_/_0.12)] text-[var(--color-warning)]",
+  danger: "bg-[oklch(from_var(--color-destructive)_l_c_h_/_0.10)] text-[var(--color-destructive)]",
+  info: "bg-[oklch(from_var(--color-info)_l_c_h_/_0.10)] text-[var(--color-info)]",
+};
+
+function StatCard({
+  index,
+  label,
+  value,
+  sublabel,
+  icon: Icon,
+  tone,
+  href,
+}: {
+  index: number;
+  label: string;
+  value: React.ReactNode;
+  sublabel?: React.ReactNode;
+  icon: React.ComponentType<{ className?: string }>;
+  tone: StatTone;
+  href?: string;
+}) {
+  const body = (
+    <div
+      className={cn(
+        "app-enter group/stat flex h-full items-start gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] px-4 py-3.5 shadow-xs",
+        "transition-colors duration-200 hover:border-[var(--color-border-strong)]",
+      )}
+      style={{ animationDelay: `${index * 50}ms` }}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "grid size-9 shrink-0 place-items-center rounded-lg",
+          STAT_TONE_BG[tone],
+        )}
+      >
+        <Icon className="size-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          {label}
+        </p>
+        <p className="mt-1 font-display text-[20px] font-bold leading-none tracking-tight tabular-nums text-foreground sm:text-[22px]">
+          {value}
+        </p>
+        {sublabel && (
+          <p className="mt-1.5 truncate text-[11px] text-muted-foreground">
+            {sublabel}
+          </p>
+        )}
+      </div>
+      {href && (
+        <ArrowUpRight
+          aria-hidden
+          className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/stat:opacity-100"
+        />
+      )}
+    </div>
+  );
+  return href ? (
+    <Link to={href} className="block">
+      {body}
+    </Link>
+  ) : (
+    body
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Recent audits — top 5 of the last 24h. Severity stripe, type icon,
+// actor + relative timestamp. Click row to deep-link into the trail.
+// ────────────────────────────────────────────────────────────────────────
+
+function recentSeverityColor(severity: AuditSeverity): string {
+  const rank = severityRank(severity);
+  if (rank >= severityRank(AuditSeverity.Error)) return "var(--color-destructive)";
+  if (rank >= severityRank(AuditSeverity.Warning)) return "var(--color-warning)";
+  if (rank >= severityRank(AuditSeverity.Information)) return "var(--color-info)";
+  return "var(--color-muted-foreground)";
+}
+
+function recentEventTypeIcon(eventType: AuditEventType): React.ComponentType<{ className?: string }> {
+  if (eventType === AuditEventType.Security) return ShieldCheck;
+  if (eventType === AuditEventType.Exception) return Activity;
+  if (eventType === AuditEventType.EntityChange) return Server;
+  return Activity;
+}
+
+function RecentAuditsBody() {
+  const recentAudits = useQuery({
+    queryKey: ["audits", "recent", "overview"],
+    queryFn: ({ signal }) => {
+      // 24h window, page size 5 — matches the visual capacity below.
+      const to = new Date();
+      const from = new Date(to.getTime() - 24 * 60 * 60 * 1000);
+      return listAudits(
+        { pageNumber: 1, pageSize: 5, fromUtc: from.toISOString(), toUtc: to.toISOString() },
+        signal,
+      );
+    },
+    staleTime: 30_000,
+  });
+
+  const items = recentAudits.data?.items ?? [];
+
+  if (recentAudits.isLoading) {
+    return (
+      <ul className="space-y-2.5">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <li key={i} className="flex items-center gap-3">
+            <Skeleton className="size-7 rounded-md" />
+            <Skeleton className="h-3 w-32" />
+            <Skeleton className="ml-auto h-3 w-16" />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-2 py-6 text-center">
+        <ScrollText className="size-4 text-muted-foreground" />
+        <div className="text-[13px] font-semibold tracking-tight text-foreground">
+          No recent activity
+        </div>
+        <p className="max-w-sm text-[11.5px] text-muted-foreground">
+          Audited actions in the last 24 hours will appear here.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <ul className="-my-1 divide-y divide-[oklch(from_var(--color-border)_l_c_h_/_0.5)]">
+      {items.map((row) => (
+        <RecentAuditRow key={row.id} row={row} />
+      ))}
+    </ul>
+  );
+}
+
+function RecentAuditRow({ row }: { row: AuditSummaryDto }) {
+  const Icon = recentEventTypeIcon(row.eventType);
+  const tone = recentSeverityColor(row.severity);
+  return (
+    <li>
+      <Link
+        to="/system/audits"
+        className="group/row -mx-1 flex items-center gap-3 rounded-md px-1 py-2.5 transition-colors hover:bg-[var(--color-accent)]"
+      >
+        <span
+          aria-hidden
+          className="grid size-7 shrink-0 place-items-center rounded-md"
+          style={{
+            color: tone,
+            background: `oklch(from ${tone} l c h / 0.10)`,
+          }}
+        >
+          <Icon className="size-3.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[12.5px] font-medium tracking-tight text-foreground">
+            {row.source ?? AUDIT_EVENT_TYPE_LABELS[row.eventType] ?? "Event"}
+          </div>
+          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span className="truncate">
+              {row.userName ?? row.userId?.slice(0, 8) ?? "system"}
+            </span>
+            <span aria-hidden>·</span>
+            <span className="tabular-nums">{relativeTime(row.occurredAtUtc)} ago</span>
+          </div>
+        </div>
+        <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-hover/row:translate-x-0.5" />
+      </Link>
+    </li>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Quick actions — four shortcut tiles to the most useful destinations.
+// ────────────────────────────────────────────────────────────────────────
+
+type QuickAction = {
+  to: string;
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  tone: StatTone;
+};
+
+const QUICK_ACTIONS: QuickAction[] = [
+  {
+    to: "/identity/users",
+    title: "Invite users",
+    description: "Add teammates, assign roles.",
+    icon: UsersRound,
+    tone: "info",
+  },
+  {
+    to: "/files",
+    title: "My files",
+    description: "Upload and manage your files.",
+    icon: FolderOpen,
+    tone: "success",
+  },
+  {
+    to: "/system/audits",
+    title: "Audit trail",
+    description: "Security & entity-change events.",
+    icon: ScrollText,
+    tone: "primary",
+  },
+];
+
+function QuickActionsBody() {
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      {QUICK_ACTIONS.map((a) => (
+        <Link
+          key={a.to}
+          to={a.to}
+          className={cn(
+            "group/qa flex items-start gap-2.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3",
+            "transition-colors duration-200 hover:border-[var(--color-border-strong)] hover:bg-[var(--color-accent)]",
+          )}
+        >
+          <span
+            aria-hidden
+            className={cn(
+              "grid size-8 shrink-0 place-items-center rounded-md",
+              STAT_TONE_BG[a.tone],
+            )}
+          >
+            <a.icon className="size-3.5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[12.5px] font-semibold tracking-tight text-foreground">
+              {a.title}
+            </div>
+            <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+              {a.description}
+            </p>
+          </div>
+          <ArrowRight className="size-3 shrink-0 text-muted-foreground opacity-0 transition-all group-hover/qa:translate-x-0.5 group-hover/qa:opacity-100" />
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// First-run setup card — shown until the user dismisses it. Users can opt
+// out per-tenant via localStorage; it doesn't reappear once dismissed.
+// ────────────────────────────────────────────────────────────────────────
+
+const FIRST_RUN_DISMISSED_KEY = "boilerplate.firstrun.dismissed";
+
+function dismissedKeyFor(tenantId: string | undefined): string {
+  return `${FIRST_RUN_DISMISSED_KEY}:${tenantId ?? "_default"}`;
+}
+
+function readDismissed(tenantId: string | undefined): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(dismissedKeyFor(tenantId)) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function writeDismissed(tenantId: string | undefined, value: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(dismissedKeyFor(tenantId), String(value));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+type SetupTileSpec = {
+  to: string;
+  step: string;
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  tone: StatTone;
+};
+
+const SETUP_TILES: SetupTileSpec[] = [
+  {
+    to: "/identity/users",
+    step: "01",
+    title: "Invite your team",
+    description: "Add teammates, assign roles, and group them.",
+    icon: UsersRound,
+    tone: "info",
+  },
+  {
+    to: "/files",
+    step: "02",
+    title: "Upload files",
+    description: "Share documents and assets with your team.",
+    icon: FolderOpen,
+    tone: "success",
+  },
+];
+
+function FirstRunPanel({
+  tenantName,
+  tenantId,
+  onDismiss,
+}: {
+  tenantName: string;
+  tenantId: string | undefined;
+  onDismiss: () => void;
+}) {
+  return (
+    <section
+      aria-labelledby="firstrun-heading"
+      className="app-enter relative overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] shadow-xs"
+    >
+      <button
+        type="button"
+        onClick={() => {
+          writeDismissed(tenantId, true);
+          onDismiss();
+        }}
+        aria-label="Dismiss setup checklist"
+        title="Skip for now"
+        className="absolute right-3 top-3 z-10 grid size-7 cursor-pointer place-items-center rounded-md text-muted-foreground transition-colors hover:bg-[var(--color-accent)] hover:text-foreground"
+      >
+        <X className="size-3.5" />
+      </button>
+
+      <div className="px-5 py-5 sm:px-6 sm:py-6">
+        <h2
+          id="firstrun-heading"
+          className="font-display text-[20px] font-bold tracking-tight text-foreground sm:text-[22px]"
+        >
+          Welcome to {tenantName}
+        </h2>
+        <p className="mt-1 max-w-xl text-[12.5px] leading-relaxed text-muted-foreground">
+          Your tenant is provisioned and ready. Here's where most teams start.
+        </p>
+
+        <ul className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+          {SETUP_TILES.map((tile, idx) => (
+            <li
+              key={tile.to}
+              className="app-enter"
+              style={{ animationDelay: `${80 + idx * 60}ms` }}
+            >
+              <SetupTile spec={tile} />
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+function SetupTile({ spec }: { spec: SetupTileSpec }) {
+  const Icon = spec.icon;
+  return (
+    <Link
+      to={spec.to}
+      className={cn(
+        "group/tile flex h-full flex-col gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3.5",
+        "transition-colors duration-200 hover:border-[var(--color-border-strong)] hover:bg-[var(--color-accent)]",
+      )}
+    >
+      <div className="flex items-start justify-between">
+        <span
+          aria-hidden
+          className={cn(
+            "grid size-8 place-items-center rounded-md",
+            STAT_TONE_BG[spec.tone],
+          )}
+        >
+          <Icon className="size-3.5" />
+        </span>
+        <span className="text-[10.5px] font-medium uppercase tracking-wider text-muted-foreground">
+          Step {spec.step}
+        </span>
+      </div>
+
+      <div>
+        <div className="text-[13px] font-semibold tracking-tight text-foreground">
+          {spec.title}
+        </div>
+        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+          {spec.description}
+        </p>
+      </div>
+
+      <div className="mt-auto flex items-center gap-1 pt-1 text-[11px] font-medium text-muted-foreground transition-colors group-hover/tile:text-foreground">
+        Open
+        <ArrowRight className="size-3 transition-transform group-hover/tile:translate-x-0.5" />
+      </div>
+    </Link>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Page
+// ────────────────────────────────────────────────────────────────────────
+
+export function OverviewPage() {
+  const { user } = useAuth();
+
+  // Tenant status drives the "Valid for" stat card and its tone, plus the
+  // global expiry/grace banner mounted in the AppShell.
+  const status = useQuery({
+    queryKey: ["tenant", "me", "status"],
+    queryFn: () => getMyStatus(),
+    staleTime: 60_000,
+  });
+
+  // First-run state — shown until the user dismisses it for this tenant.
+  // Re-checks on tenant change so switching tenants restores the panel.
+  const tenantId = user?.tenant;
+  const [dismissed, setDismissed] = useState<boolean>(() => readDismissed(tenantId));
+  useEffect(() => {
+    setDismissed(readDismissed(tenantId));
+  }, [tenantId]);
+  const showFirstRun = !dismissed;
+
+  const refreshing = status.isFetching;
+  const onRefresh = () => {
+    void status.refetch();
+  };
+
+  // ── Header strings ────────────────────────────────────────────────────
+  const now = new Date();
+  const dateCaption = now.toLocaleDateString("en-US", {
+    weekday: "long",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  const greeting = getGreeting();
+  const firstName = (user?.name ?? user?.email?.split("@")[0] ?? "operator")
+    .toString()
+    .split(" ")[0];
+  const tenantLabel = user?.tenant ?? "your tenant";
+
+  // ── Validity card — driven by the tenant's expiry state (validUpto /
+  // graceEndsUtc), so an in-grace tenant counts down to grace-end and an
+  // expired tenant reads "Expired" in a danger tone — matching the global
+  // banner. Falls back gracefully when status is unavailable.
+  const validity = useMemo(() => validityView(status.data), [status.data]);
+  const validityDateFmt: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  };
+  const validityValue = status.isLoading ? (
+    <Skeleton className="h-5 w-16" />
+  ) : status.isError || !status.data ? (
+    "—"
+  ) : validity.state === "Expired" ? (
+    <span className="text-[var(--color-destructive)]">Expired</span>
+  ) : validity.daysLeft === null ? (
+    "Open-ended"
+  ) : (
+    <span className="inline-flex items-baseline gap-1">
+      <span
+        className={cn(
+          "tabular-nums",
+          validity.tone === "warning" && "text-[var(--color-warning)]",
+        )}
+      >
+        {formatNumber(validity.daysLeft)}
+      </span>
+      <span className="text-[12px] font-medium text-muted-foreground">days</span>
+    </span>
+  );
+  const validitySub = status.isLoading
+    ? undefined
+    : status.isError || !status.data
+      ? "Status unavailable"
+      : validity.state === "Expired"
+        ? "Contact your operator to renew"
+        : validity.state === "InGrace"
+          ? validity.targetUtc
+            ? `grace ends ${new Date(validity.targetUtc).toLocaleDateString("en-US", validityDateFmt)}`
+            : "in grace period"
+          : validity.targetUtc
+            ? `until ${new Date(validity.targetUtc).toLocaleDateString("en-US", validityDateFmt)}`
+            : "no end date";
+
+  return (
+    <div className="space-y-5">
+      {showFirstRun && (
+        <FirstRunPanel
+          tenantName={tenantLabel}
+          tenantId={tenantId}
+          onDismiss={() => setDismissed(true)}
+        />
+      )}
+
+      {/* ── Editorial greeting header ───────────────────────────────────
+          Direct text — no card chrome. Small caption above (date + tenant),
+          big greeting below, action buttons on the right. */}
+      <header className="app-enter flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            {dateCaption} · {tenantLabel}
+          </p>
+          <h1 className="mt-1 font-display text-display-page font-bold leading-tight tracking-tight text-foreground">
+            {greeting}, {firstName}
+          </h1>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" disabled={refreshing} onClick={onRefresh}>
+            <RefreshCw className={cn("mr-1.5 size-3.5", refreshing && "animate-spin")} />
+            Refresh
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/system/audits">
+              <ScrollText className="mr-1.5 size-3.5" />
+              View audits
+            </Link>
+          </Button>
+        </div>
+      </header>
+
+      {/* ── Stats row — 2 cards ─────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        <StatCard
+          index={0}
+          tone={status.isLoading || status.isError || !status.data ? "success" : validity.tone}
+          icon={Calendar}
+          label="Valid for"
+          value={validityValue}
+          sublabel={validitySub}
+        />
+      </div>
+
+      {/* ── Multi-column widget grid ────────────────────────────────────
+          Left rail (360px) holds system status. The right side fills with
+          a 2-up grid of secondary widgets that all read at the same
+          density. */}
+      <div className="grid w-full min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
+          <EntityDetailSection
+            title="Recent audits"
+            icon={ScrollText}
+            description="Last 24 hours, top 5 events."
+            action={
+              <Link
+                to="/system/audits"
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                See all <ArrowUpRight className="size-3" />
+              </Link>
+            }
+          >
+            <RecentAuditsBody />
+          </EntityDetailSection>
+
+          <EntityDetailSection
+            title="Quick actions"
+            icon={Sparkles}
+            description="Jump into the most-used destinations."
+          >
+            <QuickActionsBody />
+          </EntityDetailSection>
+        </div>
+    </div>
+  );
+}

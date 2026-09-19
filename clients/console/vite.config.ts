@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      port: 5173,
+      port: 5174,
       strictPort: true,
       // Dev mirrors the nginx image: the console proxies to the API rather than
       // letting the browser call it cross-origin. The refresh token is an HttpOnly

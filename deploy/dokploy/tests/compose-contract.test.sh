@@ -62,12 +62,14 @@ refute_match "no stack has a Dockerfile reference" "$both_text" '[Dd]ockerfile'
 
 # ── App images all come from IMAGE_TAG ───────────────────────────────
 app_images="$(printf '%s\n' "$app_text" | grep -E '^[[:space:]]*image:' | sed -E 's/^[[:space:]]*image:[[:space:]]*//')"
-# Pinned, so a service that silently disappears fails the contract. The console
-# is the one service this stack may legitimately not have — `dotnet new saas
-# --frontend false` scaffolds an API-only product (ADR-0001) — so the expected
-# count follows it and everything else stays fixed.
+# Pinned, so a service that silently disappears fails the contract. The two clients
+# are the services this stack may legitimately not have — `dotnet new saas
+# --frontend false` scaffolds an API-only product (ADR-0001) — so the expected count
+# follows them and everything else stays fixed. They come as a pair (ADR-0008): one
+# without the other is a scaffolding bug, and the assertions below check each.
 expected_app_images=2
-if grep -qE '^  console:' "$APP"; then expected_app_images=3; fi
+if grep -qE '^  dashboard:' "$APP"; then expected_app_images=$((expected_app_images + 1)); fi
+if grep -qE '^  console:' "$APP"; then expected_app_images=$((expected_app_images + 1)); fi
 assert_eq "every app service is accounted for" "$expected_app_images" "$(printf '%s\n' "$app_images" | grep -c .)"
 while IFS= read -r image; do
   [ -n "$image" ] || continue
@@ -77,6 +79,7 @@ done <<< "$app_images"
 assert_contains "app pulls the published API image"      "$app_images" 'boilerplate-api:'
 assert_contains "app pulls the published migrator image" "$app_images" 'boilerplate-db-migrator:'
 #if (frontend)
+assert_contains "app pulls the dashboard image"          "$app_images" 'boilerplate-dashboard:'
 assert_contains "app pulls the console image"            "$app_images" 'boilerplate-console:'
 #endif
 assert_match "app images are always re-pulled" "$app_text" '^[[:space:]]*pull_policy:[[:space:]]*always'
@@ -164,17 +167,39 @@ assert_match "api redirects plain HTTP to HTTPS" "$api_block" 'redirectscheme\.s
 assert_match "api load balancer targets the Kestrel port" "$api_block" 'loadbalancer\.server\.port=8080'
 
 #if (frontend)
-console_block="$(service_block "$APP" console)"
-assert_match "console is routed by Traefik" "$console_block" 'traefik\.enable=true'
-assert_match "console keeps the original Host header" "$console_block" 'loadbalancer\.passhostheader=true'
-assert_match "console has a load-balancer healthcheck" "$console_block" 'loadbalancer\.healthcheck\.path='
-# The console image runs nginx as uid 101, which cannot bind :80 — it listens on 8080
-# (clients/console/Dockerfile + docker/default.conf.template). Traefik routing to :80
+# Both clients are the same image shape (ADR-0008), so they answer the same questions.
+# The images run nginx as uid 101, which cannot bind :80 — they listen on 8080
+# (clients/<app>/Dockerfile + docker/default.conf.template). Traefik routing to :80
 # would simply never connect, and nothing else here would say why.
-assert_match "console load balancer targets the unprivileged nginx port" "$console_block" \
-  'loadbalancer\.server\.port=8080'
-assert_match "console exposes the unprivileged nginx port" "$console_block" '^[[:space:]]*-[[:space:]]*"8080"'
-refute_match "console never names the privileged port" "$console_block" 'loadbalancer\.server\.port=80$'
+for client in dashboard console; do
+  client_block="$(service_block "$APP" "$client")"
+  assert_true "$client is a service in the app stack" test -n "$client_block"
+  assert_match "$client is routed by Traefik" "$client_block" 'traefik\.enable=true'
+  assert_match "$client keeps the original Host header" "$client_block" 'loadbalancer\.passhostheader=true'
+  assert_match "$client has a load-balancer healthcheck" "$client_block" 'loadbalancer\.healthcheck\.path='
+  assert_match "$client load balancer targets the unprivileged nginx port" "$client_block" \
+    'loadbalancer\.server\.port=8080'
+  assert_match "$client exposes the unprivileged nginx port" "$client_block" '^[[:space:]]*-[[:space:]]*"8080"'
+  refute_match "$client never names the privileged port" "$client_block" 'loadbalancer\.server\.port=80$'
+done
+
+# The two clients must not answer on the same hostname, or whichever router Traefik
+# resolves first silently swallows the other app.
+dashboard_block="$(service_block "$APP" dashboard)"
+console_block="$(service_block "$APP" console)"
+# `.` stands in for Traefik's backticks around the host rule: a literal one inside a
+# single-quoted pattern reads as a command substitution to shellcheck (SC2016).
+assert_match "dashboard is routed on DASHBOARD_DOMAIN" "$dashboard_block" 'Host\(.\$\{DASHBOARD_DOMAIN\}.\)'
+assert_match "console is routed on CONSOLE_DOMAIN" "$console_block" 'Host\(.\$\{CONSOLE_DOMAIN\}.\)'
+refute_match "dashboard never claims the console hostname" "$dashboard_block" 'CONSOLE_DOMAIN'
+refute_match "console never claims the dashboard hostname" "$console_block" 'Host\(.\$\{DASHBOARD_DOMAIN\}.\)'
+
+# Mailed links (password reset, email confirmation) go to a tenant's users, so the
+# origin the API writes into them is the dashboard's — never the operator console's.
+assert_match "mailed links point at the dashboard" "$api_block" \
+  'OriginOptions__OriginUrl:[[:space:]]*https://\$\{DASHBOARD_DOMAIN\}'
+assert_match "both clients are in the CORS allow-list" "$api_block" \
+  'CorsOptions__AllowedOrigins__1:[[:space:]]*https://\$\{CONSOLE_DOMAIN\}'
 #endif
 
 # Traefik reports a middleware that two different containers define as a

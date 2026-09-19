@@ -35,7 +35,7 @@
         "frontend": {
             "type": "parameter",
             "datatype": "bool",
-            "description": "Include the React client app(s) under clients/ and everything that serves them (console container, client CI, Aspire client resources).",
+            "description": "Include BOTH React clients under clients/ — the dashboard (tenant app) and the console (operator tool) — and everything that serves them (their container images, client CI, Aspire client resources).",
             "defaultValue": "true"
         },
         "sandcastle": {
@@ -197,7 +197,8 @@
                         ".github/workflows/frontend.yml",
                         ".agents/rules/frontend/**",
                         "scripts/export-openapi.sh",
-                        "docs/adr/0004-*"
+                        "docs/adr/0004-*",
+                        "docs/adr/0008-*"
                     ]
                 },
                 {

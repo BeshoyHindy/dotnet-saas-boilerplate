@@ -1,5 +1,5 @@
 import {
-  Folder,
+  Building2,
   HeartPulse,
   LayoutDashboard,
   Palette,
@@ -8,10 +8,11 @@ import {
   Settings as SettingsIcon,
   Shield,
   ShieldCheck,
+  UserCog,
   Users,
   UserRound,
 } from "lucide-react";
-import { ALL_TRASH_PERMISSIONS } from "@/lib/trash-permissions";
+import { IdentityPermissions, MultitenancyPermissions } from "@/lib/permissions";
 
 /**
  * A palette entry whose whole job is to navigate: the target as data, not a closure.
@@ -47,19 +48,28 @@ export const navigationGroups: NavigationGroup[] = [
       {
         id: "nav-overview",
         label: "Overview",
-        hint: "Tenant telemetry & usage",
+        hint: "Platform snapshot",
         Icon: LayoutDashboard,
         keywords: ["home", "dashboard"],
         to: "/",
       },
       {
-        id: "nav-files",
-        label: "Files",
-        hint: "My uploaded assets",
-        Icon: Folder,
-        keywords: ["storage", "uploads", "documents"],
-        to: "/files",
-        perm: "Permissions.Files.Upload",
+        id: "nav-tenants",
+        label: "Tenants",
+        hint: "The tenant registry — enter, renew, deactivate",
+        Icon: Building2,
+        keywords: ["customers", "organisations", "registry", "operator"],
+        to: "/tenants",
+        perm: MultitenancyPermissions.Tenants.View,
+      },
+      {
+        id: "nav-impersonation",
+        label: "Impersonation",
+        hint: "Active acting grants",
+        Icon: UserCog,
+        keywords: ["acting", "grants", "operator", "support"],
+        to: "/impersonation",
+        perm: IdentityPermissions.Impersonation.View,
       },
       {
         id: "nav-users",
@@ -104,15 +114,6 @@ export const navigationGroups: NavigationGroup[] = [
         keywords: ["audit", "log", "compliance", "security", "trace", "correlation"],
         to: "/system/audits",
         perm: "Permissions.AuditTrails.View",
-      },
-      {
-        id: "nav-trash",
-        label: "Trash",
-        hint: "Soft-deleted records",
-        Icon: ScrollText,
-        keywords: ["recycle", "deleted", "restore"],
-        to: "/system/trash",
-        anyPerm: ALL_TRASH_PERMISSIONS,
       },
       {
         id: "nav-sessions",
@@ -163,13 +164,13 @@ export const navigationGroups: NavigationGroup[] = [
         perm: "Permissions.Groups.Create",
       },
       {
-        id: "create-file",
-        label: "Upload file",
-        hint: "Add to your storage",
+        id: "create-tenant",
+        label: "Create tenant",
+        hint: "Provision a new customer",
         Icon: Plus,
-        keywords: ["new", "upload", "attach"],
-        to: "/files?action=upload",
-        perm: "Permissions.Files.Upload",
+        keywords: ["new", "customer", "organisation", "provision"],
+        to: "/tenants?action=create",
+        perm: MultitenancyPermissions.Tenants.Create,
       },
     ],
   },

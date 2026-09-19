@@ -69,6 +69,7 @@ CI publishes three images to GHCR:
 | `ghcr.io/<owner>/boilerplate-api` | `src/Host/Dockerfile`, target `api` |
 | `ghcr.io/<owner>/boilerplate-db-migrator` | `src/Host/Dockerfile`, target `migrator` |
 <!--#if (frontend) -->
+| `ghcr.io/<owner>/boilerplate-dashboard` | `clients/dashboard/Dockerfile` |
 | `ghcr.io/<owner>/boilerplate-console` | `clients/console/Dockerfile` |
 <!--#endif -->
 
@@ -92,11 +93,13 @@ echo "$GHCR_TOKEN" | docker login ghcr.io -u "$OWNER" --password-stdin
 docker build -f src/Host/Dockerfile --target api      -t "ghcr.io/$OWNER/boilerplate-api:$TAG" .
 docker build -f src/Host/Dockerfile --target migrator -t "ghcr.io/$OWNER/boilerplate-db-migrator:$TAG" .
 <!--#if (frontend) -->
-docker build clients/console -t "ghcr.io/$OWNER/boilerplate-console:$TAG"
+docker build clients/dashboard -t "ghcr.io/$OWNER/boilerplate-dashboard:$TAG"
+docker build clients/console   -t "ghcr.io/$OWNER/boilerplate-console:$TAG"
 <!--#endif -->
 docker push "ghcr.io/$OWNER/boilerplate-api:$TAG"
 docker push "ghcr.io/$OWNER/boilerplate-db-migrator:$TAG"
 <!--#if (frontend) -->
+docker push "ghcr.io/$OWNER/boilerplate-dashboard:$TAG"
 docker push "ghcr.io/$OWNER/boilerplate-console:$TAG"
 <!--#endif -->
 ```
@@ -166,7 +169,8 @@ in both.
 | `IMAGE_OWNER` | app | your GHCR owner, lowercase | same |
 | `IMAGE_TAG` | app | `dev-latest` | `1.4.0` |
 | `API_DOMAIN` | app | `api.staging.example.com` | `api.example.com` |
-| `CONSOLE_DOMAIN` | app | `app.staging.example.com` | `app.example.com` |
+| `DASHBOARD_DOMAIN` | app | `app.staging.example.com` | `app.example.com` |
+| `CONSOLE_DOMAIN` | app | `console.staging.example.com` | `console.example.com` |
 | `STORAGE_DOMAIN` | both | `storage.staging.example.com` | `storage.example.com` |
 | `TRAEFIK_CERT_RESOLVER` | both | `letsencrypt` | `letsencrypt` |
 | `ALLOWED_HOSTS` | app | `api.staging.example.com` | `api.example.com` |
@@ -256,14 +260,16 @@ What happens, in order:
    migration fails, the migrator exits non-zero, the API never starts and the
    deploy fails. The API never migrates at startup.
 <!--#if (frontend) -->
-4. `console` starts and renders `/config.json`, its nginx site and its
-   Content-Security-Policy from `APP_API_URL`, `APP_STORAGE_URL` and
-   `APP_DEFAULT_TENANT`. It proxies `/api` to the API, so the browser only ever
-   talks to `CONSOLE_DOMAIN`. nginx runs as uid 101 and listens on **8080** —
-   that is what Traefik's `loadbalancer.server.port` names, not `:80`. The API
-   host is re-resolved per request through Docker's embedded DNS
-   (`APP_RESOLVER`, default `127.0.0.11`), so the console starts even if the API
-   is not up yet and follows it across a redeploy.
+4. `dashboard` and `console` start and each renders `/config.json`, its nginx
+   site and its Content-Security-Policy from `APP_API_URL`, `APP_STORAGE_URL`
+   and `APP_DEFAULT_TENANT` (the console also takes `APP_DASHBOARD_URL`, so a
+   tenant user who lands there can be sent to the app that is theirs). Each
+   proxies `/api` to the API, so a browser only ever talks to its own client's
+   hostname. nginx runs as uid 101 and listens on **8080** — that is what
+   Traefik's `loadbalancer.server.port` names, not `:80`. The API host is
+   re-resolved per request through Docker's embedded DNS (`APP_RESOLVER`,
+   default `127.0.0.11`), so a client starts even if the API is not up yet and
+   follows it across a redeploy.
 <!--#endif -->
 5. Traefik picks up the labels, requests certificates for the hostnames, and
    begins probing `GET /health/ready` on the API every 10 s. A container that
@@ -275,8 +281,10 @@ What happens, in order:
 curl -fsS https://api.example.com/health/live     # process is up
 curl -fsS https://api.example.com/health/ready    # dependencies are usable
 <!--#if (frontend) -->
-curl -fsSI https://app.example.com/ | head -1     # console serves
-curl -fsS https://app.example.com/config.json     # console got its runtime config
+curl -fsSI https://app.example.com/ | head -1     # dashboard serves
+curl -fsS https://app.example.com/config.json     # dashboard got its runtime config
+curl -fsSI https://console.example.com/ | head -1 # console serves
+curl -fsS https://console.example.com/config.json # console got its runtime config
 <!--#endif -->
 curl -fsSI https://storage.example.com/minio/health/live | head -1
 ```
@@ -477,10 +485,10 @@ usable until it expires.
 | `… 'AllowedHosts' contains '*'` | Name the hostnames. `*` is rejected in Production because a poisoned `Host` reaches password-reset links. |
 | `… still holds a template placeholder` | A secret looks like a sample (`changeme`, `secret`, `dev-only`). Regenerate it with the commands in §3. |
 | `ProxyOptions: Enabled is true but nothing is trusted` | `PROXY_KNOWN_NETWORK` is unset. Run the `docker network inspect` command in §3. |
-| 404 from Traefik on a domain | The stack deployed before the DNS record existed, or `API_DOMAIN`/`CONSOLE_DOMAIN` does not match the record. Compose domains are label-driven and **not** hot-reloaded: redeploy after changing one. |
+| 404 from Traefik on a domain | The stack deployed before the DNS record existed, or `API_DOMAIN`/`DASHBOARD_DOMAIN`/`CONSOLE_DOMAIN` does not match the record. Compose domains are label-driven and **not** hot-reloaded: redeploy after changing one. |
 | 502/503 from Traefik, API container running | The readiness probe is failing. `curl` the API container directly from the host, or read `GET /health` for the full report. A missing `API_DOMAIN` in `ALLOWED_HOSTS` does this — the probe sends that Host and host filtering answers 400. |
 | Certificate never issued | The `A` record did not resolve when Traefik asked, or port 80 is blocked. Fix DNS, then redeploy. |
-| The front end loads but every call is a CORS error | `CONSOLE_DOMAIN` is not the origin the browser actually uses; it is what the API puts in its allow-list. |
+| A client loads but every call is a CORS error | `DASHBOARD_DOMAIN`/`CONSOLE_DOMAIN` is not the origin the browser actually uses; both are what the API puts in its allow-list. Mailed links use `DASHBOARD_DOMAIN`. |
 | Password-reset links point at a container IP | Traefik is not passing the original `Host`. `passhostheader=true` must stay on the API's load-balancer labels — `X-Forwarded-Host` is deliberately never honoured, so that label is the only path for the real host. |
 | Uploads fail with a signature error | `STORAGE_DOMAIN` differs between the two stacks, or `Storage__S3__ServiceUrl` was pointed at an internal alias. The signature covers the host. |
 | `NoSuchBucket` on first upload | The data stack's `minio-init` did not run, or `STORAGE_BUCKET` differs between the two stacks. |
