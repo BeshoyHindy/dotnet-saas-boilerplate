@@ -10,15 +10,16 @@ public sealed class AuthRateLimitWiringTests
 {
     private const string AuthPolicy = "auth";
 
-    // Each entry: route-pattern suffix that uniquely identifies the endpoint.
+    // Each entry: route-pattern suffix that uniquely identifies the endpoint. All six live in the
+    // anonymous auth group api/v{version}/tenants/{tenant}/auth/... (ADR-0002).
     private static readonly string[] AuthSensitiveRouteSuffixes =
     {
-        "token/issue",
-        "token/refresh",
-        "forgot-password",
-        "reset-password",
-        "confirm-email",
-        "self-register"
+        "auth/token",
+        "auth/refresh",
+        "auth/forgot-password",
+        "auth/reset-password",
+        "auth/confirm-email",
+        "auth/register"
     };
 
     private readonly AppWebApplicationFactory _factory;
