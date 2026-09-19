@@ -30,7 +30,15 @@ These are the model for background loops: stay alive, log with context, never sw
 
 ## Tokens / sessions
 
-Login `POST /api/v1/tenants/{tenant}/auth/token` (header `X-Client-App` enforces the operator/tenant app boundary). Refresh `POST /api/v1/tenants/{tenant}/auth/refresh` cross-checks subject. Both live in the anonymous auth group alongside forgot-password, reset-password, confirm-email and register — the only endpoints that take the tenant from the route (ADR-0002). Session rows are written best-effort during login — failures log a warning and login still succeeds. Admin can't demote/deactivate the last admin or the root-tenant seed admin (guards in `UserRoleService`/`UserStatusService`).
+Login `POST /api/v1/tenants/{tenant}/auth/token` (header `X-Client-App` enforces the operator/tenant app boundary). Refresh `POST /api/v1/tenants/{tenant}/auth/refresh` cross-checks subject. Both live in the anonymous auth group alongside forgot-password, reset-password, confirm-email and register — the only endpoints that take the tenant from the route (ADR-0002). Admin can't demote/deactivate the last admin or the root-tenant seed admin (guards in `UserRoleService`/`UserStatusService`).
+
+**One session store, and it *is* the refresh token** (`UserSession`, one tenant-isolated row per device):
+
+- `ITokenService` mints **access tokens only**. `ISessionService.CreateSessionAsync` mints the refresh token, so login creates the session *before* the access token — its id becomes the `sid` claim. **A session-creation failure fails the login** (no try/catch): a login with no session row can neither refresh nor be revoked.
+- The token is `"{tenantId}.{32 CSPRNG bytes, base64url}"` (`RefreshTokenValue`), stored only as SHA-256. The prefix is routing metadata, never a credential — it must equal the resolved tenant, and the hash lookup runs inside the tenant query filter. **No `IgnoreQueryFilters()` anywhere on the token path.**
+- `RotateRefreshTokenAsync` is one compare-and-set `ExecuteUpdate`, so N concurrent refreshes yield exactly one winner (losers get `Superseded`). A `PreviousTokenHash` hit is reuse → the session is revoked. A `SecurityStamp` change (password reset, credential change) kills the session. `sid` survives rotation.
+- Browsers also get the token as `HttpOnly; Secure; SameSite=Strict` cookie (`RefreshTokenCookie`) pinned by `Path` to the tenant's refresh route; the refresh endpoint falls back to it when the body omits the token. CORS still allows no credentials (#13), so the cookie is same-site only and body delivery remains the client path.
+- **End-impersonation is access-only.** It runs in the impersonated tenant's context and so cannot write a session row in the actor's tenant; operator token exchange (#9) is where crossing a tenant boundary gets its mechanism.
 
 ## Tests
 

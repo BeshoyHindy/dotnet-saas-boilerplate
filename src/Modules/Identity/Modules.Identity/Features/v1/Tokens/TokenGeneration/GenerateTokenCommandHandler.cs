@@ -8,7 +8,7 @@ using Boilerplate.Modules.Identity.Contracts.Events;
 using Boilerplate.Modules.Identity.Contracts.Services;
 using Boilerplate.Modules.Identity.Contracts.v1.Tokens.TokenGeneration;
 using Mediator;
-using Microsoft.Extensions.Logging;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
 namespace Boilerplate.Modules.Identity.Features.v1.Tokens.TokenGeneration;
@@ -23,7 +23,6 @@ public sealed class GenerateTokenCommandHandler
     private readonly IOutboxStore _outboxStore;
     private readonly IMultiTenantContextAccessor<AppTenantInfo> _multiTenantContextAccessor;
     private readonly ISessionService _sessionService;
-    private readonly ILogger<GenerateTokenCommandHandler> _logger;
 
     public GenerateTokenCommandHandler(
         IIdentityService identityService,
@@ -32,8 +31,7 @@ public sealed class GenerateTokenCommandHandler
         IRequestContext requestContext,
         IOutboxStore outboxStore,
         IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor,
-        ISessionService sessionService,
-        ILogger<GenerateTokenCommandHandler> logger)
+        ISessionService sessionService)
     {
         _identityService = identityService;
         _tokenService = tokenService;
@@ -42,7 +40,6 @@ public sealed class GenerateTokenCommandHandler
         _outboxStore = outboxStore;
         _multiTenantContextAccessor = multiTenantContextAccessor;
         _sessionService = sessionService;
-        _logger = logger;
     }
 
     public async ValueTask<TokenResponse> Handle(
@@ -85,30 +82,23 @@ public sealed class GenerateTokenCommandHandler
             userAgent: ua,
             ct: cancellationToken);
 
-        // Issue token
-        var token = await _tokenService.IssueAsync(subject, claims, cancellationToken);
+        // The session row IS the refresh token, so it is created BEFORE the access token: its id
+        // becomes the `sid` claim, and a failure here fails the login. A login that leaves no
+        // session behind cannot be refreshed and cannot be revoked — succeeding would be worse
+        // than a 500.
+        var session = await _sessionService.CreateSessionAsync(subject, ip, ua, cancellationToken);
 
-        // Persist refresh token (hashed) for this user
-        await _identityService.StoreRefreshTokenAsync(subject, token.RefreshToken, token.RefreshTokenExpiresAt, cancellationToken);
+        var (accessToken, accessTokenExpiresAt) = await _tokenService.IssueAccessOnlyAsync(
+            subject,
+            claims.Append(new Claim(JwtRegisteredClaimNames.Sid, session.SessionId.ToString())),
+            lifetime: null,
+            cancellationToken);
 
-        // Create user session for session management (non-blocking, fail gracefully)
-        try
-        {
-            var refreshTokenHash = TokenFingerprint.Sha256Short(token.RefreshToken);
-            await _sessionService.CreateSessionAsync(
-                subject,
-                refreshTokenHash,
-                ip,
-                ua,
-                token.RefreshTokenExpiresAt,
-                cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            // Session creation is non-critical - don't fail the login
-            // This can happen if migrations haven't been applied yet
-            _logger.LogWarning(ex, "Failed to create user session for user {UserId}. Login will continue without session tracking.", subject);
-        }
+        var token = new TokenResponse(
+            AccessToken: accessToken,
+            RefreshToken: session.RefreshToken,
+            RefreshTokenExpiresAt: session.RefreshTokenExpiresAt,
+            AccessTokenExpiresAt: accessTokenExpiresAt);
 
         // 3) Audit token issuance with a fingerprint (never raw token)
         var fingerprint = TokenFingerprint.Sha256Short(token.AccessToken);

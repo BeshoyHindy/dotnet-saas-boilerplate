@@ -16,7 +16,7 @@ public static class EndImpersonationEndpoint
     internal static RouteHandlerBuilder MapEndImpersonationEndpoint(this IEndpointRouteBuilder endpoints)
     {
         return endpoints.MapPost("/impersonation/end",
-            [Authorize] async Task<Results<Ok<TokenResponse>, ProblemHttpResult>>
+            [Authorize] async Task<Results<Ok<EndImpersonationResponse>, ProblemHttpResult>>
             ([FromServices] IMediator mediator,
              CancellationToken ct) =>
             {
@@ -25,11 +25,11 @@ public static class EndImpersonationEndpoint
             })
             .WithName("EndImpersonation")
             .WithSummary("End user impersonation")
-            .WithDescription("Returns a fresh access + refresh token for the original actor based on the act_sub/act_tenant claims embedded in the impersonation token. Callable by any authenticated impersonation session.")
+            .WithDescription("Returns a fresh access token for the original actor based on the act_sub/act_tenant claims embedded in the impersonation token. Access-only: a refresh token belongs to a session row in the actor's own tenant, which this call cannot write. Callable by any authenticated impersonation session.")
             // Stepping *out* of impersonation must stay reachable by the impersonated principal, which
             // holds the target user's (possibly permissionless) grants — the act_sub claim is the gate.
             .RequireAuthenticatedOnly()
-            .Produces<TokenResponse>(StatusCodes.Status200OK)
+            .Produces<EndImpersonationResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status400BadRequest);
     }

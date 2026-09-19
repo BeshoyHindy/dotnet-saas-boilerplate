@@ -13,7 +13,7 @@ using System.Linq;
 namespace Boilerplate.Modules.Identity.Features.v1.Impersonation.EndImpersonation;
 
 public sealed class EndImpersonationCommandHandler
-    : ICommandHandler<EndImpersonationCommand, TokenResponse>
+    : ICommandHandler<EndImpersonationCommand, EndImpersonationResponse>
 {
     private readonly IIdentityService _identityService;
     private readonly ITokenService _tokenService;
@@ -41,7 +41,7 @@ public sealed class EndImpersonationCommandHandler
         _logger = logger;
     }
 
-    public async ValueTask<TokenResponse> Handle(
+    public async ValueTask<EndImpersonationResponse> Handle(
         EndImpersonationCommand request,
         CancellationToken cancellationToken)
     {
@@ -98,8 +98,14 @@ public sealed class EndImpersonationCommandHandler
 
         var (subject, actorClaims) = actorClaimsResult.Value;
 
-        var token = await _tokenService.IssueAsync(subject, actorClaims, cancellationToken);
-        await _identityService.StoreRefreshTokenAsync(subject, token.RefreshToken, token.RefreshTokenExpiresAt, cancellationToken);
+        // Access-only, no refresh: a refresh token is a row in the *actor's* tenant session store,
+        // and this request is running inside the impersonated tenant's context — writing there would
+        // file the operator's session under the wrong tenant. The actor's own session (if they have
+        // one) was never revoked, so stepping out restores them immediately; a cross-app operator
+        // re-authenticates when this short-lived token expires. Operator token exchange (#9) is
+        // where crossing a tenant boundary gets its proper mechanism.
+        var (accessToken, accessTokenExpiresAt) = await _tokenService.IssueAccessOnlyAsync(
+            subject, actorClaims, lifetime: null, cancellationToken);
 
         await _securityAudit.ImpersonationEndedAsync(
             actorUserId: actorUserId,
@@ -116,6 +122,6 @@ public sealed class EndImpersonationCommandHandler
                 actorUserId, actorTenantId, impersonatedUserId, impersonatedTenantId, jti ?? "<missing>");
         }
 
-        return token;
+        return new EndImpersonationResponse(accessToken, accessTokenExpiresAt);
     }
 }

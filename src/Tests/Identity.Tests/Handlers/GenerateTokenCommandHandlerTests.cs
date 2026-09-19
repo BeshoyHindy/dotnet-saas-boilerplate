@@ -1,4 +1,4 @@
-﻿using AutoFixture;
+using AutoFixture;
 using Finbuckle.MultiTenant.Abstractions;
 using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.BuildingBlocks.Eventing.Outbox;
@@ -8,9 +8,9 @@ using Boilerplate.Modules.Identity.Contracts.DTOs;
 using Boilerplate.Modules.Identity.Contracts.Services;
 using Boilerplate.Modules.Identity.Contracts.v1.Tokens.TokenGeneration;
 using Boilerplate.Modules.Identity.Features.v1.Tokens.TokenGeneration;
-using Microsoft.Extensions.Logging;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
 namespace Identity.Tests.Handlers;
@@ -27,7 +27,6 @@ public sealed class GenerateTokenCommandHandlerTests
     private readonly IOutboxStore _outboxStore;
     private readonly IMultiTenantContextAccessor<AppTenantInfo> _multiTenantContextAccessor;
     private readonly ISessionService _sessionService;
-    private readonly ILogger<GenerateTokenCommandHandler> _logger;
     private readonly GenerateTokenCommandHandler _sut;
     private readonly IFixture _fixture;
 
@@ -40,7 +39,6 @@ public sealed class GenerateTokenCommandHandlerTests
         _outboxStore = Substitute.For<IOutboxStore>();
         _multiTenantContextAccessor = Substitute.For<IMultiTenantContextAccessor<AppTenantInfo>>();
         _sessionService = Substitute.For<ISessionService>();
-        _logger = Substitute.For<ILogger<GenerateTokenCommandHandler>>();
 
         _sut = new GenerateTokenCommandHandler(
             _identityService,
@@ -49,10 +47,32 @@ public sealed class GenerateTokenCommandHandlerTests
             _requestContext,
             _outboxStore,
             _multiTenantContextAccessor,
-            _sessionService,
-            _logger);
+            _sessionService);
 
         _fixture = new Fixture();
+    }
+
+    private SessionTokenDto ArrangeSession(Guid? sessionId = null)
+    {
+        var session = new SessionTokenDto(
+            sessionId ?? Guid.NewGuid(),
+            _fixture.Create<string>(),
+            DateTime.UtcNow.AddDays(7));
+
+        _sessionService
+            .CreateSessionAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(session);
+
+        return session;
+    }
+
+    private (string AccessToken, DateTime ExpiresAt) ArrangeAccessToken()
+    {
+        var issued = (_fixture.Create<string>(), DateTime.UtcNow.AddHours(1));
+        _tokenService
+            .IssueAccessOnlyAsync(Arg.Any<string>(), Arg.Any<IEnumerable<Claim>>(), Arg.Any<TimeSpan?>(), Arg.Any<CancellationToken>())
+            .Returns(issued);
+        return issued;
     }
 
     #region Handle - Happy Path Tests
@@ -69,11 +89,6 @@ public sealed class GenerateTokenCommandHandlerTests
             new(ClaimTypes.Name, "TestUser"),
             new(ClaimTypes.Email, command.Email)
         };
-        var expectedToken = new TokenResponse(
-            AccessToken: _fixture.Create<string>(),
-            RefreshToken: _fixture.Create<string>(),
-            RefreshTokenExpiresAt: DateTime.UtcNow.AddDays(7),
-            AccessTokenExpiresAt: DateTime.UtcNow.AddHours(1));
 
         _requestContext.IpAddress.Returns("192.168.1.1");
         _requestContext.UserAgent.Returns("TestAgent");
@@ -82,18 +97,48 @@ public sealed class GenerateTokenCommandHandlerTests
         _identityService.ValidateCredentialsAsync(command.Email, command.Password, Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns((userId, claims));
 
-        _tokenService.IssueAsync(userId, claims, Arg.Any<CancellationToken>())
-            .Returns(expectedToken);
+        var session = ArrangeSession();
+        var issued = ArrangeAccessToken();
 
         // Act
         var result = await _sut.Handle(command, CancellationToken.None);
 
-        // Assert
+        // Assert — the refresh token and its expiry come from the session, not the token service.
         result.ShouldNotBeNull();
-        result.AccessToken.ShouldBe(expectedToken.AccessToken);
-        result.RefreshToken.ShouldBe(expectedToken.RefreshToken);
-        result.RefreshTokenExpiresAt.ShouldBe(expectedToken.RefreshTokenExpiresAt);
-        result.AccessTokenExpiresAt.ShouldBe(expectedToken.AccessTokenExpiresAt);
+        result.AccessToken.ShouldBe(issued.AccessToken);
+        result.RefreshToken.ShouldBe(session.RefreshToken);
+        result.RefreshTokenExpiresAt.ShouldBe(session.RefreshTokenExpiresAt);
+        result.AccessTokenExpiresAt.ShouldBe(issued.ExpiresAt);
+    }
+
+    [Fact]
+    public async Task Handle_Should_StampAccessTokenWithTheSessionId()
+    {
+        // Arrange
+        var command = new GenerateTokenCommand("user@example.com", "password123");
+        var userId = _fixture.Create<string>();
+        var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, userId) };
+
+        _requestContext.IpAddress.Returns("192.168.1.1");
+        _requestContext.UserAgent.Returns("TestAgent");
+        _requestContext.ClientId.Returns("test-client");
+
+        _identityService.ValidateCredentialsAsync(command.Email, command.Password, Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns((userId, claims));
+
+        var session = ArrangeSession();
+        ArrangeAccessToken();
+
+        // Act
+        await _sut.Handle(command, CancellationToken.None);
+
+        // Assert — `sid` names the device's session row, so consumers can correlate across rotations.
+        await _tokenService.Received(1).IssueAccessOnlyAsync(
+            userId,
+            Arg.Is<IEnumerable<Claim>>(c => c.Any(x =>
+                x.Type == JwtRegisteredClaimNames.Sid && x.Value == session.SessionId.ToString())),
+            null,
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -107,7 +152,6 @@ public sealed class GenerateTokenCommandHandlerTests
             new(ClaimTypes.NameIdentifier, userId),
             new(ClaimTypes.Name, "TestUser")
         };
-        var token = _fixture.Create<TokenResponse>();
 
         _requestContext.IpAddress.Returns("192.168.1.1");
         _requestContext.UserAgent.Returns("TestAgent");
@@ -116,16 +160,15 @@ public sealed class GenerateTokenCommandHandlerTests
         _identityService.ValidateCredentialsAsync(command.Email, command.Password, Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns((userId, claims));
 
-        _tokenService.IssueAsync(userId, claims, Arg.Any<CancellationToken>())
-            .Returns(token);
+        ArrangeSession();
+        ArrangeAccessToken();
 
         // Act
         await _sut.Handle(command, CancellationToken.None);
 
         // Assert
         await _identityService.Received(1).ValidateCredentialsAsync(command.Email, command.Password, Arg.Any<string?>(), Arg.Any<CancellationToken>());
-        await _tokenService.Received(1).IssueAsync(userId, claims, Arg.Any<CancellationToken>());
-        await _identityService.Received(1).StoreRefreshTokenAsync(userId, token.RefreshToken, token.RefreshTokenExpiresAt, Arg.Any<CancellationToken>());
+        await _sessionService.Received(1).CreateSessionAsync(userId, "192.168.1.1", "TestAgent", Arg.Any<CancellationToken>());
         await _securityAudit.Received(1).LoginSucceededAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _securityAudit.Received(1).TokenIssuedAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>());
         await _outboxStore.Received(1).AddAsync(Arg.Any<Boilerplate.BuildingBlocks.Eventing.Abstractions.IIntegrationEvent>(), Arg.Any<CancellationToken>());
@@ -202,7 +245,6 @@ public sealed class GenerateTokenCommandHandlerTests
         var command = new GenerateTokenCommand("user@example.com", "password123");
         var userId = _fixture.Create<string>();
         var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, userId) };
-        var token = _fixture.Create<TokenResponse>();
         using var cts = new CancellationTokenSource();
         var cancellationToken = cts.Token;
 
@@ -213,31 +255,30 @@ public sealed class GenerateTokenCommandHandlerTests
         _identityService.ValidateCredentialsAsync(command.Email, command.Password, null, cancellationToken)
             .Returns((userId, claims));
 
-        _tokenService.IssueAsync(userId, claims, cancellationToken)
-            .Returns(token);
+        ArrangeSession();
+        ArrangeAccessToken();
 
         // Act
         await _sut.Handle(command, cancellationToken);
 
         // Assert
         await _identityService.Received(1).ValidateCredentialsAsync(command.Email, command.Password, null, cancellationToken);
-        await _tokenService.Received(1).IssueAsync(userId, claims, cancellationToken);
-        await _identityService.Received(1).StoreRefreshTokenAsync(userId, token.RefreshToken, token.RefreshTokenExpiresAt, cancellationToken);
+        await _sessionService.Received(1).CreateSessionAsync(userId, "192.168.1.1", "TestAgent", cancellationToken);
+        await _tokenService.Received(1).IssueAccessOnlyAsync(userId, Arg.Any<IEnumerable<Claim>>(), null, cancellationToken);
         await _outboxStore.Received(1).AddAsync(Arg.Any<Boilerplate.BuildingBlocks.Eventing.Abstractions.IIntegrationEvent>(), cancellationToken);
     }
 
     #endregion
 
-    #region Handle - Session Creation Exception Tests
+    #region Handle - Session Creation Failure Tests
 
     [Fact]
-    public async Task Handle_Should_ContinueSuccessfully_When_SessionCreationFails()
+    public async Task Handle_Should_FailTheLogin_When_SessionCreationFails()
     {
         // Arrange
         var command = new GenerateTokenCommand("user@example.com", "password123");
         var userId = _fixture.Create<string>();
         var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, userId) };
-        var token = _fixture.Create<TokenResponse>();
 
         _requestContext.IpAddress.Returns("192.168.1.1");
         _requestContext.UserAgent.Returns("TestAgent");
@@ -246,18 +287,17 @@ public sealed class GenerateTokenCommandHandlerTests
         _identityService.ValidateCredentialsAsync(command.Email, command.Password, Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns((userId, claims));
 
-        _tokenService.IssueAsync(userId, claims, Arg.Any<CancellationToken>())
-            .Returns(token);
-
-        _sessionService.CreateSessionAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<DateTime>(), Arg.Any<CancellationToken>())
+        _sessionService
+            .CreateSessionAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new InvalidOperationException("Database not available"));
 
-        // Act
-        var result = await _sut.Handle(command, CancellationToken.None);
+        // Act & Assert — a login with no session row can neither refresh nor be revoked, so it
+        // must not succeed. The failure propagates instead of being logged and swallowed.
+        await Should.ThrowAsync<InvalidOperationException>(
+            async () => await _sut.Handle(command, CancellationToken.None));
 
-        // Assert
-        result.ShouldNotBeNull();
-        result.AccessToken.ShouldBe(token.AccessToken);
+        await _tokenService.DidNotReceive().IssueAccessOnlyAsync(
+            Arg.Any<string>(), Arg.Any<IEnumerable<Claim>>(), Arg.Any<TimeSpan?>(), Arg.Any<CancellationToken>());
     }
 
     #endregion
@@ -271,7 +311,6 @@ public sealed class GenerateTokenCommandHandlerTests
         var command = new GenerateTokenCommand("user@example.com", "password123");
         var userId = _fixture.Create<string>();
         var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, userId) };
-        var token = _fixture.Create<TokenResponse>();
 
         // Request context returns null values
         _requestContext.IpAddress.Returns((string?)null);
@@ -281,8 +320,8 @@ public sealed class GenerateTokenCommandHandlerTests
         _identityService.ValidateCredentialsAsync(command.Email, command.Password, Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns((userId, claims));
 
-        _tokenService.IssueAsync(userId, claims, Arg.Any<CancellationToken>())
-            .Returns(token);
+        ArrangeSession();
+        ArrangeAccessToken();
 
         // Act
         var result = await _sut.Handle(command, CancellationToken.None);

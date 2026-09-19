@@ -35,6 +35,7 @@ public static class GenerateTokenEndpoint
             [FromHeader(Name = AppHeader)] string? app,
             [FromServices] IMultiTenantContextAccessor<AppTenantInfo> tenantAccessor,
             [FromServices] IMediator mediator,
+            HttpContext httpContext,
             CancellationToken ct) =>
             {
                 // The tenant comes from the {tenant} route segment via tenant resolution — never from a
@@ -51,9 +52,15 @@ public static class GenerateTokenEndpoint
                 }
 
                 var token = await mediator.Send(command, ct);
-                return token is null
-                    ? TypedResults.Unauthorized()
-                    : TypedResults.Ok(token);
+                if (token is null)
+                {
+                    return TypedResults.Unauthorized();
+                }
+
+                // Browsers get the refresh token as a cookie they cannot read; the body copy stays
+                // for native and server-side clients (ADR-0002).
+                RefreshTokenCookie.Append(httpContext, tenant!, token.RefreshToken, token.RefreshTokenExpiresAt);
+                return TypedResults.Ok(token);
             })
             .WithName("IssueJwtTokens")
             .WithSummary("Issue JWT access and refresh tokens")

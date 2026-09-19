@@ -88,43 +88,24 @@ public sealed class IdentityService : IIdentityService
     }
 
     public async Task<(string Subject, IEnumerable<Claim> Claims)?>
-        ValidateRefreshTokenAsync(string refreshToken, CancellationToken ct = default)
+        BuildClaimsForRefreshAsync(string userId, CancellationToken ct = default)
     {
-        var tenant = GetValidatedTenant();
-        var user = await FindUserByRefreshTokenAsync(refreshToken, tenant.Id, ct);
+        ArgumentNullException.ThrowIfNull(userId);
 
-        ValidateRefreshTokenExpiry(user);
+        var tenant = GetValidatedTenant();
+
+        // No IgnoreQueryFilters on the token path (ADR-0002): the tenant filter is the isolation.
+        var user = await _userManager.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user is null)
+        {
+            return null;
+        }
+
         ValidateUserStatus(user);
         ValidateTenantStatus(tenant);
 
         var claims = await BuildUserClaimsAsync(user, tenant.Id, ct);
         return (user.Id, claims);
-    }
-
-    public async Task StoreRefreshTokenAsync(string subject, string refreshToken, DateTime expiresAtUtc, CancellationToken ct = default)
-    {
-        // Targeted UPDATE bypasses tracking + Finbuckle interceptors (which NRE on cross-tenant IgnoreQueryFilters).
-        // Safe: user IDs are globally unique GUIDs, so exactly one row matches Id == subject regardless of tenant.
-        var hashedToken = HashToken(refreshToken);
-        var updated = await _dbContext.Users
-            .IgnoreQueryFilters()
-            .Where(u => u.Id == subject)
-            .ExecuteUpdateAsync(
-                s => s.SetProperty(u => u.RefreshToken, hashedToken)
-                      .SetProperty(u => u.RefreshTokenExpiryTime, expiresAtUtc),
-                ct).ConfigureAwait(false);
-
-        if (updated == 0)
-        {
-            throw new UnauthorizedException("user not found");
-        }
-
-        if (_logger.IsEnabled(LogLevel.Debug))
-        {
-            _logger.LogDebug(
-                "Stored refresh token for user {UserId}. Token hash: {TokenHash}, Expires: {ExpiresAt}",
-                subject, hashedToken[..Math.Min(8, hashedToken.Length)], expiresAtUtc);
-        }
     }
 
     public async Task<(string Subject, IEnumerable<Claim> Claims)?>
@@ -226,41 +207,6 @@ public sealed class IdentityService : IIdentityService
         return user;
     }
 
-    private async Task<AppUser> FindUserByRefreshTokenAsync(string refreshToken, string tenantId, CancellationToken ct)
-    {
-        var hashedToken = HashToken(refreshToken);
-
-        if (_logger.IsEnabled(LogLevel.Debug))
-        {
-            _logger.LogDebug(
-                "Validating refresh token for tenant {TenantId}. Token hash: {TokenHash}",
-                tenantId, hashedToken[..Math.Min(8, hashedToken.Length)]);
-        }
-
-        var user = await _userManager.Users
-            .FirstOrDefaultAsync(u => u.RefreshToken == hashedToken, ct);
-
-        if (user is null)
-        {
-            _logger.LogWarning("No user found with matching refresh token hash for tenant {TenantId}", tenantId);
-            throw new UnauthorizedException("refresh token is invalid or expired");
-        }
-
-        return user;
-    }
-
-    private void ValidateRefreshTokenExpiry(AppUser user)
-    {
-        var now = _timeProvider.GetUtcNow().UtcDateTime;
-        if (user.RefreshTokenExpiryTime <= now)
-        {
-            _logger.LogWarning(
-                "Refresh token expired for user {UserId}. Expired at: {ExpiryTime}, Current time: {CurrentTime}",
-                user.Id, user.RefreshTokenExpiryTime, now);
-            throw new UnauthorizedException("refresh token is invalid or expired");
-        }
-    }
-
     private static void ValidateUserStatus(AppUser user)
     {
         if (!user.IsActive)
@@ -330,12 +276,5 @@ public sealed class IdentityService : IIdentityService
 
         var allRoles = directRoles.Union(groupRoles).Distinct();
         claims.AddRange(allRoles.Select(r => new Claim(ClaimTypes.Role, r)));
-    }
-
-    private static string HashToken(string token)
-    {
-        var bytes = System.Text.Encoding.UTF8.GetBytes(token);
-        var hash = System.Security.Cryptography.SHA256.HashData(bytes);
-        return Convert.ToBase64String(hash);
     }
 }

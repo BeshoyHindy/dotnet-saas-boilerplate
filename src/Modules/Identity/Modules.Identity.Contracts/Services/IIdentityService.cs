@@ -16,15 +16,13 @@ public interface IIdentityService
         ValidateCredentialsAsync(string email, string password, string? twoFactorCode = null, CancellationToken ct = default);
 
     /// <summary>
-    /// Validates a refresh token and returns its claims if valid.
+    /// Rebuilds the claim set for a user of the *current* tenant after their session's refresh token
+    /// has been rotated, re-running the account and tenant status checks that login runs. The lookup
+    /// stays inside the tenant query filter, so the refresh path can never reach across tenants.
+    /// Returns null if the user is not in this tenant.
     /// </summary>
     Task<(string Subject, IEnumerable<Claim> Claims)?>
-        ValidateRefreshTokenAsync(string refreshToken, CancellationToken ct = default);
-
-    /// <summary>
-    /// Persists a hashed refresh token for the specified subject.
-    /// </summary>
-    Task StoreRefreshTokenAsync(string subject, string refreshToken, DateTime expiresAtUtc, CancellationToken ct = default);
+        BuildClaimsForRefreshAsync(string userId, CancellationToken ct = default);
 
     /// <summary>
     /// Builds the claim set for a user located in an arbitrary tenant, bypassing Finbuckle's tenant

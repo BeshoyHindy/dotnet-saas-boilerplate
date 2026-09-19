@@ -1,4 +1,6 @@
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.Modules.Identity.Contracts.v1.Tokens.RefreshToken;
+using Finbuckle.MultiTenant.Abstractions;
 using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -17,16 +19,35 @@ public static class RefreshTokenEndpoint
 
         return endpoint.MapPost("/refresh",
             [AllowAnonymous] async Task<Results<Ok<RefreshTokenCommandResponse>, UnauthorizedHttpResult, ProblemHttpResult>>
-            ([FromBody] RefreshTokenCommand command,
+            ([FromBody] RefreshTokenCommand? command,
+            [FromServices] IMultiTenantContextAccessor<AppTenantInfo> tenantAccessor,
             [FromServices] IMediator mediator,
+            HttpContext httpContext,
             CancellationToken ct) =>
             {
-                var response = await mediator.Send(command, ct);
+                // A browser holds the token in an HttpOnly cookie it cannot read, so it cannot put it
+                // in the body — the cookie is the fallback, never an override of an explicit body value.
+                var refreshToken = command?.RefreshToken;
+                if (string.IsNullOrWhiteSpace(refreshToken))
+                {
+                    refreshToken = RefreshTokenCookie.Read(httpContext) ?? string.Empty;
+                }
+
+                var response = await mediator.Send(
+                    new RefreshTokenCommand(command?.Token, refreshToken), ct);
+
+                var tenant = tenantAccessor.MultiTenantContext?.TenantInfo?.Id;
+                if (tenant is not null)
+                {
+                    RefreshTokenCookie.Append(
+                        httpContext, tenant, response.RefreshToken, response.RefreshTokenExpiryTime);
+                }
+
                 return TypedResults.Ok(response);
             })
             .WithName("RefreshJwtTokens")
             .WithSummary("Refresh JWT access and refresh tokens")
-            .WithDescription("Use a valid (possibly expired) access token together with a valid refresh token to obtain a new access token and a rotated refresh token. The tenant is taken from the '{tenant}' route segment.")
+            .WithDescription("Use a valid (possibly expired) access token together with a valid refresh token to obtain a new access token and a rotated refresh token. The tenant is taken from the '{tenant}' route segment. Browsers may omit the refresh token from the body and let the HttpOnly refresh cookie carry it.")
             .Produces<RefreshTokenCommandResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status400BadRequest)

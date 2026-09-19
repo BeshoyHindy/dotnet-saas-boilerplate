@@ -96,8 +96,6 @@ namespace Boilerplate.Migrations.PostgreSQL.Identity
                     LastName = table.Column<string>(type: "text", nullable: true),
                     ImageUrl = table.Column<string>(type: "text", nullable: true),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
-                    RefreshToken = table.Column<string>(type: "text", nullable: true),
-                    RefreshTokenExpiryTime = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     ObjectId = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
                     LastPasswordChangeDate = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     TenantId = table.Column<string>(type: "text", nullable: false),
@@ -312,6 +310,8 @@ namespace Boilerplate.Migrations.PostgreSQL.Identity
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     UserId = table.Column<string>(type: "character varying(450)", maxLength: 450, nullable: false),
                     RefreshTokenHash = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    PreviousTokenHash = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    SecurityStamp = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
                     IpAddress = table.Column<string>(type: "character varying(45)", maxLength: 45, nullable: false),
                     UserAgent = table.Column<string>(type: "character varying(1024)", maxLength: 1024, nullable: false),
                     DeviceType = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
@@ -487,10 +487,17 @@ namespace Boilerplate.Migrations.PostgreSQL.Identity
                 column: "ExpiresAt");
 
             migrationBuilder.CreateIndex(
+                name: "IX_UserSessions_PreviousTokenHash",
+                schema: "identity",
+                table: "UserSessions",
+                column: "PreviousTokenHash");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_UserSessions_RefreshTokenHash",
                 schema: "identity",
                 table: "UserSessions",
-                column: "RefreshTokenHash");
+                columns: new[] { "RefreshTokenHash", "TenantId" },
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_UserSessions_UserId",
