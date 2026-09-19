@@ -451,9 +451,14 @@ public sealed class TenantEndpointSweepTests
     }
 
     /// <summary>
-    /// Prints what was swept. Not an assertion about behaviour — a record, so the numbers in a review
-    /// come from the run rather than from someone's memory, and so the exempt list is visible with
-    /// its reasons every time.
+    /// Prints what was swept, and pins it.
+    ///
+    /// The report is the record a reviewer reads. The four set assertions underneath it are what stop
+    /// the sweep shrinking: a floor ("more than twenty routes") is satisfied by a sweep that has
+    /// quietly lost eight of them, and says nothing about a route that appeared and was never looked
+    /// at. <see cref="TenantSweepShape"/> names every route in each class, and the failure names
+    /// exactly which one came or went — including the burst of names a single group-level
+    /// <c>ExemptFromTenantSweep</c> would produce.
     /// </summary>
     [Fact]
     public async Task Sweep_Reports_What_It_Covered()
@@ -482,11 +487,53 @@ public sealed class TenantEndpointSweepTests
 
         _output.WriteLine(report.ToString());
 
-        // The sweep must not quietly become a no-op — e.g. if endpoint classification broke.
-        resource.Count(e => !e.IsExempt && !e.IsRootOnly).ShouldBeGreaterThan(
-            20, "the sweep should be covering the whole resource surface of the API");
-        collections.Count.ShouldBeGreaterThan(
-            10, "the list half of the sweep should be covering the API's collections");
+        AssertShape(
+            "resource routes swept with the other tenant's id",
+            resource.Where(e => !e.IsExempt && !e.IsRootOnly).Select(e => e.Name),
+            TenantSweepShape.SweptResourceRoutes,
+            nameof(TenantSweepShape.SweptResourceRoutes));
+
+        AssertShape(
+            "root-only resource routes",
+            resource.Where(e => !e.IsExempt && e.IsRootOnly).Select(e => e.Name),
+            TenantSweepShape.RootOnlyResourceRoutes,
+            nameof(TenantSweepShape.RootOnlyResourceRoutes));
+
+        AssertShape(
+            "collections searched for the other tenant's rows",
+            collections.Select(e => e.Name),
+            TenantSweepShape.CollectionRoutes,
+            nameof(TenantSweepShape.CollectionRoutes));
+
+        AssertShape(
+            "routes exempted from the sweep",
+            exempt.Select(e => e.Name),
+            TenantSweepShape.ExemptRoutes,
+            nameof(TenantSweepShape.ExemptRoutes));
+    }
+
+    /// <summary>
+    /// Compares one class of the swept surface against its pinned set, reporting the difference as
+    /// the two lists an author can act on: what appeared, and what is gone.
+    /// </summary>
+    private static void AssertShape(
+        string what, IEnumerable<string> actual, IReadOnlySet<string> expected, string setName)
+    {
+        var found = actual.ToHashSet(StringComparer.Ordinal);
+
+        var drift = found.Except(expected, StringComparer.Ordinal)
+            .Select(name => $"+ {name}\n      appeared: add it to {nameof(TenantSweepShape)}.{setName}")
+            .Concat(expected.Except(found, StringComparer.Ordinal)
+                .Select(name => $"- {name}\n      gone: it is no longer {what}; remove it from " +
+                                $"{nameof(TenantSweepShape)}.{setName} if that was deliberate"))
+            .OrderBy(text => text, StringComparer.Ordinal)
+            .ToList();
+
+        drift.ShouldBeEmpty(
+            $"the set of {what} is pinned route by route, so the sweep cannot shrink or grow without " +
+            "somebody saying so. Update the set in the same commit as the endpoint, and let the diff " +
+            $"show a reviewer that the API's tenant-scoped surface changed.\n  " +
+            string.Join("\n  ", drift));
     }
 
     /// <summary>
