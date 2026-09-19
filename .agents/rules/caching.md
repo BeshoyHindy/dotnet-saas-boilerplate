@@ -24,6 +24,15 @@ var perms = await cache.GetOrCreateAsync(
 - Invalidate with `RemoveAsync(key)` or `RemoveByTagAsync(tag)` in the relevant mutation handler.
 - `GetOrCreateAsync` gives **stampede protection** for free (factory runs once per key).
 
+## Tenant scoping is the caller's job — for now
+
+`HybridCache` does **not** prefix keys with the ambient tenant. Every key that holds tenant data carries the tenant because the `CacheKeys` helper puts it there (`TenantTheme(tenantId)`, `IdempotencyEntry(tenantId, key)`) or because the id in it is already tenant-unique (`UserPermissions(userId)`). That is isolation by convention, and convention is exactly what ADR-0002 set out to replace.
+
+So, until the building block does it — tracked as its own ticket on the map, *Prefix cache keys with the tenant inside the Caching building block* (#77):
+
+- **Never invent a cache key that holds tenant data without the tenant in it.** Add it to `CacheKeys.cs` with the tenant id as a parameter, the way the existing ones do.
+- Genuinely global entries — `DefaultTheme`, `ImpersonationGrantStatus(jti)` (grants are `IGlobalEntity`) — are the exception, not the default. If you cannot say in one line why an entry is global, it is not.
+
 ## Gotchas
 
 - **No L1 backplane.** `RemoveByTagAsync` on one node does **not** evict L1 on peer nodes — cross-node staleness is bounded only by the 2-min local expiration. Don't rely on instant cross-node invalidation; keep local expiration short for hot, mutable data.

@@ -95,6 +95,16 @@ public sealed class {Name}DbContext : BaseDbContext
 }
 ```
 
+Your context is now covered by two architecture tests without any wiring: `TenantIsolationTests`
+builds its model and fails on an entity that is neither tenant-filtered nor `IGlobalEntity`, and
+`IgnoreQueryFiltersAllowListTests` fails on any `IgnoreQueryFilters` call in a file that is not
+allow-listed. Both live in `Architecture.Tests`. See `.agents/rules/database.md`.
+
+Likewise, every route you map in `MapEndpoints` joins the cross-tenant sweep in `Integration.Tests`
+the moment it exists — a route with a resource id must answer **404** (never 403) for another
+tenant's id, and needs either a `TenantSweepRegistry` entry it can seed or an explicit
+`.ExemptFromTenantSweep("reason")`. See `.agents/rules/integration-testing.md`.
+
 ## Step 4 — Solution + project references
 
 ```bash

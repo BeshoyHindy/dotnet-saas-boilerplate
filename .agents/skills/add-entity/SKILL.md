@@ -106,6 +106,28 @@ public DbSet<{Entity}> {Entities} => Set<{Entity}>();
 
 The DbContext already extends `BaseDbContext` and calls `base.OnModelCreating` **last** — don't change that.
 
+## Tenant isolation: you get it, or you argue for the exception
+
+`BaseDbContext` marks every entity in its model `IsMultiTenant()` unless the entity implements
+`IGlobalEntity`. You do nothing; the filter is there. `Architecture.Tests/TenantIsolationTests` builds
+each context's model and fails on any entity that is neither filtered nor marked, so "I forgot" is not
+a state this repo can reach.
+
+`IGlobalEntity` is a **design decision, not a convenience**. The whole current list is
+`ImpersonationGrant`, `OutboxMessage`, `InboxMessage` — each one platform machinery that carries its
+own tenant id in a column for the scope it re-enters. If your entity holds anything a tenant would
+call theirs, it is not global. Mark it and you are opting that table out of the one mechanism that
+keeps tenants apart.
+
+Reading soft-deleted rows back (a trash view, a restore, a purge job)? Lift **only** the named filter:
+
+```csharp
+db.{Entities}.IgnoreQueryFilters([QueryFilters.SoftDelete])   // tenant filter stays on
+```
+
+The bare `IgnoreQueryFilters()` strips the tenant filter too and is allow-listed per file with an exact
+call count (`Architecture.Tests/IgnoreQueryFiltersAllowListTests`). See `.agents/rules/database.md`.
+
 ## Migration
 
 Use the **create-migration** skill (build first, correct `--context`):
@@ -122,4 +144,5 @@ dotnet ef migrations add Add{Entity} \
 - [ ] `sealed`, `AggregateRoot<Guid>` (+ `IHasTenant`/`IAuditableEntity`/`ISoftDeletable` as needed), private ctor, static `Create` using `Guid.CreateVersion7()`
 - [ ] Domain event inherits `DomainEvent`; raised via `DomainEvent.Create` + `AddDomainEvent`
 - [ ] EF config: no manual soft-delete/tenant filter; `ValueGeneratedNever()` on nav-collection children
+- [ ] Tenant-isolated by default — `IGlobalEntity` only with a one-line justification; soft-delete reads use `IgnoreQueryFilters([QueryFilters.SoftDelete])`, never the bare form
 - [ ] `DbSet` added; build green; migration created with `--context {X}DbContext`

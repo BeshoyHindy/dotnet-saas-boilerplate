@@ -26,6 +26,26 @@ public class DefaultUploaderOnlyPolicyTests
     }
 
     [Fact]
+    public async Task CanAttachAsync_Should_AllowTheCallersOwnOwnerId()
+    {
+        var p = new DefaultUploaderOnlyPolicy("User");
+        var caller = Guid.NewGuid();
+        (await p.CanAttachAsync(caller, caller.ToString(), default)).ShouldBeTrue();
+    }
+
+    /// <summary>
+    /// These owner types are self-owned, and an owner id from the body is caller-supplied: accepting
+    /// somebody else's produced a file nobody could read, and — with a user id from another tenant —
+    /// a row referencing a subject the caller cannot see.
+    /// </summary>
+    [Fact]
+    public async Task CanAttachAsync_Should_DenySomebodyElsesOwnerId()
+    {
+        var p = new DefaultUploaderOnlyPolicy("User");
+        (await p.CanAttachAsync(Guid.NewGuid(), Guid.NewGuid().ToString(), default)).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task CanReadAsync_Should_AllowAnyone_ForPublicFile()
     {
         var p = new DefaultUploaderOnlyPolicy("MyFiles");

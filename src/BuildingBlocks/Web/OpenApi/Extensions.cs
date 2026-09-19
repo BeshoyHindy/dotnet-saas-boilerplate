@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Builder;
+﻿using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -77,7 +78,11 @@ public static class Extensions
         // so the document and its viewer must state their intent like any other endpoint. This matches
         // how they already behave (PathAwareAuthorizationHandler lets /openapi and /scalar through).
         // Both are mapped only when OpenApiOptions:Enabled is true — off by default in production.
-        app.MapOpenApi(openApiPath).AllowAnonymous();
+        app.MapOpenApi(openApiPath)
+            .AllowAnonymous()
+            .ExemptFromTenantSweep(
+                "{documentName} selects an API version document, not a tenant resource. The document " +
+                "describes route shapes only — it is generated from endpoint metadata and reads no data.");
 
         app.MapScalarApiReference(options =>
         {
@@ -89,6 +94,10 @@ public static class Extensions
                 .HideModels()
                 .WithOpenApiRoutePattern(openApiPath)
                 .AddPreferredSecuritySchemes("Bearer");
-        }).AllowAnonymous();
+        })
+        .AllowAnonymous()
+        .ExemptFromTenantSweep(
+            "{documentName?} selects which OpenAPI document the reference UI renders, not a tenant " +
+            "resource. The UI is static assets plus that document; it reads no tenant data.");
     }
 }
