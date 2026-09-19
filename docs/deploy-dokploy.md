@@ -15,7 +15,7 @@ has no shell to run a container `HEALTHCHECK` with.
 | File | What it is |
 |---|---|
 | [`deploy/dokploy/data-services.compose.yml`](../deploy/dokploy/data-services.compose.yml) | PostgreSQL, Valkey, MinIO, bucket creator |
-| [`deploy/dokploy/app.compose.yml`](../deploy/dokploy/app.compose.yml) | migrator → api → console, all pulled from GHCR |
+| [`deploy/dokploy/app.compose.yml`](../deploy/dokploy/app.compose.yml) | the application services, in order, all pulled from GHCR |
 | [`deploy/dokploy/.env.example`](../deploy/dokploy/.env.example) | the variable contract, key names only |
 | [`deploy/dokploy/dokploy-deploy.sh`](../deploy/dokploy/dokploy-deploy.sh) | trigger a deploy from CI and wait for it |
 | [`deploy/dokploy/tests/run.sh`](../deploy/dokploy/tests/run.sh) | contract tests over all of the above |
@@ -31,7 +31,7 @@ Three hostnames point at the server. Create one `A` record each:
 | Record | Example | Serves |
 |---|---|---|
 | API | `api.example.com` | the .NET API |
-| Console | `app.example.com` | the React console |
+| Console | `app.example.com` | the web front end, and the API's CORS origin |
 | Storage | `storage.example.com` | MinIO's S3 endpoint |
 
 Storage needs its own public name because the API hands the browser **presigned**
@@ -68,7 +68,9 @@ CI publishes three images to GHCR:
 |---|---|
 | `ghcr.io/<owner>/boilerplate-api` | `src/Host/Dockerfile`, target `api` |
 | `ghcr.io/<owner>/boilerplate-db-migrator` | `src/Host/Dockerfile`, target `migrator` |
+<!--#if (frontend) -->
 | `ghcr.io/<owner>/boilerplate-console` | `clients/console/Dockerfile` |
+<!--#endif -->
 
 `IMAGE_TAG` is the only thing that differs between a deploy and a rollback:
 
@@ -80,19 +82,23 @@ CI publishes three images to GHCR:
 Production must name a fixed version. `latest` makes a redeploy irreproducible —
 the same button press a week later brings up different code.
 
-`.github/workflows/backend.yml` publishes all three from one job, so a tag never
-exists for two images out of three. To build them by hand — a one-off tag, or a
-fork with Actions disabled:
+`.github/workflows/backend.yml` publishes them from one job, so a tag never
+exists for some of the images and not the others. To build them by hand — a
+one-off tag, or a fork with Actions disabled:
 
 ```bash
 OWNER=<your-ghcr-owner>; TAG=<your-tag>
 echo "$GHCR_TOKEN" | docker login ghcr.io -u "$OWNER" --password-stdin
 docker build -f src/Host/Dockerfile --target api      -t "ghcr.io/$OWNER/boilerplate-api:$TAG" .
 docker build -f src/Host/Dockerfile --target migrator -t "ghcr.io/$OWNER/boilerplate-db-migrator:$TAG" .
+<!--#if (frontend) -->
 docker build clients/console -t "ghcr.io/$OWNER/boilerplate-console:$TAG"
+<!--#endif -->
 docker push "ghcr.io/$OWNER/boilerplate-api:$TAG"
 docker push "ghcr.io/$OWNER/boilerplate-db-migrator:$TAG"
+<!--#if (frontend) -->
 docker push "ghcr.io/$OWNER/boilerplate-console:$TAG"
+<!--#endif -->
 ```
 
 Set `IMAGE_TAG` to whatever `$TAG` you used. Nothing else in this guide changes.
@@ -129,7 +135,7 @@ echo "$(openssl rand -base64 18 | tr -dc 'A-Za-z0-9')Aa1"   # SEED_ADMIN_PASSWOR
 
 `SEED_ADMIN_PASSWORD` must satisfy the Identity policy: 10+ characters with an
 upper, a lower and a digit — hence the suffix. It is used once, by the migrator,
-to seed the root tenant's admin. Change it from the console after first sign-in.
+to seed the root tenant's admin. Change it at first sign-in.
 
 ### Find `PROXY_KNOWN_NETWORK`
 
@@ -249,6 +255,7 @@ What happens, in order:
    `depends_on: migrator: condition: service_completed_successfully`. If the
    migration fails, the migrator exits non-zero, the API never starts and the
    deploy fails. The API never migrates at startup.
+<!--#if (frontend) -->
 4. `console` starts and renders `/config.json`, its nginx site and its
    Content-Security-Policy from `APP_API_URL`, `APP_STORAGE_URL` and
    `APP_DEFAULT_TENANT`. It proxies `/api` to the API, so the browser only ever
@@ -257,17 +264,20 @@ What happens, in order:
    host is re-resolved per request through Docker's embedded DNS
    (`APP_RESOLVER`, default `127.0.0.11`), so the console starts even if the API
    is not up yet and follows it across a redeploy.
-5. Traefik picks up the labels, requests certificates for the three hostnames,
-   and begins probing `GET /health/ready` on the API every 10 s. A container
-   that fails the probe is taken out of rotation.
+<!--#endif -->
+5. Traefik picks up the labels, requests certificates for the hostnames, and
+   begins probing `GET /health/ready` on the API every 10 s. A container that
+   fails the probe is taken out of rotation.
 
 ## 5. Verify
 
 ```bash
 curl -fsS https://api.example.com/health/live     # process is up
 curl -fsS https://api.example.com/health/ready    # dependencies are usable
+<!--#if (frontend) -->
 curl -fsSI https://app.example.com/ | head -1     # console serves
 curl -fsS https://app.example.com/config.json     # console got its runtime config
+<!--#endif -->
 curl -fsSI https://storage.example.com/minio/health/live | head -1
 ```
 
@@ -470,7 +480,7 @@ usable until it expires.
 | 404 from Traefik on a domain | The stack deployed before the DNS record existed, or `API_DOMAIN`/`CONSOLE_DOMAIN` does not match the record. Compose domains are label-driven and **not** hot-reloaded: redeploy after changing one. |
 | 502/503 from Traefik, API container running | The readiness probe is failing. `curl` the API container directly from the host, or read `GET /health` for the full report. A missing `API_DOMAIN` in `ALLOWED_HOSTS` does this — the probe sends that Host and host filtering answers 400. |
 | Certificate never issued | The `A` record did not resolve when Traefik asked, or port 80 is blocked. Fix DNS, then redeploy. |
-| Console loads but every call is a CORS error | `CONSOLE_DOMAIN` is not the origin the browser actually uses; it is what the API puts in its allow-list. |
+| The front end loads but every call is a CORS error | `CONSOLE_DOMAIN` is not the origin the browser actually uses; it is what the API puts in its allow-list. |
 | Password-reset links point at a container IP | Traefik is not passing the original `Host`. `passhostheader=true` must stay on the API's load-balancer labels — `X-Forwarded-Host` is deliberately never honoured, so that label is the only path for the real host. |
 | Uploads fail with a signature error | `STORAGE_DOMAIN` differs between the two stacks, or `Storage__S3__ServiceUrl` was pointed at an internal alias. The signature covers the host. |
 | `NoSuchBucket` on first upload | The data stack's `minio-init` did not run, or `STORAGE_BUCKET` differs between the two stacks. |

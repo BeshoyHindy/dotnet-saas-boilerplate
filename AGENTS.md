@@ -2,15 +2,15 @@
 
 ### Issue tracker
 
-Issues and specs live as GitHub issues in `BeshoyHindy/dotnet-saas-boilerplate` (via the `gh` CLI). See `docs/agents/issue-tracker.md`.
+Issues and specs live as GitHub issues on this repository, read and written with the `gh` CLI.
 
 ### Triage labels
 
-Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. Only `ready-for-agent` reaches an autonomous agent.
 
 ### Domain docs
 
-Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Single-context: architecture decisions live in `docs/adr/`; the per-area conventions an agent must read before editing live in `.agents/rules/`.
 
 ### Branching
 

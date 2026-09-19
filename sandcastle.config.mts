@@ -55,7 +55,7 @@ export default defineConfig({
   },
 
   issues: {
-    // Triage vocabulary: see docs/agents/triage-labels.md. Only issues a human
+    // Triage vocabulary: see AGENTS.md. Only issues a human
     // has judged fully specified reach an autonomous agent.
     label: "ready-for-agent",
 

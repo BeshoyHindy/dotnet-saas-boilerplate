@@ -14,11 +14,15 @@ Prerequisites: .NET 10 SDK, Docker, Node.js 20+.
 
 ```bash
 dotnet build src/Boilerplate.slnx
+<!--#if (aspire) -->
 dotnet run --project src/Host/Boilerplate.AppHost   # full Aspire stack
+<!--#endif -->
 dotnet test src/Boilerplate.slnx                    # tests (integration suite needs Docker)
 ```
 
+<!--#if (frontend) -->
 The console lives under `clients/console` — `pnpm install && pnpm dev`.
+<!--#endif -->
 
 ## Pull requests
 
@@ -28,10 +32,6 @@ The console lives under `clients/console` — `pnpm install && pnpm dev`.
 - Don't touch `src/BuildingBlocks/` without prior discussion — wide blast radius.
 - Architecture rules (module boundaries, file layout, coding style) are documented in [AGENTS.md](AGENTS.md), `.agents/rules/` and `docs/adr/`. Apply them.
 
-## Code of conduct
-
-This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md).
-
 ## Licensing
 
-Contributions are licensed under the project's [MIT License](LICENSE).
+Contributions are licensed under the terms this project ships under.

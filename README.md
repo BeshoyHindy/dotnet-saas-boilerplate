@@ -7,6 +7,39 @@ for local orchestration with .NET Aspire.
 `Boilerplate` is the placeholder root name. A new product renames it in one command
 (`dotnet new saas -n Acme`) — see [`docs/adr/0001-placeholder-namespace-and-dotnet-new-rename.md`](docs/adr/0001-placeholder-namespace-and-dotnet-new-rename.md).
 
+## Start a new product from it
+
+```bash
+git clone https://github.com/BeshoyHindy/dotnet-saas-boilerplate Acme && cd Acme
+dotnet new install .            # the repository root IS the template
+dotnet new saas -n Acme -o ../Acme.App
+```
+
+Nothing is published to NuGet.org: `dotnet new install <path>` on a clone is the supported
+install route, so there is no package version to keep in step with the source.
+
+| Option | Default | Drops when `false` |
+|---|---|---|
+| `--frontend` | `true` | `clients/**`, the console container in `docker-compose.yml` and `deploy/dokploy/app.compose.yml`, the Aspire client resources, `frontend.yml` |
+| `--aspire` | `true` | `src/Host/Boilerplate.AppHost` and its solution folder |
+| `--sandcastle` | `true` | `.sandcastle/`, `sandcastle.config.mts`, the root pnpm project that exists only for them, `sandcastle.yml` |
+
+`--skipRestore`, `--contactEmail`, `--contactUrl` and `--mailFrom` are also accepted
+(`dotnet new saas --help` lists them all).
+
+`Boilerplate` → `Acme` is a plain text replacement across every file type, and a second derived
+symbol renames the lowercase/kebab form (`boilerplate` → `acme`: image names, database and bucket
+names, the compose project, npm scopes, JWT issuer and audience, `localStorage` key prefixes).
+The two `UserSecretsId` GUIDs are regenerated per scaffold, and the API and DbMigrator keep
+sharing one. A scaffold carries `AGENTS.md`, `CLAUDE.md`, `.agents/rules/`, `CONTRIBUTING.md`
+and `SECURITY.md` — a new project has to be workable by the same agent pipeline on day one.
+What it deliberately does **not** carry: `LICENSE` (pick your own), `README.md` (replaced by
+[`README-template.md`](README-template.md)), the vendored `.agents/skills/` and
+`.agents/workflows/` with `skills-lock.json`, and ADR-0001 itself.
+
+Run the whole thing locally — scaffold, build, test, brand-grep — with
+[`scripts/template-smoke.sh`](scripts/template-smoke.sh).
+
 ## What's in the box
 
 - **Modules** (bounded contexts, each with a `.Contracts` project as its only public surface):
@@ -97,6 +130,7 @@ cd clients/console && pnpm test:e2e       # Playwright smoke suite
 | `docker-compose.yml` | Runs the production images locally, with `.env.example` |
 | `deploy/dokploy/` | Dokploy compose stacks, env contract and deploy script |
 | `docs/adr/` | Architecture decision records |
+| `.template.config/` | The `dotnet new saas` definition — this repo *is* the template |
 
 ## Contributing
 

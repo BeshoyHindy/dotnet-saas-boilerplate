@@ -30,6 +30,7 @@ updates:
       nuget:
         patterns: ['*']
 
+#if (frontend || sandcastle)
   # ── Node ────────────────────────────────────────────────────────────
   # Two independent pnpm lockfiles: the repo root (the sandcastle orchestrator)
   # and clients/console, which is deliberately NOT a workspace package — its
@@ -37,8 +38,12 @@ updates:
   # manifest and lockfile have to live beside it. One PR covers both.
   - package-ecosystem: npm
     directories:
+      #if (sandcastle)
       - '/'
+      #endif
+      #if (frontend)
       - '/clients/console'
+      #endif
     target-branch: develop
     schedule:
       interval: monthly
@@ -53,6 +58,7 @@ updates:
     ignore:
       - dependency-name: typescript
         versions: ['>=7.0.0']
+#endif
 
   # ── GitHub Actions ──────────────────────────────────────────────────
   # The workflows pin major tags; this keeps those majors from going stale and
@@ -76,7 +82,9 @@ updates:
   - package-ecosystem: docker
     directories:
       - '/src/Host'
+      #if (frontend)
       - '/clients/console'
+      #endif
     target-branch: develop
     schedule:
       interval: monthly
