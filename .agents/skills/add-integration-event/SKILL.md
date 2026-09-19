@@ -82,7 +82,8 @@ builder.Services.AddIntegrationEventHandlers(typeof({Consumer}Module).Assembly);
 
 - **Idempotency is free** with the in-memory bus (the Inbox dedups by `{eventId, handlerName}`) — don't hand-roll it.
 - The in-memory bus runs handlers **synchronously in the publisher's scope** — keep the handler lean; a throw surfaces to the originating request. Published via the outbox, that scope belongs to the dispatcher, so the consumer runs on the next cycle and its failures never reach the caller. Don't let a caller (or a test) assume the side effect already happened; integration tests drain with `OutboxDrain.DrainAsync`.
-- If the handler reads a **tenant-filtered** DbContext from a background path (open-generic handler, Hangfire job), restore Finbuckle context first via `IMultiTenantContextSetter` (see `FinbuckleEventTenantScope`).
+- **The tenant is already there.** `IEventTenantScope` installs the event's tenant — the full record from the store, connection string included — before the handlers' DI scope exists, so a handler just resolves its tenant-filtered DbContext. Never write `IMultiTenantContextSetter`; an architecture test fails the build on it.
+- **A tenant-less event must say so.** Publishing with a blank `TenantId` throws on dispatch unless the event type implements `IGlobalIntegrationEvent` (the event-side `[SystemJob]`). A global handler that needs tenant data enters each tenant via `ITenantScope`.
 - **Module load order:** the consumer must load before the publisher if it must react (`Order` in `[assembly: AppModule]`).
 
 ## Checklist
@@ -90,5 +91,5 @@ builder.Services.AddIntegrationEventHandlers(typeof({Consumer}Module).Assembly);
 - [ ] Event in source Contracts, implements `IIntegrationEvent`, stable type name
 - [ ] Published via `IOutboxWriter.AddAsync` (not the bus); no per-module eventing registration needed
 - [ ] Consumer handler `sealed : IIntegrationEventHandler<T>`; `AddIntegrationEventHandlers(assembly)` registered
-- [ ] Background readers restore tenant context; module `Order` lets the consumer load first
+- [ ] `TenantId` set from the publishing tenant, or the event declared `IGlobalIntegrationEvent`; module `Order` lets the consumer load first
 - [ ] Build + tests green

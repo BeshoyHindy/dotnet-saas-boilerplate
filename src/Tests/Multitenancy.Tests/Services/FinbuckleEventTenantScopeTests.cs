@@ -1,78 +1,86 @@
-using Finbuckle.MultiTenant;
-using Finbuckle.MultiTenant.Abstractions;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.Modules.Multitenancy.Services;
+using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 using Xunit;
 
 namespace Multitenancy.Tests.Services;
 
+/// <summary>
+/// The event scope must go through <see cref="ITenantScope"/> — that is what guarantees the full
+/// tenant record (connection string included) is loaded and installed before the handlers' DI scope
+/// is created. It used to fabricate an id-only <c>AppTenantInfo</c> and let the bus create the scope.
+/// </summary>
 public sealed class FinbuckleEventTenantScopeTests
 {
-    private readonly StubAccessor _accessor = new();
+    private readonly RecordingTenantScope _tenantScope = new();
+    private readonly ServiceProvider _provider = new ServiceCollection().BuildServiceProvider();
 
     [Fact]
-    public void Begin_Should_SetTenantContext_When_TenantIdProvided()
+    public async Task DispatchAsync_Should_Run_The_Dispatch_Inside_The_Tenant_Scope()
     {
-        var sut = new FinbuckleEventTenantScope(_accessor, _accessor);
+        var sut = new FinbuckleEventTenantScope(_tenantScope, _provider.GetRequiredService<IServiceScopeFactory>());
+        var dispatched = false;
 
-        using (sut.Begin("acme"))
+        await sut.DispatchAsync("acme", (services, _) =>
         {
-            _accessor.MultiTenantContext.TenantInfo.ShouldNotBeNull();
-            _accessor.MultiTenantContext.TenantInfo!.Id.ShouldBe("acme");
-            _accessor.MultiTenantContext.TenantInfo.Identifier.ShouldBe("acme");
-        }
+            dispatched = true;
+            services.ShouldBeSameAs(_tenantScope.SuppliedServices);
+            return Task.CompletedTask;
+        });
+
+        dispatched.ShouldBeTrue();
+        _tenantScope.RanFor.ShouldHaveSingleItem().ShouldBe("acme");
     }
 
-    [Fact]
-    public void Begin_Should_RestorePreviousContext_When_Disposed()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task DispatchAsync_Should_Open_A_Plain_Scope_For_Global_Events(string? tenantId)
     {
-        // Seed a pre-existing ambient tenant.
-        ((IMultiTenantContextSetter)_accessor).MultiTenantContext =
-            new MultiTenantContext<AppTenantInfo>(new AppTenantInfo("root", "root"));
-        var sut = new FinbuckleEventTenantScope(_accessor, _accessor);
+        var sut = new FinbuckleEventTenantScope(_tenantScope, _provider.GetRequiredService<IServiceScopeFactory>());
+        IServiceProvider? seen = null;
 
-        using (sut.Begin("acme"))
+        await sut.DispatchAsync(tenantId, (services, _) =>
         {
-            _accessor.MultiTenantContext.TenantInfo!.Id.ShouldBe("acme");
-        }
+            seen = services;
+            return Task.CompletedTask;
+        });
 
-        _accessor.MultiTenantContext.TenantInfo!.Id.ShouldBe("root");
+        seen.ShouldNotBeNull();
+        _tenantScope.RanFor.ShouldBeEmpty("a global event must not enter any tenant");
     }
 
-    [Fact]
-    public void Begin_Should_LeaveContextUntouched_When_TenantIdNullOrWhitespace()
+    #region Test doubles
+
+    private sealed class RecordingTenantScope : ITenantScope
     {
-        // Seed a known tenant so we can prove Begin(null/"") does not replace it.
-        ((IMultiTenantContextSetter)_accessor).MultiTenantContext =
-            new MultiTenantContext<AppTenantInfo>(new AppTenantInfo("root", "root"));
-        var sut = new FinbuckleEventTenantScope(_accessor, _accessor);
+        public List<string> RanFor { get; } = [];
 
-        using (sut.Begin(null))
+        public IServiceProvider SuppliedServices { get; } = new ServiceCollection().BuildServiceProvider();
+
+        public Task RunAsync(string tenantId, Func<IServiceProvider, CancellationToken, Task> work, CancellationToken cancellationToken = default)
         {
-            _accessor.MultiTenantContext.TenantInfo!.Id.ShouldBe("root");
+            ArgumentNullException.ThrowIfNull(work);
+            RanFor.Add(tenantId);
+            return work(SuppliedServices, cancellationToken);
         }
 
-        using (sut.Begin("   "))
-        {
-            _accessor.MultiTenantContext.TenantInfo!.Id.ShouldBe("root");
-        }
+        public Task<TResult> RunAsync<TResult>(string tenantId, Func<IServiceProvider, CancellationToken, Task<TResult>> work, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task RunForEachTenantAsync(Func<AppTenantInfo, IServiceProvider, CancellationToken, Task> work, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<AppTenantInfo> GetTenantAsync(string tenantId, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<AppTenantInfo>> GetTenantsAsync(CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public ITenantScopeHandle Begin(AppTenantInfo tenant) => throw new NotSupportedException();
     }
 
-#pragma warning disable S2376 // Finbuckle's IMultiTenantContextSetter is a set-only contract.
-    private sealed class StubAccessor : IMultiTenantContextAccessor<AppTenantInfo>, IMultiTenantContextSetter
-    {
-        private IMultiTenantContext<AppTenantInfo> _context =
-            new MultiTenantContext<AppTenantInfo>(new AppTenantInfo());
-
-        public IMultiTenantContext<AppTenantInfo> MultiTenantContext => _context;
-
-        IMultiTenantContext IMultiTenantContextAccessor.MultiTenantContext => _context;
-
-        IMultiTenantContext IMultiTenantContextSetter.MultiTenantContext
-        {
-            set => _context = (IMultiTenantContext<AppTenantInfo>)value;
-        }
-    }
-#pragma warning restore S2376
+    #endregion
 }

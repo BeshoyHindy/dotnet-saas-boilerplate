@@ -71,6 +71,12 @@ public sealed class MultitenancyModule : IModule
 
         builder.Services.AddHeroDbContext<TenantDbContext>();
 
+        // The one way to enter a tenant outside a request (ADR-0002, "Jobs and events"). Singletons:
+        // both are stateless and reach the scoped tenant store through IServiceScopeFactory. Registered
+        // here rather than in BuildingBlocks because they need Finbuckle's store, which this module owns.
+        builder.Services.AddSingleton<AmbientTenantContext>();
+        builder.Services.AddSingleton<ITenantScope, TenantScope>();
+
         // Replace (not Add) the no-op event tenant scope with a Finbuckle-backed one so background
         // event dispatch establishes the tenant before tenant-filtered handler DbContexts are built.
         builder.Services.Replace(
