@@ -15,7 +15,7 @@ public static class DeleteFileEndpoint
                 async (Guid id, IMediator mediator, CancellationToken cancellationToken) =>
                 {
                     await mediator.Send(new DeleteFileCommand(id), cancellationToken);
-                    return Results.NoContent();
+                    return TypedResults.NoContent();
                 })
             .WithName("DeleteFile")
             .WithSummary("Soft-delete a file; bytes purged after retention window")

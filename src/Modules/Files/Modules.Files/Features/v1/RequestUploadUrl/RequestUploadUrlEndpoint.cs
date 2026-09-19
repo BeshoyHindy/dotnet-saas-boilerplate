@@ -14,7 +14,7 @@ public static class RequestUploadUrlEndpoint
     internal static RouteHandlerBuilder MapRequestUploadUrlEndpoint(this IEndpointRouteBuilder endpoints)
         => endpoints.MapPost("/upload-url",
                 async (RequestUploadUrlCommand command, IMediator mediator, CancellationToken ct) =>
-                    Results.Ok(await mediator.Send(command, ct)))
+                    TypedResults.Ok(await mediator.Send(command, ct)))
             .WithName("RequestFileUploadUrl")
             .WithSummary("Mint a presigned PUT URL for a file upload")
             .RequirePermission(FilesPermissions.Upload)

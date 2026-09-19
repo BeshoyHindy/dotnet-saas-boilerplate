@@ -1,4 +1,5 @@
 ﻿using Asp.Versioning;
+using Microsoft.OpenApi;
 using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.BuildingBlocks.Eventing;
 using Boilerplate.BuildingBlocks.Persistence;
@@ -210,7 +211,30 @@ public class IdentityModule : IModule
             .WithApiVersionSet(apiVersionSet)
             .WithMetadata(new TenantFromRouteAttribute())
             .AllowAnonymous()
-            .RequireRateLimiting("auth");
+            .RequireRateLimiting("auth")
+            // `{tenant}` is a route value, not a handler argument: tenant resolution reads it and no
+            // endpoint binds it. ASP.NET Core only documents the parameters it binds, so the exported
+            // contract (ADR-0004) would carry a path template with an undeclared placeholder and a
+            // generated client would have nothing to substitute. Declare it once, for the group.
+            .AddOpenApiOperationTransformer((operation, _, _) =>
+            {
+                operation.Parameters ??= [];
+                if (!operation.Parameters.Any(p =>
+                        p.In == ParameterLocation.Path &&
+                        string.Equals(p.Name, TenantRoute.ValueKey, StringComparison.Ordinal)))
+                {
+                    operation.Parameters.Insert(0, new OpenApiParameter
+                    {
+                        Name = TenantRoute.ValueKey,
+                        In = ParameterLocation.Path,
+                        Required = true,
+                        Description = "The tenant identifier. The one place a caller may name a tenant (ADR-0002).",
+                        Schema = new OpenApiSchema { Type = JsonSchemaType.String },
+                    });
+                }
+
+                return Task.CompletedTask;
+            });
 
         authGroup.MapGenerateTokenEndpoint();
         authGroup.MapRefreshTokenEndpoint();

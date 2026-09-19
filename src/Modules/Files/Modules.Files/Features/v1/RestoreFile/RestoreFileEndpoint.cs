@@ -15,7 +15,7 @@ public static class RestoreFileEndpoint
                 async (Guid id, IMediator mediator, CancellationToken cancellationToken) =>
                 {
                     await mediator.Send(new RestoreFileCommand(id), cancellationToken);
-                    return Results.NoContent();
+                    return TypedResults.NoContent();
                 })
             .WithName("RestoreFile")
             .WithSummary("Restore a soft-deleted file from trash (admin)")

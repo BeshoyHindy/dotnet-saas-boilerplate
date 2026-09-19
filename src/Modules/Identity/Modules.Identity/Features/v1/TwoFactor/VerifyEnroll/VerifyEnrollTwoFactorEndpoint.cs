@@ -1,5 +1,6 @@
 using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
 using Boilerplate.Modules.Identity.Contracts.v1.TwoFactor;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
 using Mediator;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -14,7 +15,7 @@ public static class VerifyEnrollTwoFactorEndpoint
     {
         return endpoints.MapPost("/2fa/verify",
                 async (VerifyEnrollTwoFactorCommand command, IMediator mediator, CancellationToken ct) =>
-                    TypedResults.Ok(new { success = await mediator.Send(command, ct) }))
+                    TypedResults.Ok(new TwoFactorOperationResponse(await mediator.Send(command, ct))))
             .WithName("VerifyEnrollTwoFactor")
             .WithSummary("Confirm TOTP enrollment")
             .WithDescription("Verifies the 6-digit code from the authenticator app. On success, 2FA is enabled and subsequent logins must include a code.")
@@ -23,7 +24,7 @@ public static class VerifyEnrollTwoFactorEndpoint
             .RequireAuthenticatedOnly()
             // Enables the subject's own 2FA — an actor must not do this on their behalf.
             .DenyWhenActing()
-            .Produces(StatusCodes.Status200OK)
+            .Produces<TwoFactorOperationResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status403Forbidden);

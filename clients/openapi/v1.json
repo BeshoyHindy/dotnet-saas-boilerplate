@@ -19,11 +19,7 @@
         "properties": {
           "addedCount": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "alreadyMemberUserIds": {
             "items": {
@@ -207,44 +203,28 @@
           "eventsBySeverity": {
             "additionalProperties": {
               "format": "int64",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             },
             "type": "object"
           },
           "eventsBySource": {
             "additionalProperties": {
               "format": "int64",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             },
             "type": "object"
           },
           "eventsByTenant": {
             "additionalProperties": {
               "format": "int64",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             },
             "type": "object"
           },
           "eventsByType": {
             "additionalProperties": {
               "format": "int64",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             },
             "type": "object"
           }
@@ -618,19 +598,11 @@
           },
           "scanStatus": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "sizeBytes": {
             "format": "int64",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "status": {
             "$ref": "#/components/schemas/FileAssetStatus"
@@ -670,11 +642,7 @@
           "data": {
             "items": {
               "format": "uint8",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             },
             "type": "array"
           },
@@ -737,11 +705,7 @@
           },
           "memberCount": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "name": {
             "type": "string"
@@ -958,13 +922,64 @@
           },
           "defaultElevation": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           }
         },
+        "type": "object"
+      },
+      "NotificationDto": {
+        "properties": {
+          "body": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAtUtc": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "link": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "metadataJson": {
+            "type": "string"
+          },
+          "readAtUtc": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "source": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "title",
+          "body",
+          "link",
+          "source",
+          "metadataJson",
+          "readAtUtc",
+          "createdAtUtc"
+        ],
         "type": "object"
       },
       "PagedResponseOfAuditSummaryDto": {
@@ -983,35 +998,52 @@
           },
           "pageNumber": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "pageSize": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "totalCount": {
             "format": "int64",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "totalPages": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PagedResponseOfFileAssetDto": {
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FileAssetDto"
+            },
+            "type": "array"
+          },
+          "pageNumber": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
           }
         },
         "type": "object"
@@ -1032,35 +1064,19 @@
           },
           "pageNumber": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "pageSize": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "totalCount": {
             "format": "int64",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "totalPages": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           }
         },
         "type": "object"
@@ -1081,35 +1097,19 @@
           },
           "pageNumber": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "pageSize": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "totalCount": {
             "format": "int64",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "totalPages": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           }
         },
         "type": "object"
@@ -1130,35 +1130,19 @@
           },
           "pageNumber": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "pageSize": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "totalCount": {
             "format": "int64",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "totalPages": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           }
         },
         "type": "object"
@@ -1179,35 +1163,19 @@
           },
           "pageNumber": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "pageSize": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "totalCount": {
             "format": "int64",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "totalPages": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           }
         },
         "type": "object"
@@ -1272,6 +1240,52 @@
           "action",
           "isBasic",
           "isRoot"
+        ],
+        "type": "object"
+      },
+      "PresignedDownloadResponse": {
+        "properties": {
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "url": {
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expiresAt"
+        ],
+        "type": "object"
+      },
+      "PresignedUploadResponse": {
+        "properties": {
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "fileAssetId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "requiredHeaders": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "uploadUrl": {
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fileAssetId",
+          "uploadUrl",
+          "requiredHeaders",
+          "expiresAt"
         ],
         "type": "object"
       },
@@ -1357,11 +1371,9 @@
         "properties": {
           "months": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "null",
-              "integer",
-              "string"
+              "integer"
             ]
           },
           "tenantId": {
@@ -1412,11 +1424,7 @@
           },
           "sizeBytes": {
             "format": "int64",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ]
+            "type": "integer"
           },
           "visibility": {
             "$ref": "#/components/schemas/Visibility"
@@ -1457,6 +1465,18 @@
             ]
           }
         },
+        "type": "object"
+      },
+      "RevokeSessionsResponse": {
+        "properties": {
+          "revokedCount": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revokedCount"
+        ],
         "type": "object"
       },
       "RoleDto": {
@@ -1520,11 +1540,9 @@
         "properties": {
           "durationMinutes": {
             "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "null",
-              "integer",
-              "string"
+              "integer"
             ]
           },
           "reason": {
@@ -1862,6 +1880,17 @@
         ],
         "type": "object"
       },
+      "TwoFactorOperationResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "type": "object"
+      },
       "TypographyDto": {
         "properties": {
           "fontFamily": {
@@ -1869,22 +1898,14 @@
           },
           "fontSizeBase": {
             "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ]
+            "type": "number"
           },
           "headingFontFamily": {
             "type": "string"
           },
           "lineHeightBase": {
             "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ]
+            "type": "number"
           }
         },
         "type": "object"
@@ -2212,11 +2233,7 @@
             "name": "PageNumber",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           },
           {
@@ -2224,11 +2241,7 @@
             "name": "PageSize",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           },
           {
@@ -2532,11 +2545,7 @@
             "name": "Skip",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           },
           {
@@ -2544,11 +2553,7 @@
             "name": "Take",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           }
         ],
@@ -2631,11 +2636,7 @@
             "name": "Skip",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           },
           {
@@ -2643,11 +2644,7 @@
             "name": "Take",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           }
         ],
@@ -2797,11 +2794,7 @@
             "name": "page",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           },
           {
@@ -2809,16 +2802,22 @@
             "name": "pageSize",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           }
         ],
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FileAssetDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
             "description": "OK"
           }
         },
@@ -2842,11 +2841,7 @@
             "name": "page",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           },
           {
@@ -2854,16 +2849,22 @@
             "name": "pageSize",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           }
         ],
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FileAssetDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
             "description": "OK"
           }
         },
@@ -2887,11 +2888,7 @@
             "name": "pageNumber",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           },
           {
@@ -2899,16 +2896,19 @@
             "name": "pageSize",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           }
         ],
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfFileAssetDto"
+                }
+              }
+            },
             "description": "OK"
           }
         },
@@ -2938,6 +2938,13 @@
         },
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresignedUploadResponse"
+                }
+              }
+            },
             "description": "OK"
           }
         },
@@ -2967,8 +2974,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK"
+          "204": {
+            "description": "No Content"
           }
         },
         "security": [
@@ -2996,6 +3003,13 @@
         ],
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileAssetDto"
+                }
+              }
+            },
             "description": "OK"
           }
         },
@@ -3026,6 +3040,13 @@
         ],
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileAssetDto"
+                }
+              }
+            },
             "description": "OK"
           }
         },
@@ -3055,8 +3076,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK"
+          "204": {
+            "description": "No Content"
           }
         },
         "security": [
@@ -3094,6 +3115,13 @@
         ],
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresignedDownloadResponse"
+                }
+              }
+            },
             "description": "OK"
           }
         },
@@ -3181,6 +3209,13 @@
         },
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorOperationResponse"
+                }
+              }
+            },
             "description": "OK"
           },
           "400": {
@@ -3247,6 +3282,13 @@
         },
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorOperationResponse"
+                }
+              }
+            },
             "description": "OK"
           },
           "400": {
@@ -3735,11 +3777,7 @@
             "schema": {
               "default": 100,
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           }
         ],
@@ -4112,11 +4150,7 @@
             "name": "PageNumber",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           },
           {
@@ -4124,11 +4158,7 @@
             "name": "PageSize",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           },
           {
@@ -4322,11 +4352,7 @@
             "name": "pageNumber",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           },
           {
@@ -4334,11 +4360,7 @@
             "name": "pageSize",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           }
         ],
@@ -4429,6 +4451,13 @@
         },
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeSessionsResponse"
+                }
+              }
+            },
             "description": "OK"
           },
           "401": {
@@ -4535,11 +4564,7 @@
             "name": "PageNumber",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           },
           {
@@ -4547,11 +4572,7 @@
             "name": "PageSize",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           },
           {
@@ -5063,6 +5084,13 @@
         },
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeSessionsResponse"
+                }
+              }
+            },
             "description": "OK"
           },
           "401": {
@@ -5252,11 +5280,7 @@
             "name": "page",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           },
           {
@@ -5264,16 +5288,22 @@
             "name": "pageSize",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           }
         ],
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
             "description": "OK"
           }
         },
@@ -5312,6 +5342,14 @@
         "operationId": "GetUnreadNotificationCount",
         "responses": {
           "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "format": "int32",
+                  "type": "integer"
+                }
+              }
+            },
             "description": "OK"
           }
         },
@@ -5341,8 +5379,8 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK"
+          "204": {
+            "description": "No Content"
           }
         },
         "security": [
@@ -5366,11 +5404,7 @@
             "name": "PageNumber",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           },
           {
@@ -5378,11 +5412,7 @@
             "name": "PageSize",
             "schema": {
               "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ]
+              "type": "integer"
             }
           },
           {
@@ -5987,6 +6017,17 @@
       "post": {
         "description": "Generate a password reset token and send it via email. The tenant is taken from the '{tenant}' route segment.",
         "operationId": "RequestPasswordReset",
+        "parameters": [
+          {
+            "description": "The tenant identifier. The one place a caller may name a tenant (ADR-0002).",
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -6017,6 +6058,17 @@
       "post": {
         "description": "Use a valid (possibly expired) access token together with a valid refresh token to obtain a new access token and a rotated refresh token. The tenant is taken from the '{tenant}' route segment. Browsers may omit the refresh token from the body and let the HttpOnly refresh cookie carry it.",
         "operationId": "RefreshJwtTokens",
+        "parameters": [
+          {
+            "description": "The tenant identifier. The one place a caller may name a tenant (ADR-0002).",
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -6069,6 +6121,17 @@
       "post": {
         "description": "Allow a user to self-register. Anonymous; the tenant is taken from the '{tenant}' route segment.",
         "operationId": "SelfRegisterUser",
+        "parameters": [
+          {
+            "description": "The tenant identifier. The one place a caller may name a tenant (ADR-0002).",
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -6109,6 +6172,17 @@
       "post": {
         "description": "Reset the user's password using the provided verification token. The tenant is taken from the '{tenant}' route segment.",
         "operationId": "ResetPassword",
+        "parameters": [
+          {
+            "description": "The tenant identifier. The one place a caller may name a tenant (ADR-0002).",
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -6140,6 +6214,15 @@
         "description": "Submit credentials to receive a JWT access token and a refresh token. The tenant is taken from the '{tenant}' route segment. The 'X-Client-App' header (admin|dashboard) is used to enforce the SuperAdmin / dashboard boundary.",
         "operationId": "IssueJwtTokens",
         "parameters": [
+          {
+            "description": "The tenant identifier. The one place a caller may name a tenant (ADR-0002).",
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "in": "header",
             "name": "X-Client-App",

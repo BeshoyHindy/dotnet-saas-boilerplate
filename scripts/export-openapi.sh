@@ -53,6 +53,33 @@ source, target = sys.argv[1], sys.argv[2]
 with open(source, encoding="utf-8") as handle:
     document = json.load(handle)
 
+
+def narrow_numbers(node):
+    """Drop the string alternative from numeric schemas.
+
+    ASP.NET Core's web defaults set JsonNumberHandling.AllowReadingFromString, so the
+    schema exporter types every int as `["integer", "string"]` with a numeric-string
+    pattern. That leniency is an *input* convenience — responses always carry JSON
+    numbers — but it makes every count, page number and size arrive in a generated
+    client as `string | number`, which no caller can do arithmetic on. Narrowing it
+    here keeps the checked-in contract honest about what the API actually emits.
+    """
+    if isinstance(node, dict):
+        kinds = node.get("type")
+        if isinstance(kinds, list) and "string" in kinds and ({"integer", "number"} & set(kinds)):
+            node["type"] = [k for k in kinds if k != "string"]
+            if len(node["type"]) == 1:
+                node["type"] = node["type"][0]
+            node.pop("pattern", None)
+        for value in node.values():
+            narrow_numbers(value)
+    elif isinstance(node, list):
+        for value in node:
+            narrow_numbers(value)
+
+
+narrow_numbers(document)
+
 # Object key order carries no meaning in OpenAPI, but ASP.NET Core emits paths and
 # schemas in endpoint-discovery order — which reflection can reshuffle between
 # runs. Sorting every object makes the artifact a function of the API alone.
