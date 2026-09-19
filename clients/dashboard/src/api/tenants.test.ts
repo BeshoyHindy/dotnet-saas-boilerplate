@@ -3,11 +3,17 @@ import {
   DEFAULT_DARK_PALETTE,
   DEFAULT_LIGHT_PALETTE,
   themeFingerprint,
-  type BrandAssetsDto,
-  type TenantThemeDto,
+  type TenantThemeDraft,
 } from "@/api/tenants";
 
-function assets(overrides: Partial<BrandAssetsDto> = {}): BrandAssetsDto {
+type DraftAssets = TenantThemeDraft["brandAssets"];
+
+/**
+ * The draft's asset half: the URLs the server issued, plus whatever is staged for this save. The
+ * URLs are read-only as far as the API is concerned (#83) — they are here because the editor shows
+ * them, not because a save sends them.
+ */
+function assets(overrides: Partial<DraftAssets> = {}): DraftAssets {
   return {
     logoUrl: null,
     logoDarkUrl: null,
@@ -22,7 +28,7 @@ function assets(overrides: Partial<BrandAssetsDto> = {}): BrandAssetsDto {
   };
 }
 
-function theme(overrides: Partial<TenantThemeDto> = {}): TenantThemeDto {
+function theme(overrides: Partial<TenantThemeDraft> = {}): TenantThemeDraft {
   return {
     lightPalette: DEFAULT_LIGHT_PALETTE,
     darkPalette: DEFAULT_DARK_PALETTE,
@@ -31,7 +37,7 @@ function theme(overrides: Partial<TenantThemeDto> = {}): TenantThemeDto {
     layout: { borderRadius: 12, defaultElevation: 1 },
     isDefault: false,
     ...overrides,
-  } as TenantThemeDto;
+  } as TenantThemeDraft;
 }
 
 describe("themeFingerprint", () => {

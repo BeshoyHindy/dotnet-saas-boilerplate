@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Image as ImageIcon, Loader2, Upload, X, Link as LinkIcon } from "lucide-react";
+import { Image as ImageIcon, Loader2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
 import { formatBytes } from "@/hooks/use-file-upload";
 import type { Schemas } from "@/lib/api-client";
@@ -19,8 +18,8 @@ type Props = {
    * one key space the deploy stacks publish — and hand back a durable, unsigned URL.
    */
   onUpload: (image: ImageUpload) => void;
-  /** A pasted URL, or "" when the user clears the image. The caller decides what "" means. */
-  onChange: (next: string) => void;
+  /** The user cleared the image: the caller removes what is stored. */
+  onRemove: () => void;
   /** The caller's save is in flight. */
   busy?: boolean;
   /** Allowed extensions (lower-case w/ leading dot). Server enforces the same list. */
@@ -45,8 +44,11 @@ const IMAGE_EXTS = [".jpg", ".jpeg", ".png", ".ico"];
 const MAX_BYTES = 2 * 1024 * 1024;
 
 /**
- * ImageInput — pick an image (uploaded as bytes through the owning module's own endpoint) or
- * paste a URL you host elsewhere.
+ * ImageInput — pick an image, uploaded as bytes through the owning module's own endpoint, or remove
+ * the one that is stored. There is no "paste a URL" mode any more (#83): the API stopped accepting
+ * an asset URL from a client, because a URL a client names may be an object belonging to someone
+ * else in the same tenant, and replacing or removing the asset would then delete *their* bytes. What
+ * the field shows is the URL the server issued.
  *
  * It does NOT go through the Files module. A Files `publicUrl` is a presigned GET that expires in
  * minutes (see `.agents/rules/modules/files.md`), so persisting one on an entity column — an
@@ -55,14 +57,13 @@ const MAX_BYTES = 2 * 1024 * 1024;
 export function ImageInput({
   value,
   onUpload,
-  onChange,
+  onRemove,
   busy = false,
   allowedExtensions = IMAGE_EXTS,
   maxBytes = MAX_BYTES,
   shape = "square",
   className,
 }: Props) {
-  const [mode, setMode] = useState<"upload" | "url">("upload");
   const [reading, setReading] = useState(false);
 
   // Local preview of the just-picked file, shown until the caller's save round-trips a real URL.
@@ -132,21 +133,11 @@ export function ImageInput({
 
   const clear = () => {
     setPreviewUrl(null);
-    onChange("");
+    onRemove();
   };
 
   return (
     <div className={cn("space-y-3", className)}>
-      {/* Mode toggle */}
-      <div className="flex gap-1">
-        <ModeChip active={mode === "upload"} onClick={() => setMode("upload")} icon={<Upload className="h-3.5 w-3.5" />}>
-          Upload
-        </ModeChip>
-        <ModeChip active={mode === "url"} onClick={() => setMode("url")} icon={<LinkIcon className="h-3.5 w-3.5" />}>
-          Paste URL
-        </ModeChip>
-      </div>
-
       {/* Preview + controls row */}
       <div className="flex items-start gap-4">
         <div
@@ -170,69 +161,26 @@ export function ImageInput({
         </div>
 
         <div className="flex-1 space-y-2">
-          {mode === "upload" ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" size="sm" onClick={handlePick} disabled={isWorking}>
-                {isWorking
-                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  : <Upload className="h-3.5 w-3.5" />}
-                {showImage ? "Replace image" : "Choose image"}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" size="sm" onClick={handlePick} disabled={isWorking}>
+              {isWorking
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <Upload className="h-3.5 w-3.5" />}
+              {showImage ? "Replace image" : "Choose image"}
+            </Button>
+            {showImage && !isWorking && (
+              <Button type="button" size="sm" variant="outline" onClick={clear}>
+                <X className="h-3.5 w-3.5" />
+                Remove
               </Button>
-              {showImage && !isWorking && (
-                <Button type="button" size="sm" variant="outline" onClick={clear}>
-                  <X className="h-3.5 w-3.5" />
-                  Remove
-                </Button>
-              )}
-            </div>
-          ) : (
-            <Input
-              type="url"
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-              placeholder="https://…"
-              maxLength={512}
-              spellCheck={false}
-              autoComplete="off"
-              className="font-mono text-[12.5px]"
-            />
-          )}
+            )}
+          </div>
 
           <p className="text-xs text-[var(--color-muted-foreground)]">
-            {mode === "upload"
-              ? `${allowedExtensions.join(" / ")} · up to ${formatBytes(maxBytes)}`
-              : "Direct link to an image you host elsewhere."}
+            {allowedExtensions.join(" / ")} · up to {formatBytes(maxBytes)}
           </p>
         </div>
       </div>
     </div>
-  );
-}
-
-function ModeChip({
-  active,
-  onClick,
-  icon,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-full px-2.5 text-xs font-medium transition-colors duration-[var(--duration-fast)]",
-        active
-          ? "bg-[var(--color-primary)] text-[var(--color-primary-foreground)]"
-          : "text-[var(--color-muted-foreground)] hover:bg-[var(--color-muted)]",
-      )}
-    >
-      {icon}
-      {children}
-    </button>
   );
 }

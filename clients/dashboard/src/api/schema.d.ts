@@ -644,26 +644,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/identity/profile/image": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Set the authenticated user's avatar URL
-         * @description Persists a durable image URL on the current user's profile. Typically called after the Files module's presigned-upload flow returns a publicUrl. Pass a null/empty body to clear.
-         */
-        put: operations["SetProfileImage"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/identity/register": {
         parameters: {
             query?: never;
@@ -1194,7 +1174,7 @@ export interface paths {
         get: operations["GetTenantTheme"];
         /**
          * Update current tenant theme
-         * @description Update the theme settings for the current tenant, including colors, typography, and layout.
+         * @description Update the theme settings for the current tenant: colors, typography, layout, and the brand assets. A brand asset is uploaded as bytes or removed with its delete flag — the asset URLs are response-only, so a client cannot point one at an object the server did not issue for that asset.
          */
         put: operations["UpdateTenantTheme"];
         post?: never;
@@ -1573,14 +1553,16 @@ export interface components {
         Body: {
             reason: null | string;
         };
-        BrandAssetsDto: {
+        BrandAssetUploadsDto: {
             deleteFavicon: boolean;
             deleteLogo: boolean;
             deleteLogoDark: boolean;
             favicon: null | components["schemas"]["FileUploadRequest"];
-            faviconUrl: null | string;
             logo: null | components["schemas"]["FileUploadRequest"];
             logoDark: null | components["schemas"]["FileUploadRequest"];
+        };
+        BrandAssetsDto: {
+            faviconUrl: null | string;
             logoDarkUrl: null | string;
             logoUrl: null | string;
         };
@@ -1949,9 +1931,6 @@ export interface components {
         };
         /** @enum {unknown} */
         SecurityAction: "None" | "LoginSucceeded" | "LoginFailed" | "TokenIssued" | "TokenRevoked" | "PasswordChanged" | "RoleAssigned" | "RoleRevoked" | "PermissionDenied" | "PolicyFailed" | "ImpersonationStarted" | "ImpersonationEnded" | null;
-        SetProfileImageCommand: {
-            imageUrl: null | string;
-        };
         StartImpersonationCommand: {
             /** Format: int32 */
             durationMinutes?: null | number;
@@ -2028,6 +2007,13 @@ export interface components {
             brandAssets: components["schemas"]["BrandAssetsDto"];
             darkPalette: components["schemas"]["PaletteDto"];
             isDefault: boolean;
+            layout: components["schemas"]["LayoutDto"];
+            lightPalette: components["schemas"]["PaletteDto"];
+            typography: components["schemas"]["TypographyDto"];
+        };
+        TenantThemeUpdateDto: {
+            brandAssets: components["schemas"]["BrandAssetUploadsDto"];
+            darkPalette: components["schemas"]["PaletteDto"];
             layout: components["schemas"]["LayoutDto"];
             lightPalette: components["schemas"]["PaletteDto"];
             typography: components["schemas"]["TypographyDto"];
@@ -3509,42 +3495,6 @@ export interface operations {
             };
         };
     };
-    SetProfileImage: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SetProfileImageCommand"];
-            };
-        };
-        responses: {
-            /** @description No Content */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     RegisterUser: {
         parameters: {
             query?: never;
@@ -4793,7 +4743,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["TenantThemeDto"];
+                "application/json": components["schemas"]["TenantThemeUpdateDto"];
             };
         };
         responses: {
