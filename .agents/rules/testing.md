@@ -43,4 +43,6 @@ If Docker is down, integration tests fail fast with `DockerUnavailableException`
 
 ## Frontend tests
 
-Vitest units (`cd clients/console && pnpm test`) plus a small route-mocked Playwright smoke suite (`pnpm test:e2e`) — see `frontend/console.md`.
+Per client (ADR-0008 — there are two: `clients/dashboard` and `clients/console`): Vitest units
+(`cd clients/<app> && pnpm test`) plus a small route-mocked Playwright smoke suite
+(`pnpm exec playwright test --workers=1`) — see `frontend/clients.md`.

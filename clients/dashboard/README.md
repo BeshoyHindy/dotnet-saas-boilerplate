@@ -1,8 +1,11 @@
 # Dashboard
 
-The template's one client (ADR-0004): a React 19 + Vite SPA that serves tenant users and root
-operators alike. Operator screens — the tenant registry and impersonation grants — live in the same
-app behind the same permissions the API enforces.
+The tenant app (ADR-0008): a React 19 + Vite SPA for a tenant's own users — their overview, files,
+identity administration, audits, trash, sessions and settings, including their tenant's branding.
+
+It is one of two clients. Platform administration — the tenant registry, impersonation grants and
+the acting layer — is the operator tool's, `clients/console`, and deliberately does not exist here:
+this app holds exactly one credential, the signed-in user's own.
 
 ## Run it
 
@@ -18,7 +21,7 @@ the refresh token is an `HttpOnly; SameSite=Strict` cookie and CORS allows no cr
 (ADR-0002), so the browser must see one origin.
 
 Easiest full stack: `dotnet run --project src/Host/Boilerplate.AppHost` from the repository root,
-which starts PostgreSQL, Valkey, MinIO, Mailpit, the migrator, the API and this dashboard.
+which starts PostgreSQL, Valkey, MinIO, Mailpit, the migrator, the API and both clients.
 
 ## The API contract
 
@@ -38,21 +41,13 @@ import { api, unwrap } from "@/lib/api-client";
 const user = unwrap(await api.GET("/api/v1/identity/users/{id}", { params: { path: { id } } }));
 ```
 
-## Acting as someone else
+## One credential, always
 
-Two ways in (ADR-0002, issue #9), one credential, and it is **never stored**:
-
-| | Endpoint | Who |
-|---|---|---|
-| Enter a tenant | `POST /api/v1/identity/operator/token-exchange` | root operators (`Permissions.Platform.Users.Impersonate`) |
-| Impersonate a user | `POST /api/v1/identity/impersonation/start` | same tenant only |
-| Stop | `POST /api/v1/identity/impersonation/end` | returns **no token** |
-
-The short-lived, access-only token lives in module memory (`src/auth/acting-store.ts`), beside the
-signed-in session it never replaces. So a reload drops you back into your own account, a 401 on it
-means "revoked or expired" rather than "refresh me", and it cannot be read out of localStorage. While
-it is installed, `ActingBanner` says so on every page and the credential screens (2FA, change
-password) are disabled — the API refuses them from an actor anyway.
+The access token is in `localStorage` under `boilerplate.dashboard.*`; the refresh token is an
+`HttpOnly; SameSite=Strict` cookie this code never sees (ADR-0002), which is why the app is served
+from the API's origin. There is no acting store, no `X-Console-As-Operator` sentinel and no
+impersonation stash — a request here is always sent as the person who signed in. Acting as another
+user, in any tenant, is done in the console.
 
 ## Scripts
 
@@ -61,7 +56,7 @@ password) are disabled — the API refuses them from an actor anyway.
 | `pnpm dev` | Vite dev server on port 5173 |
 | `pnpm build` | `tsc -b && vite build` — the typecheck + bundle gate |
 | `pnpm test` | Vitest units (jsdom), beside the source |
-| `pnpm test:e2e` | Playwright smoke suite: sign-in, user CRUD, operator enters a tenant |
+| `pnpm test:e2e` | Playwright smoke suite: sign-in and user CRUD (`--workers=1`) |
 | `pnpm lint` | ESLint |
 | `pnpm generate:api` | Regenerate `src/api/schema.d.ts` from the checked-in contract |
 

@@ -111,10 +111,21 @@ Shared framework code under `src/BuildingBlocks/`, consumed by every module and 
 Changing one has the blast radius of the whole application.
 _Avoid_: common, shared library, infrastructure, core (Core is one building block among several).
 
+**Dashboard**:
+The React application a tenant's own users sign in to (`clients/dashboard`) — the product (ADR-0008).
+It holds one credential, the signed-in user's own, and has no platform surface.
+_Avoid_: portal, frontend, the app, tenant console.
+
 **Console**:
-The single React application (`clients/console`), serving tenant users and operators alike; operator
-screens are the same app behind permissions (ADR-0004).
-_Avoid_: admin, dashboard, portal, frontend, the clients (there is one).
+The React application root operators sign in to (`clients/console`) — the operator tool (ADR-0008):
+the tenant registry, the acting layer, and the screens an operator needs while acting. A tenant user
+who signs in there is told it is not their app.
+_Avoid_: admin, superadmin app, backoffice, the dashboard (that is the other client).
+
+**The clients**:
+The two of them together (`clients/dashboard` and `clients/console`). Between 2024's ADR-0004 and
+ADR-0008 there was only one, which is why older comments say "the console" where they mean "a client".
+_Avoid_: the frontend, the SPA (there are two).
 
 **Contract**:
 The checked-in OpenAPI document `clients/openapi/v1.json` — the one agreed description of the API.
@@ -165,7 +176,8 @@ _Avoid_: public bucket, static assets, CDN folder.
 ## Ambiguous words to avoid outright
 
 - **admin** — say *operator* (root tenant) or *tenant admin* (the role inside a tenant).
-- **client** — say *console* (the React app) or *API client* (generated code). Never "the clients".
+- **client** — name the one you mean: *dashboard* (the tenant app) or *console* (the operator tool);
+  *the clients* is fine for both together. *API client* is the generated code, never an app.
 - **user** — fine for a person; never for a Tenant.
 - **global** — reserved for the two declared exemptions (`IGlobalEntity`,
   `IGlobalIntegrationEvent`). Do not use it to mean "shared" or "platform-wide" elsewhere.

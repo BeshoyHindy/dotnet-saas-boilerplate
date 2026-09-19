@@ -20,11 +20,11 @@ dotnet new saas -n Acme -o ../Acme
 
 `-n Acme` renames everything: `Boilerplate` → `Acme` in namespaces, project and file names, and a
 derived lowercase form renames image names, database and bucket names, the compose project, npm
-scopes, the JWT issuer and audience and the console's `localStorage` prefixes.
+scopes, the JWT issuer and audience and each client's `localStorage` prefixes.
 
 | Parameter | Default | What `false` drops |
 |---|---|---|
-| `--frontend` | `true` | `clients/**`, the console service in `docker-compose.yml` and the app stack, the console image, the client CI workflow, ADR-0004 |
+| `--frontend` | `true` | `clients/**` (BOTH clients), their services in `docker-compose.yml` and the app stack, both images, the client CI workflow, ADR-0004 + ADR-0008 |
 | `--aspire` | `true` | the AppHost project |
 | `--sandcastle` | `true` | `.sandcastle/`, `sandcastle.config.mts`, the root pnpm project that exists only for them, its workflow, ADR-0006 |
 
@@ -73,8 +73,8 @@ dotnet run --project src/Host/Acme.AppHost
 ```
 
 Aspire starts PostgreSQL, Valkey, MinIO and Mailpit, runs the migrator to completion, then the API,
-then the console. The dashboard is at <https://localhost:15888>; it also shows the generated MinIO,
-seeded-admin and demo passwords (Resources → Parameters).
+then both clients. The Aspire dashboard is at <https://localhost:15888>; it also shows the generated
+MinIO, seeded-admin and demo passwords (Resources → Parameters).
 
 #### Running two AppHosts at once
 
@@ -117,18 +117,19 @@ The one exception is the `migrator` service, which runs as Development: it is as
 accounts below, and demo seeding is refused in a Production host. Remove `--demo` and that
 `DOTNET_ENVIRONMENT` line together if you want the migrator on Production too.
 
-### The console on its own
+### A client on its own
 
 ```bash
-cd clients/console && pnpm install && pnpm dev     # http://localhost:5173
+cd clients/dashboard && pnpm install && pnpm dev    # http://localhost:5173  (tenant app)
+cd clients/console   && pnpm install && pnpm dev    # http://localhost:5174  (operator tool)
 ```
 
 The dev server proxies `/api`, `/openapi`, `/scalar` and `/health` to the API (target from
 `VITE_API_BASE_URL`, default `http://localhost:5030`). **Keep it that way.** The refresh token is an
-`HttpOnly; SameSite=Strict` cookie and CORS allows no credentials, so a console served from a
+`HttpOnly; SameSite=Strict` cookie and CORS allows no credentials, so a client served from a
 different origin than the API can never refresh a session. The runtime `apiBase` is `""` — same
 origin — in every environment, and the nginx image proxies exactly like the dev server does. A CORS
-error in the console is a proxy misconfiguration, not a reason to point the client elsewhere.
+CORS error is a proxy misconfiguration, not a reason to point the client elsewhere.
 
 Sign in as the seeded root admin (`admin@root.com`) with the password from the Aspire dashboard or
 `.env`, and rotate it.
@@ -221,11 +222,12 @@ Every event is published under a tenant; one that genuinely is not must implemen
 
 ### A change to the API surface
 
-Re-export the contract and regenerate the console's types, and commit both:
+Re-export the contract and regenerate BOTH clients' types, and commit every artifact:
 
 ```bash
 bash scripts/export-openapi.sh
-cd clients/console && pnpm generate:api
+cd clients/dashboard && pnpm generate:api
+cd clients/console   && pnpm generate:api
 ```
 
 The **drift gate** re-derives both sides in CI and fails when either differs from what is committed —
@@ -237,7 +239,8 @@ asks the same question locally.
 ```bash
 dotnet build src/Acme.slnx -warnaserror
 dotnet test src/Acme.slnx            # integration suites need Docker
-cd clients/console && pnpm test && pnpm build
+cd clients/dashboard && pnpm test && pnpm build
+cd clients/console   && pnpm test && pnpm build
 ```
 
 The rule files under `.agents/rules/` are the long form of everything above, one file per area.
@@ -254,7 +257,7 @@ optional deploy), frontend (Vitest, Playwright smoke, drift), deploy contract, g
 sandcastle. The brand gate and the template smoke stay behind in the template repository — they
 prove the template, not your product.
 
-Images go to GHCR as `<name>-api`, `<name>-db-migrator` and `<name>-console`, tagged
+Images go to GHCR as `<name>-api`, `<name>-db-migrator`, `<name>-dashboard` and `<name>-console`, tagged
 `dev-<sha>` / `dev-latest` from `develop` and `<version>` from a `v*` tag. Never a bare `latest`.
 
 **GitHub settings the owner must set by hand** — CI is written for them and stays skipped or red
@@ -306,10 +309,10 @@ Stated plainly, because each is a deliberate trade rather than an oversight.
 - **A public file URL outlives a visibility change.** Public Files assets are presigned per read
   (default 5 minutes, clamped 1–15), so flipping Public → Private stops issuance at once, but a link
   already handed out works until its signature expires. Hard revocation means deleting the object.
-- **Three React Compiler lint rules sit at `warn`** in the console (`set-state-in-effect`,
+- **Three React Compiler lint rules sit at `warn`** in both clients (`set-state-in-effect`,
   `static-components`, `refs`). Each needs a real design change, not a mechanical fix; they are left
   visible rather than disabled, and no `eslint-disable` comment exists in `src/`.
-- **TypeScript is held below 7** (`^6.0.3`) across the console and the root pnpm project. Bump
+- **TypeScript is held below 7** (`^6.0.3`) across both clients and the root pnpm project. Bump
   deliberately, not with a dependency batch.
 - **Production refuses the Local storage provider.** It defaults to `s3` and fails fast on `local`,
   which would serve files from `wwwroot` with no signing; overriding that needs an explicit

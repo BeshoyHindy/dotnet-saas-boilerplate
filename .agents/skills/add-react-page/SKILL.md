@@ -1,13 +1,22 @@
 ---
 name: add-react-page
-description: Add a list+create page to the console (clients/console) — generated API types, API module, page, lazy route, permission gate, unit test. Use when adding any frontend screen. See .agents/rules/frontend/console.md.
-argument-hint: "[admin|dashboard] [Area] [Resource]"
+description: Add a list+create page to one of the two React clients (clients/dashboard or clients/console) — generated API types, API module, page, lazy route, permission gate, unit test. Use when adding any frontend screen. See .agents/rules/frontend/clients.md.
+argument-hint: "[dashboard|console] [Area] [Resource]"
 ---
 
 # Add React Page
 
-The frontend slice. Read `.agents/rules/frontend/shared.md` plus the app file (`frontend/admin.md` /
-`frontend/dashboard.md`) — the two apps **deliberately diverge**:
+The frontend slice. Read `.agents/rules/frontend/clients.md` (everything shared) plus the file for
+the client you are changing — `dashboard.md` (the tenant app) or `console.md` (the operator tool).
+Which client a screen belongs to is the first decision: a screen for a tenant's users goes in the
+dashboard, a screen about the platform (or one an operator needs while acting) goes in the console.
+
+> ⚠️ **The rest of this file is stale** — it describes the pre-ADR-0004 `admin`/`dashboard` pair and
+> a hand-written `apiFetch` client that no longer exist. Today both clients generate types from
+> `clients/openapi/v1.json` and call through `openapi-fetch` (`unwrap(await api.GET(...))`). Follow
+> `clients.md` where the two disagree; rewriting this skill is its own ticket.
+
+The table below is historical:
 
 | | **admin** (operator) | **dashboard** (tenant) |
 |---|---|---|

@@ -1,6 +1,6 @@
 ---
 name: add-permission
-description: Add a new permission end-to-end — server constant + endpoint gate, and gate the console's route and nav entry on it. Use when a new endpoint needs authorization. See modules/identity.md + frontend/console.md.
+description: Add a new permission end-to-end — server constant + endpoint gate, and gate the route and nav entry of whichever client owns the screen. Use when a new endpoint needs authorization. See modules/identity.md + frontend/clients.md.
 argument-hint: "[ModuleName] [Resource] [Action]"
 ---
 
@@ -38,7 +38,9 @@ The module already calls `services.AddPermissions({X}Permissions.All)` in `Confi
 
 ## Step 3 — (admin only) mirror it
 
-`clients/console/src/lib/permissions.ts` — only if a *route* has to gate on it. The role editor reads the server's catalog endpoint, so there is nothing else to mirror:
+`clients/<app>/src/lib/permissions.ts`, in whichever client owns the screen (ADR-0008; a
+`Permissions.Tenants.*` or `Permissions.Platform.*` constant belongs only in the console) — and only
+if a *route* has to gate on it. The role editor reads the server's catalog endpoint, so there is nothing else to mirror:
 
 ```ts
 export const {Module}Permissions = Object.freeze({

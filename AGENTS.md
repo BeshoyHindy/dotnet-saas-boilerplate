@@ -23,7 +23,8 @@ Gitflow (ADR-0007). Branch from `develop` as `feature/<slug>` (agents: `sandcast
 Area rules live in `.agents/rules/`, one file per area — read the one covering what you are about to
 change. `architecture.md` and `modules/*.md` carry the module rules; `buildingblocks-protection.md`
 guards `src/BuildingBlocks/`, which is shared by every module and is not modified without explicit
-approval.
+approval. `frontend/clients.md` covers both React clients; `frontend/dashboard.md` and
+`frontend/console.md` cover what is true of only one.
 
 The tenancy invariant (ADR-0002) constrains almost everything: a caller never names a tenant, every
 endpoint declares exactly one authorization intent, tenant-less background work is `[SystemJob]`, and
@@ -37,7 +38,8 @@ fails for each.
 dotnet build src/Boilerplate.slnx -warnaserror
 dotnet test src/Boilerplate.slnx                    # integration suites need Docker
 <!--#if (frontend) -->
-cd clients/console && pnpm test && pnpm build       # Vitest + type-checked build
+cd clients/dashboard && pnpm test && pnpm build     # Vitest + type-checked build
+cd clients/console   && pnpm test && pnpm build     # …and again for the operator tool
 <!--#endif -->
 bash deploy/dokploy/tests/run.sh                    # compose/env contract
 <!--#if (sandcastle) -->
@@ -47,8 +49,9 @@ gitleaks dir .                                      # must stay clean
 ```
 
 <!--#if (frontend) -->
-After an API-surface change, re-export the contract and regenerate the console's types
-(`bash scripts/export-openapi.sh`, then `pnpm generate:api` in `clients/console`) and commit both —
+After an API-surface change, re-export the contract and regenerate BOTH clients' types
+(`bash scripts/export-openapi.sh`, then `pnpm generate:api` in `clients/dashboard` and
+`clients/console` — there are two clients, ADR-0008) and commit every artifact —
 CI re-derives both sides and fails on drift. `bash scripts/check-openapi-drift.sh backend|frontend`
 asks the same question locally.
 <!--#endif -->

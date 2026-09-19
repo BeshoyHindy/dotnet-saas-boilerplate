@@ -1,8 +1,13 @@
 # Console
 
-The template's one client (ADR-0004): a React 19 + Vite SPA that serves tenant users and root
-operators alike. Operator screens — the tenant registry and impersonation grants — live in the same
-app behind the same permissions the API enforces.
+The operator tool (ADR-0008): a React 19 + Vite SPA for root operators — the tenant registry,
+impersonation grants, the acting layer ("enter tenant" / "impersonate"), the identity screens an
+operator needs while acting, cross-tenant audits, health and sessions.
+
+It is one of two clients. The product a tenant's own users sign in to is `clients/dashboard`;
+tenant self-service (My Files, Trash, one's own branding) lives there, not here. A signed-in user
+without an operator permission is shown one plain "this console is for platform operators" screen
+rather than a shell whose every panel would 403 (`src/auth/operator-gate.tsx`).
 
 ## Run it
 
@@ -73,7 +78,8 @@ password) are disabled — the API refuses them from an actor anyway.
 |---|---|---|
 | `APP_API_URL` | yes | Origin nginx proxies `/api` and `/health` to. Server-side, never seen by the browser. |
 | `APP_STORAGE_URL` | no | Object-storage origin, named in the Content-Security-Policy for presigned uploads and images. |
-| `APP_DEFAULT_TENANT` | no (`root`) | Tenant identifier the sign-in form pre-fills. |
+| `APP_DEFAULT_TENANT` | no (`root`) | The tenant operators sign in to. There is no tenant field on this app's form. |
+| `APP_DASHBOARD_URL` | no | Where the tenant app is deployed. Only used to link a non-operator who signed in here to the app that is theirs; empty hides the link. |
 | `APP_RESOLVER` | no (`127.0.0.11`) | DNS nginx re-resolves `APP_API_URL` with on every request. The default is Docker's embedded resolver. |
 
 The entrypoint renders `/config.json`, the nginx site and a strict CSP from those, so one built image
