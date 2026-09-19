@@ -350,6 +350,13 @@ public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Prog
                     routeBuilder.MapGet("/__test/request-info", (HttpContext context) =>
                             Results.Ok(new RequestInfo(context.Request.Host.Value ?? string.Empty, context.Request.Scheme)))
                         .AllowAnonymous();
+
+                    // Deliberately carries NO authorization intent (no .AllowAnonymous(),
+                    // .RequirePermission(...) or .RequireAuthenticatedOnly()) — a stand-in for a real
+                    // endpoint that forgot to declare one, so UnmatchedRouteTests can prove it still
+                    // hits FallbackPolicy (401) and is unaffected by the unmatched-path catch-all
+                    // (issue #47), which must only intercept requests that matched nothing.
+                    routeBuilder.MapGet("/__test/no-metadata", () => Results.Ok());
                 }
             };
         }

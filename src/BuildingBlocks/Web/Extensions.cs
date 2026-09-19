@@ -19,6 +19,7 @@ using Boilerplate.BuildingBlocks.Web.RateLimiting;
 using Boilerplate.BuildingBlocks.Web.Security;
 using Boilerplate.BuildingBlocks.Web.Versioning;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
@@ -210,6 +211,19 @@ public static class Extensions
 
         // Always expose health endpoints
         app.MapHeroHealthEndpoints();
+
+        // A request matching no mapped endpoint reaches AuthorizationMiddleware with Endpoint == null
+        // and empty metadata. ASP.NET Core's AuthorizationPolicy.CombineAsync treats "no auth metadata
+        // at all" the same whether that's because nothing matched or because a real endpoint forgot to
+        // declare an intent: it falls back to FallbackPolicy (issue #47), so unmapped routes returned
+        // 401 instead of 404. Map an explicit catch-all so unmatched requests get an endpoint whose
+        // AllowAnonymous metadata makes CombineAsync return null (no policy at all, per the framework's
+        // "if there is an IAllowAnonymous, don't authorize" short-circuit) — the request then reaches
+        // this handler, which answers 404. A real endpoint that still forgets to declare an intent is
+        // unaffected: it has its own route, never falls through to this one, and keeps hitting
+        // FallbackPolicy (401) exactly as before — deny-by-default for mapped endpoints is unchanged.
+        app.MapFallback(() => Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Not Found"))
+            .AllowAnonymous();
 
         // Mapped here (not as pre-routing middleware) so the dashboard runs behind UseAuthentication
         // and UseAuthorization and is gated by SystemPermissions.Hangfire.View like any other endpoint.
