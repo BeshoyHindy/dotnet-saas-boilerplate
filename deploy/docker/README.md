@@ -103,6 +103,27 @@ Single-host compose is the default story; production deployments often point at 
 
 The data-plane volumes (`pg_data`, `redis_data`, `minio_data`) can be deleted once you've migrated.
 
+## Behind a reverse proxy
+
+`appsettings.Production.json` turns forwarded headers on (`ProxyOptions__Enabled=true`) but trusts
+**nobody** by default, and the API refuses to boot until you say who the proxy is. That is deliberate:
+on a shared container network, trusting any peer lets a neighbouring container spoof
+`X-Forwarded-For`, which is the partition key for rate limiting and the client IP in the audit trail.
+
+Set one of these on the `api` service:
+
+| Env var | Example | When |
+|---|---|---|
+| `ProxyOptions__KnownNetworks__0` | `10.0.0.0/8` | Usual case — the CIDR of the Docker/overlay network the proxy sits on. Add `__1`, `__2` for more. |
+| `ProxyOptions__KnownProxies__0` | `10.0.4.7` | A fixed proxy address. |
+| `ProxyOptions__TrustAnyProxy` | `true` | Explicit opt-out, only where the container is genuinely unreachable except through the proxy. |
+| `ProxyOptions__ForwardLimit` | `1` | Number of proxy hops in front of the app (default 1). |
+
+`X-Forwarded-Host` is **never** honoured, whatever you configure: host filtering runs before the
+forwarded-headers middleware, and `Request.Host` ends up inside emailed confirmation links. Keep the
+proxy forwarding the original `Host` header (Traefik does by default) and keep `AllowedHosts` listing
+the public hostnames.
+
 ## Troubleshooting
 
 | Symptom | Likely cause |
@@ -112,6 +133,7 @@ The data-plane volumes (`pg_data`, `redis_data`, `minio_data`) can be deleted on
 | `OptionsValidationException: SigningKey looks like a sample placeholder` | `JWT_SIGNING_KEY` contains `replace-with` (the framework's placeholder detector). Generate a real key: `openssl rand -base64 48`. |
 | `Production configuration is not usable: Missing required configuration 'AllowedHosts'` | The API refuses to answer for any Host header in Production. Set `AllowedHosts` on the `api` service to the hostnames it serves, semicolon-separated (e.g. `api.example.com`). `*` is rejected. |
 | `Production configuration is not usable: … still holds a template placeholder` | A secret env var (signing key, seed password, SMTP password, S3 secret) still carries a sample value such as `changeme`. Replace it with a generated secret. |
-| Client IPs all show as the proxy's, or HTTPS redirects loop | The API is behind a reverse proxy but `ProxyOptions__Enabled` is false, or it trusts nobody. `appsettings.Production.json` enables it with `TrustAnyProxy` — keep the API reachable only through the proxy, or list the proxy addresses in `ProxyOptions__KnownProxies`. |
+| `ProxyOptions: Enabled is true but nothing is trusted` | Production enables forwarded headers but deliberately trusts no one by default. Name the proxy — see "Behind a reverse proxy" below. |
+| Client IPs all show as the proxy's, or HTTPS redirects loop | The forwarded headers are not being applied: either `ProxyOptions__Enabled` is false, or the peer address is outside the trusted networks you configured. |
 | API up but admin shows a CORS error | `APP_ADMIN_URL` / `APP_DASHBOARD_URL` in `.env` doesn't match what your external proxy serves. Both go on the CORS allow-list. |
 | `migrator` retries Postgres for 2 minutes then fails | Postgres didn't come up — check `docker compose logs postgres`. Most often a `POSTGRES_PASSWORD` change against an existing `pg_data` volume; delete the volume with `docker compose down -v` (destructive) and start over. |

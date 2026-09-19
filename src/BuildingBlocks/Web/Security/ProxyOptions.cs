@@ -30,9 +30,11 @@ public sealed class ProxyOptions
     public string[] KnownNetworks { get; set; } = [];
 
     /// <summary>
-    /// Accept forwarded headers from any peer. Only safe when the container is unreachable except
-    /// through the proxy (the Dokploy/Traefik shape in ADR-0005), because it lets the immediate peer
-    /// spoof the client IP and scheme.
+    /// Accept forwarded headers from any peer. Opt-in only, and never the shipped default: on a
+    /// shared container network every neighbour — not just the proxy — can then spoof the client IP
+    /// that partitions rate limits and lands in the audit trail. Set it only where the app is
+    /// genuinely unreachable except through the proxy; otherwise list
+    /// <see cref="KnownProxies"/>/<see cref="KnownNetworks"/>.
     /// </summary>
     public bool TrustAnyProxy { get; set; }
 

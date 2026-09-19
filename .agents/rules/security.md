@@ -3,9 +3,11 @@
 CORS, security headers, rate limiting, idempotency. `src/BuildingBlocks/Web/`.
 For auth/JWT/permissions see `modules/identity.md`; for the global exception handler see `api-conventions.md`.
 
-## CORS (`Web/Cors/`) — the credentialed-request gotcha
+## CORS (`Web/Cors/`)
 
-Policy `AppCorsPolicy`. When `CorsOptions.AllowAll=true` it uses **`SetIsOriginAllowed(_ => true).AllowAnyHeader().AllowAnyMethod().AllowCredentials()`** — deliberately **NOT `AllowAnyOrigin()`**. `Access-Control-Allow-Origin: *` is illegal with credentialed requests, so `AllowAnyOrigin()` silently breaks any call the browser sends with credentials while the rest keeps working. Never "simplify" it to `AllowAnyOrigin()`. `UseHeroCors()` runs **before** `UseHttpsRedirection()` so OPTIONS preflight isn't 307-redirected.
+Policy `AppCorsPolicy`. **No `AllowCredentials()` in either branch** (decided in #13): auth is a bearer header, no client sends cookies or `withCredentials`, and the credentialed SignalR negotiate that once justified it is gone. Don't add it back without a client that needs it — and then only on the explicit-origins branch.
+
+`CorsOptions.AllowAll=true` is **Development only**; `CorsOptionsValidator` fails the boot in every other environment. It uses `SetIsOriginAllowed(_ => true)` rather than `AllowAnyOrigin()` so the reflected origin is visible in traces. `UseHeroCors()` runs **before** `UseHttpsRedirection()` so OPTIONS preflight isn't 307-redirected.
 
 ## Security headers (`Web/Security/`)
 
@@ -15,7 +17,9 @@ The headers are written from a **`Response.OnStarting` callback**, not eagerly: 
 
 ## Host filtering & the proxy (`Web/Security/ProxyOptions.cs`)
 
-`AllowedHosts` is an explicit semicolon-separated list; `*` is rejected in Production by `ProductionConfigurationGuard`. Behind Traefik set `ProxyOptions.Enabled` so `UseForwardedHeaders` runs **first** in the pipeline; it clears the loopback-only defaults, so either list `KnownProxies`/`KnownNetworks` or set `TrustAnyProxy` when the container is reachable only through the proxy.
+`AllowedHosts` is an explicit semicolon-separated list; `*` is rejected in Production by `ProductionConfigurationGuard`. Behind Traefik set `ProxyOptions.Enabled` so `UseForwardedHeaders` runs **first** in the pipeline; it clears the loopback-only defaults, and `ProxyOptionsValidator` then **fails the boot** unless `KnownProxies`/`KnownNetworks` names the proxy or `TrustAnyProxy` is set explicitly (opt-in, only where the app is unreachable except through the proxy). Trusting any peer on a shared container network lets a neighbour spoof `X-Forwarded-For`, which partitions rate limits and lands in the audit trail.
+
+**`XForwardedHost` is never enabled.** Host filtering runs before the forwarded-headers middleware, so honouring it would let a caller rewrite `Request.Host` after the allow-list approved the real one — and that value is interpolated into the confirmation/reset links Identity mails (`RegisterUserEndpoint`, `ResendConfirmationEmailEndpoint`, `SelfRegisterUserEndpoint`). `ForwardedHeadersTests` locks this down.
 
 ## Request limits (`Web/Limits/`)
 

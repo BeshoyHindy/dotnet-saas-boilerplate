@@ -143,5 +143,32 @@ public sealed class ProductionConfigurationGuardTests
         PlaceholderSecret.Looks("replace-with-your-own-key").ShouldBeTrue();
     }
 
+    [Theory]
+    // Short words appear inside random base64 runs all the time; flagging those would train
+    // operators to work around the check instead of fixing the secret.
+    [InlineData("Xxx7QfNbSampleTodoZk1nR4wYbGdE7jU4sNiOo1vSecretPasswordQ")]
+    [InlineData("k3xxxV9sampleR2todoP7secretL5")]
+    [InlineData("ZXhhbXBsZXNlY3JldHBhc3N3b3JkVE9ETw==")]
+    public void Looks_Should_AcceptAKey_When_AShortMarkerIsOnlyARandomFragment(string signingKey)
+    {
+        // Act + Assert
+        PlaceholderSecret.Looks(signingKey).ShouldBeFalse();
+    }
+
+    [Theory]
+    // …but the same words standing on their own, or delimited, are what people actually type.
+    [InlineData("secret")]
+    [InlineData("my-secret-key")]
+    [InlineData("todo")]
+    [InlineData("sample_signing_key")]
+    [InlineData("Password123!")]
+    [InlineData("xxx")]
+    [InlineData("integration-test-signing-key")]
+    public void Looks_Should_RejectAKey_When_AShortMarkerStandsAsAWholeWord(string signingKey)
+    {
+        // Act + Assert
+        PlaceholderSecret.Looks(signingKey).ShouldBeTrue();
+    }
+
     #endregion
 }

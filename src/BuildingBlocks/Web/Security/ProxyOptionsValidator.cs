@@ -30,12 +30,16 @@ internal sealed class ProxyOptionsValidator : IValidateOptions<ProxyOptions>
             .Where(network => !TryParseNetwork(network))
             .Select(network => $"ProxyOptions: KnownNetworks entry '{network}' is not a valid CIDR network (expected 'prefix/length')."));
 
+        // Fail closed. Enabled with nothing trusted is not a safe middle ground: it either silently
+        // ignores the proxy's headers, or — if we defaulted to trusting everyone — lets any neighbour
+        // on the container network spoof the client IP. The operator has to name the proxy.
         if (!options.TrustAnyProxy && options.KnownProxies.Length == 0 && options.KnownNetworks.Length == 0)
         {
             failures.Add(
-                "ProxyOptions: Enabled is true but no KnownProxies/KnownNetworks are configured and TrustAnyProxy is false, " +
-                "so forwarded headers would be ignored. Configure the proxy addresses or set TrustAnyProxy when the app is " +
-                "only reachable through the proxy.");
+                "ProxyOptions: Enabled is true but nothing is trusted. Set ProxyOptions__KnownNetworks__0 to the proxy's " +
+                "network (e.g. '10.0.0.0/8' for a Docker overlay) or ProxyOptions__KnownProxies__0 to its address. " +
+                "ProxyOptions__TrustAnyProxy=true is an explicit opt-out, valid only where the app is unreachable except " +
+                "through the proxy.");
         }
 
         return failures.Count > 0 ? ValidateOptionsResult.Fail(failures) : ValidateOptionsResult.Success;
