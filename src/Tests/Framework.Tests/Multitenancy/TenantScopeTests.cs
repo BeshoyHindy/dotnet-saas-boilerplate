@@ -201,6 +201,34 @@ public sealed class TenantScopeTests
         (await harness.Sut.GetTenantsAsync()).Select(t => t.Id).ShouldBe(["root", TenantId], ignoreOrder: true);
     }
 
+    [Fact]
+    public async Task RunForEachTenantAsync_Should_Stop_At_The_First_Exception_And_Restore_The_Ambient_Tenant()
+    {
+        var harness = new Harness();
+        harness.Store.Seed(new AppTenantInfo("tenant-1", "tenant-1"));
+        harness.Store.Seed(new AppTenantInfo("tenant-2", "tenant-2"));
+        using var outer = harness.Ambient.Enter(new AppTenantInfo("root", "root"));
+
+        var visited = new List<string>();
+
+        await Should.ThrowAsync<InvalidOperationException>(() =>
+            harness.Sut.RunForEachTenantAsync((tenant, _, _) =>
+            {
+                visited.Add(tenant.Id!);
+                if (tenant.Id == "tenant-1")
+                {
+                    throw new InvalidOperationException("boom");
+                }
+
+                return Task.CompletedTask;
+            }));
+
+        visited.ShouldBe(
+            ["tenant-1"], "tenant 2 must never be visited once tenant 1's callback throws — no fan-out swallowing");
+        harness.Ambient.Current!.Id.ShouldBe(
+            "root", "a leaked tenant context would attach the next unit of work to the wrong tenant");
+    }
+
     // GetTenantAsync checks the registered stores in registration order — the 60-minute distributed
     // cache store first, the EF-backed catalog second (see MultitenancyModule) — so a job or event
     // dispatch costs a catalog SELECT only on a cache miss. Exercised generically, by store order, not

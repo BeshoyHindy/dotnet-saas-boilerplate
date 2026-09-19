@@ -44,7 +44,7 @@ await tenantScope.RunAsync(tenantId, async (services, ct) =>
 await tenantScope.RunForEachTenantAsync(async (tenant, services, ct) => { … }, ct);   // fan-out
 ```
 
-Never write `IMultiTenantContextSetter` yourself — an architecture test fails the build if any file outside `AmbientTenantContext` names it.
+Never write `IMultiTenantContextSetter` yourself — an architecture test fails if any file outside `AmbientTenantContext` names it.
 
 `RunAsync` is what you want. `Begin` exists for Hangfire's activator alone and is **synchronous on purpose**: the ambient tenant is an `AsyncLocal`, and a write made in the continuation of an `async` method is discarded when that method returns, so an async `Begin` would hand back a scope whose tenant is already gone.
 
