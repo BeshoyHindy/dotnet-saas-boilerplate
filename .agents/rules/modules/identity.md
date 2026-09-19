@@ -39,7 +39,16 @@ Login `POST /api/v1/tenants/{tenant}/auth/token` (header `X-Client-App` enforces
 - `RotateRefreshTokenAsync` is one compare-and-set `ExecuteUpdate`, so N concurrent refreshes yield exactly one winner (losers get `Superseded`). A `PreviousTokenHash` hit is reuse → the session is revoked. A `SecurityStamp` change (password reset, credential change) kills the session. `sid` survives rotation.
 - Browsers also get the token as `HttpOnly; Secure; SameSite=Strict` cookie (`RefreshTokenCookie`) pinned by `Path` to the tenant's refresh route; the refresh endpoint falls back to it when the body omits the token. CORS still allows no credentials (#13), so the cookie is same-site only and body delivery remains the client path.
 - **Every response that is not a successful rotation clears the cookie**, via `DeleteWhenResponseStarts` — an `OnStarting` callback, because `UseExceptionHandler` wipes headers before re-running the pipeline and an eager `Set-Cookie` would vanish from exactly the 401s that need it (same reason as the security headers; see `security.md`). `Delete` must keep every attribute identical to `Append`, `Path` above all: a browser matches a deletion by name + Path, so a mismatch silently leaves the credential in place.
-- **End-impersonation is access-only.** It runs in the impersonated tenant's context and so cannot write a session row in the actor's tenant; operator token exchange (#9) is where crossing a tenant boundary gets its mechanism.
+- **End-impersonation returns no token.** The actor's own session is never taken away while they act as someone else, so End just marks the grant ended (which kills the acting token on its next request). The old access-only token it used to mint had no refresh counterpart — a credential nothing could renew.
+
+## Acting as someone else (impersonation + operator token exchange)
+
+`IImpersonationTokenIssuer` is **the** place a token is minted for another identity. Two surfaces call it and they share everything downstream — one `ImpersonationGrant` table, one jti revocation list, one lifetime ceiling (`OperatorExchange:MaxMinutes`, clamped server-side), one audit record:
+
+- `POST /identity/impersonation/start` — **same tenant only**. A cross-tenant caller (root included) gets 403 pointing at the exchange.
+- `POST /identity/operator/token-exchange` — **root only** (`SystemPermissions.Platform.CrossTenantImpersonate`, the catalog's "Cross-Tenant Impersonate"), plus a root-tenant check in the handler. The subject is a real user of the target tenant (`targetUserId`, else the tenant record's `AdminEmail`), so the normal permission pipeline applies unchanged. Reason required; unknown tenant 404, deactivated tenant 403, unknown user 404, deactivated user 409. No refresh token, no session row, no cookie.
+
+Neither accepts a caller that already carries `act_sub` (no nesting). The audit row lands in the **ambient** tenant — the caller's own — so an operator finds their crossings in root. `BuildClaimsForUserAsync`/`FindTenantUserAsync` read the target user with `IgnoreQueryFilters` from the ambient database, so a tenant with a dedicated connection string cannot be entered until the tenant-scope helper lands.
 
 ### Logout
 
