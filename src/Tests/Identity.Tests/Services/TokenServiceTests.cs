@@ -1,4 +1,5 @@
 using System.Diagnostics.Metrics;
+using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -110,6 +111,56 @@ public sealed class TokenServiceTests : IDisposable
         // Assert
         jwt.Issuer.ShouldBe(Issuer);
         jwt.Audiences.ShouldContain(Audience);
+        jwt.Claims.ShouldContain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == "user-123");
+        jwt.Claims.ShouldContain(c => c.Type == ClaimTypes.Email && c.Value == "user@example.com");
+    }
+
+    [Fact]
+    public async Task IssueAsync_Should_StampIssuedAtAndNotBefore_When_TokenIsMinted()
+    {
+        // Arrange
+        var service = CreateService();
+
+        // Act
+        var response = await service.IssueAsync("user-123", SampleClaims());
+        var jwt = ReadToken(response.AccessToken);
+
+        // Assert — `iat` dates the token, `nbf` stops it being valid before it was minted.
+        var issuedAt = jwt.Claims.Where(c => c.Type == JwtRegisteredClaimNames.Iat).ToList();
+        issuedAt.Count.ShouldBe(1, "exactly one iat claim must be emitted");
+        issuedAt[0].Value.ShouldBe(EpochTime.GetIntDate(FixedNow.UtcDateTime).ToString(CultureInfo.InvariantCulture));
+
+        jwt.ValidFrom.ShouldBe(FixedNow.UtcDateTime);
+        jwt.ValidTo.ShouldBe(FixedNow.UtcDateTime.AddMinutes(30));
+    }
+
+    [Fact]
+    public async Task IssueAccessOnlyAsync_Should_StampIssuedAtAndNotBefore_When_TokenIsMinted()
+    {
+        // Arrange
+        var service = CreateService();
+
+        // Act
+        var (accessToken, _) = await service.IssueAccessOnlyAsync("user-123", SampleClaims(), TimeSpan.FromMinutes(5));
+        var jwt = ReadToken(accessToken);
+
+        // Assert
+        jwt.Claims.Count(c => c.Type == JwtRegisteredClaimNames.Iat).ShouldBe(1);
+        jwt.ValidFrom.ShouldBe(FixedNow.UtcDateTime);
+        jwt.ValidTo.ShouldBe(FixedNow.UtcDateTime.AddMinutes(5));
+    }
+
+    [Fact]
+    public async Task IssueAsync_Should_PreserveCallerClaims_When_IssuedAtIsAppended()
+    {
+        // Arrange
+        var service = CreateService();
+
+        // Act
+        var response = await service.IssueAsync("user-123", SampleClaims());
+        var jwt = ReadToken(response.AccessToken);
+
+        // Assert
         jwt.Claims.ShouldContain(c => c.Type == ClaimTypes.NameIdentifier && c.Value == "user-123");
         jwt.Claims.ShouldContain(c => c.Type == ClaimTypes.Email && c.Value == "user@example.com");
     }

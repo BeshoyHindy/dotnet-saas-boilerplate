@@ -10,6 +10,7 @@ using Boilerplate.BuildingBlocks.Eventing.Abstractions;
 using Boilerplate.BuildingBlocks.Persistence;
 using Boilerplate.BuildingBlocks.Shared.Constants;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Web.Health;
 using Boilerplate.BuildingBlocks.Web.Modules;
 using Boilerplate.Modules.Multitenancy.Contracts;
 using Boilerplate.Modules.Multitenancy.Data;
@@ -119,9 +120,13 @@ public sealed class MultitenancyModule : IModule
             .WithStore<EFCoreStore<TenantDbContext, AppTenantInfo>>(ServiceLifetime.Scoped);
 
         builder.Services.AddHealthChecks()
+            // The only per-module database check tagged for readiness: every module's DbContext
+            // talks to the same PostgreSQL server, and no request can be served without the tenant
+            // catalog, so this one check answers the readiness question for all of them.
             .AddDbContextCheck<TenantDbContext>(
                 name: "db:multitenancy",
-                failureStatus: HealthStatus.Unhealthy)
+                failureStatus: HealthStatus.Unhealthy,
+                tags: [HealthTags.Ready])
             .AddCheck<TenantMigrationsHealthCheck>(
                 name: "db:tenants-migrations",
                 failureStatus: HealthStatus.Unhealthy);

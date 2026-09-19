@@ -1,0 +1,20 @@
+<Project>
+
+	<!--
+	  Directory.Build.props sets NoDefaultExcludes=true (so dotfiles survive packing), which also
+	  re-admits build output to the default item globs. Any project that widens a glob — a Content
+	  or None include ending in `**\*`, the template pack, a linked `appsettings*.json` — then picks
+	  up the copies under bin/ and obj/ as well as the originals. The symptoms are duplicate-item
+	  build errors and, worse, stale build output (including copied appsettings files) shipping as
+	  content. Strip build output from every default item type here, once, for every project under
+	  src/. SDK-generated sources (obj/**/*.AssemblyInfo.cs and friends) are added by targets at
+	  build time, not by these evaluation-time globs, so they are unaffected.
+	-->
+	<ItemGroup>
+		<Compile Remove="$(BaseOutputPath)/**;$(BaseIntermediateOutputPath)/**;bin/**;obj/**" />
+		<Content Remove="$(BaseOutputPath)/**;$(BaseIntermediateOutputPath)/**;bin/**;obj/**" />
+		<None Remove="$(BaseOutputPath)/**;$(BaseIntermediateOutputPath)/**;bin/**;obj/**" />
+		<EmbeddedResource Remove="$(BaseOutputPath)/**;$(BaseIntermediateOutputPath)/**;bin/**;obj/**" />
+	</ItemGroup>
+
+</Project>

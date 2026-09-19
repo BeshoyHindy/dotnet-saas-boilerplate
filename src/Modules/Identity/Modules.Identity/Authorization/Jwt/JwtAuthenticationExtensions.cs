@@ -13,6 +13,8 @@ internal static class JwtAuthenticationExtensions
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        services.AddSingleton<IValidateOptions<JwtOptions>, JwtOptionsProductionValidator>();
+
         services.AddSingleton<IConfigureOptions<JwtBearerOptions>, ConfigureJwtBearerOptions>();
         services
             .AddAuthentication(authentication =>

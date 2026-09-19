@@ -34,36 +34,60 @@ public static class HealthEndpoints
                 .WithDescription("Reports if the API process is alive. Does not check dependencies.")
                 .Produces<HealthResult>(StatusCodes.Status200OK);
 
-        // Readiness: includes DB + registered checks. Full payload on both 200 and 503 so
-        // operators see which check failed; probe consumers key off status code, so a 503 body is safe.
+        // Readiness: only the checks tagged HealthTags.Ready. The proxy polls this on a short
+        // interval, so running every per-module check here would open one connection per module per
+        // probe against the same database. Full payload on both 200 and 503 so operators see which
+        // check failed; probe consumers key off status code, so a 503 body is safe.
         group.MapGet("/ready",
                     async (HealthCheckService hc, CancellationToken cancellationToken) =>
                     {
-                        var report = await hc.CheckHealthAsync(cancellationToken: cancellationToken);
-                        var results = report.Entries.Select(e =>
-                    new HealthEntry(
-                        Name: e.Key,
-                        Status: e.Value.Status.ToString(),
-                        Description: e.Value.Description,
-                        DurationMs: e.Value.Duration.TotalMilliseconds,
-                        Details: e.Value.Data.ToDictionary(
-                            k => k.Key,
-                            v => v.Value is null ? "null" : v.Value
-                        )));
+                        var report = await hc.CheckHealthAsync(
+                            registration => registration.Tags.Contains(HealthTags.Ready),
+                            cancellationToken);
 
-                        var payload = new HealthResult(report.Status.ToString(), results);
-                        var statusCode = report.Status == HealthStatus.Healthy
-                            ? StatusCodes.Status200OK
-                            : StatusCodes.Status503ServiceUnavailable;
-
-                        return Results.Json(payload, statusCode: statusCode);
+                        return WriteReport(report);
                     })
                     .WithName("Readiness")
-                    .WithSummary("Readiness probe with database check.")
-                    .WithDescription("Returns 200 if all dependencies are healthy, otherwise 503. Body is the same shape in both cases.")
+                    .WithSummary("Readiness probe over the checks tagged 'ready'.")
+                    .WithDescription("Returns 200 if every readiness dependency is healthy, otherwise 503. Body is the same shape in both cases.")
+                    .Produces<HealthResult>(StatusCodes.Status200OK)
+                    .Produces<HealthResult>(StatusCodes.Status503ServiceUnavailable);
+
+        // Full report: every registered check, including the per-module ones readiness skips.
+        // Operator-facing and on demand, not a probe target.
+        group.MapGet("/",
+                    async (HealthCheckService hc, CancellationToken cancellationToken) =>
+                    {
+                        var report = await hc.CheckHealthAsync(cancellationToken);
+                        return WriteReport(report);
+                    })
+                    .WithName("HealthReport")
+                    .WithSummary("Full health report across every registered check.")
+                    .WithDescription("Runs all checks, including per-module database checks that readiness skips. Returns 200 when healthy, otherwise 503.")
                     .Produces<HealthResult>(StatusCodes.Status200OK)
                     .Produces<HealthResult>(StatusCodes.Status503ServiceUnavailable);
 
         return app;
+    }
+
+    private static IResult WriteReport(HealthReport report)
+    {
+        var results = report.Entries.Select(e =>
+            new HealthEntry(
+                Name: e.Key,
+                Status: e.Value.Status.ToString(),
+                Description: e.Value.Description,
+                DurationMs: e.Value.Duration.TotalMilliseconds,
+                Details: e.Value.Data.ToDictionary(
+                    k => k.Key,
+                    v => v.Value is null ? "null" : v.Value
+                )));
+
+        var payload = new HealthResult(report.Status.ToString(), results);
+        var statusCode = report.Status == HealthStatus.Healthy
+            ? StatusCodes.Status200OK
+            : StatusCodes.Status503ServiceUnavailable;
+
+        return Results.Json(payload, statusCode: statusCode);
     }
 }

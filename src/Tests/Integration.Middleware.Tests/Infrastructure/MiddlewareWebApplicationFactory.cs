@@ -177,6 +177,10 @@ public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Prog
                 // Security headers ON so SecurityHeadersMiddleware emits its headers.
                 ["SecurityHeadersOptions:Enabled"] = "true",
 
+                // Explicit host allow-list (never "*") so HostFilteringTests can prove a foreign
+                // Host header is rejected with 400 before routing.
+                ["AllowedHosts"] = TestConstants.AllowedHost,
+
                 ["Storage:Provider"] = "s3",
                 ["Storage:S3:Bucket"] = MinioBucket,
                 ["Storage:S3:ServiceUrl"] = _minio.GetConnectionString(),

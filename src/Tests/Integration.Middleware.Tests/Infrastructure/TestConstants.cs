@@ -6,6 +6,9 @@ public static class TestConstants
     public const string RootAdminEmail = "admin@root.com";
     public const string DefaultPassword = "123Pa$$word!";
 
+    /// <summary>The single host the middleware host accepts; anything else must be rejected by host filtering.</summary>
+    public const string AllowedHost = "localhost";
+
     public const string JwtIssuer = "boilerplate";
     public const string JwtAudience = "boilerplate.clients";
     public const string JwtSigningKey = "integration-test-signing-key-that-is-at-least-32-chars-long!!";

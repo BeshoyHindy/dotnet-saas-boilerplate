@@ -29,8 +29,15 @@ for local orchestration with .NET Aspire.
 ## Run
 
 ```bash
+bash scripts/dev-secrets.sh                          # once per clone — see below
 dotnet run --project src/Host/Boilerplate.AppHost
 ```
+
+The repository ships **no credentials**. `scripts/dev-secrets.sh` generates a JWT signing key into the
+local [user-secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets) store of the API
+(shared with the migrator); the API refuses to start without one. Anything else a host needs —
+connection strings, S3 and SMTP credentials, the seeded admin password — comes from Aspire
+parameters, environment variables or that same store, never from `appsettings*.json`.
 
 The Aspire dashboard is at <https://localhost:15888>; the API and its Scalar reference at
 <https://localhost:7030/scalar>; admin at <http://localhost:5173>; dashboard at

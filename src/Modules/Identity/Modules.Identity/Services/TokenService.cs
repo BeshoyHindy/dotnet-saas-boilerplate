@@ -70,10 +70,19 @@ public sealed class TokenService : ITokenService
         var accessTokenExpiry = lifetime is { } span
             ? now.Add(span)
             : now.AddMinutes(_options.AccessTokenMinutes);
+
+        // `iat` dates the token so a consumer (or an audit trail) can reason about its age
+        // independently of `exp`; `nbf` bounds it at the other end, so a token can never be valid
+        // before it was minted. JwtSecurityToken emits `nbf` from notBefore but never `iat`.
+        var issuedAt = EpochTime.GetIntDate(now).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        IEnumerable<Claim> allClaims = (claims ?? [])
+            .Append(new Claim(JwtRegisteredClaimNames.Iat, issuedAt, ClaimValueTypes.Integer64));
+
         var jwtToken = new JwtSecurityToken(
             _options.Issuer,
             _options.Audience,
-            claims,
+            allClaims,
+            notBefore: now,
             expires: accessTokenExpiry,
             signingCredentials: creds);
 
