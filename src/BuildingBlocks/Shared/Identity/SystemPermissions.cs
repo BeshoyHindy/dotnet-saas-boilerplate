@@ -20,8 +20,8 @@ public static class SystemPermissions
 
     /// <summary>
     /// Platform-scoped permissions held only by the SuperAdmin (root tenant Admin role).
-    /// Tagged <c>IsRoot=true</c>, which means <see cref="PermissionConstants.Admin"/> filters
-    /// them out for non-root tenants and <see cref="PermissionConstants.Root"/> picks them up
+    /// Tagged <c>IsRoot=true</c>, which means <see cref="IPermissionRegistry.Admin"/> filters
+    /// them out for non-root tenants and <see cref="IPermissionRegistry.Root"/> picks them up
     /// for the root tenant. Use these for cross-tenant operations: managing tenants, system-wide
     /// audits, and the platform impersonation pathway.
     /// </summary>
@@ -34,7 +34,9 @@ public static class SystemPermissions
 
     public static IReadOnlyList<AppPermission> All { get; } =
     [
-        new("View Hangfire",  ActionConstants.View, Hangfire.Resource,  IsBasic: true),
+        // Operator-only: the Hangfire dashboard exposes every tenant's jobs and lets the viewer
+        // requeue or delete them, so it belongs to the platform operator, not to tenant members.
+        new("View Hangfire",  ActionConstants.View, Hangfire.Resource,  IsRoot: true),
         new("View Dashboard", ActionConstants.View, Dashboard.Resource, IsBasic: true),
 
         // Platform · cross-tenant — SuperAdmin only.

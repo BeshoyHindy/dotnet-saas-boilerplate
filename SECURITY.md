@@ -32,4 +32,4 @@ Out of scope: third-party NuGet/npm packages (report upstream) and issues in dow
 
 ## Production hardening
 
-This kit ships with development-friendly defaults. Before deploying a fork, rotate JWT signing keys and seeded passwords, lock CORS, set strong Hangfire dashboard credentials, and persist DataProtection keys to a shared store for multi-instance hosting.
+This kit ships with development-friendly defaults. Before deploying a fork, rotate JWT signing keys and seeded passwords, lock CORS, keep the `Permissions.Hangfire.View` operator permission on the root tenant's Admin role only, and persist DataProtection keys to a shared store for multi-instance hosting.

@@ -23,6 +23,7 @@ public sealed class RolePermissionSyncer(
     IMultiTenantContextAccessor<AppTenantInfo> tenantAccessor,
     HybridCache cache,
     TimeProvider timeProvider,
+    IPermissionRegistry permissionRegistry,
     ILogger<RolePermissionSyncer> logger)
 {
     public async Task SyncAsync(CancellationToken cancellationToken)
@@ -30,12 +31,12 @@ public sealed class RolePermissionSyncer(
         var tenantId = tenantAccessor.MultiTenantContext.TenantInfo?.Id;
         bool isRoot = tenantId == MultitenancyConstants.Root.Id;
 
-        int basicAdded = await SyncRoleAsync(RoleConstants.Basic, PermissionConstants.Basic, cancellationToken).ConfigureAwait(false);
+        int basicAdded = await SyncRoleAsync(RoleConstants.Basic, permissionRegistry.Basic, cancellationToken).ConfigureAwait(false);
 
         // Admin gets all non-root permissions; the root tenant's Admin additionally gets Root permissions.
         var adminPermissions = isRoot
-            ? PermissionConstants.Admin.Concat(PermissionConstants.Root).Distinct().ToList()
-            : PermissionConstants.Admin.ToList();
+            ? permissionRegistry.Admin.Concat(permissionRegistry.Root).Distinct().ToList()
+            : permissionRegistry.Admin.ToList();
         int adminAdded = await SyncRoleAsync(RoleConstants.Admin, adminPermissions, cancellationToken).ConfigureAwait(false);
 
         // If we wrote anything, drop the per-user permission cache so already-logged-in

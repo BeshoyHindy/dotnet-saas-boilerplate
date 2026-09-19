@@ -1,3 +1,4 @@
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
 using Boilerplate.Modules.Identity.Contracts.v1.TwoFactor;
 using Mediator;
 using Microsoft.AspNetCore.Authorization;
@@ -18,6 +19,8 @@ public static class DisableTwoFactorEndpoint
             .WithSummary("Disable TOTP for the current user")
             .WithDescription("Turns off 2FA after confirming the current password. Also rotates the authenticator secret so a re-enroll starts fresh.")
             .RequireAuthorization()
+            // Self-service: acts on the caller's own account and re-confirms their password.
+            .RequireAuthenticatedOnly()
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized);

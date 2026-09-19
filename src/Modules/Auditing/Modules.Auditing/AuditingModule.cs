@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Constants;
 using Boilerplate.BuildingBlocks.Web.Modules;
 using Boilerplate.Modules.Auditing.Contracts;
 using Boilerplate.Modules.Auditing.Features.v1.GetAuditById;
@@ -30,7 +31,7 @@ public class AuditingModule : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        Boilerplate.BuildingBlocks.Shared.Constants.PermissionConstants.Register(
+        builder.Services.AddPermissions(
             Boilerplate.Modules.Auditing.Contracts.Authorization.AuditingPermissions.All);
 
         var httpOpts = builder.Configuration.GetSection("Auditing").Get<AuditHttpOptions>() ?? new AuditHttpOptions();

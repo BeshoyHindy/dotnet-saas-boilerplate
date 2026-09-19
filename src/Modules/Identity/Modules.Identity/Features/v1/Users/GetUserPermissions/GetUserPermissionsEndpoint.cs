@@ -1,4 +1,5 @@
 using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
 using Boilerplate.BuildingBlocks.Shared.Identity.Claims;
 using Boilerplate.Modules.Identity.Contracts.v1.Users.GetUserPermissions;
 using Mediator;
@@ -11,8 +12,8 @@ namespace Boilerplate.Modules.Identity.Features.v1.Users.GetUserPermissions;
 
 public static class GetUserPermissionsEndpoint
 {
-    // No RequirePermission on purpose: returns the *caller's* own permissions (the SPA needs them to render
-    // gated routes); gating behind Users.View would lock out non-user-managing roles. Fallback policy → 401.
+    // Authenticated-only on purpose: returns the *caller's* own permissions (the SPA needs them to render
+    // gated routes); gating behind Users.View would lock out non-user-managing roles.
     internal static RouteHandlerBuilder MapGetCurrentUserPermissionsEndpoint(this IEndpointRouteBuilder endpoints)
     {
         return endpoints.MapGet("/permissions", async (ClaimsPrincipal user, IMediator mediator, CancellationToken cancellationToken) =>
@@ -27,6 +28,7 @@ public static class GetUserPermissionsEndpoint
         .WithName("GetCurrentUserPermissions")
         .WithSummary("Get current user permissions")
         .WithDescription("Retrieve permissions for the authenticated user. Requires authentication only — every signed-in user can read their own grants.")
+        .RequireAuthenticatedOnly()
         .Produces<IEnumerable<string>>(StatusCodes.Status200OK)
         .Produces(StatusCodes.Status401Unauthorized);
     }

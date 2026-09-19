@@ -1,3 +1,5 @@
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.Modules.Files.Contracts.Authorization;
 using Boilerplate.Modules.Files.Contracts.v1.Queries;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
@@ -14,5 +16,9 @@ public static class GetFileMetadataEndpoint
                     Results.Ok(await mediator.Send(new GetFileMetadataQuery(id), cancellationToken)))
             .WithName("GetFileMetadata")
             .WithSummary("Get FileAsset metadata (plus a public URL if Visibility=Public)")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            // Files.Upload is the module's "may use Files at all" grant (same gate as the list
+            // endpoints); which individual asset the caller may see is decided per-file by
+            // IFileAccessPolicy inside the handler.
+            .RequirePermission(FilesPermissions.Upload);
 }

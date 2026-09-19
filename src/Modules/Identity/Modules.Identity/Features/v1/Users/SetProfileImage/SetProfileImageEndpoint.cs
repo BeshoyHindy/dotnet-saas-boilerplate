@@ -1,3 +1,4 @@
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
 using Boilerplate.Modules.Identity.Contracts.v1.Users.SetProfileImage;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
@@ -19,6 +20,8 @@ public static class SetProfileImageEndpoint
             .WithSummary("Set the authenticated user's avatar URL")
             .WithDescription("Persists a durable image URL on the current user's profile. Typically called after the Files module's presigned-upload flow returns a publicUrl. Pass a null/empty body to clear.")
             .RequireAuthorization()
+            // Self-service: sets the caller's own avatar URL.
+            .RequireAuthenticatedOnly()
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status400BadRequest);

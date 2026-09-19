@@ -11,7 +11,7 @@ namespace Integration.Tests.Tests.Roles;
 
 /// <summary>
 /// Regression coverage for the per-module permission registry. Each module owns its
-/// permissions in its Contracts project and registers them via <see cref="PermissionConstants.Register"/>
+/// permissions in its Contracts project and contributes them via <c>services.AddPermissions(...)</c>
 /// during <c>ConfigureServices</c>. These tests catch two classes of bug:
 ///   1. A new permission added to a module is not registered (registry drift).
 ///   2. The Admin role's claim seeding is not propagating new permissions to existing tenants.
@@ -20,16 +20,19 @@ namespace Integration.Tests.Tests.Roles;
 public sealed class PermissionRegistrationTests
 {
     private readonly AuthHelper _auth;
+    private readonly AppWebApplicationFactory _factory;
 
     public PermissionRegistrationTests(AppWebApplicationFactory factory)
     {
         _auth = new AuthHelper(factory);
+        _factory = factory;
     }
 
     [Fact]
     public void Registry_Should_Contain_All_Module_Permissions()
     {
-        var registered = PermissionConstants.All.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+        var registry = _factory.Services.GetRequiredService<IPermissionRegistry>();
+        var registered = registry.All.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
 
         // Each module's static `All` list is the single source of truth.
         AssertAllRegistered(registered, IdentityPermissions.All.Select(p => p.Name), nameof(IdentityPermissions));
@@ -89,8 +92,8 @@ public sealed class PermissionRegistrationTests
     {
         var missing = expected.Where(name => !registered.Contains(name)).ToList();
         missing.ShouldBeEmpty(
-            $"{moduleName}: {missing.Count} permission(s) not in PermissionConstants registry — " +
+            $"{moduleName}: {missing.Count} permission(s) not in the host's IPermissionRegistry — " +
             $"missing: [{string.Join(", ", missing)}]. " +
-            $"Make sure the module's ConfigureServices calls PermissionConstants.Register({moduleName}.All).");
+            $"Make sure the module's ConfigureServices calls services.AddPermissions({moduleName}.All).");
     }
 }

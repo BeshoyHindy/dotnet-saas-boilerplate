@@ -1,3 +1,4 @@
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
 using Boilerplate.Modules.Identity.Contracts.v1.TwoFactor;
 using Mediator;
 using Microsoft.AspNetCore.Authorization;
@@ -18,6 +19,8 @@ public static class VerifyEnrollTwoFactorEndpoint
             .WithSummary("Confirm TOTP enrollment")
             .WithDescription("Verifies the 6-digit code from the authenticator app. On success, 2FA is enabled and subsequent logins must include a code.")
             .RequireAuthorization()
+            // Self-service: confirms the caller's own enrollment.
+            .RequireAuthenticatedOnly()
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status401Unauthorized);

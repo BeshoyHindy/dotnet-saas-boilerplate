@@ -1,3 +1,5 @@
+using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.Modules.Files.Contracts.Authorization;
 using Boilerplate.Modules.Files.Contracts.v1.Commands;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
@@ -14,5 +16,7 @@ public static class FinalizeUploadEndpoint
                     Results.Ok(await mediator.Send(new FinalizeUploadCommand(id), cancellationToken)))
             .WithName("FinalizeFileUpload")
             .WithSummary("Finalize a file upload after the browser PUT completes")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            // Second half of the presigned-upload flow — same grant as /upload-url.
+            .RequirePermission(FilesPermissions.Upload);
 }

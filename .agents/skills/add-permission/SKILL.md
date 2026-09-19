@@ -26,7 +26,7 @@ public static class {X}Permissions
 }
 ```
 
-The module already calls `PermissionConstants.Register({X}Permissions.All)` in `ConfigureServices`, so a new entry in `All` is picked up automatically.
+The module already calls `services.AddPermissions({X}Permissions.All)` in `ConfigureServices`, so a new entry in `All` is picked up automatically. The registry (`IPermissionRegistry`) is built once from those contributions when the container is built — there is no way to add a permission after startup.
 
 ## Step 2 — Gate the endpoint
 

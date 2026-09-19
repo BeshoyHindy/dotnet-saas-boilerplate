@@ -45,9 +45,11 @@ public sealed class PermissionCatalogTests
         catalog.ShouldNotBeNull();
 
         // Root tenant sees Admin ∪ Root — the same union RolePermissionSyncer applies,
-        // so any divergence means editor and syncer disagree on what's grantable.
-        var expected = PermissionConstants.Admin
-            .Concat(PermissionConstants.Root)
+        // so any divergence means editor and syncer disagree on what's grantable. Read from the
+        // host's own registry, which is the singleton the endpoint answers from.
+        var registry = _factory.Services.GetRequiredService<IPermissionRegistry>();
+        var expected = registry.Admin
+            .Concat(registry.Root)
             .DistinctBy(p => p.Name)
             .Select(p => p.Name)
             .ToHashSet(StringComparer.Ordinal);

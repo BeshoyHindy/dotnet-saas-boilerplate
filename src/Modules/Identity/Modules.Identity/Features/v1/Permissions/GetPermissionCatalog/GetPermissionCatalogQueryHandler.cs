@@ -8,7 +8,8 @@ using Mediator;
 namespace Boilerplate.Modules.Identity.Features.v1.Permissions.GetPermissionCatalog;
 
 public sealed class GetPermissionCatalogQueryHandler(
-    IMultiTenantContextAccessor<AppTenantInfo> tenantAccessor)
+    IMultiTenantContextAccessor<AppTenantInfo> tenantAccessor,
+    IPermissionRegistry permissionRegistry)
     : IQueryHandler<GetPermissionCatalogQuery, IReadOnlyList<PermissionCatalogEntryDto>>
 {
     public ValueTask<IReadOnlyList<PermissionCatalogEntryDto>> Handle(
@@ -22,8 +23,8 @@ public sealed class GetPermissionCatalogQueryHandler(
         // Matches the same root-vs-admin rule used by RolePermissionSyncer so the catalog the
         // SPA edits agrees with the set the syncer would push into a tenant's role claims.
         var source = isRoot
-            ? PermissionConstants.Admin.Concat(PermissionConstants.Root).DistinctBy(p => p.Name)
-            : PermissionConstants.Admin;
+            ? permissionRegistry.Admin.Concat(permissionRegistry.Root).DistinctBy(p => p.Name)
+            : permissionRegistry.Admin;
 
         IReadOnlyList<PermissionCatalogEntryDto> result =
         [

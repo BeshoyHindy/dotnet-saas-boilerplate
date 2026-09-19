@@ -18,6 +18,7 @@ internal sealed class IdentityDbInitializer(
     TimeProvider timeProvider,
     IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor,
     ITenantInitialPasswordBuffer passwordBuffer,
+    IPermissionRegistry permissionRegistry,
     IConfiguration configuration) : IDbInitializer
 {
     public async Task MigrateAsync(CancellationToken cancellationToken)
@@ -54,15 +55,15 @@ internal sealed class IdentityDbInitializer(
             // Assign permissions
             if (roleName == RoleConstants.Basic)
             {
-                await AssignPermissionsToRoleAsync(context, PermissionConstants.Basic, role, cancellationToken);
+                await AssignPermissionsToRoleAsync(context, permissionRegistry.Basic, role, cancellationToken);
             }
             else if (roleName == RoleConstants.Admin)
             {
-                await AssignPermissionsToRoleAsync(context, PermissionConstants.Admin, role, cancellationToken);
+                await AssignPermissionsToRoleAsync(context, permissionRegistry.Admin, role, cancellationToken);
 
                 if (multiTenantContextAccessor.MultiTenantContext.TenantInfo?.Id == MultitenancyConstants.Root.Id)
                 {
-                    await AssignPermissionsToRoleAsync(context, PermissionConstants.Root, role, cancellationToken);
+                    await AssignPermissionsToRoleAsync(context, permissionRegistry.Root, role, cancellationToken);
                 }
             }
         }

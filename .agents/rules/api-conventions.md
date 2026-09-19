@@ -15,7 +15,7 @@ public static class RegisterUserEndpoint
                 mediator.Send(command, cancellationToken))
             .WithName("RegisterUser")
             .WithSummary("Register user")
-            .RequirePermission(IdentityPermissionConstants.Users.Create);
+            .RequirePermission(IdentityPermissions.Users.Create);
 }
 ```
 
@@ -51,7 +51,15 @@ Don't catch broadly to swallow. Background loops may `catch (Exception)` to stay
 
 ## Permissions
 
-Constants in `Shared/Identity/*Permissions.cs` (e.g. `IdentityPermissionConstants`). Apply with `.RequirePermission(...)` on the endpoint. `RequiredPermissionAttribute` implements `IRequiredPermissionMetadata` — never let a duplicate of that interface appear; it silently disables **all** `.RequirePermission()` gates.
+Constants in `Shared/Identity/*Permissions.cs` (e.g. `IdentityPermissions`). Apply with `.RequirePermission(...)` on the endpoint. `RequiredPermissionAttribute` implements `IRequiredPermissionMetadata` — never let a duplicate of that interface appear; it silently disables **all** `.RequirePermission()` gates.
+
+**Every endpoint must declare exactly one intent**, and the permission policy fails closed — an endpoint declaring none is denied for everyone:
+
+- `.RequirePermission(a, b, …)` — **all-of**: the caller must hold *every* listed permission.
+- `.RequireAuthenticatedOnly()` — self-service routes scoped to the caller (own profile, own password, own 2FA).
+- `.AllowAnonymous()` — genuinely public (token issue/refresh, health, OpenAPI).
+
+`EndpointAuthorizationIntentTests` (Integration.Tests) reads the running host's `EndpointDataSource` and fails the build on an endpoint that declares nothing or more than one.
 
 ## Specifications
 
