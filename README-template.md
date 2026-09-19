@@ -39,8 +39,7 @@ dotnet run --project src/Host/Boilerplate.Api      # needs external Postgres + R
 ### Frontend only (against a running API)
 
 ```bash
-cd clients/admin     && npm install && npm run dev   # → http://localhost:5173
-cd clients/dashboard && npm install && npm run dev   # → http://localhost:5174
+cd clients/console && pnpm install && pnpm dev      # → http://localhost:5173
 ```
 
 The React apps read their API URL at runtime from `public/config.json` — no rebuild to repoint.

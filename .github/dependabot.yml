@@ -31,14 +31,14 @@ updates:
         patterns: ['*']
 
   # ── Node ────────────────────────────────────────────────────────────
-  # Three independent lockfiles: pnpm at the root (the sandcastle orchestrator
-  # only — the clients are deliberately not workspace packages) and one npm
-  # lockfile per React client. One PR covers all three.
+  # Two independent pnpm lockfiles: the repo root (the sandcastle orchestrator)
+  # and clients/console, which is deliberately NOT a workspace package — its
+  # container image is built from that directory as the Docker context, so its
+  # manifest and lockfile have to live beside it. One PR covers both.
   - package-ecosystem: npm
     directories:
       - '/'
-      - '/clients/admin'
-      - '/clients/dashboard'
+      - '/clients/console'
     target-branch: develop
     schedule:
       interval: monthly
@@ -70,14 +70,13 @@ updates:
         patterns: ['*']
 
   # ── Container base images ───────────────────────────────────────────
-  # The .NET hosts (src/Host/Dockerfile, both targets) and each client's nginx
+  # The .NET hosts (src/Host/Dockerfile, both targets) and the console's nginx
   # image. A bump here runs the migrator smoke and nothing else — backend.yml's
   # `docker` path filter keeps the .NET suites out of it.
   - package-ecosystem: docker
     directories:
       - '/src/Host'
-      - '/clients/admin'
-      - '/clients/dashboard'
+      - '/clients/console'
     target-branch: develop
     schedule:
       interval: monthly

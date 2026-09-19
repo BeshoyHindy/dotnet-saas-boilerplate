@@ -15,7 +15,7 @@ public static class MarkNotificationReadEndpoint
                 async (Guid id, IMediator mediator, CancellationToken cancellationToken) =>
                 {
                     await mediator.Send(new MarkNotificationReadCommand(id), cancellationToken);
-                    return Results.NoContent();
+                    return TypedResults.NoContent();
                 })
             .WithName("MarkNotificationRead")
             .WithSummary("Mark a single notification as read")

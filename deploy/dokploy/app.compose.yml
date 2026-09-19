@@ -138,8 +138,9 @@ services:
       - "traefik.http.services.${STACK_NAME}-api.loadbalancer.healthcheck.hostname=${API_DOMAIN}"
 
   # ── Console (React SPA served by nginx) ─────────────────────────────
-  # Configured at container start: the entrypoint renders /config.json from
-  # these variables, so one image serves every environment.
+  # Configured at container start: the entrypoint renders /config.json, the nginx
+  # site and the Content-Security-Policy from these variables, so one image serves
+  # every environment (ADR-0004).
   console:
     image: ${IMAGE_REGISTRY}/${IMAGE_OWNER}/boilerplate-console:${IMAGE_TAG}
     pull_policy: always
@@ -148,11 +149,19 @@ services:
       api:
         condition: service_started
     environment:
+      # The origin nginx proxies /api and /health to — a server-side address, not a
+      # browser one. The browser only ever talks to CONSOLE_DOMAIN, which is what lets
+      # the SameSite=Strict refresh cookie work with CORS credentials off (ADR-0002).
+      # It goes back out through Traefik so the Host header stays API_DOMAIN, which is
+      # what ALLOWED_HOSTS names.
       APP_API_URL: https://${API_DOMAIN}
-      APP_DASHBOARD_URL: https://${CONSOLE_DOMAIN}
+      # Named in the console's Content-Security-Policy: the browser fetches presigned
+      # upload/download URLs straight from object storage.
+      APP_STORAGE_URL: https://${STORAGE_DOMAIN}
       APP_DEFAULT_TENANT: ${APP_DEFAULT_TENANT}
+    # 8080: the console image runs nginx unprivileged, so it cannot bind :80.
     expose:
-      - "80"
+      - "8080"
     networks:
       dokploy-network:
         aliases:
@@ -170,7 +179,7 @@ services:
       - "traefik.http.routers.${STACK_NAME}-console.service=${STACK_NAME}-console"
       - "traefik.http.middlewares.${STACK_NAME}-console-https.redirectscheme.scheme=https"
       - "traefik.http.middlewares.${STACK_NAME}-console-https.redirectscheme.permanent=true"
-      - "traefik.http.services.${STACK_NAME}-console.loadbalancer.server.port=80"
+      - "traefik.http.services.${STACK_NAME}-console.loadbalancer.server.port=8080"
       - "traefik.http.services.${STACK_NAME}-console.loadbalancer.passhostheader=true"
       # /config.json only exists once the entrypoint has rendered it, so it is a
       # real readiness signal for this image rather than a liveness one.

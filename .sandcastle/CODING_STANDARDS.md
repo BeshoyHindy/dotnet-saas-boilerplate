@@ -66,7 +66,7 @@ Host (composition root)  →  Modules.{Name} (runtime)  →  Modules.{Name}.Cont
 | Unit tests | `.agents/rules/testing.md` |
 | Container-backed tests | `.agents/rules/integration-testing.md` |
 | A specific module's quirks | `.agents/rules/modules/{module}.md` |
-| React apps | `.agents/rules/frontend/shared.md` + the app-specific file |
+| The console | `.agents/rules/frontend/console.md` |
 
 Architectural decisions that are settled — and the reasoning you should not re-litigate — are in
 `docs/adr/`.

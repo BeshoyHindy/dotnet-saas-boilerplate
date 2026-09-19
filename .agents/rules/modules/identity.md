@@ -30,7 +30,7 @@ These are the model for background loops: stay alive, log with context, never sw
 
 ## Tokens / sessions
 
-Login `POST /api/v1/tenants/{tenant}/auth/token` (header `X-Client-App` enforces the operator/tenant app boundary). Refresh `POST /api/v1/tenants/{tenant}/auth/refresh` cross-checks subject. Both live in the anonymous auth group alongside forgot-password, reset-password, confirm-email and register — the only endpoints that take the tenant from the route (ADR-0002). Admin can't demote/deactivate the last admin or the root-tenant seed admin (guards in `UserRoleService`/`UserStatusService`).
+Login `POST /api/v1/tenants/{tenant}/auth/token` (no client-app header: the operator/tenant app boundary it enforced died with the second client — ADR-0004). Refresh `POST /api/v1/tenants/{tenant}/auth/refresh` cross-checks subject. Both live in the anonymous auth group alongside forgot-password, reset-password, confirm-email and register — the only endpoints that take the tenant from the route (ADR-0002). Admin can't demote/deactivate the last admin or the root-tenant seed admin (guards in `UserRoleService`/`UserStatusService`).
 
 **One session store, and it *is* the refresh token** (`UserSession`, one tenant-isolated row per device):
 

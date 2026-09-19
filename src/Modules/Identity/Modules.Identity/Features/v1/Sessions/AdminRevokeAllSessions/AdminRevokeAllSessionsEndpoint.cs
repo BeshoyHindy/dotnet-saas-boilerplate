@@ -1,4 +1,5 @@
 using Boilerplate.Modules.Identity.Contracts.Authorization;
+using Boilerplate.Modules.Identity.Contracts.DTOs;
 using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
 using Boilerplate.Modules.Identity.Contracts.v1.Sessions.AdminRevokeAllSessions;
 using Mediator;
@@ -15,13 +16,13 @@ public static class AdminRevokeAllSessionsEndpoint
         return endpoints.MapPost("/users/{userId:guid}/sessions/revoke-all", async (Guid userId, AdminRevokeAllSessionsCommand? command, IMediator mediator, CancellationToken cancellationToken) =>
         {
             var result = await mediator.Send(command ?? new AdminRevokeAllSessionsCommand(userId), cancellationToken);
-            return TypedResults.Ok(new { RevokedCount = result });
+            return TypedResults.Ok(new RevokeSessionsResponse(result));
         })
         .WithName("AdminRevokeAllSessions")
         .WithSummary("Revoke all user's sessions (Admin)")
         .RequirePermission(IdentityPermissions.Sessions.RevokeAll)
         .WithDescription("Revoke all sessions for a specific user. Requires admin permission.")
-        .Produces(StatusCodes.Status200OK)
+        .Produces<RevokeSessionsResponse>(StatusCodes.Status200OK)
         .Produces(StatusCodes.Status401Unauthorized)
         .Produces(StatusCodes.Status403Forbidden);
     }

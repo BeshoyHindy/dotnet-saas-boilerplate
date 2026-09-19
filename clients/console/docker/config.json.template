@@ -1,0 +1,4 @@
+{
+  "apiBase": "",
+  "defaultTenant": "${APP_DEFAULT_TENANT}"
+}

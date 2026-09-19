@@ -15,7 +15,7 @@ for local orchestration with .NET Aspire.
   Valkey), eventing (outbox/inbox), jobs (Hangfire), storage (S3/MinIO), mailing.
 - **Hosts**: `Boilerplate.Api` (composition root), `Boilerplate.DbMigrator` (one-shot migrate/seed —
   the API never migrates at startup), `Boilerplate.AppHost` (Aspire orchestrator).
-- **Clients**: `clients/admin` (operator console) and `clients/dashboard` (tenant app) — React 19 +
+- **Client**: `clients/console` — one React 19 app for tenant users and root operators (ADR-0004), +
   Vite + TypeScript, TanStack Query, React Router, Radix + Tailwind.
 - **Deploy**: one multi-target image definition (`src/Host/Dockerfile`, targets `api` and
   `migrator`), a root `docker-compose.yml` that runs those images locally, and Dokploy
@@ -81,8 +81,8 @@ HTTPS deployment.
 
 ```bash
 dotnet test src/Boilerplate.slnx          # unit + architecture + Testcontainers integration
-cd clients/admin     && npm run test:e2e  # Playwright
-cd clients/dashboard && npm run test:e2e  # Playwright
+cd clients/console && pnpm test           # Vitest units
+cd clients/console && pnpm test:e2e       # Playwright smoke suite
 ```
 
 ## Repository layout

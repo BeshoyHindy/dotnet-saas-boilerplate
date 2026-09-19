@@ -10,13 +10,13 @@ var appPrefix = builder.Environment.ApplicationName
     .ToLowerInvariant();
 #pragma warning restore CA1308
 
-// Postgres + pgAdmin sidecar (auto-discovers registered databases); persistent so volumes and saved state survive restarts.
+// Postgres; persistent so volumes and saved state survive restarts. No database-browser
+// sidecar: the stack is the application and its dependencies, and a pgAdmin (or
+// RedisInsight) container is a tool a developer installs, not something a template
+// should start — and pay for in RAM — on every run.
 var postgresServer = builder.AddPostgres("postgres")
     .WithDataVolume($"{appPrefix}-postgres-data")
-    .WithLifetime(ContainerLifetime.Persistent)
-    .WithPgAdmin(pa => pa
-        .WithHostPort(5050)
-        .WithLifetime(ContainerLifetime.Persistent));
+    .WithLifetime(ContainerLifetime.Persistent);
 
 var postgres = postgresServer.AddDatabase("boilerplate-db");
 
@@ -34,20 +34,10 @@ var redisEndpoint = redis.GetEndpoint("tcp");
 var redisConnectionString = ReferenceExpression.Create(
     $"{redisEndpoint.Property(EndpointProperty.HostAndPort)}");
 
-// RedisInsight cache browser (dev-only) sidecar; RI_REDIS_* pre-registers the Valkey connection via the container-network alias "redis".
-builder.AddContainer("redis-insight", "redis/redisinsight", "3.8.0")
-    .WithHttpEndpoint(port: 5540, targetPort: 5540, name: "http")
-    .WithEnvironment("RI_REDIS_HOST0", "redis")
-    .WithEnvironment("RI_REDIS_PORT0", "6379")
-    .WithEnvironment("RI_REDIS_ALIAS0", "boilerplate-cache")
-    .WithEnvironment("RI_ACCEPT_TERMS_AND_CONDITIONS", "true")
-    .WithLifetime(ContainerLifetime.Persistent)
-    .WaitFor(redis);
-
-// Object storage (MinIO, S3-compatible). CORS via MINIO_API_CORS_ALLOW_ORIGIN so browser presigned PUTs from the admin (:5173)/dashboard (:5174) dev origins work without proxying through the API.
+// Object storage (MinIO, S3-compatible). CORS via MINIO_API_CORS_ALLOW_ORIGIN so browser
+// presigned PUTs from the console's dev origin reach it without proxying through the API.
 const string MinioBucket = "boilerplate-uploads";
-const string AdminOrigin = "http://localhost:5173";
-const string DashboardOrigin = "http://localhost:5174";
+const string ConsoleOrigin = "http://localhost:5173";
 
 // Secrets are Aspire parameters, never literals in this file: the password is generated on first
 // run and persisted to this project's user-secrets, so it survives restarts without being committed.
@@ -66,7 +56,7 @@ var minio = builder.AddContainer("minio", "quay.io/minio/minio", "RELEASE.2025-0
     .WithHttpEndpoint(port: 9001, targetPort: 9001, name: "console")
     .WithEnvironment("MINIO_ROOT_USER", minioUser)
     .WithEnvironment("MINIO_ROOT_PASSWORD", minioPassword)
-    .WithEnvironment("MINIO_API_CORS_ALLOW_ORIGIN", $"{AdminOrigin},{DashboardOrigin}")
+    .WithEnvironment("MINIO_API_CORS_ALLOW_ORIGIN", ConsoleOrigin)
     .WithVolume($"{appPrefix}-minio-data", "/data")
     .WithLifetime(ContainerLifetime.Persistent);
 
@@ -163,24 +153,25 @@ var api = builder.AddProject<Projects.Boilerplate_Api>($"{appPrefix}-api")
     .WithEnvironment("Storage__S3__AccessKey", minioUser)
     .WithEnvironment("Storage__S3__SecretKey", minioPassword)
     .WithEnvironment("Storage__S3__ForcePathStyle", "true")
-    .WithEnvironment("Storage__S3__PublicBaseUrl", ReferenceExpression.Create($"{minioApiEndpoint}/{MinioBucket}"));
+    .WithEnvironment("Storage__S3__PublicBaseUrl", ReferenceExpression.Create($"{minioApiEndpoint}/{MinioBucket}"))
+//#if (frontend)
+    // Password-reset and email-confirmation links point at a client page, so the origin
+    // the API mails has to be the console's (issue #46), not the API's own.
+    .WithEnvironment("OriginOptions__OriginUrl", ConsoleOrigin)
+//#endif
+    ;
 
 //#if (frontend)
-// Admin console (React + Vite). Target the API's HTTPS endpoint directly — UseHttpsRedirection's 307 to https is cross-origin and strips the Authorization header.
-builder.AddJavaScriptApp($"{appPrefix}-admin", "../../../clients/admin", "dev")
-    .WithNpm()
+// The console (React + Vite): one client for tenant users and root operators alike
+// (ADR-0004). VITE_API_BASE_URL is the dev server's PROXY target, not the browser's API
+// base — the browser only ever talks to the console's own origin, which is what lets the
+// SameSite=Strict refresh cookie work with CORS credentials off. The HTTPS endpoint is the
+// target because UseHttpsRedirection's 307 would otherwise strip the Authorization header.
+builder.AddJavaScriptApp($"{appPrefix}-console", "../../../clients/console", "dev")
+    .WithPnpm()
     .WithReference(api)
     .WaitFor(api)
     .WithHttpEndpoint(port: 5173, targetPort: 5173, isProxied: false)
-    .WithExternalHttpEndpoints()
-    .WithEnvironment("VITE_API_BASE_URL", api.GetEndpoint("https"));
-
-// Tenant-facing dashboard (React + Vite)
-builder.AddJavaScriptApp($"{appPrefix}-dashboard", "../../../clients/dashboard", "dev")
-    .WithNpm()
-    .WithReference(api)
-    .WaitFor(api)
-    .WithHttpEndpoint(port: 5174, targetPort: 5174, isProxied: false)
     .WithExternalHttpEndpoints()
     .WithEnvironment("VITE_API_BASE_URL", api.GetEndpoint("https"));
 //#else

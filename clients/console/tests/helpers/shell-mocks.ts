@@ -1,0 +1,81 @@
+import type { Page } from "@playwright/test";
+import { mockJsonResponse } from "./api-mocks";
+
+/**
+ * A profile body that satisfies the topbar avatar + settings/profile read.
+ * Matches the runtime UserDto shape the console expects.
+ */
+export const DEFAULT_PROFILE = {
+  id: "u-test-1",
+  userName: "alice",
+  email: "alice@acme.com",
+  firstName: "Alice",
+  lastName: "Nguyen",
+  phoneNumber: "",
+  isActive: true,
+  emailConfirmed: true,
+  twoFactorEnabled: false,
+  imageUrl: null,
+} as const;
+
+/**
+ * Mock every API call the authenticated AppShell fires on load so any
+ * protected page can be visited in isolation without hanging on the
+ * topbar's notification badge.
+ *
+ * ORDERING: Playwright matches the MOST RECENTLY registered route first.
+ * We register broad globs first and the more-specific ones last. Callers
+ * register their page-specific mocks AFTER calling this, so those win over
+ * these defaults.
+ */
+export async function installShellMocks(page: Page): Promise<void> {
+  // Notifications — register the list glob first, then the more specific
+  // unread-count (so the count request resolves to a number, not []).
+  await mockJsonResponse(page, "**/api/v1/notifications**", []);
+  await mockJsonResponse(page, "**/api/v1/notifications/unread-count**", 0);
+
+  // Defensive: profile + permissions (harmless if a page re-reads them).
+  await mockJsonResponse(page, "**/api/v1/identity/profile", DEFAULT_PROFILE);
+  await mockJsonResponse(page, "**/api/v1/identity/permissions", []);
+
+  // Tenant status drives the global expiry/grace banner mounted in the
+  // AppShell. Default to a healthy, far-future tenant so the banner stays
+  // hidden; specs that exercise the banner override this after the call.
+  await mockJsonResponse(page, "**/api/v1/tenants/me/status**", {
+    id: "acme",
+    name: "Acme Corp",
+    isActive: true,
+    validUpto: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+    hasConnectionString: false,
+    adminEmail: "admin@acme.com",
+    issuer: null,
+    expiryState: "Active",
+    graceEndsUtc: new Date(Date.now() + 372 * 24 * 60 * 60 * 1000).toISOString(),
+  });
+}
+
+/**
+ * What a root operator holds. The tenant registry, the impersonation list and — root
+ * only — the cross-tenant token exchange behind "Enter tenant" (ADR-0002).
+ */
+export const OPERATOR_PERMISSIONS = [
+  "Permissions.Tenants.View",
+  "Permissions.Users.Impersonate",
+  "Permissions.Impersonation.View",
+  "Permissions.Platform.Users.Impersonate",
+] as const;
+
+/** Build a Playwright-shaped paged response body. */
+export function paged<T>(items: T[], overrides: Partial<{ pageNumber: number; pageSize: number; totalCount: number; totalPages: number }> = {}) {
+  const pageSize = overrides.pageSize ?? 20;
+  const totalCount = overrides.totalCount ?? items.length;
+  return {
+    items,
+    pageNumber: overrides.pageNumber ?? 1,
+    pageSize,
+    totalCount,
+    totalPages: overrides.totalPages ?? Math.max(1, Math.ceil(totalCount / pageSize)),
+    hasPrevious: (overrides.pageNumber ?? 1) > 1,
+    hasNext: (overrides.pageNumber ?? 1) < (overrides.totalPages ?? Math.max(1, Math.ceil(totalCount / pageSize))),
+  };
+}

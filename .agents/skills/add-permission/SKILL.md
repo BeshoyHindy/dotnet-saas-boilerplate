@@ -1,6 +1,6 @@
 ---
 name: add-permission
-description: Add a new permission end-to-end — server constant + endpoint gate, and (admin app) mirror it into the permissions catalog + route guard. Use when a new endpoint needs authorization. See modules/identity.md + frontend/admin.md.
+description: Add a new permission end-to-end — server constant + endpoint gate, and gate the console's route and nav entry on it. Use when a new endpoint needs authorization. See modules/identity.md + frontend/console.md.
 argument-hint: "[ModuleName] [Resource] [Action]"
 ---
 
@@ -38,7 +38,7 @@ The module already calls `services.AddPermissions({X}Permissions.All)` in `Confi
 
 ## Step 3 — (admin only) mirror it
 
-`clients/admin/src/lib/permissions.ts` — add the matching string to the frozen tree (no runtime catalog endpoint exists; mirror by hand):
+`clients/console/src/lib/permissions.ts` — only if a *route* has to gate on it. The role editor reads the server's catalog endpoint, so there is nothing else to mirror:
 
 ```ts
 export const {Module}Permissions = Object.freeze({
@@ -57,7 +57,7 @@ If it should appear in the Role editor UI, add a `PERMISSION_CATALOG` entry (`{ 
 
 ## Step 5 — (admin only) seed it in tests
 
-So `RouteGuard` passes on first paint, add the new permission to the test seed set (`ADMIN_PERMS` in `clients/admin/tests/helpers/shell-mocks.ts`, used by `seedAuthedSession`).
+So `RouteGuard` passes on first paint, a spec that visits the gated route must mock `GET /api/v1/identity/permissions` with the grant (see `clients/console/tests/operator/enter-tenant.spec.ts`).
 
 ## Dashboard
 

@@ -43,4 +43,4 @@ If Docker is down, integration tests fail fast with `DockerUnavailableException`
 
 ## Frontend tests
 
-Playwright, route-mocked (no real backend) — see `frontend/shared.md`. `cd clients/{app} && npm run test:e2e`.
+Vitest units (`cd clients/console && pnpm test`) plus a small route-mocked Playwright smoke suite (`pnpm test:e2e`) — see `frontend/console.md`.

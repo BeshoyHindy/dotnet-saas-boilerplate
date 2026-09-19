@@ -197,24 +197,28 @@ services:
     # shell or curl to run one with. Probe from the host instead:
     #   curl -fsS http://localhost:8080/health/ready
 
-  # React console served by nginx. Built from clients/admin — see README; issue
-  # #14 merges the two upstream apps into clients/console, at which point only
-  # the `context:` below changes.
+  # The React console, served by nginx (ADR-0004). It proxies /api and /health to
+  # the API on the compose network, so the browser only ever talks to one origin —
+  # which is what lets the SameSite=Strict refresh cookie work without CORS
+  # credentials. APP_API_URL is therefore an INTERNAL address, not a browser one;
+  # `api` is in the API's AllowedHosts list because nginx forwards that Host.
   console:
     build:
-      context: clients/admin
+      context: clients/console
     image: boilerplate/console:local
     restart: unless-stopped
     depends_on:
       api: { condition: service_started }
     environment:
-      APP_API_URL: ${APP_API_URL:-http://localhost:8080}
-      # Still required by the console entrypoint until #14 lands; it points at
-      # the console's own origin because there is only one client app.
-      APP_DASHBOARD_URL: ${APP_CONSOLE_URL:-http://localhost:8081}
+      APP_API_URL: http://api:8080
+      # The browser fetches presigned URLs straight from MinIO, so the console's
+      # Content-Security-Policy has to name that origin.
+      APP_STORAGE_URL: http://localhost:${MINIO_API_PORT:-9000}
       APP_DEFAULT_TENANT: ${APP_DEFAULT_TENANT:-root}
+    # 8080 in the container: the console image runs nginx as an unprivileged user,
+    # which cannot bind a privileged port.
     ports:
-      - "${APP_CONSOLE_PORT:-8081}:80"
+      - "${APP_CONSOLE_PORT:-8081}:8080"
 
 volumes:
   pg_data:

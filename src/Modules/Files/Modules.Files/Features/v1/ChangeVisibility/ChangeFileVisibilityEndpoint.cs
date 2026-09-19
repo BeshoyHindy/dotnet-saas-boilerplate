@@ -16,7 +16,7 @@ public static class ChangeFileVisibilityEndpoint
                 async (Guid id, ChangeVisibilityRequest body, IMediator mediator, CancellationToken cancellationToken) =>
                 {
                     var dto = await mediator.Send(new ChangeFileVisibilityCommand(id, body.Visibility), cancellationToken);
-                    return Results.Ok(dto);
+                    return TypedResults.Ok(dto);
                 })
             .WithName("ChangeFileVisibility")
             .WithSummary("Flip a file's visibility (Public ↔ Private)")

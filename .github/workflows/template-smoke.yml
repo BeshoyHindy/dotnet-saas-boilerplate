@@ -75,13 +75,12 @@ jobs:
       - name: Build backend (warnings as errors)
         run: dotnet build "$RUNNER_TEMP/smoke/src/SmokeApp.slnx" -c Release -warnaserror
 
-      - name: Build admin app
-        working-directory: ${{ runner.temp }}/smoke/clients/admin
-        run: npm ci && npm run build
-
-      - name: Build dashboard app
-        working-directory: ${{ runner.temp }}/smoke/clients/dashboard
-        run: npm ci && npm run build
+      - name: Build the console
+        working-directory: ${{ runner.temp }}/smoke/clients/console
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm build
 
       - name: Run Architecture tests on scaffolded output
         run: dotnet test "$RUNNER_TEMP/smoke/src/Tests/Architecture.Tests" -c Release --no-build
