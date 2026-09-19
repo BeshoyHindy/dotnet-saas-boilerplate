@@ -85,17 +85,17 @@ connection strings, S3 and SMTP credentials, the seeded admin password — comes
 parameters, environment variables or that same store, never from `appsettings*.json`.
 
 The Aspire dashboard is at <https://localhost:15888>; the API and its Scalar reference at
-<https://localhost:7030/scalar>; the console at <http://localhost:5173>; the Mailpit inbox at
-<http://localhost:8025>. Aspire starts PostgreSQL, Valkey, MinIO and Mailpit, runs the migrator to
-completion, then the API, then the console.
+<https://localhost:7030/scalar>; the console at <http://localhost:5173>. MinIO and Mailpit get host
+ports allocated by Aspire — open them from the dashboard's resource list rather than a remembered
+port. Aspire starts PostgreSQL, Valkey, MinIO and Mailpit, runs the migrator to completion, then the
+API, then the console.
 
-**Only one AppHost instance at a time.** MinIO binds fixed host ports 9000 and 9001, and its
-container is persistent — so a second checkout or worktree that has run the AppHost leaves
-containers holding those ports. The new `minio` container then comes up attached to no network,
-`minio-init` loops printing `waiting for minio...`, and since the API waits for that init to
-complete, neither the API nor the console ever starts. `docker ps` shows two `minio-*` containers;
-`docker logs <minio-init>` shows the loop. Remove the other instance's persistent containers
-(`minio`, `minio-init`, `postgres`, `redis`) and run again.
+**Container host ports are not pinned**, so a second checkout or worktree can run its own AppHost
+while yours is up: MinIO and Mailpit take whatever host port is free. (The API's `7030`/`5030`, the
+dashboard's `15888` and the client's `5173` *are* fixed — they are part of the documented
+developer contract, and unlike a container they fail loudly and immediately when taken.) If you see
+`minio-init` looping on `waiting for minio...`, you are on an older revision where 9000/9001 were
+pinned; the fix is in `AppHost.cs`.
 
 Separately: the initial migrations were regenerated while this template was built, so a database
 migrated before that is incompatible and needs a fresh volume —
