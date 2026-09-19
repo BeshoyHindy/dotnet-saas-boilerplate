@@ -48,6 +48,11 @@ updates:
     groups:
       npm:
         patterns: ['*']
+    # typescript-eslint throws on TypeScript 7 (peer range <6.1.0), so lint cannot
+    # run on it. Drop this once typescript-eslint supports TS 7.
+    ignore:
+      - dependency-name: typescript
+        versions: ['>=7.0.0']
 
   # ── GitHub Actions ──────────────────────────────────────────────────
   # The workflows pin major tags; this keeps those majors from going stale and
