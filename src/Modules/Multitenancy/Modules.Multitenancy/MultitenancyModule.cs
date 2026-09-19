@@ -5,6 +5,7 @@ using Finbuckle.MultiTenant.AspNetCore.Extensions;
 using Finbuckle.MultiTenant.EntityFrameworkCore.Stores;
 using Finbuckle.MultiTenant.Extensions;
 using Finbuckle.MultiTenant.Stores;
+using Boilerplate.BuildingBlocks.Caching;
 using Boilerplate.BuildingBlocks.Core.Exceptions;
 using Boilerplate.BuildingBlocks.Eventing.Abstractions;
 using Boilerplate.BuildingBlocks.Persistence;
@@ -81,6 +82,12 @@ public sealed class MultitenancyModule : IModule
         // event dispatch establishes the tenant before tenant-filtered handler DbContexts are built.
         builder.Services.Replace(
             ServiceDescriptor.Singleton<IEventTenantScope, FinbuckleEventTenantScope>());
+
+        // Same seam for the cache: the Caching block prefixes every key and tag with the ambient
+        // tenant (ADR-0002) and asks this module who that is. Replace, so composing multitenancy
+        // always wins over a host that also passed AddHeroCaching(..., singleTenant: true).
+        builder.Services.Replace(
+            ServiceDescriptor.Singleton<ICacheTenantAccessor, FinbuckleCacheTenantAccessor>());
 
         // Same idea one level up: the outbox dispatcher must visit every database that can hold
         // outbox rows. Without these, a tenant with a dedicated connection string writes rows the

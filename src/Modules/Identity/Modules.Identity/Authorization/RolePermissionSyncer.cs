@@ -41,6 +41,10 @@ public sealed class RolePermissionSyncer(
 
         // If we wrote anything, drop the per-user permission cache so already-logged-in
         // sessions see the new perms on their next request rather than waiting for TTL.
+        // The tag is scoped to the ambient tenant by the cache, so this evicts only the tenant whose
+        // claims we just changed. That is the right blast radius: the syncer is invoked once per
+        // tenant under ITenantScope.RunAsync (RolePermissionSyncHostedService), so every tenant that
+        // gained claims gets its own eviction, and a tenant that gained none keeps its warm entries.
         if (basicAdded + adminAdded > 0)
         {
             await cache.RemoveByTagAsync(CacheKeys.Tags.Permissions, cancellationToken).ConfigureAwait(false);

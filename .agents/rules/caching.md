@@ -2,38 +2,120 @@
 
 `src/BuildingBlocks/Caching/`. Read before adding cached reads or invalidation.
 
+## The rule
+
+**Cache keys are tenant-prefixed by the building block, not by caller convention** (ADR-0002).
+
+Injecting `HybridCache` gets you the tenant-scoped cache. It rewrites every key *and every tag* to
+`t:{ambientTenantId}:{name}` before touching the real cache, for all six overloads. You write logical
+names — `"theme"`, `"perm:u:{userId}"`, `"permissions"` — and never the tenant. Adding it yourself
+doubles the prefix and hands the caller a way to name somebody else's partition.
+
+No ambient tenant → **throw**, naming the key and the way out. Never a fallback tenant: a fallback is
+how every tenant-less caller quietly ends up sharing one bucket.
+
 ## What's registered
 
-`AddHeroCaching(config)` always registers **`HybridCache`** (L1 in-memory + optional L2 Redis). Inject `HybridCache`, not `IDistributedCache`.
+`AddHeroCaching(config)` registers **`HybridCache`** (L1 in-memory + optional L2 Redis) wrapped in
+two decorators: telemetry innermost (so OTel records the *physical* key you can look up in Redis),
+tenant scoping outermost.
 
-- `CachingOptions.Redis` empty → in-memory only (dev fallback). Set → a **single shared `ConnectionMultiplexer`** (singleton `IConnectionMultiplexer`) backs both the L2 cache and the DataProtection key ring.
+- `CachingOptions.Redis` empty → in-memory only (dev fallback). Set → a **single shared
+  `ConnectionMultiplexer`** (singleton `IConnectionMultiplexer`) backs both the L2 cache and the
+  DataProtection key ring.
 - Defaults: total expiration 1h, L1 (local) expiration 2min (`CachingOptions`).
-- `ObservableHybridCache` transparently decorates `HybridCache` to emit OpenTelemetry (hits/misses/factory-duration/invalidations). You don't reference it — just inject `HybridCache`.
+- The block learns the ambient tenant through **`ICacheTenantAccessor`**, which it declares and the
+  Multitenancy module implements (`FinbuckleCacheTenantAccessor`) — a building block may not
+  reference a module. Same seam as `IEventTenantScope` → `FinbuckleEventTenantScope`.
+- A host composed **without** multitenancy says so: `AddHeroCaching(config, singleTenant: true)`.
+  Without either, resolving the cache throws with both options spelled out. There is no default.
 
 ## Pattern
 
 ```csharp
 var perms = await cache.GetOrCreateAsync(
-    CacheKeys.UserPermissions(userId),
+    CacheKeys.UserPermissions(userId),     // logical — no tenant in it
     async ct => await LoadPermissionsAsync(userId, ct),
-    tags: [CacheKeys.Tags.Permissions, CacheKeys.Tags.User(userId)],
+    tags: [CacheKeys.Tags.Permissions],    // logical — scoped for you
     cancellationToken: ct);
 ```
 
-- **Keys & tags live in `CacheKeys.cs`** — add new keys/tags there, don't inline strings. Existing: `UserPermissions(userId)`, `TenantTheme(tenantId)`, `IdempotencyEntry(tenantId,key)`, `ImpersonationGrantStatus(jti)`; tags `Permissions`, `Themes`, `Idempotency`, `Tenant(id)`, `User(id)`.
+- **Keys & tags live in `CacheKeys.cs`**, tenant-free. Existing: `UserPermissions(userId)`,
+  `TenantTheme`, `DefaultTheme`, `IdempotencyEntry(key)`, `GlobalIdempotencyEntry(subject, key)`,
+  `ImpersonationGrantStatus(jti)`; tags `Permissions`, `Themes`, `Idempotency`, `User(id)`.
+  An architecture test rejects a `CacheKeys` member that takes a tenant, and rejects an inline key or
+  tag string at any call site outside the block.
 - Invalidate with `RemoveAsync(key)` or `RemoveByTagAsync(tag)` in the relevant mutation handler.
 - `GetOrCreateAsync` gives **stampede protection** for free (factory runs once per key).
 
-## Tenant scoping is the caller's job — for now
+## Tags are scoped too
 
-`HybridCache` does **not** prefix keys with the ambient tenant. Every key that holds tenant data carries the tenant because the `CacheKeys` helper puts it there (`TenantTheme(tenantId)`, `IdempotencyEntry(tenantId, key)`) or because the id in it is already tenant-unique (`UserPermissions(userId)`). That is isolation by convention, and convention is exactly what ADR-0002 set out to replace.
+`RemoveByTagAsync("permissions")` evicts `t:{you}:permissions` — your tenant's entries and nobody
+else's. That is deliberate: before this, one tenant's role change flushed every tenant's permission
+cache, which is a cheap cross-tenant DoS as well as a correctness problem. There is no wildcard that
+crosses the boundary.
 
-So, until the building block does it — tracked as its own ticket on the map, *Prefix cache keys with the tenant inside the Caching building block* (#77):
+Cross-tenant invalidation is *per tenant*, run under `ITenantScope.RunAsync` — which is how
+`RolePermissionSyncHostedService` already drives `RolePermissionSyncer`.
 
-- **Never invent a cache key that holds tenant data without the tenant in it.** Add it to `CacheKeys.cs` with the tenant id as a parameter, the way the existing ones do.
-- Genuinely global entries — `DefaultTheme`, `ImpersonationGrantStatus(jti)` (grants are `IGlobalEntity`) — are the exception, not the default. If you cannot say in one line why an entry is global, it is not.
+HybridCache treats the tag `"*"` as "flush everything", but scoping rewrites it like any other tag:
+`RemoveByTagAsync("*")` from a tenant becomes `RemoveByTagAsync("t:{id}:*")` (or `"g:*"` through
+`GlobalHybridCache`), which matches no physical tag anyone has ever set — so it evicts nothing at
+all, not even the caller's own entries. The isolation half of that is correct (tenant A's `"*"`
+cannot reach tenant B's or the global cache's entries) but it is not a flush-all: there is no wildcard
+that survives scoping, and no way through this block to flush one tenant's whole cache in a single
+call. Flushing a tenant is still invalidating its known tags one by one, under `ITenantScope.RunAsync`.
+
+## Genuinely global entries
+
+Inject **`GlobalHybridCache`**. Keys and tags land in the `g:` namespace, disjoint from every
+tenant's `t:{id}:`, and it works with no tenant at all. The constructor parameter is the point: a
+reviewer can see the claim "this belongs to no tenant" without reading the method.
+
+Use it when both are true: the data is not a tenant's, **and** the read can happen with no tenant
+established. Today that is the impersonation-grant revocation marker — read from the JwtBearer
+`OnTokenValidated` hook, which runs *before* tenant resolution, and backing an `IGlobalEntity` keyed
+by a globally unique `jti` — plus the idempotency filter's tenant-less branch.
+
+## Reaching another tenant's entries
+
+One mechanism: **`ITenantScope.RunAsync(tenantId, …)`**. Enter the tenant, then use the cache
+normally. There is deliberately no `ForTenant(id)` API on the block — that is the "pass someone
+else's id" shape ADR-0002 removes.
+
+`TenantThemeService` still takes a `tenantId` argument (it is on a module contract) but now checks it
+against the ambient tenant and throws if they differ, so the argument cannot silently file an entry
+under the wrong tenant.
+
+## The physical key, for the one caller that needs it
+
+`CacheKeyScope` is the single source of truth for the physical layout: `TenantKey(logical)`,
+`TenantTag(logical)`, the static `GlobalKey`/`GlobalTag`, plus `HasTenant`/`AmbientTenantId` for
+deciding between the two caches. Ask it — don't rebuild the format.
+
+`IdempotencyEndpointFilter` is the only caller: HybridCache has no get-only probe
+(dotnet/aspnetcore#57191), so it reads L2 by key and must name the physical one. An architecture test
+keeps `IDistributedCache` to a stale-failing allow-list (that probe, and the Redis health check).
 
 ## Gotchas
 
-- **No L1 backplane.** `RemoveByTagAsync` on one node does **not** evict L1 on peer nodes — cross-node staleness is bounded only by the 2-min local expiration. Don't rely on instant cross-node invalidation; keep local expiration short for hot, mutable data.
-- Don't reach for `IDistributedCache` directly except where the framework already does so deliberately (idempotency probe-read) — prefer `HybridCache`.
+- **No L1 backplane.** `RemoveByTagAsync` on one node does **not** evict L1 on peer nodes —
+  cross-node staleness is bounded only by the 2-min local expiration. Don't rely on instant
+  cross-node invalidation; keep local expiration short for hot, mutable data.
+- **HybridCache ignores `MemoryDistributedCache` as an L2** (it would only duplicate L1). So with no
+  Redis configured — including the integration test host — nothing reaches L2 at all, and anything
+  that reads L2 directly sees nothing.
+- **HybridCache does not write bare JSON to L2.** It writes a framed payload (version byte, expiry,
+  key, tags, then the value). Anything reading those bytes directly has to account for that — the
+  idempotency filter's direct `IDistributedCache` probe does not, so replay currently fails against a
+  real Redis L2 (see below).
+- Don't reach for `IDistributedCache` directly — it skips the tenant prefix, the telemetry and the
+  tag bookkeeping. The allow-list above is the whole set of exceptions.
+
+## Related, tracked separately
+
+Storage paths are not yet tenant-prefixed by the building block — that is #78.
+
+*Make idempotent replay work against a real distributed cache* — the idempotency probe reads L2 by
+key through `IDistributedCache`, which returns HybridCache's framed payload rather than the bare
+JSON the filter expects, so replay against a real Redis L2 currently fails. Not fixed here.

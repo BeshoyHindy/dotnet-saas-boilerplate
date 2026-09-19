@@ -16,7 +16,7 @@ public sealed class HybridCacheBehaviorTests
     {
         var services = new ServiceCollection();
         var config = new ConfigurationBuilder().Build();
-        services.AddHeroCaching(config);
+        services.AddHeroCaching(config, singleTenant: true);
         return services.BuildServiceProvider().GetRequiredService<HybridCache>();
     }
 

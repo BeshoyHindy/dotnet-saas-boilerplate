@@ -21,7 +21,7 @@ public sealed class HeroCachingRegistrationTests
         var config = new ConfigurationBuilder().Build(); // empty — no Redis
 
         // Act
-        services.AddHeroCaching(config);
+        services.AddHeroCaching(config, singleTenant: true);
         using var provider = services.BuildServiceProvider();
 
         // Assert
@@ -46,7 +46,7 @@ public sealed class HeroCachingRegistrationTests
         services.AddSingleton<IConfiguration>(config);
 
         // Act
-        services.AddHeroCaching(config);
+        services.AddHeroCaching(config, singleTenant: true);
         using var provider = services.BuildServiceProvider();
 
         // Assert

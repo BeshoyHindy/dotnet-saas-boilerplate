@@ -24,9 +24,12 @@ public sealed class TenantThemeService : ITenantThemeService
         LocalCacheExpiration = TimeSpan.FromMinutes(2),
     };
 
-    private static readonly string[] DefaultThemeTags = [CacheKeys.Tags.Themes];
+    // One shared array for every theme entry. It used to be allocated per call because it carried a
+    // per-tenant tag; the cache now scopes tags to the ambient tenant itself, so the tag is a constant.
+    private static readonly string[] ThemeTags = [CacheKeys.Tags.Themes];
 
     private readonly HybridCache _cache;
+    private readonly GlobalHybridCache _globalCache;
     private readonly TenantDbContext _dbContext;
     private readonly IMultiTenantContextAccessor<AppTenantInfo> _tenantAccessor;
     private readonly IStorageService _storageService;
@@ -35,6 +38,7 @@ public sealed class TenantThemeService : ITenantThemeService
 
     public TenantThemeService(
         HybridCache cache,
+        GlobalHybridCache globalCache,
         TenantDbContext dbContext,
         IMultiTenantContextAccessor<AppTenantInfo> tenantAccessor,
         IStorageService storageService,
@@ -42,6 +46,7 @@ public sealed class TenantThemeService : ITenantThemeService
         ICurrentUser currentUser)
     {
         _cache = cache;
+        _globalCache = globalCache;
         _dbContext = dbContext;
         _tenantAccessor = tenantAccessor;
         _storageService = storageService;
@@ -59,31 +64,51 @@ public sealed class TenantThemeService : ITenantThemeService
     public Task<TenantThemeDto> GetThemeAsync(string tenantId, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
-
-        // Per-tenant tag array — one small alloc per call is unavoidable because the tag is
-        // parameterized by tenantId. Keeping the array allocation local (not LOH) and short-lived.
-        var tags = new[] { CacheKeys.Tags.Themes, CacheKeys.Tags.Tenant(tenantId) };
+        EnsureAmbient(tenantId);
 
         // Stateless factory via a static method group — no closure allocation even on L1 hits.
         var state = new TenantFactoryState(_dbContext, tenantId);
         return _cache.GetOrCreateAsync(
-            CacheKeys.TenantTheme(tenantId),
+            CacheKeys.TenantTheme,
             state,
             LoadTenantThemeAsync,
             ThemeEntryOptions,
-            tags,
+            ThemeTags,
             ct).AsTask();
     }
 
     public Task<TenantThemeDto> GetDefaultThemeAsync(CancellationToken ct = default)
     {
-        return _cache.GetOrCreateAsync(
+        // The default-theme row is a single, platform-wide record in the unfiltered tenant-catalog
+        // context — not a per-tenant query — so it goes through GlobalHybridCache. Caching it under
+        // the ambient tenant would file one shared answer under every tenant's own partition, and
+        // invalidating it (SetAsDefaultThemeAsync) would only ever clear the caller's copy.
+        return _globalCache.GetOrCreateAsync(
             CacheKeys.DefaultTheme,
             _dbContext,
             LoadDefaultThemeAsync,
             ThemeEntryOptions,
-            DefaultThemeTags,
+            ThemeTags,
             ct).AsTask();
+    }
+
+    /// <summary>
+    /// Every method here takes the tenant it operates on, and every caller passes the ambient one —
+    /// the theme rows are behind the tenant query filter, so another tenant's row is invisible
+    /// anyway. Since #77 the cache key is derived from the ambient tenant rather than from this
+    /// argument, so the two must agree or the entry would be filed under the wrong tenant. Rather
+    /// than let that drift, say so: crossing to another tenant is <c>ITenantScope.RunAsync</c>, the
+    /// one mechanism for it (ADR-0002), not an argument.
+    /// </summary>
+    private void EnsureAmbient(string tenantId)
+    {
+        var ambient = _tenantAccessor.MultiTenantContext?.TenantInfo?.Id;
+        if (!string.Equals(ambient, tenantId, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Theme operations run inside their own tenant. Ambient tenant is '{ambient ?? "(none)"}' " +
+                $"but '{tenantId}' was requested — enter that tenant with ITenantScope.RunAsync first.");
+        }
     }
 
     private static async ValueTask<TenantThemeDto> LoadTenantThemeAsync(TenantFactoryState state, CancellationToken ct)
@@ -112,6 +137,7 @@ public sealed class TenantThemeService : ITenantThemeService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
         ArgumentNullException.ThrowIfNull(theme);
+        EnsureAmbient(tenantId);
 
         var entity = await _dbContext.TenantThemes
             .FirstOrDefaultAsync(t => t.TenantId == tenantId, ct)
@@ -192,6 +218,7 @@ public sealed class TenantThemeService : ITenantThemeService
     public async Task ResetThemeAsync(string tenantId, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        EnsureAmbient(tenantId);
 
         var entity = await _dbContext.TenantThemes
             .FirstOrDefaultAsync(t => t.TenantId == tenantId, ct)
@@ -223,6 +250,11 @@ public sealed class TenantThemeService : ITenantThemeService
             throw new ForbiddenException("Only the root tenant can set the default theme");
         }
 
+        // No EnsureAmbient here: root nominates *another* tenant's theme as the default, so tenantId
+        // is legitimately not the ambient one. The root-only check above is what establishes the
+        // caller; EnsureAmbient stays on the per-tenant methods, where the argument and the ambient
+        // tenant really must agree.
+
         // Clear existing default
         var existingDefault = await _dbContext.TenantThemes
             .FirstOrDefaultAsync(t => t.IsDefault, ct)
@@ -246,8 +278,10 @@ public sealed class TenantThemeService : ITenantThemeService
         entity.IsDefault = true;
         await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        // Invalidate default theme cache
-        await _cache.RemoveAsync(CacheKeys.DefaultTheme, ct).ConfigureAwait(false);
+        // Invalidate the default theme cache. This is a global entry (see GetDefaultThemeAsync), so
+        // the global cache is what has to clear it — going through the tenant-scoped cache would only
+        // ever evict the root tenant's own copy, leaving everyone else reading the stale default.
+        await _globalCache.RemoveAsync(CacheKeys.DefaultTheme, ct).ConfigureAwait(false);
 
         if (_logger.IsEnabled(LogLevel.Information))
         {
@@ -257,9 +291,14 @@ public sealed class TenantThemeService : ITenantThemeService
 
     public async Task InvalidateCacheAsync(string tenantId, CancellationToken ct = default)
     {
-        // Purge both the tenant-specific entry and anything tagged for this tenant.
-        await _cache.RemoveAsync(CacheKeys.TenantTheme(tenantId), ct).ConfigureAwait(false);
-        await _cache.RemoveByTagAsync(CacheKeys.Tags.Tenant(tenantId), ct).ConfigureAwait(false);
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        EnsureAmbient(tenantId);
+
+        // Purge the tenant's own theme entry plus anything else it has tagged as a theme (its cached
+        // default-theme answer). Both calls are scoped to the ambient tenant by the cache, so this
+        // can no longer evict another tenant's themes the way the old `tenant:{id}` tag could.
+        await _cache.RemoveAsync(CacheKeys.TenantTheme, ct).ConfigureAwait(false);
+        await _cache.RemoveByTagAsync(CacheKeys.Tags.Themes, ct).ConfigureAwait(false);
     }
 
     private static TenantThemeDto MapEntityToDto(TenantTheme entity)

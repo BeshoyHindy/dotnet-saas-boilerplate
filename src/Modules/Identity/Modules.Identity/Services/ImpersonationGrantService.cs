@@ -9,9 +9,20 @@ using Microsoft.Extensions.Caching.Hybrid;
 
 namespace Boilerplate.Modules.Identity.Services;
 
+/// <remarks>
+/// The revocation marker is cached in <see cref="GlobalHybridCache"/>, not the tenant-scoped cache,
+/// and that is a decision rather than a convenience: <c>IsRevokedOrEndedAsync</c> is called from the
+/// JwtBearer <c>OnTokenValidated</c> hook, which runs <i>during</i> authentication and therefore
+/// before Finbuckle has resolved any tenant, while the writers (<c>CreateAsync</c>,
+/// <c>RevokeAsync</c>) run inside a normal request that does have one. Scoping this entry to the
+/// ambient tenant would file the write under a tenant the read can never reach, and a revocation
+/// that does not take effect is the one failure mode this cache exists to prevent. The jti is
+/// globally unique and <c>ImpersonationGrant</c> is an <c>IGlobalEntity</c>, so there is no tenant
+/// for it to belong to in the first place.
+/// </remarks>
 internal sealed class ImpersonationGrantService(
     IdentityDbContext db,
-    HybridCache cache,
+    GlobalHybridCache cache,
     TimeProvider timeProvider) : IImpersonationGrantService
 {
     public async Task<ImpersonationGrantDto> CreateAsync(CreateGrantInput input, CancellationToken ct = default)
