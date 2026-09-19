@@ -11,6 +11,8 @@ public static class MultitenancyConstants
         public const string Issuer = "boilerplate";
     }
 
-    public const string Identifier = "tenant";
+    // No `Identifier` constant: there is no caller-supplied tenant identifier any more (ADR-0002).
+    // The tenant comes from the token's `tenant` claim (ClaimConstants.Tenant) or, for the anonymous
+    // auth routes only, from the {tenant} route value (TenantRoute.ValueKey).
     public const string Schema = "tenant";
 }

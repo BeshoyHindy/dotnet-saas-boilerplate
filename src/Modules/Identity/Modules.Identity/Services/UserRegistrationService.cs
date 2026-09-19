@@ -345,15 +345,14 @@ internal sealed class UserRegistrationService(
         string code = await userManager.GenerateEmailConfirmationTokenAsync(user);
         code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
 
-        const string route = "api/v1/identity/confirm-email";
-        var endpointUri = new Uri(string.Concat($"{origin}/", route));
+        // The tenant travels in the path, not a query parameter: the confirm-email endpoint lives
+        // under the anonymous auth group /api/v1/tenants/{tenant}/auth/... (ADR-0002).
+        var tenantId = multiTenantContextAccessor?.MultiTenantContext?.TenantInfo?.Id!;
+        var route = $"api/v1/tenants/{Uri.EscapeDataString(tenantId)}/auth/confirm-email";
+        var endpointUri = new Uri(string.Concat($"{origin.TrimEnd('/')}/", route));
 
         string verificationUri = QueryHelpers.AddQueryString(endpointUri.ToString(), QueryStringKeys.UserId, user.Id);
         verificationUri = QueryHelpers.AddQueryString(verificationUri, QueryStringKeys.Code, code);
-        verificationUri = QueryHelpers.AddQueryString(
-            verificationUri,
-            MultitenancyConstants.Identifier,
-            multiTenantContextAccessor?.MultiTenantContext?.TenantInfo?.Id!);
 
         return verificationUri;
     }

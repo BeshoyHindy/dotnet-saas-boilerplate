@@ -15,10 +15,9 @@ public static class RefreshTokenEndpoint
     {
         ArgumentNullException.ThrowIfNull(endpoint);
 
-        return endpoint.MapPost("/token/refresh",
+        return endpoint.MapPost("/refresh",
             [AllowAnonymous] async Task<Results<Ok<RefreshTokenCommandResponse>, UnauthorizedHttpResult, ProblemHttpResult>>
             ([FromBody] RefreshTokenCommand command,
-            [FromHeader(Name = "tenant")] string tenant,
             [FromServices] IMediator mediator,
             CancellationToken ct) =>
             {
@@ -27,7 +26,7 @@ public static class RefreshTokenEndpoint
             })
             .WithName("RefreshJwtTokens")
             .WithSummary("Refresh JWT access and refresh tokens")
-            .WithDescription("Use a valid (possibly expired) access token together with a valid refresh token to obtain a new access token and a rotated refresh token.")
+            .WithDescription("Use a valid (possibly expired) access token together with a valid refresh token to obtain a new access token and a rotated refresh token. The tenant is taken from the '{tenant}' route segment.")
             .Produces<RefreshTokenCommandResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status400BadRequest)

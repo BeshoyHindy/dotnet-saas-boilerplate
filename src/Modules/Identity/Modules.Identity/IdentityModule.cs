@@ -4,6 +4,7 @@ using Boilerplate.BuildingBlocks.Eventing;
 using Boilerplate.BuildingBlocks.Persistence;
 using Boilerplate.BuildingBlocks.Shared.Constants;
 using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.BuildingBlocks.Storage;
 using Boilerplate.BuildingBlocks.Storage.Local;
 using Boilerplate.BuildingBlocks.Storage.Services;
@@ -179,9 +180,25 @@ public class IdentityModule : IModule
             .WithTags("Identity")
             .WithApiVersionSet(apiVersionSet);
 
-        // tokens
-        group.MapGenerateTokenEndpoint().AllowAnonymous().RequireRateLimiting("auth");
-        group.MapRefreshTokenEndpoint().AllowAnonymous().RequireRateLimiting("auth");
+        // ── Anonymous, tenant-scoped auth routes (ADR-0002) ───────────────────────────
+        // No token exists yet on these calls, so the tenant rides in the route instead:
+        // /api/v1/tenants/{tenant}/auth/... . TenantFromRouteAttribute is the metadata that
+        // permits tenant resolution to read that route value at all — and only while the caller
+        // is anonymous. Every other endpoint takes its tenant from the signed token's claim.
+        var authGroup = endpoints
+            .MapGroup(TenantRoute.AnonymousAuthGroup)
+            .WithTags("Auth")
+            .WithApiVersionSet(apiVersionSet)
+            .WithMetadata(new TenantFromRouteAttribute())
+            .AllowAnonymous()
+            .RequireRateLimiting("auth");
+
+        authGroup.MapGenerateTokenEndpoint();
+        authGroup.MapRefreshTokenEndpoint();
+        authGroup.MapForgotPasswordEndpoint();
+        authGroup.MapResetPasswordEndpoint();
+        authGroup.MapConfirmEmailEndpoint();
+        authGroup.MapSelfRegisterUserEndpoint();
 
         // The outbox is dispatched by the framework's OutboxDispatcherHostedService (on by default), which now claims
         // rows with FOR UPDATE SKIP LOCKED so several instances can drain safely. This module still registers no
@@ -204,7 +221,6 @@ public class IdentityModule : IModule
         group.MapChangePasswordEndpoint();
         group.MapAdminConfirmEmailEndpoint();
         group.MapResendConfirmationEmailEndpoint().RequireRateLimiting("auth");
-        group.MapConfirmEmailEndpoint().RequireRateLimiting("auth");
         group.MapDeleteUserEndpoint();
         group.MapGetUserByIdEndpoint();
         group.MapGetCurrentUserPermissionsEndpoint();
@@ -213,9 +229,6 @@ public class IdentityModule : IModule
         group.MapGetUsersListEndpoint();
         group.MapSearchUsersEndpoint();
         group.MapRegisterUserEndpoint();
-        group.MapForgotPasswordEndpoint().RequireRateLimiting("auth");
-        group.MapResetPasswordEndpoint().RequireRateLimiting("auth");
-        group.MapSelfRegisterUserEndpoint().RequireRateLimiting("auth");
         group.MapToggleUserStatusEndpoint();
         group.MapUpdateUserEndpoint();
         group.MapSetProfileImageEndpoint();
