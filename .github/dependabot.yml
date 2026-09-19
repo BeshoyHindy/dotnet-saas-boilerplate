@@ -1,0 +1,118 @@
+# Dependabot (issue #19).
+#
+# Every update targets `develop`, not the default-in-name-only `main`: under
+# gitflow (ADR-0007) `develop` is where changes integrate, and a dependency PR
+# against `main` would bypass every gate this repo runs.
+#
+# Updates are grouped per ecosystem so a week of patches is one PR to review and
+# one CI run to pay for, with majors left ungrouped because they are the ones
+# that need reading. Security updates ignore grouping and open immediately.
+version: 2
+
+updates:
+  # ── .NET ────────────────────────────────────────────────────────────
+  # Versions are centralized in src/Directory.Packages.props; Dependabot edits
+  # that file directly.
+  - package-ecosystem: nuget
+    directory: '/'
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      nuget-minor-and-patch:
+        update-types: [minor, patch]
+
+  # ── Node ────────────────────────────────────────────────────────────
+  # Three independent lockfiles: pnpm at the root (the sandcastle orchestrator
+  # only — the clients are deliberately not workspace packages) and one npm
+  # lockfile per React client. If Dependabot ever cannot read the pnpm lockfile
+  # version this repo pins, that entry reports the error in the repository's
+  # Dependabot logs; the other ecosystems keep working.
+  - package-ecosystem: npm
+    directory: '/'
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      npm-root-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: '/clients/admin'
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      admin-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: '/clients/dashboard'
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      dashboard-minor-and-patch:
+        update-types: [minor, patch]
+
+  # ── GitHub Actions ──────────────────────────────────────────────────
+  # The workflows pin major tags; this keeps those majors from going stale and
+  # is the only automated way a deprecated runner image or action surfaces.
+  - package-ecosystem: github-actions
+    directory: '/'
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      actions-all:
+        patterns: ['*']
+
+  # ── Container base images ───────────────────────────────────────────
+  # One entry per directory that holds a Dockerfile: the .NET hosts
+  # (src/Host/Dockerfile, both targets) and each client's nginx image.
+  - package-ecosystem: docker
+    directory: '/src/Host'
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: 'chore(deps)'
+
+  - package-ecosystem: docker
+    directory: '/clients/admin'
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: 'chore(deps)'
+
+  - package-ecosystem: docker
+    directory: '/clients/dashboard'
+    target-branch: develop
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: 'chore(deps)'

@@ -10,13 +10,10 @@
 		     `bash scripts/dev-secrets.sh`. -->
 		<UserSecretsId>0f2b2a2e-3d3c-4f0d-9d5f-2c9a1a9d6b71</UserSecretsId>
 
-		<!-- Container configuration — image is built via `dotnet publish /t:PublishContainer`.
-		     No PublishProfile needed (the legacy "DefaultContainer" profile auto-populates
-		     ContainerImageTag from $(Version), which collides with ContainerImageTags). -->
-		<ContainerPort>8080</ContainerPort>
-		<ContainerUser>1654</ContainerUser>
-		<ContainerFamily>noble</ContainerFamily>
-		<ContainerRepository>boilerplate-api</ContainerRepository>
+		<!-- No Container* properties: the image is the `api` target of src/Host/Dockerfile
+		     (chiseled, non-root, port 8080), built by CI with Buildx (ADR-0005). The SDK's
+		     PublishContainer target is not used, and leaving its settings here would be a
+		     second, silently divergent definition of the same image. -->
 	</PropertyGroup>
 
 	<ItemGroup>

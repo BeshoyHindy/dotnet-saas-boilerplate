@@ -63,11 +63,12 @@ stay in lock-step). Override anything via environment variables:
 
 Use a `Job` (or `pre-install`/`pre-upgrade` Helm hook) that runs the
 migrator container image, then deploy the API only after the Job
-succeeds. The image is built via the `PublishContainer` target:
+succeeds. The image is the `migrator` target of `src/Host/Dockerfile`
+(built from the repository root, ADR-0005):
 
 ```bash
-dotnet publish src/Host/Boilerplate.DbMigrator -c Release \
-  /t:PublishContainer /p:ContainerRepository=boilerplate-db-migrator
+docker build -f src/Host/Dockerfile --target migrator \
+  -t boilerplate-db-migrator:local .
 ```
 
 ```yaml

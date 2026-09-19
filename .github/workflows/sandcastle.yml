@@ -9,9 +9,9 @@ name: Sandcastle CI
 
 on:
   push:
-    branches: [develop, main]
+    branches: [develop, main, 'release/**', 'hotfix/**']
   pull_request:
-    branches: [develop, main]
+    branches: [develop, main, 'release/**', 'hotfix/**']
   workflow_dispatch:
 
 concurrency:
@@ -26,6 +26,7 @@ jobs:
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       sandcastle: ${{ github.event_name != 'pull_request' || steps.filter.outputs.sandcastle == 'true' }}
     steps:
@@ -48,6 +49,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.sandcastle == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v6

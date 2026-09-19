@@ -1,0 +1,59 @@
+name: Deploy Contract
+
+# The deployment layer is shell and compose, so it has no compiler to catch it.
+# This workflow is its gate: shellcheck over every script under deploy/, then
+# deploy/dokploy/tests/run.sh — the suites that assert the ADR-0005 contract
+# (pull-only images at one ${IMAGE_TAG}, migrator gating the API, the external
+# dokploy-network, the deploy script's fail-closed polling).
+#
+# Path-filtered at the trigger rather than through a skip job: nothing else in
+# the repo can break these files, so a run that would only report "skipped" is
+# a run not worth queueing.
+
+on:
+  push:
+    branches: [develop, main, 'release/**', 'hotfix/**']
+    paths:
+      - 'deploy/**'
+      - '.github/workflows/deploy-contract.yml'
+  pull_request:
+    branches: [develop, main, 'release/**', 'hotfix/**']
+    paths:
+      - 'deploy/**'
+      - '.github/workflows/deploy-contract.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-contract:
+    name: Shellcheck and contract tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # shellcheck and jq are pre-installed on ubuntu-latest; docker compose is
+      # too, so the suite's `docker compose config` checks run here rather than
+      # skipping themselves the way they do on a bare machine.
+      - name: Tool versions
+        run: |
+          shellcheck --version | sed -n '2p'
+          jq --version
+          docker compose version
+
+      - name: Shellcheck deploy scripts
+        run: |
+          mapfile -t scripts < <(find deploy -type f -name '*.sh' | sort)
+          printf 'Linting %d script(s):\n' "${#scripts[@]}"
+          printf '  %s\n' "${scripts[@]}"
+          shellcheck --severity=style "${scripts[@]}"
+
+      - name: Run deploy contract tests
+        run: bash deploy/dokploy/tests/run.sh
