@@ -80,7 +80,7 @@ jobs:
               - '.github/workflows/backend.yml'
             images:
               - 'src/**'
-              - 'clients/admin/**'
+              - 'clients/console/**'
               - 'global.json'
               - '.github/workflows/backend.yml'
 
@@ -361,12 +361,10 @@ jobs:
             context: .
             file: src/Host/Dockerfile
             target: migrator
-          # The console SPA. This is the ONLY place CI names the console
-          # client's path: issue #14 consolidates the two React apps into one
-          # console, and when it lands these two lines move and nothing else.
+          # The console SPA (ADR-0004).
           - image: boilerplate-console
-            context: clients/admin
-            file: clients/admin/Dockerfile
+            context: clients/console
+            file: clients/console/Dockerfile
             target: ''
     steps:
       - name: Checkout

@@ -1,0 +1,70 @@
+# The console's nginx site. Rendered by docker-entrypoint.sh: `${APP_API_URL}` is
+# substituted at container start, everything else is literal nginx.
+#
+# The console proxies /api (and the health probes) to the API instead of letting the
+# browser call it cross-origin. That is not a convenience: the refresh token is an
+# `HttpOnly; Secure; SameSite=Strict` cookie (ADR-0002) and CORS allows no
+# credentials, so the browser only ever sends it to the console's own origin.
+
+server {
+  listen 80;
+  server_name _;
+  root /usr/share/nginx/html;
+  index index.html;
+
+  # The SPA is small; compressing it costs nothing and saves a lot over the wire.
+  gzip on;
+  gzip_types text/css application/javascript application/json image/svg+xml;
+  gzip_min_length 1024;
+
+  # Don't advertise the exact nginx build.
+  server_tokens off;
+
+  # Same-origin API. No trailing slash on proxy_pass, so the original request URI
+  # (/api/v1/…) is forwarded verbatim; the entrypoint strips any trailing slash from
+  # APP_API_URL so this stays true. The Host header is deliberately NOT rewritten to
+  # the console's hostname — the API's host filtering allow-list names the API.
+  location /api {
+    proxy_pass ${APP_API_URL};
+    proxy_http_version 1.1;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+    # Uploads go straight to object storage, so nothing large flows through here.
+    client_max_body_size 12m;
+    proxy_read_timeout 60s;
+  }
+
+  # The anonymous liveness/readiness probes the Health page reads.
+  location /health {
+    proxy_pass ${APP_API_URL};
+    proxy_http_version 1.1;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  # Hashed bundles are immutable by construction.
+  location ~* \.(?:js|css|woff2?|png|jpg|jpeg|svg|ico|webp)$ {
+    include /etc/nginx/security-headers.conf;
+    expires 1y;
+    add_header Cache-Control "public, immutable" always;
+  }
+
+  # Runtime configuration — must be re-read on every deploy, and is the container's
+  # readiness signal (it only exists once the entrypoint has rendered it).
+  location = /config.json {
+    include /etc/nginx/security-headers.conf;
+    add_header Cache-Control "no-store" always;
+  }
+
+  # SPA fallback. index.html must never be cached, or a deploy serves old asset URLs.
+  location / {
+    include /etc/nginx/security-headers.conf;
+    add_header Cache-Control "no-store" always;
+    try_files $uri /index.html;
+  }
+
+  location ~ /\. {
+    deny all;
+  }
+}

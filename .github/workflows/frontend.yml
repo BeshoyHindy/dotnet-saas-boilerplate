@@ -1,10 +1,17 @@
 name: Frontend CI
 
-# Frontend pipeline for the two React apps (clients/admin, clients/dashboard).
-# Only does real work when clients/** changed; a backend-only PR still triggers
-# the workflow but the heavy jobs skip and the always-running "Frontend CI" gate
-# reports green so required status checks resolve. Playwright suites are
-# route-mocked (no backend needed) — the configs boot a Vite dev server.
+# Frontend pipeline for the console (clients/console). Only does real work when
+# the console changed; a backend-only PR still triggers the workflow but the
+# heavy jobs skip and the always-running "Frontend CI" gate reports green so
+# required status checks resolve.
+#
+# Two suites, both backend-free: Vitest units next to the source, and a small
+# Playwright smoke suite (sign-in, user CRUD, operator enters a tenant) whose
+# config boots a Vite dev server and mocks every API call with page.route().
+#
+# The third gate is drift: `pnpm generate:api` must be a no-op against the
+# checked-in contract (clients/openapi/v1.json). The backend half of that gate —
+# re-exporting the document from the API — belongs in backend.yml (issue #15).
 #
 # Gitflow (ADR-0007): `develop` integrates, so the gates run on PRs into
 # `develop`, `main` and the release/hotfix branches.
@@ -32,120 +39,87 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      # Per app: a PR that only touches clients/dashboard must not rebuild and
-      # re-e2e clients/admin.
-      frontend: ${{ steps.filter.outputs.admin == 'true' || steps.filter.outputs.dashboard == 'true' }}
-      apps: ${{ steps.apps.outputs.list }}
+      frontend: ${{ steps.filter.outputs.console }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
-            admin:
-              - 'clients/admin/**'
+            console:
+              - 'clients/console/**'
+              # The contract the client's types are generated from.
+              - 'clients/openapi/**'
               - '.github/workflows/frontend.yml'
-            dashboard:
-              - 'clients/dashboard/**'
-              - '.github/workflows/frontend.yml'
 
-      # The matrix is built from the filter, so an admin-only PR runs two jobs
-      # instead of four. A change to this workflow touches both filters and so
-      # lists both apps.
-      - name: Build the app matrix
-        id: apps
-        env:
-          ADMIN: ${{ steps.filter.outputs.admin }}
-          DASHBOARD: ${{ steps.filter.outputs.dashboard }}
-        run: |
-          apps=()
-          [ "$ADMIN" = true ] && apps+=('"admin"')
-          [ "$DASHBOARD" = true ] && apps+=('"dashboard"')
-          list="[$(IFS=,; echo "${apps[*]}")]"
-          echo "Apps to build: $list"
-          echo "list=$list" >> "$GITHUB_OUTPUT"
-
-  lint-build:
-    name: Lint & Build (${{ matrix.app }})
-    needs: changes
-    if: needs.changes.outputs.frontend == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        app: ${{ fromJSON(needs.changes.outputs.apps) }}
-    defaults:
-      run:
-        working-directory: clients/${{ matrix.app }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: clients/${{ matrix.app }}/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      # `build` is `tsc -b && vite build` — this is the typecheck + bundle gate.
-      - name: Build
-        run: npm run build
-
-  e2e:
-    name: E2E (${{ matrix.app }})
+  console:
+    name: Lint, build & test
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        app: ${{ fromJSON(needs.changes.outputs.apps) }}
     defaults:
       run:
-        working-directory: clients/${{ matrix.app }}
+        working-directory: clients/console
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      # Corepack activates the pnpm version pinned in package.json#packageManager,
+      # and must run before setup-node's pnpm cache resolution.
+      - name: Enable corepack
+        run: corepack enable
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: clients/${{ matrix.app }}/package-lock.json
+          cache: pnpm
+          cache-dependency-path: clients/console/pnpm-lock.yaml
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      # `build` is `tsc -b && vite build` — the typecheck + bundle gate.
+      - name: Build
+        run: pnpm build
+
+      - name: Unit tests
+        run: pnpm test
+
+      # The frontend half of the OpenAPI drift gate (ADR-0004): regenerating the
+      # types from the checked-in document must change nothing. `git status`, not
+      # `git diff --exit-code`, so a deleted file is caught too.
+      - name: API types match the contract
+        run: |
+          pnpm generate:api
+          if [ -n "$(git status --porcelain -- src/api/schema.d.ts)" ]; then
+            echo "::error::src/api/schema.d.ts is stale. Run 'pnpm generate:api' in clients/console and commit the result."
+            git --no-pager diff -- src/api/schema.d.ts
+            exit 1
+          fi
 
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
-      # The Playwright config starts the Vite dev server itself and mocks all
-      # API calls via page.route(), so no backend is required.
-      - name: Run Playwright tests
-        run: npm run test:e2e
+      - name: Playwright smoke suite
+        run: pnpm test:e2e
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: playwright-report-${{ matrix.app }}
-          path: clients/${{ matrix.app }}/playwright-report
+          name: playwright-report
+          path: clients/console/playwright-report
           retention-days: 7
 
   # Single required status check — see backend.yml for the rationale.
   frontend-ci:
     name: Frontend CI
-    needs: [changes, lint-build, e2e]
+    needs: [changes, console]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

@@ -1,87 +1,63 @@
-# Boilerplate — Dashboard
+# Console
 
-Tenant-facing dashboard for the Boilerplate. Shows the tenant's validity window and recent activity.
+The template's one client (ADR-0004): a React 19 + Vite SPA that serves tenant users and root
+operators alike. Operator screens — the tenant registry and impersonation grants — live in the same
+app behind the same permissions the API enforces.
 
-Built with React 19, Vite 7, TypeScript, TanStack Query, React Router, Tailwind 4 + shadcn/ui, and Recharts. Standalone — not part of a pnpm workspace — so it plugs into .NET Aspire as a plain `ExecutableResource`.
-
-## Prerequisites
-
-- Node.js 20+
-- The API running (locally or remote)
-
-## Install & run
-
-Two options — pick whichever matches how you want to develop.
-
-### Option A — run everything through Aspire (recommended)
-
-The AppHost launches Postgres, Redis, MinIO, the API, the admin app, **and** this dashboard together, with `VITE_API_BASE_URL` wired via service discovery.
+## Run it
 
 ```bash
-npm install --prefix clients/dashboard   # one-time
-dotnet run --project src/Host/Boilerplate.AppHost
+corepack enable                 # once: activates the pinned pnpm
+pnpm install --frozen-lockfile
+pnpm dev                        # → http://localhost:5173
 ```
 
-Aspire dashboard exposes `boilerplate-dashboard` on <http://localhost:5174>.
+The dev server proxies `/api` and `/health` to `VITE_API_BASE_URL` (default
+`http://localhost:5030`), exactly as the nginx image does in production. That is not a convenience:
+the refresh token is an `HttpOnly; SameSite=Strict` cookie and CORS allows no credentials
+(ADR-0002), so the browser must see one origin.
 
-### Option B — run the frontend standalone
+Easiest full stack: `dotnet run --project src/Host/Boilerplate.AppHost` from the repository root,
+which starts PostgreSQL, Valkey, MinIO, Mailpit, the migrator, the API and this console.
 
-Useful when the API is already running elsewhere.
+## The API contract
+
+There are **no hand-written API types**. `clients/openapi/v1.json` is exported from the API and
+checked in; the types come from it:
 
 ```bash
-cd clients/dashboard
-npm install
-npm run dev          # http://localhost:5174
+bash scripts/export-openapi.sh   # repo root: re-export the contract (needs no database)
+pnpm generate:api                # contract → src/api/schema.d.ts
 ```
 
-The dev server proxies `/api`, `/openapi`, and `/scalar` to `VITE_API_BASE_URL` (default `http://localhost:5030`).
+Both artifacts are committed, and CI fails if either is stale. Call the API through the typed client:
+
+```ts
+import { api, unwrap } from "@/lib/api-client";
+
+const user = unwrap(await api.GET("/api/v1/identity/users/{id}", { params: { path: { id } } }));
+```
 
 ## Scripts
 
-| Script            | Purpose                              |
-|-------------------|--------------------------------------|
-| `npm run dev`     | Vite dev server on port 5174         |
-| `npm run build`   | `tsc -b` + `vite build` → `dist/`    |
-| `npm run preview` | Preview the production build         |
-| `npm run lint`    | ESLint (flat config)                 |
+| Script | What it does |
+|---|---|
+| `pnpm dev` | Vite dev server on port 5173 |
+| `pnpm build` | `tsc -b && vite build` — the typecheck + bundle gate |
+| `pnpm test` | Vitest units (jsdom), beside the source |
+| `pnpm test:e2e` | Playwright smoke suite: sign-in, user CRUD, operator enters a tenant |
+| `pnpm lint` | ESLint |
+| `pnpm generate:api` | Regenerate `src/api/schema.d.ts` from the checked-in contract |
 
-## Configuration
+## The image
 
-| Variable              | Default                  | Purpose                                       |
-|-----------------------|--------------------------|-----------------------------------------------|
-| `VITE_API_BASE_URL`   | `http://localhost:5030`  | API origin used by the dev proxy              |
-| `VITE_DEFAULT_TENANT` | `root`                   | Tenant pre-filled on the sign-in form and used in anonymous auth URLs |
+`docker build clients/console` produces an nginx image configured at container start:
 
-## Architecture
+| Variable | Required | Meaning |
+|---|---|---|
+| `APP_API_URL` | yes | Origin nginx proxies `/api` and `/health` to. Server-side, never seen by the browser. |
+| `APP_STORAGE_URL` | no | Object-storage origin, named in the Content-Security-Policy for presigned uploads and images. |
+| `APP_DEFAULT_TENANT` | no (`root`) | Tenant identifier the sign-in form pre-fills. |
 
-```
-src/
-├── api/                  # Typed API clients (tenants, audits, files, health, notifications)
-├── auth/                 # JWT-backed auth (own localStorage prefix: boilerplate.dashboard.*)
-├── components/
-│   ├── layout/           # Sidebar, Topbar, AppShell
-│   └── ui/               # shadcn primitives
-├── lib/                  # api-client, query-client, cn
-├── pages/                # Overview, Login, NotFound
-├── styles/globals.css    # Tailwind 4 CSS-first + shadcn variables
-├── App.tsx, main.tsx, routes.tsx
-```
-
-### What the overview shows
-
-- **Valid for** — the tenant's validity window (days left / grace / expired) from `GET /api/v1/tenants/me/status`.
-- **Recent audits** — the last 24 hours of audit events from `GET /api/v1/audits`.
-
-## Authentication flow
-
-Identical to the admin app: sign in at `POST /api/v1/tenants/{tenant}/auth/token`, JWT in `localStorage`, `Authorization: Bearer` on every call (and no tenant header — the server reads the token's `tenant` claim, ADR-0002), single-flight refresh on 401 via `POST /api/v1/tenants/{tenant}/auth/refresh`. Keys are namespaced `boilerplate.dashboard.*` so both apps can run side-by-side without clobbering each other's session.
-
-### Impersonation
-
-A session opened by an operator — a tenant admin impersonating one of their own users, or a token handed off from the admin app — carries `act_sub`/`act_tenant` and has **no refresh token**; the operator's original tokens sit stashed under `boilerplate.dashboard.impersonation.*`.
-
-Ending it (`POST /api/v1/identity/impersonation/end`) returns **no token**: the operator's own session was never taken away, so the tab restores it from that stash, refresh token included. If the grant is revoked mid-session the API starts answering `401`, which routes to `/impersonation-ended` instead of attempting a refresh that cannot succeed.
-
-## Production build
-
-`npm run build` emits `dist/`. Deploy behind any static host; forward `/api/*` to the backend and serve `index.html` as the SPA fallback.
+The entrypoint renders `/config.json`, the nginx site and a strict CSP from those, so one built image
+promotes across every environment.

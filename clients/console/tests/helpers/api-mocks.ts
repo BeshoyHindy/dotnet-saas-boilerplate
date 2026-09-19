@@ -2,7 +2,7 @@ import type { Page, Route } from "@playwright/test";
 
 /**
  * Shared API mocking helpers. Tests use page.route() to intercept fetch
- * calls to the dashboard's API and respond deterministically — no real
+ * calls to the console's API and respond deterministically — no real
  * backend required, no DB seeding, no flake.
  *
  * Convention: pass the URL pattern as a substring (Playwright accepts
@@ -39,7 +39,7 @@ export async function mockJsonResponse<T>(
 
 /**
  * Respond with an RFC 7807 ProblemDetails-shaped error matching the
- * backend's exception handler output. The dashboard's apiFetch parses
+ * backend's exception handler output. The console's API client parses
  * this into ApiRequestError.problem.
  */
 export async function mockProblemDetails(

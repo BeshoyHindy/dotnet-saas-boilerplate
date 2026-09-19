@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { mockJsonResponse, mockProblemDetails } from "../helpers/api-mocks";
 
-// The dashboard login page (rebuilt to the dentalOS card layout): Boilerplate logo
+// The console login page (rebuilt to the dentalOS card layout): Boilerplate logo
 // lockup + ".NET 10 Starter Kit" caption, and a tenant/email/password card.
 
 const TOKEN_RESPONSE = {

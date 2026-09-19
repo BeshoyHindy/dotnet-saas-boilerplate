@@ -68,7 +68,7 @@ CI publishes three images to GHCR:
 |---|---|
 | `ghcr.io/<owner>/boilerplate-api` | `src/Host/Dockerfile`, target `api` |
 | `ghcr.io/<owner>/boilerplate-db-migrator` | `src/Host/Dockerfile`, target `migrator` |
-| `ghcr.io/<owner>/boilerplate-console` | `clients/admin/Dockerfile` |
+| `ghcr.io/<owner>/boilerplate-console` | `clients/console/Dockerfile` |
 
 `IMAGE_TAG` is the only thing that differs between a deploy and a rollback:
 
@@ -89,7 +89,7 @@ OWNER=<your-ghcr-owner>; TAG=<your-tag>
 echo "$GHCR_TOKEN" | docker login ghcr.io -u "$OWNER" --password-stdin
 docker build -f src/Host/Dockerfile --target api      -t "ghcr.io/$OWNER/boilerplate-api:$TAG" .
 docker build -f src/Host/Dockerfile --target migrator -t "ghcr.io/$OWNER/boilerplate-db-migrator:$TAG" .
-docker build clients/admin -t "ghcr.io/$OWNER/boilerplate-console:$TAG"
+docker build clients/console -t "ghcr.io/$OWNER/boilerplate-console:$TAG"
 docker push "ghcr.io/$OWNER/boilerplate-api:$TAG"
 docker push "ghcr.io/$OWNER/boilerplate-db-migrator:$TAG"
 docker push "ghcr.io/$OWNER/boilerplate-console:$TAG"
@@ -249,8 +249,10 @@ What happens, in order:
    `depends_on: migrator: condition: service_completed_successfully`. If the
    migration fails, the migrator exits non-zero, the API never starts and the
    deploy fails. The API never migrates at startup.
-4. `console` starts and renders `/config.json` from `APP_API_URL`,
-   `APP_DASHBOARD_URL` and `APP_DEFAULT_TENANT`.
+4. `console` starts and renders `/config.json`, its nginx site and its
+   Content-Security-Policy from `APP_API_URL`, `APP_STORAGE_URL` and
+   `APP_DEFAULT_TENANT`. It proxies `/api` to the API, so the browser only ever
+   talks to `CONSOLE_DOMAIN`.
 5. Traefik picks up the labels, requests certificates for the three hostnames,
    and begins probing `GET /health/ready` on the API every 10 s. A container
    that fails the probe is taken out of rotation.

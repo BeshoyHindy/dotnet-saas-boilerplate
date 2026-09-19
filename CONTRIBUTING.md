@@ -18,7 +18,7 @@ dotnet run --project src/Host/Boilerplate.AppHost   # full Aspire stack
 dotnet test src/Boilerplate.slnx                    # tests (integration suite needs Docker)
 ```
 
-Client apps live under `clients/admin` and `clients/dashboard` — `npm install && npm run dev` in each.
+The console lives under `clients/console` — `pnpm install && pnpm dev`.
 
 ## Pull requests
 

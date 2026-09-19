@@ -1,6 +1,6 @@
 ---
 name: add-react-page
-description: Add a list+create page to a React app (clients/admin or clients/dashboard) — API module, page, lazy route, (admin) permission gate, Playwright test. Use when adding any frontend screen. See .agents/rules/frontend/.
+description: Add a list+create page to the console (clients/console) — generated API types, API module, page, lazy route, permission gate, unit test. Use when adding any frontend screen. See .agents/rules/frontend/console.md.
 argument-hint: "[admin|dashboard] [Area] [Resource]"
 ---
 

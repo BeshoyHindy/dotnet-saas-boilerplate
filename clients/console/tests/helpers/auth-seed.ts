@@ -5,13 +5,13 @@ import type { Page } from "@playwright/test";
  * tests targeting protected routes don't bounce to /login.
  *
  * We populate the same localStorage keys the runtime tokenStore writes
- * (see clients/dashboard/src/auth/token-store.ts). The token value is
+ * (see clients/console/src/auth/token-store.ts). The token value is
  * a JWT-shaped string that decodes to the supplied user — useAuth's
  * decoder reads sub/email/given_name/family_name/tenant out of the
  * payload. Permissions are NOT read from the JWT: at runtime the app
  * fetches them from GET /api/v1/identity/permissions (installShellMocks
  * stubs that route to []; permission-gated specs re-mock it with the
- * grants they need — see tests/system/trash.spec.ts).
+ * grants they need — see tests/operator/enter-tenant.spec.ts).
  */
 export type SeededUser = {
   sub: string;
@@ -27,13 +27,12 @@ export type SeededUser = {
   permissions?: string[];
 };
 
-const ACCESS_KEY = "boilerplate.dashboard.accessToken";
-const REFRESH_KEY = "boilerplate.dashboard.refreshToken";
-const TENANT_KEY = "boilerplate.dashboard.tenant";
+const ACCESS_KEY = "boilerplate.console.accessToken";
+const TENANT_KEY = "boilerplate.console.tenant";
 
 /**
  * Encode a minimal JWT (header.payload.signature) where every segment is
- * base64url-encoded JSON. Signature is a junk string — the dashboard
+ * base64url-encoded JSON. Signature is a junk string — the console
  * never validates it (only the server does), so this is safe.
  */
 function fakeJwt(payload: Record<string, unknown>): string {
@@ -58,18 +57,17 @@ export async function seedAuthedSession(page: Page, user: SeededUser) {
   };
   const accessToken = fakeJwt(payload);
 
+  // No refresh token: the console keeps it in an HttpOnly cookie it cannot read
+  // (ADR-0002), so a seeded session is an access token plus the tenant Id.
   await page.addInitScript(
-    ({ access, refresh, tenant, accessKey, refreshKey, tenantKey }) => {
+    ({ access, tenant, accessKey, tenantKey }) => {
       localStorage.setItem(accessKey, access);
-      localStorage.setItem(refreshKey, refresh);
       localStorage.setItem(tenantKey, tenant);
     },
     {
       access: accessToken,
-      refresh: "fake-refresh-token",
       tenant: user.tenant,
       accessKey: ACCESS_KEY,
-      refreshKey: REFRESH_KEY,
       tenantKey: TENANT_KEY,
     },
   );

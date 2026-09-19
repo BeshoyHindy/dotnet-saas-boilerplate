@@ -1,41 +1,32 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Playwright config for the dashboard app.
+ * Playwright config for the console.
  *
- * Tests run against a Vite dev server on port 5174 (the same port the
- * `dev` script uses), with API calls intercepted via `page.route()` so
- * tests don't need a running backend. This keeps the test loop fast
- * (~5s per test) and deterministic — no flaky network, no DB seeding.
+ * The suite here is a deliberately SMALL smoke suite (ADR-0004): sign-in, user CRUD,
+ * and an operator entering a tenant — the three journeys that must not break silently.
+ * Everything below page level belongs in the Vitest units next to the source.
  *
- * For tests that need a real backend, see `clients/dashboard/tests/e2e/`
- * (none today — all current tests are route-mocked).
+ * Tests run against a Vite dev server on port 5173 with API calls intercepted via
+ * `page.route()`, so no backend, no database and no seeding are involved.
  *
  * Usage:
- *   npm run test:e2e               # headless, all browsers
- *   npm run test:e2e -- --ui       # interactive runner
- *   npm run test:e2e -- --headed   # see the browser drive
- *   npm run test:e2e -- auth.spec  # filter by file
+ *   pnpm test:e2e                  # headless
+ *   pnpm test:e2e -- --ui          # interactive runner
+ *   pnpm test:e2e -- --headed      # watch the browser drive
+ *   pnpm test:e2e -- login.spec    # filter by file
  */
 export default defineConfig({
   testDir: "./tests",
-  // Tests are deterministic (mocked APIs) so parallelism is safe and
-  // dramatically faster. We still serialise within a file via test.serial
-  // when state spans tests (e.g. password-reset multi-step flows).
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  // Use all logical cores locally; throttle to 2 in CI to avoid
-  // exhausting GitHub Actions runners.
   workers: process.env.CI ? 2 : undefined,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
 
   use: {
-    baseURL: "http://localhost:5174",
+    baseURL: "http://localhost:5173",
     trace: "on-first-retry",
-    // Disable animations + reduce flake from CSS keyframes / transitions
-    // (we have a lot — parallax orbs, app-enter staggers, btn-shimmer).
-    // Tests assert against final state, not in-flight frames.
     actionTimeout: 10_000,
     navigationTimeout: 15_000,
   },
@@ -47,12 +38,11 @@ export default defineConfig({
     },
   ],
 
-  // Boot the Vite dev server before any test runs. `reuseExistingServer`
-  // means re-running the test suite picks up an already-running dev
-  // server (faster local iteration).
+  // Boot the Vite dev server before any test runs. `reuseExistingServer` means a
+  // re-run picks up an already-running dev server (faster local iteration).
   webServer: {
-    command: "npm run dev",
-    url: "http://localhost:5174",
+    command: "pnpm dev",
+    url: "http://localhost:5173",
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
     stdout: "ignore",

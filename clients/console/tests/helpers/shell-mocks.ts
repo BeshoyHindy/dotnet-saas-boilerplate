@@ -3,7 +3,7 @@ import { mockJsonResponse } from "./api-mocks";
 
 /**
  * A profile body that satisfies the topbar avatar + settings/profile read.
- * Matches the runtime UserDto shape the dashboard expects.
+ * Matches the runtime UserDto shape the console expects.
  */
 export const DEFAULT_PROFILE = {
   id: "u-test-1",
