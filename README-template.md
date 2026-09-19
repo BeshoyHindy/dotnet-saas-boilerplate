@@ -61,8 +61,8 @@ src/
 clients/
   admin/               Operator console (React 19 + Vite + Tailwind)
   dashboard/           Tenant app (React 19 + Vite + Tailwind)
+docker-compose.yml     Runs the production images locally (+ .env.example)
 deploy/
-  docker/              Production docker-compose + .env
   dokploy/             Dokploy deployment configuration
 ```
 
@@ -78,27 +78,31 @@ dotnet run --project src/Host/Boilerplate.DbMigrator -- apply --seed
 
 This project shipped with sensible defaults. Before production:
 
-- [ ] **Secrets** — set strong values in `deploy/docker/.env`
-      (`cp deploy/docker/.env.example deploy/docker/.env` and fill them in).
-      Never commit `.env`.
+- [ ] **Secrets** — the values `scripts/local-env.sh` writes into `.env` are local-only
+      throwaways. Generate fresh ones for anything deployed, and never commit `.env`.
 - [ ] **Branding** — the clients render a plain text wordmark; swap it (and add a logo under
       `clients/*/public/`) in `clients/*/src/components/**` for your own identity.
 - [ ] **Mail** — configure SMTP / SendGrid under `MailOptions` in
       `src/Host/Boilerplate.Api/appsettings.json`.
 - [ ] **OpenAPI contact** — update `OpenApiOptions.Contact` in `appsettings.json`.
 - [ ] **Container registry & infra** — set your registry and review bucket / database names
-      in `deploy/dokploy` and `deploy/docker`.
+      in `deploy/dokploy`.
 
-## Production (Docker Compose)
+## Run the container images (Docker Compose)
 
 ```bash
-cd deploy/docker
-# cp .env.example .env && edit
-docker compose up -d --build
+bash scripts/local-env.sh         # once — writes .env with generated secrets
+docker compose up --build         # API :8080, console :8081, Mailpit inbox :8025
+curl -fsS http://localhost:8080/health/ready
 ```
 
-Sign in to the admin console as `admin@root.com` using the `SEED_ADMIN_PASSWORD` from your
-`.env`, then rotate it from Settings → Security.
+This runs the same `api` / `migrator` images a deployment uses, against PostgreSQL, Valkey,
+MinIO and a Mailpit mail catcher. The containers run as Production, so placeholder secrets and
+`AllowedHosts: *` are refused exactly as they would be on a server — hence the generated `.env`.
+Everything else has a local default; see `.env.example`.
+
+Sign in to the console as `admin@root.com` using the `SEED_ADMIN_PASSWORD` from `.env`, then
+rotate it from Settings → Security.
 
 ## Adding a feature
 

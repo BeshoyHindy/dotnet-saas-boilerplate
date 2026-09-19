@@ -49,10 +49,18 @@ const string MinioBucket = "boilerplate-uploads";
 const string AdminOrigin = "http://localhost:5173";
 const string DashboardOrigin = "http://localhost:5174";
 
-var minioUser = builder.AddParameter("minio-user", "minioadmin");
-var minioPassword = builder.AddParameter("minio-password", "minioadmin", secret: true);
+// Secrets are Aspire parameters, never literals in this file: the password is generated on first
+// run and persisted to this project's user-secrets, so it survives restarts without being committed.
+// Read the current values from the Aspire dashboard (Resources → Parameters) if you need them.
+var minioUser = builder.AddParameter("minio-user", "boilerplate");
+var minioPassword = builder.AddParameter(
+    "minio-password",
+    new GenerateParameterDefault { MinLength = 24, Lower = true, Upper = true, Numeric = true, Special = false },
+    secret: true,
+    persist: true);
 
-var minio = builder.AddContainer("minio", "minio/minio")
+// quay.io, not the implicit docker.io: MinIO no longer publishes to Docker Hub.
+var minio = builder.AddContainer("minio", "quay.io/minio/minio", "RELEASE.2025-09-07T16-13-09Z")
     .WithArgs("server", "/data", "--console-address", ":9001")
     .WithHttpEndpoint(port: 9000, targetPort: 9000, name: "api")
     .WithHttpEndpoint(port: 9001, targetPort: 9001, name: "console")
@@ -72,7 +80,7 @@ mc mb --ignore-existing local/{{MinioBucket}};
 mc anonymous set download local/{{MinioBucket}};
 """).ReplaceLineEndings("\n");
 
-var minioInit = builder.AddContainer("minio-init", "minio/mc")
+var minioInit = builder.AddContainer("minio-init", "quay.io/minio/mc", "RELEASE.2025-08-13T08-35-41Z")
     .WithEntrypoint("/bin/sh")
     .WithArgs("-c", minioInitScript)
     .WithEnvironment("MC_USER", minioUser)
@@ -81,21 +89,57 @@ var minioInit = builder.AddContainer("minio-init", "minio/mc")
 
 var minioApiEndpoint = minio.GetEndpoint("api");
 
-// DB migrator: applies pending migrations + seeds the root admin (admin@root.com), then exits; the API waits for its completion so it never starts against an unmigrated DB. Seed password is a dev-only default.
+// Mail catcher: traps every message the API sends instead of delivering it. SMTP on :1025, inbox UI on :8025.
+var mailpit = builder.AddContainer("mailpit", "axllent/mailpit", "v1.31")
+    .WithEndpoint(port: 1025, targetPort: 1025, scheme: "tcp", name: "smtp")
+    .WithHttpEndpoint(port: 8025, targetPort: 8025, name: "http")
+    .WithEnvironment("MP_SMTP_AUTH_ACCEPT_ANY", "true")
+    .WithEnvironment("MP_SMTP_AUTH_ALLOW_INSECURE", "true")
+    .WithExternalHttpEndpoints();
+
+var mailpitSmtp = mailpit.GetEndpoint("smtp");
+
+// Password the seeded root admin user signs in with. Generated + persisted like the MinIO one above.
+// IdentityModule's policy is 10+ characters with an upper, a lower and a digit, hence the constraints.
+var seedAdminPassword = builder.AddParameter(
+    "seed-admin-password",
+    new GenerateParameterDefault
+    {
+        MinLength = 20,
+        Lower = true,
+        Upper = true,
+        Numeric = true,
+        Special = false,
+        MinLower = 2,
+        MinUpper = 2,
+        MinNumeric = 2,
+    },
+    secret: true,
+    persist: true);
+
+// DB migrator: applies pending migrations + seeds the root tenant and its admin user, then exits. The
+// API waits for its completion so it never starts against an unmigrated DB. Structural bootstrap only —
+// no demo/sample data is seeded.
 var migrator = builder.AddProject<Projects.Boilerplate_DbMigrator>($"{appPrefix}-db-migrator")
     .WithReference(postgres)
     .WaitFor(postgres)
+    // The migrator is a plain console Host, which reads DOTNET_ENVIRONMENT — Aspire only sets
+    // ASPNETCORE_ENVIRONMENT, so without this it defaults to Production and the Production-only
+    // option validators reject a dev stack (e.g. the placeholder signing key it injects for itself).
+    .WithEnvironment("DOTNET_ENVIRONMENT", builder.Environment.EnvironmentName)
     .WithEnvironment("DatabaseOptions__Provider", "POSTGRESQL")
     .WithEnvironment("DatabaseOptions__ConnectionString", postgres.Resource.ConnectionStringExpression)
     .WithEnvironment("DatabaseOptions__MigrationsAssembly", "Boilerplate.Migrations.PostgreSQL")
-    .WithEnvironment("Seed__DefaultAdminPassword", "123Pa$$word!")
+    .WithEnvironment("Seed__DefaultAdminPassword", seedAdminPassword)
     .WithArgs("apply", "--seed");
 
-// API Service
+// API Service. Startup order is migrator → API → console: the migrator must have exited 0 before the
+// API boots, and the React apps below wait on the API.
 var api = builder.AddProject<Projects.Boilerplate_Api>($"{appPrefix}-api")
     .WithReference(postgres)
     .WaitFor(postgres)
     .WaitFor(redis)
+    .WaitFor(mailpit)
     .WaitForCompletion(minioInit)
     .WaitForCompletion(migrator)
     .WithExternalHttpEndpoints()
@@ -104,14 +148,12 @@ var api = builder.AddProject<Projects.Boilerplate_Api>($"{appPrefix}-api")
     .WithEnvironment("DatabaseOptions__MigrationsAssembly", "Boilerplate.Migrations.PostgreSQL")
     .WithEnvironment("CachingOptions__Redis", redisConnectionString)
     .WithEnvironment("CachingOptions__EnableSsl", "false")
-    // SMTP via Ethereal (https://ethereal.email) — fake catch-all inbox for local dev (nothing delivered); mirrors appsettings.Development.json. Safe to commit: throwaway test creds.
+    // SMTP points at the Mailpit container above — nothing leaves the machine and no credentials are needed.
     .WithEnvironment("MailOptions__UseSendGrid", "false")
-    .WithEnvironment("MailOptions__From", "nicole.lueilwitz0@ethereal.email")
+    .WithEnvironment("MailOptions__From", "no-reply@localhost")
     .WithEnvironment("MailOptions__DisplayName", "Boilerplate")
-    .WithEnvironment("MailOptions__Smtp__Host", "smtp.ethereal.email")
-    .WithEnvironment("MailOptions__Smtp__Port", "587")
-    .WithEnvironment("MailOptions__Smtp__UserName", "nicole.lueilwitz0@ethereal.email")
-    .WithEnvironment("MailOptions__Smtp__Password", "x4VJz2r9x2NDss9KpC")
+    .WithEnvironment("MailOptions__Smtp__Host", ReferenceExpression.Create($"{mailpitSmtp.Property(EndpointProperty.Host)}"))
+    .WithEnvironment("MailOptions__Smtp__Port", ReferenceExpression.Create($"{mailpitSmtp.Property(EndpointProperty.Port)}"))
     .WithEnvironment("Storage__Provider", "s3")
     .WithEnvironment("Storage__S3__Bucket", MinioBucket)
     .WithEnvironment("Storage__S3__Region", "us-east-1")
