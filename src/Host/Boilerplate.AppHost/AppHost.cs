@@ -238,19 +238,10 @@ builder.AddJavaScriptApp($"{appPrefix}-dashboard", "../../../clients/dashboard",
     .WithEnvironment("VITE_API_BASE_URL", api.GetEndpoint("https"))
     // The demo-account picker is on in the local stack and nowhere else by default: this
     // is the one environment whose accounts are seeded, disposable and nobody's data.
-    .WithEnvironment("VITE_DEMO_MODE", "true");
-// ── CONNECT ME (demo seeder) ────────────────────────────────────────────────────────
-// The demo accounts' shared password belongs here, as a `VITE_DEMO_PASSWORD` environment
-// value on the dashboard above:
-//
-//     .WithEnvironment("VITE_DEMO_PASSWORD", seedDemoPassword)
-//
-// `seed-demo-password` is the Aspire parameter that carries it, and it arrives with the
-// server-side demo seeder (branch feature/restore-demo-accounts) — this file must not
-// invent a second source for the same secret in the meantime. Until the two are joined
-// the picker degrades deliberately: it fills in the tenant and the email and asks for the
-// password, rather than signing in with a credential nothing here can know.
-// ────────────────────────────────────────────────────────────────────────────────────
+    .WithEnvironment("VITE_DEMO_MODE", "true")
+    // The same generated parameter the migrator seeds the demo accounts with, so the picker
+    // signs in with one click. Dev only: a Vite env value is public to the browser by design.
+    .WithEnvironment("VITE_DEMO_PASSWORD", seedDemoPassword);
 
 // The console — the operator tool. Root operators only; a tenant user who signs in here
 // is told so (see clients/console/src/auth/operator-gate.tsx).
