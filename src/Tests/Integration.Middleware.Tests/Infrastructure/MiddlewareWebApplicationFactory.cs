@@ -181,6 +181,12 @@ public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Prog
                 // Host header is rejected with 400 before routing.
                 ["AllowedHosts"] = TestConstants.AllowedHost,
 
+                // Reverse-proxy support ON, trusting any peer (TestServer has no real proxy address),
+                // so ForwardedHeadersTests exercises the middleware for real: X-Forwarded-Proto is
+                // honoured, X-Forwarded-Host is not.
+                ["ProxyOptions:Enabled"] = "true",
+                ["ProxyOptions:TrustAnyProxy"] = "true",
+
                 ["Storage:Provider"] = "s3",
                 ["Storage:S3:Bucket"] = MinioBucket,
                 ["Storage:S3:ServiceUrl"] = _minio.GetConnectionString(),
@@ -308,7 +314,7 @@ public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Prog
     }
 
     /// <summary>
-    /// Appends an AllowAnonymous GET /__test/throw endpoint to the LIVE route builder.
+    /// Appends AllowAnonymous GET /__test/throw and /__test/request-info endpoints to the LIVE route builder.
     ///
     /// A DI-registered EndpointDataSource is NOT picked up by minimal hosting's implicit
     /// routing — the route builder must be the one the host actually maps against. The
@@ -337,6 +343,12 @@ public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Prog
                         {
                             throw new InvalidOperationException("boom");
                         })
+                        .AllowAnonymous();
+
+                    // Echoes what the pipeline decided the request looks like, so a test can see
+                    // whether forwarded headers were applied.
+                    routeBuilder.MapGet("/__test/request-info", (HttpContext context) =>
+                            Results.Ok(new RequestInfo(context.Request.Host.Value ?? string.Empty, context.Request.Scheme)))
                         .AllowAnonymous();
                 }
             };

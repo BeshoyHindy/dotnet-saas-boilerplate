@@ -5,9 +5,8 @@ namespace Boilerplate.BuildingBlocks.Web.Cors;
 
 /// <summary>
 /// Validates <see cref="CorsOptions"/> against the hosting environment. Data annotations cannot see
-/// the environment, and the dangerous combination here is environment-dependent: the AllowAll branch
-/// echoes any origin back with <c>AllowCredentials</c>, which in Production hands every website a
-/// credentialed cross-origin channel to the API.
+/// the environment, and the rule that matters here is environment-dependent: the AllowAll branch
+/// echoes back any origin, which is a convenience for a laptop and an open door anywhere else.
 /// </summary>
 internal sealed class CorsOptionsValidator(IHostEnvironment environment) : IValidateOptions<CorsOptions>
 {
@@ -17,9 +16,12 @@ internal sealed class CorsOptionsValidator(IHostEnvironment environment) : IVali
 
         var failures = new List<string>();
 
-        if (options.AllowAll && environment.IsProduction())
+        // Development only — Staging, Production and any custom environment must name their origins.
+        if (options.AllowAll && !environment.IsDevelopment())
         {
-            failures.Add("CorsOptions: AllowAll must be false in Production. List the browser origins in AllowedOrigins.");
+            failures.Add(
+                $"CorsOptions: AllowAll is permitted only in Development (environment is '{environment.EnvironmentName}'). " +
+                "List the browser origins in AllowedOrigins.");
         }
 
         foreach (var origin in options.AllowedOrigins)

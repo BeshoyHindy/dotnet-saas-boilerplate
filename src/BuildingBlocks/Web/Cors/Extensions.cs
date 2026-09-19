@@ -39,23 +39,26 @@ public static class Extensions
                 options.AddPolicy(PolicyName, builder =>
                 {
                     var settings = corsSettings.Value;
+
+                    // No AllowCredentials in either branch: authentication is a bearer header, and no
+                    // client sends cookies or `withCredentials` (the credentialed SignalR negotiate
+                    // that once justified it is gone). Asking for credentials would mean the browser
+                    // attaches cookies cross-origin — risk with nothing using it.
                     if (settings.AllowAll)
                     {
-                        // Echo the request origin (not `*`): the CORS spec forbids `*` with credentialed requests,
-                        // so AllowCredentials needs a specific origin.
+                        // Development-only (CorsOptionsValidator rejects it elsewhere). Echo the
+                        // request origin rather than `*` so the reflected value is visible in traces.
                         builder
                             .SetIsOriginAllowed(_ => true)
                             .AllowAnyHeader()
-                            .AllowAnyMethod()
-                            .AllowCredentials();
+                            .AllowAnyMethod();
                     }
                     else
                     {
                         builder
                             .WithOrigins(settings.AllowedOrigins)
                             .WithHeaders(settings.AllowedHeaders)
-                            .WithMethods(settings.AllowedMethods)
-                            .AllowCredentials();
+                            .WithMethods(settings.AllowedMethods);
                     }
                 });
             });

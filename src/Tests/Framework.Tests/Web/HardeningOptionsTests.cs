@@ -92,8 +92,43 @@ public sealed class HardeningOptionsTests
         // Assert
         forwarded.ForwardedHeaders.HasFlag(ForwardedHeaders.XForwardedFor).ShouldBeTrue();
         forwarded.ForwardedHeaders.HasFlag(ForwardedHeaders.XForwardedProto).ShouldBeTrue();
-        forwarded.ForwardedHeaders.HasFlag(ForwardedHeaders.XForwardedHost).ShouldBeTrue();
         forwarded.ForwardLimit.ShouldBe(2);
+        forwarded.KnownProxies.Count.ShouldBe(1);
+        forwarded.KnownIPNetworks.Count.ShouldBe(1);
+    }
+
+    [Fact]
+    public void ConfigureForwardedHeaders_Should_NeverHonourForwardedHost_When_Enabled()
+    {
+        // Arrange — host filtering runs BEFORE this middleware, and Request.Host ends up inside
+        // emailed confirmation links, so a caller must never be able to rewrite it.
+        var forwarded = new ForwardedHeadersOptions();
+
+        // Act
+        new ConfigureForwardedHeaders(Options.Create(new ProxyOptions { Enabled = true, TrustAnyProxy = true })).Configure(forwarded);
+
+        // Assert
+        forwarded.ForwardedHeaders.HasFlag(ForwardedHeaders.XForwardedHost).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ConfigureForwardedHeaders_Should_SkipUnparseableEntries_When_ConfigurationIsMalformed()
+    {
+        // Arrange. The validator already rejects these at startup with a message naming the bad
+        // value, so this configurator must not pre-empt it with a raw FormatException.
+        var proxy = new ProxyOptions
+        {
+            Enabled = true,
+            KnownProxies = ["10.1.2.3", "not-an-ip"],
+            KnownNetworks = ["10.0.0.0/8", "10.0.0.0", "nonsense/8"]
+        };
+        var forwarded = new ForwardedHeadersOptions();
+
+        // Act
+        var configure = () => new ConfigureForwardedHeaders(Options.Create(proxy)).Configure(forwarded);
+
+        // Assert
+        configure.ShouldNotThrow();
         forwarded.KnownProxies.Count.ShouldBe(1);
         forwarded.KnownIPNetworks.Count.ShouldBe(1);
     }
@@ -158,11 +193,14 @@ public sealed class HardeningOptionsTests
 
     #region CORS
 
-    [Fact]
-    public void CorsOptionsValidator_Should_Fail_When_AllowAllIsUsedInProduction()
+    [Theory]
+    [InlineData("Production")]
+    [InlineData("Staging")]
+    [InlineData("QA")]
+    public void CorsOptionsValidator_Should_Fail_When_AllowAllIsUsedOutsideDevelopment(string environmentName)
     {
         // Act
-        var result = new CorsOptionsValidator(Environment(Environments.Production))
+        var result = new CorsOptionsValidator(Environment(environmentName))
             .Validate(null, new CorsOptions { AllowAll = true });
 
         // Assert
