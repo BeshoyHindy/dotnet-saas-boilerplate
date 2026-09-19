@@ -75,6 +75,14 @@ public sealed class TenantStorageKeyRulesTests
             () => TenantStorageKeyRules.Compose(tenantId, StorageSpace.Private, "x/y.png"));
     }
 
+    [Fact]
+    public void KeyRootSegments_Should_BeTheFirstSegmentOfEachRoot()
+    {
+        // The one literal an S3 bucket name or Storage:S3:Prefix's first segment must never collide
+        // with — see S3StorageOptions validation (#78 hardening item 2).
+        TenantStorageKeyRules.KeyRootSegments.ShouldBe(["tenants", "uploads"]);
+    }
+
     #endregion
 
     #region Ownership

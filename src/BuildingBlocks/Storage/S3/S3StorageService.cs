@@ -42,6 +42,32 @@ internal sealed partial class S3StorageService : IStorageService
         {
             throw new InvalidOperationException("Storage:S3:Bucket is required when using S3 storage.");
         }
+
+        RejectIfKeyRoot(_options.Bucket, "Storage:S3:Bucket");
+        RejectIfKeyRoot(_options.Prefix, "Storage:S3:Prefix");
+    }
+
+    /// <summary>
+    /// <see cref="ToLogicalKey"/> strips the bucket and the deployment prefix off the front of a
+    /// path before checking it against the key grammar. A bucket, or a prefix whose first segment,
+    /// named the same as one of <see cref="TenantStorageKeyRules.KeyRootSegments"/> would make that
+    /// stripping eat the key's own first segment instead — silently mapping every URL to the wrong
+    /// key (#78 hardening item 2). Refused at construction, not discovered at the first delete.
+    /// </summary>
+    private static void RejectIfKeyRoot(string? value, string settingName)
+    {
+        var firstSegment = value?.Trim('/').Split('/', 2)[0];
+
+        if (string.IsNullOrEmpty(firstSegment)
+            || !TenantStorageKeyRules.KeyRootSegments.Contains(firstSegment, StringComparer.Ordinal))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"{settingName} '{value}' collides with a Storage key root " +
+            $"({string.Join(", ", TenantStorageKeyRules.KeyRootSegments)}); choose a different value, " +
+            "or a URL's bucket/prefix segment would be stripped as if it were the key's own first segment.");
     }
 
     public async Task<string> UploadAsync<T>(FileUploadRequest request, FileType fileType, CancellationToken cancellationToken = default) where T : class
@@ -70,7 +96,8 @@ internal sealed partial class S3StorageService : IStorageService
             BucketName = _options.Bucket,
             Key = ToPhysicalKey(key),
             InputStream = stream,
-            ContentType = request.ContentType
+            // Never the client-supplied ContentType — see FileTypeMetadata.ContentTypeFor.
+            ContentType = FileTypeMetadata.ContentTypeFor(extension)
         };
 
         // Rely on bucket policy for public access; do not set ACLs to avoid conflicts with ACL-disabled buckets.
@@ -86,7 +113,29 @@ internal sealed partial class S3StorageService : IStorageService
     public async Task RemoveAsync(string path, CancellationToken cancellationToken = default)
     {
         var key = AuthorizeHandle(path);
+        await RemoveAuthorizedAsync(key, cancellationToken).ConfigureAwait(false);
+    }
 
+    public async Task<bool> RemoveIfOwnedAsync(string? storedHandle, CancellationToken cancellationToken = default)
+    {
+        if (!TryAuthorizeHandle(storedHandle, out var key))
+        {
+            return false;
+        }
+
+        await RemoveAuthorizedAsync(key, cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <summary>
+    /// Deletes an already-authorized logical <paramref name="key"/>. Both public delete entry
+    /// points route here instead of calling each other, so <see cref="ToLogicalKey"/> — which
+    /// strips the bucket and deployment prefix — runs exactly once per call (#78 hardening item 3;
+    /// calling the public <see cref="RemoveAsync"/> from <see cref="RemoveIfOwnedAsync"/> would
+    /// strip <c>Storage:S3:Prefix</c> a second time and delete the wrong physical object).
+    /// </summary>
+    private async Task RemoveAuthorizedAsync(string key, CancellationToken cancellationToken)
+    {
         try
         {
             await _s3.DeleteObjectAsync(_options.Bucket, ToPhysicalKey(key), cancellationToken).ConfigureAwait(false);
@@ -99,17 +148,6 @@ internal sealed partial class S3StorageService : IStorageService
         {
             _logger.LogWarning(ex, "Unexpected error deleting S3 object {Key}", key);
         }
-    }
-
-    public async Task<bool> RemoveIfOwnedAsync(string? storedHandle, CancellationToken cancellationToken = default)
-    {
-        if (!TryAuthorizeHandle(storedHandle, out var key))
-        {
-            return false;
-        }
-
-        await RemoveAsync(key, cancellationToken).ConfigureAwait(false);
-        return true;
     }
 
     public async Task<FileDownloadResponse?> DownloadAsync(string path, CancellationToken cancellationToken = default)
@@ -412,7 +450,11 @@ internal sealed partial class S3StorageService : IStorageService
     /// in front, and the deployment's optional <c>Storage:S3:Prefix</c> — everything the block
     /// itself added. What is left is the logical key, which is then checked, never repaired: the
     /// path is deliberately <b>not</b> percent-unescaped, so an encoded separator stays encoded and
-    /// the key grammar refuses it.
+    /// the key grammar refuses it. A backslash is refused the same way — unlike
+    /// <see cref="Local.LocalStorageService"/>, which legitimately sees Windows-form disk paths, S3
+    /// object keys never contain one, so repairing it here would be exactly the silent normalisation
+    /// <see cref="TenantStorageKeyRules.TryAuthorize"/> documents that it never does (#78 hardening
+    /// item 1).
     /// </summary>
     private string ToLogicalKey(string? handle)
     {
@@ -421,7 +463,7 @@ internal sealed partial class S3StorageService : IStorageService
             return string.Empty;
         }
 
-        var value = handle.Replace('\\', '/');
+        var value = handle;
 
         if (Uri.TryCreate(value, UriKind.Absolute, out var uri)
             && (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.Ordinal)

@@ -47,6 +47,10 @@ Still true, and still worth doing: never pass a caller-supplied string to `Downl
 
 `BuildPublicUrl` is only valid for keys the bucket policy actually publishes — i.e. the public space under `uploads/` (avatars, tenant theme), which is what `UploadAsync` writes. **Never** use it for a private-space key: that prefix has no anonymous grant (contract-tested in `deploy/dokploy/tests/`), so the link 403s, and granting it would publish every private file. Public Files assets go through `GenerateDownloadUrlAsync` with a short TTL instead (`PublicFileUrlFactory`, see `modules/files.md`). Nesting the public space *under* `uploads/` is deliberate: the one anonymous-read grant in `deploy/` keeps covering exactly it, and nothing under `tenants/`.
 
+**`Storage:S3:Bucket` (and the first segment of `Storage:S3:Prefix`) may never equal a key root (`tenants`, `uploads`).** `S3StorageService`'s constructor rejects it — that name would make the URL→key mapping strip the key's own first segment instead of the bucket/prefix segment.
+
+**A public upload's stored content type is derived from its already-validated extension (`FileTypeMetadata.ContentTypeFor`), never from the caller-supplied `Content-Type`** — public-space objects are served anonymously, so trusting the header would let `evil.png` be stored and served as `text/html`.
+
 ## Test gotcha
 
 `AddHeroStorage` reads `Storage:Provider` **before** a test factory's in-memory config overlay applies, so it wires `LocalStorageService`. Integration tests that need MinIO must **remove the `IStorageService`/`LocalStorageService`/`S3StorageService` descriptors post-registration and re-register the S3 stack** pointed at the MinIO container (see `AppWebApplicationFactory`). See `integration-testing.md`.

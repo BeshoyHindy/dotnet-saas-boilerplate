@@ -88,6 +88,23 @@ public sealed class LocalStorageServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task DownloadAsync_Should_ServeTheContentTypeDerivedFromTheExtension_NotTheClientHeader()
+    {
+        // Local never persists the client's Content-Type — download derives it from the file name
+        // via FileExtensionContentTypeProvider — so a client claiming "evil.png" is text/html can't
+        // get that header served back (#78 hardening item 4; this provider needed no code change,
+        // only pinning that it already holds).
+        var request = PngRequest();
+        request.ContentType = "text/html";
+
+        var path = await _sut.UploadAsync<Probe>(request, FileType.Image);
+        var download = await _sut.DownloadAsync(path);
+
+        download!.ContentType.ShouldBe("image/png");
+        await download.Stream.DisposeAsync();
+    }
+
+    [Fact]
     public async Task RemoveAsync_Should_DeleteFile_When_FileExists()
     {
         // Arrange

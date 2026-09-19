@@ -123,14 +123,8 @@ public sealed partial class LocalStorageService : IStorageService
 
     public Task RemoveAsync(string path, CancellationToken cancellationToken = default)
     {
-        var fullPath = ResolveDiskPath(AuthorizeHandle(path));
-
-        if (File.Exists(fullPath))
-        {
-            File.Delete(fullPath);
-        }
-
-        return Task.CompletedTask;
+        var key = AuthorizeHandle(path);
+        return RemoveAuthorizedAsync(key);
     }
 
     public async Task<bool> RemoveIfOwnedAsync(string? storedHandle, CancellationToken cancellationToken = default)
@@ -140,8 +134,26 @@ public sealed partial class LocalStorageService : IStorageService
             return false;
         }
 
-        await RemoveAsync(key, cancellationToken).ConfigureAwait(false);
+        await RemoveAuthorizedAsync(key).ConfigureAwait(false);
         return true;
+    }
+
+    /// <summary>
+    /// Deletes an already-authorized key. Both public delete entry points route here instead of
+    /// calling each other, so ownership is checked exactly once per call rather than
+    /// <see cref="RemoveIfOwnedAsync"/> re-entering the public <see cref="RemoveAsync"/> and running
+    /// <see cref="AuthorizeHandle"/> a second time (#78 hardening item 3).
+    /// </summary>
+    private Task RemoveAuthorizedAsync(string key)
+    {
+        var fullPath = ResolveDiskPath(key);
+
+        if (File.Exists(fullPath))
+        {
+            File.Delete(fullPath);
+        }
+
+        return Task.CompletedTask;
     }
 
     private static string SanitizeFileName(string fileName)

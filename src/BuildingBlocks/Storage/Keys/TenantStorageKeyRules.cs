@@ -59,6 +59,20 @@ public static partial class TenantStorageKeyRules
         space == StorageSpace.Public ? PublicRoot : PrivateRoot;
 
     /// <summary>
+    /// The first path segment of each key root — the one literal an S3 bucket name or the first
+    /// segment of <c>Storage:S3:Prefix</c> must never collide with. <c>StripSegment</c> in
+    /// <c>S3StorageService.ToLogicalKey</c> eats whatever segment matches the bucket/prefix off the
+    /// front of a URL path; a bucket literally named <c>uploads</c> or <c>tenants</c> would make it
+    /// eat the key's own first segment instead. Derived from <see cref="PrivateRoot"/> and
+    /// <see cref="PublicRoot"/> rather than restated, so this stays the one place those roots are
+    /// spelled (the architecture scan enforces that for string literals; this keeps it true here too).
+    /// </summary>
+    public static IReadOnlyList<string> KeyRootSegments { get; } =
+        [FirstSegmentOf(PrivateRoot), FirstSegmentOf(PublicRoot)];
+
+    private static string FirstSegmentOf(string root) => root[..root.IndexOf('/', StringComparison.Ordinal)];
+
+    /// <summary>
     /// The full prefix a tenant owns in <paramref name="space"/>, trailing slash included. The
     /// trailing slash is what makes the comparison a whole-segment one.
     /// </summary>

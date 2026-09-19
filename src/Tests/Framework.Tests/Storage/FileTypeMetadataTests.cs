@@ -34,6 +34,29 @@ public sealed class FileTypeMetadataTests
 
     #endregion
 
+    #region ContentTypeFor
+
+    [Theory]
+    [InlineData(".png", "image/png")]
+    [InlineData(".PNG", "image/png")]
+    [InlineData(".jpg", "image/jpeg")]
+    [InlineData(".jpeg", "image/jpeg")]
+    [InlineData(".ico", "image/x-icon")]
+    public void ContentTypeFor_Should_DeriveFromTheExtension(string extension, string expected)
+    {
+        FileTypeMetadata.ContentTypeFor(extension).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void ContentTypeFor_Should_FallBackToOctetStream_When_ExtensionIsUnrecognized()
+    {
+        // Never reachable through a validated upload — the extension allow-list rules it out first
+        // — but the fallback must never be something a browser will render.
+        FileTypeMetadata.ContentTypeFor(".exe").ShouldBe("application/octet-stream");
+    }
+
+    #endregion
+
     #region Edge Cases
 
     [Fact]

@@ -96,6 +96,72 @@ public sealed class S3StorageServiceTests
     }
 
     [Fact]
+    public async Task UploadAsync_Should_StoreTheContentTypeDerivedFromTheExtension_NotTheClientHeader()
+    {
+        // Public uploads are served anonymously straight from storage: trusting the client's
+        // Content-Type would let `evil.png` be stored, and served, as text/html (#78 item 4).
+        var sut = Create();
+        var request = PngRequest();
+        request.ContentType = "text/html";
+
+        await sut.UploadAsync<Probe>(request, FileType.Image);
+
+        var put = _s3.ReceivedCalls()
+            .Select(c => c.GetArguments()[0])
+            .OfType<PutObjectRequest>()
+            .Single();
+        put.ContentType.ShouldBe("image/png");
+    }
+
+    [Fact]
+    public void Constructor_Should_Throw_When_TheBucketNameCollidesWithAKeyRoot()
+    {
+        Should.Throw<InvalidOperationException>(() => Create(new S3StorageOptions
+        {
+            Bucket = "uploads",
+            ServiceUrl = ServiceUrl,
+        }));
+        Should.Throw<InvalidOperationException>(() => Create(new S3StorageOptions
+        {
+            Bucket = "tenants",
+            ServiceUrl = ServiceUrl,
+        }));
+    }
+
+    [Fact]
+    public void Constructor_Should_Throw_When_ThePrefixsFirstSegmentCollidesWithAKeyRoot()
+    {
+        Should.Throw<InvalidOperationException>(() => Create(new S3StorageOptions
+        {
+            Bucket = Bucket,
+            ServiceUrl = ServiceUrl,
+            Prefix = "tenants/env",
+        }));
+    }
+
+    [Fact]
+    public void Constructor_Should_Allow_ABucketOrPrefix_ThatDoesNotCollideWithAKeyRoot()
+    {
+        Should.NotThrow(() => Create(new S3StorageOptions
+        {
+            Bucket = "uploads-bucket",
+            ServiceUrl = ServiceUrl,
+            Prefix = "env/staging",
+        }));
+    }
+
+    [Fact]
+    public async Task DownloadAsync_Should_Refuse_AHandleWithABackslash_RatherThanRepairIt()
+    {
+        // TenantStorageKeyRules.TryAuthorize never repairs a key; the S3 provider must not either.
+        var sut = Create();
+
+        await Should.ThrowAsync<StorageKeyNotOwnedException>(
+            () => sut.DownloadAsync("tenants\\acme\\myfiles\\x.pdf"));
+        _s3.ReceivedCalls().ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task ADeploymentPrefix_Should_StayOutOfTheHandle_But_ReachS3()
     {
         // `Storage:S3:Prefix` is deployment plumbing: it belongs on the wire, never in the handle a
@@ -216,6 +282,21 @@ public sealed class S3StorageServiceTests
         (await sut.RemoveIfOwnedAsync(null)).ShouldBeFalse();
 
         _s3.ReceivedCalls().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task RemoveIfOwnedAsync_Should_SendThePrefixPlusTheLogicalKey_Exactly_When_APrefixIsConfigured()
+    {
+        // RemoveIfOwnedAsync used to authorize then call the public RemoveAsync(key), which re-ran
+        // ToLogicalKey and stripped the deployment prefix a second time (#78 item 3). With a prefix
+        // configured, that second strip would send the wrong physical key to S3.
+        var sut = Create(new S3StorageOptions { Bucket = Bucket, ServiceUrl = ServiceUrl, Prefix = "env/staging" });
+        var key = sut.ComposeKey(StorageSpace.Private, "myfiles/x.pdf");
+
+        (await sut.RemoveIfOwnedAsync(key)).ShouldBeTrue();
+
+        await _s3.Received(1).DeleteObjectAsync(
+            Bucket, "env/staging/tenants/acme/myfiles/x.pdf", Arg.Any<CancellationToken>());
     }
 
     [Fact]
