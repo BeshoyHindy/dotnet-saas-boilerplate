@@ -15,8 +15,22 @@ import { actingStore, type ActingSession } from "@/auth/acting-store";
 import { decodeJwt, isTokenExpired, type JwtClaims } from "@/auth/jwt";
 import { endSession, issueToken } from "@/auth/api";
 import { refreshAccessToken } from "@/lib/api-client";
+import { endSessionLocally } from "@/lib/query-client";
 import { getMyPermissions } from "@/api/identity";
 import { endActingSession, exchangeOperatorToken, startImpersonation } from "@/api/operator";
+
+/**
+ * `ActingSession` minus the bearer credential — what a component is allowed to see.
+ * The transport (`src/lib/api-client.ts`) reads the real session, `accessToken`
+ * included, straight off `acting-store`; nothing else needs to hold it.
+ */
+export type ActingSessionView = Omit<ActingSession, "accessToken">;
+
+function toActingView(session: ActingSession | null): ActingSessionView | null {
+  if (!session) return null;
+  const { tenantId, tenantName, userId, userName, expiresAt, jti, grantId } = session;
+  return { tenantId, tenantName, userId, userName, expiresAt, jti, grantId };
+}
 
 export type AuthUser = {
   id: string;
@@ -48,11 +62,13 @@ export type AuthContextValue = {
   refreshPermissions: () => Promise<void>;
 
   /**
-   * The session the user is currently acting through, or null. Their own session keeps
-   * running underneath — `user` above is still them — and the acting token lives in
-   * memory only (see acting-store), so a reload always lands back in their own account.
+   * The session the user is currently acting through, or null — METADATA ONLY, no
+   * `accessToken`. Their own session keeps running underneath — `user` above is still
+   * them. The acting token itself stays reachable only through `acting-store`, inside
+   * the transport (`src/lib/api-client.ts`): every component gets to know *that* and
+   * *who* the caller is acting as, never the bearer credential it takes to do it.
    */
-  acting: ActingSession | null;
+  acting: ActingSessionView | null;
   /** Exchange the operator's token for one that acts inside `tenantId` (root only). */
   enterTenant: (input: {
     tenantId: string;
@@ -146,9 +162,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         await refreshAccessToken();
       } catch {
-        // Refresh token dead (expired, revoked, or DB reseeded) — drop the
-        // stale session so routing falls through to /login cleanly.
-        tokenStore.clear();
+        // Refresh token dead (expired, revoked, or DB reseeded) — end the session so
+        // routing falls through to /login cleanly, and so a stray acting token or
+        // cached query from before the reload cannot outlive it.
+        endSessionLocally();
       } finally {
         if (!cancelled) setIsInitializing(false);
       }
@@ -231,6 +248,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // clear them before issuing the token so hydration re-fetches from scratch.
       tokenStore.setPermissions([]);
       setPermissionsHydrated(false);
+      // Whatever the PREVIOUS user in this tab was acting as must not survive into this
+      // one: the acting token is in-memory only and keyed to nothing that changes on
+      // sign-in, so without this a forced sign-out (or a shared machine) would hand the
+      // next person who logs in someone else's acting session.
+      actingStore.clear();
       const tokens = await issueToken(input);
       // Remember the tenant **Id** from the token, not what was typed: the refresh
       // cookie's Path is /api/v1/tenants/{tenantId}/auth/refresh, so refreshing
@@ -268,15 +290,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     }
 
-    // Stop acting first: the acting token is a separate credential and must not outlive
-    // the session that minted it, even in memory.
-    actingStore.clear();
-    tokenStore.clear();
-    queryClient.clear();
-  }, [queryClient]);
+    // The acting token is a separate credential and must not outlive the session that
+    // minted it, even in memory — endSessionLocally() is the one place that drops it
+    // alongside the token store and the query cache (see .agents/rules/frontend/console.md).
+    endSessionLocally();
+  }, []);
 
   // ── Acting layer (operator token exchange + impersonation, ADR-0002) ──
-  const acting = useSyncExternalStore(actingStore.subscribe, actingStore.get);
+  const rawActing = useSyncExternalStore(actingStore.subscribe, actingStore.get);
+  // Projected to metadata only — see `ActingSessionView`. Memoized on the underlying
+  // session (a stable reference between store changes) so this doesn't manufacture a
+  // new object, and therefore a new `value` below, on every unrelated re-render.
+  const acting = useMemo(() => toActingView(rawActing), [rawActing]);
 
   // An acting session can end without being asked to (grant revoked, token expired). The
   // API client drops it and leaves a notice; surface that rather than silently switching
@@ -287,7 +312,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const notice = actingStore.consumeNotice();
         if (notice) {
           toast.warning("Stopped acting", { description: notice });
-          void queryClient.invalidateQueries();
+          // clear(), not invalidateQueries(): everything cached was fetched under the
+          // dropped acting credential, in another tenant. Invalidating only marks it
+          // stale — it can still render (and refetch-fail loudly) before the queries
+          // that matter finish; clear() empties the cache outright, matching enter/exit.
+          queryClient.clear();
         }
       }),
     [queryClient],

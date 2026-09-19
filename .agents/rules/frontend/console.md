@@ -94,6 +94,26 @@ design. `ActingBanner` (in `AppShell`) is always visible while it is set. Creden
 enroll/verify/disable, change password — are disabled while acting, mirroring the server's
 `DenyWhenActing` 403.
 
+Nothing outside the transport ever touches the acting **bearer token**: `AuthContext.acting` is
+`ActingSessionView` (`ActingSession` minus `accessToken`) — metadata only, for banners and query keys.
+The real credential is read straight off `acting-store` inside `src/lib/api-client.ts`.
+
+**One clear-site rule.** Every "this session is over" path — logout, a dead refresh
+(`refreshAccessToken`'s non-OK branch), a token-gone 401 (`authFetch`'s `!accessToken` branch), boot's
+failed silent refresh — MUST call `endSessionLocally()` (`src/lib/query-client.ts`), never clear
+`tokenStore`/`actingStore` by hand. It clears the acting session, the token store and the query cache
+together, so a forced sign-out can never hand the next person who signs in on that tab a stranger's
+acting token or their cached data. `login()` additionally clears `actingStore` up front (before issuing
+the new token) for the same reason — it does not call `endSessionLocally()` itself since it is
+establishing a session, not ending one. An acting session dropped **involuntarily** (revoked/expired,
+`acting-store`'s `drop()`) still calls `queryClient.clear()`, not `invalidateQueries()`: stale data must
+not be able to render before a refetch replaces it.
+
+`api-client.ts`'s `authFetch` also captures the acting identity (jti, or null under `AS_OPERATOR`) once
+per call, before the first send. If it no longer matches `acting-store` by the time a retry (post-refresh)
+would go out, the retry is skipped and a synthetic 401 is returned instead of sending with whatever
+credential — acting or operator's own — took over in between.
+
 ## Design system (Tailwind v4, shadcn-style)
 
 - **`cn()` is at `src/lib/cn.ts`** (`twMerge(clsx(...))`) — not `lib/utils.ts`. `components.json`: `style:new-york`, `baseColor:slate`, `cssVariables:true`, `iconLibrary:lucide`.

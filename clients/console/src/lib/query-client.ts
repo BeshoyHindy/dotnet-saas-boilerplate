@@ -1,6 +1,8 @@
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import { ApiRequestError, isTenantDeactivatedError } from "@/lib/api-client";
 import { router } from "@/routes";
+import { tokenStore } from "@/auth/token-store";
+import { actingStore } from "@/auth/acting-store";
 
 const TENANT_DEACTIVATED_PATH = "/tenant-deactivated";
 
@@ -20,6 +22,21 @@ function handleGlobalError(error: unknown) {
   if (!isTenantDeactivatedError(error)) return;
   if (router.state.location.pathname === TENANT_DEACTIVATED_PATH) return;
   void router.navigate(TENANT_DEACTIVATED_PATH, { replace: true });
+}
+
+/**
+ * The ONE place that ends a session on this device: drops any acting session, clears
+ * the stored access token/tenant/permissions, and empties the query cache so nothing
+ * fetched under the old credential — or a stranger's acting token — can render under
+ * whatever session (or lack of one) comes next. Every "this session is over" path
+ * (logout, a dead refresh, a token-gone 401, boot's failed silent refresh) must call
+ * this instead of clearing `tokenStore`/`actingStore` by hand — see
+ * `.agents/rules/frontend/console.md`.
+ */
+export function endSessionLocally(): void {
+  actingStore.clear();
+  tokenStore.clear();
+  queryClient.clear();
 }
 
 export const queryClient = new QueryClient({
