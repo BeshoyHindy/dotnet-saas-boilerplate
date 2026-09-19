@@ -187,10 +187,12 @@ done
 # resolves first silently swallows the other app.
 dashboard_block="$(service_block "$APP" dashboard)"
 console_block="$(service_block "$APP" console)"
-assert_match "dashboard is routed on DASHBOARD_DOMAIN" "$dashboard_block" 'Host\(`\$\{DASHBOARD_DOMAIN\}`\)'
-assert_match "console is routed on CONSOLE_DOMAIN" "$console_block" 'Host\(`\$\{CONSOLE_DOMAIN\}`\)'
+# `.` stands in for Traefik's backticks around the host rule: a literal one inside a
+# single-quoted pattern reads as a command substitution to shellcheck (SC2016).
+assert_match "dashboard is routed on DASHBOARD_DOMAIN" "$dashboard_block" 'Host\(.\$\{DASHBOARD_DOMAIN\}.\)'
+assert_match "console is routed on CONSOLE_DOMAIN" "$console_block" 'Host\(.\$\{CONSOLE_DOMAIN\}.\)'
 refute_match "dashboard never claims the console hostname" "$dashboard_block" 'CONSOLE_DOMAIN'
-refute_match "console never claims the dashboard hostname" "$console_block" 'Host\(`\$\{DASHBOARD_DOMAIN\}`\)'
+refute_match "console never claims the dashboard hostname" "$console_block" 'Host\(.\$\{DASHBOARD_DOMAIN\}.\)'
 
 # Mailed links (password reset, email confirmation) go to a tenant's users, so the
 # origin the API writes into them is the dashboard's — never the operator console's.

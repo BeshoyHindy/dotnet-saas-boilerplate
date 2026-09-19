@@ -43,8 +43,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      dashboard: ${{ steps.filter.outputs.dashboard }}
-      console: ${{ steps.filter.outputs.console }}
+      # paths-filter's `changes` output is a JSON array of the filter names that matched
+      # — exactly the matrix this workflow wants, so a client that did not change never
+      # gets a job rather than getting one that skips.
+      clients: ${{ steps.filter.outputs.changes }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -64,15 +66,14 @@ jobs:
   client:
     name: Lint, build & test (${{ matrix.client }})
     needs: changes
-    # Indexed by the matrix leg, so each client runs only when it (or the shared
-    # contract) changed.
-    if: needs.changes.outputs[matrix.client] == 'true'
+    if: needs.changes.outputs.clients != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        client: [dashboard, console]
+        # Only the clients whose files (or the shared contract) changed.
+        client: ${{ fromJson(needs.changes.outputs.clients) }}
     defaults:
       run:
         working-directory: clients/${{ matrix.client }}
