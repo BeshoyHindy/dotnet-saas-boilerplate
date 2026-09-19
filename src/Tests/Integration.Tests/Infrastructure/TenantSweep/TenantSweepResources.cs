@@ -58,6 +58,13 @@ public sealed class SeededTenant
 {
     public required string TenantId { get; init; }
     public required string AdminEmail { get; init; }
+
+    /// <summary>
+    /// The id of the user whose token <see cref="AdminClient"/> carries. Needed by the self-service
+    /// routes, which only let a caller act on their <i>own</i> rows: the session revoke route reads
+    /// this to mint a session the control is actually allowed to delete.
+    /// </summary>
+    public required string AdminUserId { get; init; }
     public required string Marker { get; init; }
     public required HttpClient AdminClient { get; init; }
     public required IReadOnlyDictionary<ResourceKind, string> Ids { get; init; }
@@ -67,6 +74,14 @@ public sealed class SeededTenant
         : throw new InvalidOperationException(
             $"The sweep did not seed a {kind} for tenant {TenantId}; TenantSweepSeeder must create one.");
 }
+
+/// <summary>
+/// What one pass of <see cref="TenantSweepSeeder"/> produced: the row of every kind, plus the few
+/// facts about the tenant's admin that the self-service routes need.
+/// </summary>
+/// <param name="Ids">One live row per <see cref="ResourceKind"/>.</param>
+/// <param name="AdminUserId">The user behind the admin token.</param>
+public sealed record SeededRows(IReadOnlyDictionary<ResourceKind, string> Ids, string AdminUserId);
 
 /// <summary>
 /// Maps a route's <see cref="ResourceParameter.RegistryKey"/> (preceding literal segment + parameter
@@ -95,6 +110,10 @@ public static class TenantSweepRegistry
             // Identity — groups, sessions, impersonation grants
             ["groups/id"] = ResourceKind.Group,
             ["groups/groupId"] = ResourceKind.Group,
+            // The session probed on the B side is a LIVE session of tenant B's user, not a spent one:
+            // if the tenant filter ever came off, the revoke routes would find it and answer
+            // something other than 404 (the self-service route refuses another user's session, the
+            // admin route revokes it), so the probe has a real row to fail against.
             ["sessions/sessionId"] = ResourceKind.Session,
             ["grants/id"] = ResourceKind.ImpersonationGrant,
 
@@ -288,7 +307,7 @@ internal static class TenantSweepSeeder
         PropertyNameCaseInsensitive = true,
     };
 
-    public static async Task<IReadOnlyDictionary<ResourceKind, string>> SeedAsync(
+    public static async Task<SeededRows> SeedAsync(
         AppWebApplicationFactory factory,
         AuthHelper auth,
         HttpClient adminClient,
@@ -329,7 +348,7 @@ internal static class TenantSweepSeeder
         ids[ResourceKind.AuditCorrelation] = audit.CorrelationId;
         ids[ResourceKind.AuditTrace] = audit.TraceId;
 
-        return ids;
+        return new SeededRows(ids, adminUserId);
     }
 
     /// <summary>The id of the user whose token <paramref name="client"/> carries.</summary>

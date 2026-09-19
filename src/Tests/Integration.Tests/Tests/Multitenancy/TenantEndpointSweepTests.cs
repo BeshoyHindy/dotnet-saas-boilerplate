@@ -219,24 +219,36 @@ public sealed class TenantEndpointSweepTests
     {
         var sweep = await SweepAsync();
         var failures = new List<string>();
+        var controlled = 0;
 
-        foreach (var endpoint in Ordered(ResourceEndpoints(sweep)
-            .Where(e => !e.IsExempt && !e.IsRootOnly && IsDestructive(e))))
+        var destructive = Ordered(ResourceEndpoints(sweep)
+            .Where(e => !e.IsExempt && !e.IsRootOnly && IsDestructive(e))).ToList();
+
+        foreach (var endpoint in destructive)
         {
+            if (TenantSweepFreshRows.DestructiveRoutesWithoutAControl.ContainsKey(endpoint.Name))
+            {
+                continue;
+            }
+
             var fresh = await MintFreshAsync(sweep, endpoint);
             if (fresh is null)
             {
-                // No fresh-row factory for this resource kind: the non-destructive control and the
-                // B-side 404 still cover the route; skipping beats deleting a row other cases need.
+                failures.Add(
+                    $"{endpoint.Name}\n      no fresh row could be minted for it, so this DELETE is " +
+                    "never proven to work at all — its 404 for tenant B means nothing. Add a factory " +
+                    $"to {nameof(TenantSweepFreshRows)} (per kind, or per route when the ids have to " +
+                    $"agree), or name the route in " +
+                    $"{nameof(TenantSweepFreshRows)}.{nameof(TenantSweepFreshRows.DestructiveRoutesWithoutAControl)} " +
+                    "with the reason.");
                 continue;
             }
 
             var (path, routeValues) = Substitute(endpoint, sweep.A, fresh);
             using var response = await SendAsync(sweep.A.AdminClient, endpoint, path, routeValues, sweep.A);
+            controlled++;
 
-            if (response.StatusCode is HttpStatusCode.NotFound
-                or HttpStatusCode.Unauthorized
-                or HttpStatusCode.Forbidden)
+            if ((int)response.StatusCode >= 400)
             {
                 failures.Add(
                     $"{endpoint.Name}\n      called as {endpoint.Method} {path} on a row seeded moments before\n" +
@@ -244,6 +256,11 @@ public sealed class TenantEndpointSweepTests
                     $"      body: {Truncate(await response.Content.ReadAsStringAsync())}");
             }
         }
+
+        _output.WriteLine(
+            $"destructive routes     : {destructive.Count}\n" +
+            $"  controlled           : {controlled}\n" +
+            $"  declared without one : {destructive.Count(e => TenantSweepFreshRows.DestructiveRoutesWithoutAControl.ContainsKey(e.Name))}");
 
         failures.ShouldBeEmpty(
             "a destructive verb must reach the caller's own row, or its 404 for the other tenant says " +
@@ -532,10 +549,11 @@ public sealed class TenantEndpointSweepTests
     };
 
     /// <summary>
-    /// A row created for a single destructive control, so the control does not consume a row the
-    /// rest of the sweep still needs. Returns null for kinds with no cheap factory.
+    /// Rows created for a single destructive control, so the control does not consume a row the rest
+    /// of the sweep still needs. Null means no factory could produce them, which the caller reports
+    /// as a failure rather than a skip.
     /// </summary>
-    private static async Task<IReadOnlyDictionary<ResourceKind, string>?> MintFreshAsync(
+    private static Task<IReadOnlyDictionary<ResourceKind, string>?> MintFreshAsync(
         TenantSweepFixture sweep, SweptEndpoint endpoint)
     {
         var kinds = endpoint.ResourceParameters
@@ -543,20 +561,7 @@ public sealed class TenantEndpointSweepTests
             .Distinct()
             .ToList();
 
-        var fresh = new Dictionary<ResourceKind, string>();
-
-        foreach (var kind in kinds)
-        {
-            var id = await TenantSweepFreshRows.TryCreateAsync(sweep, sweep.A, kind);
-            if (id is null)
-            {
-                return null;
-            }
-
-            fresh[kind] = id;
-        }
-
-        return fresh;
+        return TenantSweepFreshRows.TryCreateAsync(sweep, sweep.A, endpoint.Name, kinds);
     }
 
     /// <summary>

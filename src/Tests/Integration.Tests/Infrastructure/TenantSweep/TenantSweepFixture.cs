@@ -31,7 +31,8 @@ public sealed class TenantSweepFixture
         Auth = new AuthHelper(factory);
     }
 
-    private AppWebApplicationFactory Factory { get; }
+    /// <summary>The running host. Fresh-row factories register throwaway users through it.</summary>
+    public AppWebApplicationFactory Factory { get; }
 
     public AuthHelper Auth { get; }
 
@@ -99,15 +100,16 @@ public sealed class TenantSweepFixture
         // which is what lets the list half of the sweep spot a leak on any endpoint at all.
         var marker = $"{prefix}{tenantId[^8..]}";
 
-        var ids = await TenantSweepSeeder.SeedAsync(Factory, Auth, client, tenantId, marker);
+        var seeded = await TenantSweepSeeder.SeedAsync(Factory, Auth, client, tenantId, marker);
 
         return new SeededTenant
         {
             TenantId = tenantId,
             AdminEmail = adminEmail,
+            AdminUserId = seeded.AdminUserId,
             Marker = marker,
             AdminClient = client,
-            Ids = ids,
+            Ids = seeded.Ids,
         };
     }
 }
