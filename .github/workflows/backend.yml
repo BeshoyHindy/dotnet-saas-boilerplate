@@ -59,6 +59,7 @@ jobs:
       backend: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.backend == 'true' }} # the .NET test suites
       docker: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.docker == 'true' }} # the migrator image smoke
       images: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.images == 'true' }} # publishing to GHCR
+      openapi: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.openapi == 'true' }} # the OpenAPI drift gate
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -72,6 +73,14 @@ jobs:
               - '!src/Host/Dockerfile'
               - 'global.json'
               - 'coverage.runsettings'
+              - '.github/workflows/backend.yml'
+            openapi:
+              - 'src/**'
+              - '!src/Host/Dockerfile'
+              - 'clients/openapi/**'
+              - 'scripts/export-openapi.sh'
+              - 'scripts/check-openapi-drift.sh'
+              - 'global.json'
               - '.github/workflows/backend.yml'
             docker:
               - 'src/Host/Dockerfile'
@@ -503,10 +512,28 @@ jobs:
             fi
           done
 
-  # ── OpenAPI drift (issue #15) ───────────────────────────────────────
-  # The drift gate belongs in this workflow, next to the build that produces the
-  # document. Issue #15 owns it; when it lands, add it to `backend-ci` below so
-  # it becomes part of the single required check.
+  # ── OpenAPI drift (issue #15, ADR-0004) ─────────────────────────────
+  # The drift gate lives next to the build that produces the document: the API
+  # re-exports clients/openapi/v1.json and fails if that changes anything. The
+  # frontend half (regenerating src/api/schema.d.ts from the same file) lives
+  # in frontend.yml — together the two block drift on both sides.
+  openapi-drift:
+    name: OpenAPI Drift (backend)
+    needs: changes
+    if: github.event_name != 'push' && needs.changes.outputs.openapi == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Re-export the OpenAPI document and fail on drift
+        run: bash scripts/check-openapi-drift.sh backend
 
   # Single required status check. Always runs on a pull request (even when the
   # heavy jobs are skipped on a client-only PR) so branch protection resolves.
@@ -515,7 +542,7 @@ jobs:
   # pull requests, and a job that reports "nothing to report" is still a runner.
   backend-ci:
     name: Backend CI
-    needs: [changes, test, integration-test, migrator-smoke, coverage]
+    needs: [changes, test, integration-test, migrator-smoke, coverage, openapi-drift]
     if: always() && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5

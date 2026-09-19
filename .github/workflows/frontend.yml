@@ -11,7 +11,8 @@ name: Frontend CI
 #
 # The third gate is drift: `pnpm generate:api` must be a no-op against the
 # checked-in contract (clients/openapi/v1.json). The backend half of that gate —
-# re-exporting the document from the API — belongs in backend.yml (issue #15).
+# re-exporting the document from the API — is the `openapi-drift` job in
+# backend.yml; both call scripts/check-openapi-drift.sh (issue #15).
 #
 # Gitflow (ADR-0007): `develop` integrates, so the gates run on PRs into
 # `develop`, `main` and the release/hotfix branches.
@@ -90,17 +91,13 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
-      # The frontend half of the OpenAPI drift gate (ADR-0004): regenerating the
-      # types from the checked-in document must change nothing. `git status`, not
-      # `git diff --exit-code`, so a deleted file is caught too.
+      # The frontend half of the OpenAPI drift gate (issue #15, ADR-0004):
+      # regenerating the types from the checked-in document must change
+      # nothing. Shared with the backend half in scripts/check-openapi-drift.sh
+      # so the same check runs here and on a developer's machine.
       - name: API types match the contract
-        run: |
-          pnpm generate:api
-          if [ -n "$(git status --porcelain -- src/api/schema.d.ts)" ]; then
-            echo "::error::src/api/schema.d.ts is stale. Run 'pnpm generate:api' in clients/console and commit the result."
-            git --no-pager diff -- src/api/schema.d.ts
-            exit 1
-          fi
+        working-directory: .
+        run: bash scripts/check-openapi-drift.sh frontend
 
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps chromium
