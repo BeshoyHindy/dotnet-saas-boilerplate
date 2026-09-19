@@ -22,10 +22,10 @@ import { cn } from "@/lib/cn";
 /**
  * TenantBrandingCard — operator-facing theme editor for a single tenant.
  *
- * Scopes every API call to `tenantId` via the `tenant:` header override.
- * The endpoints are current-tenant-scoped server-side, so the operator
- * has to explicitly declare which tenant they're targeting — only root
- * operators get past the override middleware.
+ * The theme endpoints are current-tenant-scoped server-side, and since ADR-0002
+ * a caller cannot scope a request to another tenant: `tenantId` labels the query
+ * cache, but the reads and writes land on the operator's own tenant until the
+ * operator token-exchange endpoint lands.
  *
  * Scope: palette (light + dark) + brand asset URLs. Typography and layout
  * fields exist on the server-side DTO but are intentionally omitted from
@@ -42,7 +42,7 @@ export function TenantBrandingCard({ tenantId }: { tenantId: string }) {
 
   const themeQuery = useQuery({
     queryKey: themeQueryKey,
-    queryFn: () => getTenantTheme(tenantId),
+    queryFn: () => getTenantTheme(),
     // Re-fetch when the page regains focus so other admins' edits are
     // picked up without a manual refresh.
     refetchOnWindowFocus: true,
@@ -60,7 +60,7 @@ export function TenantBrandingCard({ tenantId }: { tenantId: string }) {
   }, [themeQuery.data]);
 
   const saveMutation = useMutation({
-    mutationFn: (theme: TenantThemeDto) => updateTenantTheme(tenantId, theme),
+    mutationFn: (theme: TenantThemeDto) => updateTenantTheme(theme),
     onSuccess: () => {
       toast.success("Branding saved");
       void queryClient.invalidateQueries({ queryKey: themeQueryKey });
@@ -70,7 +70,7 @@ export function TenantBrandingCard({ tenantId }: { tenantId: string }) {
   });
 
   const resetMutation = useMutation({
-    mutationFn: () => resetTenantTheme(tenantId),
+    mutationFn: () => resetTenantTheme(),
     onSuccess: () => {
       toast.success("Branding reset to defaults");
       void queryClient.invalidateQueries({ queryKey: themeQueryKey });

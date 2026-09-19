@@ -52,7 +52,7 @@ Environment variables are read via `import.meta.env` and surfaced through `src/e
 | Variable                  | Default                  | Purpose                                       |
 |---------------------------|--------------------------|-----------------------------------------------|
 | `VITE_API_BASE_URL`       | `http://localhost:5030`  | API origin used by the dev proxy              |
-| `VITE_DEFAULT_TENANT`     | `root`                   | Default tenant header for unauthenticated calls |
+| `VITE_DEFAULT_TENANT`     | `root`                   | Tenant pre-filled on the sign-in form and used in anonymous auth URLs |
 
 Create `.env.local` to override locally.
 
@@ -66,7 +66,7 @@ src/
 │   ├── layout/         # Sidebar, Topbar, AppShell
 │   └── ui/             # shadcn primitives (Button, Card, Input, Label, Table)
 ├── lib/
-│   ├── api-client.ts   # fetch wrapper: auth header, tenant header, single-flight refresh
+│   ├── api-client.ts   # fetch wrapper: auth header, auth-route builder, single-flight refresh
 │   ├── query-client.ts # TanStack QueryClient
 │   └── cn.ts           # clsx + tailwind-merge
 ├── pages/              # Route-level components
@@ -78,10 +78,10 @@ src/
 
 ## Authentication flow
 
-1. `POST /api/v1/identity/token/issue` with `{ email, password }` plus `tenant` header.
+1. `POST /api/v1/tenants/{tenant}/auth/token` with `{ email, password }`. The tenant is a path segment — the only place a caller may name one, and only while no token exists yet (ADR-0002).
 2. Access + refresh tokens are stored in `localStorage` (keys prefixed `boilerplate.admin.`).
-3. The API client attaches `Authorization: Bearer <access>` and `tenant: <slug>` on every call.
-4. On `401`, a single-flight refresh call hits `POST /api/v1/identity/token/refresh`, retries the original request, and logs the user out if the refresh fails.
+3. The API client attaches `Authorization: Bearer <access>` on every call and sends no tenant of its own: the server reads the token's `tenant` claim.
+4. On `401`, a single-flight refresh call hits `POST /api/v1/tenants/{tenant}/auth/refresh`, retries the original request, and logs the user out if the refresh fails.
 
 ## Styling
 

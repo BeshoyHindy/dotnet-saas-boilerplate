@@ -13,7 +13,7 @@ test.describe("admin confirm-email", () => {
   test("success state on 2xx with continue-to-signin CTA", async ({ page }) => {
     await mockJsonResponse(
       page,
-      "**/api/v1/identity/confirm-email**",
+      "**/api/v1/tenants/*/auth/confirm-email**",
       '"Your email is confirmed."',
     );
     await page.goto(VALID_LINK);
@@ -26,7 +26,7 @@ test.describe("admin confirm-email", () => {
   });
 
   test("failure state with recovery affordances", async ({ page }) => {
-    await mockProblemDetails(page, "**/api/v1/identity/confirm-email**", 400, {
+    await mockProblemDetails(page, "**/api/v1/tenants/*/auth/confirm-email**", 400, {
       title: "Invalid token",
       detail: "The confirmation token is no longer valid.",
     });

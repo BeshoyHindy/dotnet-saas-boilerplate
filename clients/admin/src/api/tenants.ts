@@ -141,11 +141,11 @@ export async function retryTenantProvisioning(id: string): Promise<TenantProvisi
 // ─────────────────────────────────────────────────────────────────────────
 // Tenant theme / branding
 //
-// The theme endpoints are CURRENT-TENANT scoped server-side — they read
-// the request's tenant header and act on that tenant's row. The admin
-// operator is in the root tenant by default, so we explicitly send
-// `tenant: <targetId>` to operate on a different tenant. The server's
-// root-operator override middleware permits this for root callers.
+// The theme endpoints are CURRENT-TENANT scoped server-side: they act on the
+// tenant the caller's token names. Since ADR-0002 an operator cannot scope a
+// request to another tenant, so `tenantId` below only labels the query cache —
+// the call reads and writes the operator's own tenant until the operator
+// token-exchange endpoint lands.
 // ─────────────────────────────────────────────────────────────────────────
 
 export type PaletteDto = {
@@ -214,29 +214,22 @@ export const DEFAULT_DARK_PALETTE: PaletteDto = {
   info: "#38BDF8",
 };
 
-/** Fetch a tenant's theme. Caller needs MultitenancyPermissions.Tenants.ViewTheme. */
-export async function getTenantTheme(tenantId: string): Promise<TenantThemeDto> {
-  return apiFetch<TenantThemeDto>(`/api/v1/tenants/theme`, {
-    headers: { tenant: tenantId },
-  });
+/** Fetch the caller's tenant theme. Needs MultitenancyPermissions.Tenants.ViewTheme. */
+export async function getTenantTheme(): Promise<TenantThemeDto> {
+  return apiFetch<TenantThemeDto>(`/api/v1/tenants/theme`);
 }
 
-/** Save a tenant's theme. Caller needs MultitenancyPermissions.Tenants.UpdateTheme. */
-export async function updateTenantTheme(
-  tenantId: string,
-  theme: TenantThemeDto,
-): Promise<void> {
+/** Save the caller's tenant theme. Needs MultitenancyPermissions.Tenants.UpdateTheme. */
+export async function updateTenantTheme(theme: TenantThemeDto): Promise<void> {
   await apiFetch<void>(`/api/v1/tenants/theme`, {
     method: "PUT",
-    headers: { tenant: tenantId },
     body: JSON.stringify(theme),
   });
 }
 
-/** Reset a tenant's theme to framework defaults. */
-export async function resetTenantTheme(tenantId: string): Promise<void> {
+/** Reset the caller's tenant theme to framework defaults. */
+export async function resetTenantTheme(): Promise<void> {
   await apiFetch<void>(`/api/v1/tenants/theme/reset`, {
     method: "POST",
-    headers: { tenant: tenantId },
   });
 }

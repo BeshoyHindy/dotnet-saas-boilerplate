@@ -64,27 +64,28 @@ test.describe("reset-password page", () => {
   });
 
   test("posts to /reset-password and redirects to /login on success", async ({ page }) => {
-    const captured = captureRequest(page, "**/api/v1/identity/reset-password");
+    const captured = captureRequest(page, "**/api/v1/tenants/*/auth/reset-password");
 
     await page.goto(VALID_LINK);
     await page.getByLabel("New password").fill("VeryStrong!Passw0rd");
     await page.getByLabel("Confirm password").fill("VeryStrong!Passw0rd");
     await page.getByRole("button", { name: /set new password/i }).click();
 
-    const { body, headers } = await captured.value();
+    const { body, headers, url } = await captured.value();
     expect(body).toMatchObject({
       email: "alice@acme.com",
       password: "VeryStrong!Passw0rd",
       token: "ABC123def",
     });
-    expect(headers.tenant).toBe("acme");
+    expect(url).toContain("/api/v1/tenants/acme/auth/reset-password");
+    expect(headers.tenant).toBeUndefined();
 
     // Redirects to /login on success.
     await expect(page).toHaveURL(/\/login$/);
   });
 
   test("surfaces a token-expired error inline without leaving the page", async ({ page }) => {
-    await mockProblemDetails(page, "**/api/v1/identity/reset-password", 400, {
+    await mockProblemDetails(page, "**/api/v1/tenants/*/auth/reset-password", 400, {
       title: "Invalid token",
       detail: "The reset token has expired or already been used.",
     });
@@ -103,7 +104,7 @@ test.describe("reset-password page", () => {
   });
 
   test("typing after an error clears the alert (avoids stale messages)", async ({ page }) => {
-    await mockProblemDetails(page, "**/api/v1/identity/reset-password", 400, {
+    await mockProblemDetails(page, "**/api/v1/tenants/*/auth/reset-password", 400, {
       title: "Invalid token",
       detail: "The reset token has expired or already been used.",
     });

@@ -5,9 +5,9 @@ import { mockJsonResponse, mockProblemDetails } from "../helpers/api-mocks";
 // an authed session here — a seeded session makes <LoginPage> redirect away
 // (Navigate to "/") and the form never renders.
 //
-// The login form posts to /api/v1/identity/token/issue with the `tenant`
-// header + `X-Client-App: admin`, and a body of { email, password } (the tenant
-// rides the header, not the body). See src/auth/api.ts.
+// The login form posts to /api/v1/tenants/{tenant}/auth/token with
+// `X-Client-App: admin` and a body of { email, password }. The tenant is a path
+// segment, never a header or a body field (ADR-0002). See src/auth/api.ts.
 
 const TOKEN_RESPONSE = {
   accessToken: "fake.access.token",
@@ -39,10 +39,10 @@ test.describe("admin login", () => {
     await expect(page.getByRole("link", { name: "Forgot?" })).toBeVisible();
   });
 
-  test("manual sign-in posts to token/issue with the admin app + tenant headers", async ({
+  test("manual sign-in posts to the tenant auth route with the admin app header", async ({
     page,
   }) => {
-    await mockJsonResponse(page, "**/api/v1/identity/token/issue", TOKEN_RESPONSE);
+    await mockJsonResponse(page, "**/api/v1/tenants/*/auth/token", TOKEN_RESPONSE);
 
     await page.goto("/login");
 
@@ -53,23 +53,24 @@ test.describe("admin login", () => {
 
     const reqPromise = page.waitForRequest(
       (r) =>
-        r.url().includes("/api/v1/identity/token/issue") && r.method() === "POST",
+        r.url().includes("/auth/token") && r.method() === "POST",
       { timeout: 5_000 },
     );
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     const req = await reqPromise;
 
-    // X-Client-App marks this as the platform-admin client; tenant rides the header.
+    // X-Client-App marks this as the platform-admin client; the tenant is in the path.
     expect(req.headers()["x-client-app"]).toBe("admin");
-    expect(req.headers().tenant).toBe("root");
+    expect(req.url()).toContain("/api/v1/tenants/root/auth/token");
+    expect(req.headers().tenant).toBeUndefined();
 
     const body = JSON.parse(req.postData() ?? "{}");
     expect(body.email).toBe("operator@root.example");
     expect(body.password).toBe("Sup3rSecret!");
   });
 
-  test("surfaces a 401 from token/issue and stays on /login", async ({ page }) => {
-    await mockProblemDetails(page, "**/api/v1/identity/token/issue", 401, {
+  test("surfaces a 401 from the token route and stays on /login", async ({ page }) => {
+    await mockProblemDetails(page, "**/api/v1/tenants/*/auth/token", 401, {
       title: "Unauthorized",
       detail: "Invalid credentials.",
     });

@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, authPath } from "@/lib/api-client";
 import type { PagedResponse } from "@/lib/api-types";
 
 export type UserDto = {
@@ -30,9 +30,9 @@ export type SearchUsersParams = {
   emailConfirmed?: boolean;
   roleId?: string;
   /**
-   * When set, sends a `tenant` header overriding the operator's active tenant
-   * for this request only. Used by impersonation flows so a root operator can
-   * browse another tenant's users without flipping their global session.
+   * Target tenant for the impersonation picker. Currently inert: since ADR-0002
+   * the tenant comes from the caller's token alone, so the search runs inside the
+   * operator's own tenant until the operator token-exchange endpoint lands.
    */
   tenantId?: string;
 };
@@ -96,9 +96,7 @@ export async function searchUsers(params: SearchUsersParams = {}): Promise<Paged
   if (params.isActive !== undefined) q.set("IsActive", String(params.isActive));
   if (params.emailConfirmed !== undefined) q.set("EmailConfirmed", String(params.emailConfirmed));
   if (params.roleId) q.set("RoleId", params.roleId);
-  return apiFetch<PagedResponse<UserDto>>(`${BASE}/search?${q.toString()}`, {
-    headers: params.tenantId ? { tenant: params.tenantId } : undefined,
-  });
+  return apiFetch<PagedResponse<UserDto>>(`${BASE}/search?${q.toString()}`);
 }
 
 export async function getUser(id: string): Promise<UserDto> {
@@ -145,10 +143,9 @@ export async function requestPasswordReset(input: {
   email: string;
   tenant: string;
 }): Promise<void> {
-  await apiFetch<string>(`${IDENTITY}/forgot-password`, {
+  await apiFetch<string>(authPath(input.tenant, "forgot-password"), {
     method: "POST",
     skipAuth: true,
-    headers: { tenant: input.tenant },
     body: JSON.stringify({ email: input.email }),
   });
 }
@@ -164,10 +161,9 @@ export async function resetPassword(input: {
   token: string;
   tenant: string;
 }): Promise<void> {
-  await apiFetch<string>(`${IDENTITY}/reset-password`, {
+  await apiFetch<string>(authPath(input.tenant, "reset-password"), {
     method: "POST",
     skipAuth: true,
-    headers: { tenant: input.tenant },
     body: JSON.stringify({
       email: input.email,
       password: input.password,
@@ -177,8 +173,8 @@ export async function resetPassword(input: {
 }
 
 /**
- * Confirm-email link landing. Server expects (userId, code, tenant) as
- * query parameters from the registration email.
+ * Confirm-email link landing. The tenant is a path segment; (userId, code) come
+ * from the registration email as query parameters.
  */
 export async function confirmEmail(input: {
   userId: string;
@@ -188,11 +184,9 @@ export async function confirmEmail(input: {
   const qs = new URLSearchParams({
     userId: input.userId,
     code: input.code,
-    tenant: input.tenant,
   }).toString();
-  return apiFetch<string>(`${IDENTITY}/confirm-email?${qs}`, {
+  return apiFetch<string>(`${authPath(input.tenant, "confirm-email")}?${qs}`, {
     method: "GET",
     skipAuth: true,
-    headers: { tenant: input.tenant },
   });
 }

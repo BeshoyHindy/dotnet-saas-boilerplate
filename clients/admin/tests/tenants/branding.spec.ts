@@ -132,7 +132,7 @@ test.describe("tenant branding card", () => {
     await expect(page.locator("text=/^unsaved$/i").first()).toBeVisible();
   });
 
-  test("Save PUTs the edited theme with the tenant header", async ({ page }) => {
+  test("Save PUTs the edited theme", async ({ page }) => {
     await mockJsonResponse(page, "**/api/v1/tenants/theme", THEME_DEFAULT);
 
     await page.goto(`/tenants/${TENANT_ID}`);
@@ -148,7 +148,8 @@ test.describe("tenant branding card", () => {
     await page.getByRole("button", { name: /save branding/i }).click();
     const req = await reqPromise;
 
-    expect(req.headers().tenant).toBe(TENANT_ID);
+    // No tenant header: the call is scoped by the operator's own token (ADR-0002).
+    expect(req.headers().tenant).toBeUndefined();
     const body = JSON.parse(req.postData() ?? "{}");
     expect(body.brandAssets.logoUrl).toBe("https://cdn.example.com/acme.svg");
     expect(body.lightPalette).toMatchObject({ primary: "#2563EB" });
@@ -170,7 +171,7 @@ test.describe("tenant branding card", () => {
     );
     await page.getByRole("button", { name: /reset (branding )?to defaults/i }).click();
     const req = await reqPromise;
-    expect(req.headers().tenant).toBe(TENANT_ID);
+    expect(req.headers().tenant).toBeUndefined();
 
     await expect(page.getByText(/branding reset to defaults/i)).toBeVisible();
   });

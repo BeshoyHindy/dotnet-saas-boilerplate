@@ -23,10 +23,10 @@ export type ImpersonationResponse = {
  * to the dashboard via a URL hash so the dashboard can swap into the
  * impersonated session in a fresh tab.
  *
- * Note: the admin's apiFetch attaches the operator's current tenant header
- * by default, which the server uses for the cross-tenant authorization
- * check (root operators may impersonate any tenant; tenant admins only
- * their own). We do NOT override the tenant header here for that reason.
+ * Note: the caller's tenant comes from their own token (ADR-0002), and the
+ * server uses it for the cross-tenant authorization check (root operators may
+ * impersonate any tenant; tenant admins only their own). The target tenant
+ * travels in the request body, not in any header.
  *
  * ---
  * Why there is no `endImpersonation()` in this file (compare dashboard):

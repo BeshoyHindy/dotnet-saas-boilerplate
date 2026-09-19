@@ -12,28 +12,29 @@ test.describe("admin forgot-password", () => {
     await expect(page.getByRole("button", { name: /send reset link/i })).toBeVisible();
   });
 
-  test("posts email + tenant header to /forgot-password", async ({ page }) => {
+  test("posts the email to the tenant-scoped /forgot-password route", async ({ page }) => {
     await page.goto("/forgot-password");
     await page.getByLabel("Email").fill("operator@root.example");
     await page.getByLabel("Tenant").fill("root");
 
     const reqPromise = page.waitForRequest(
       (r) =>
-        r.url().includes("/api/v1/identity/forgot-password") && r.method() === "POST",
+        r.url().includes("/auth/forgot-password") && r.method() === "POST",
       { timeout: 5_000 },
     );
-    await mockJsonResponse(page, "**/api/v1/identity/forgot-password", '""');
+    await mockJsonResponse(page, "**/api/v1/tenants/*/auth/forgot-password", '""');
     await page.getByRole("button", { name: /send reset link/i }).click();
     const req = await reqPromise;
 
     expect(JSON.parse(req.postData() ?? "{}")).toMatchObject({
       email: "operator@root.example",
     });
-    expect(req.headers().tenant).toBe("root");
+    expect(req.url()).toContain("/api/v1/tenants/root/auth/forgot-password");
+    expect(req.headers().tenant).toBeUndefined();
   });
 
   test("shows the 'check your inbox' success state after 200", async ({ page }) => {
-    await mockJsonResponse(page, "**/api/v1/identity/forgot-password", '""');
+    await mockJsonResponse(page, "**/api/v1/tenants/*/auth/forgot-password", '""');
 
     await page.goto("/forgot-password");
     await page.getByLabel("Email").fill("alice@acme.com");
@@ -47,7 +48,7 @@ test.describe("admin forgot-password", () => {
   });
 
   test("surfaces server errors inline", async ({ page }) => {
-    await mockProblemDetails(page, "**/api/v1/identity/forgot-password", 500, {
+    await mockProblemDetails(page, "**/api/v1/tenants/*/auth/forgot-password", 500, {
       title: "Tenant resolution failed",
       detail: "No tenant matching the supplied identifier.",
     });

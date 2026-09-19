@@ -41,7 +41,7 @@ test.describe("admin reset-password", () => {
   });
 
   test("posts to /reset-password and bounces to /login on success", async ({ page }) => {
-    await mockJsonResponse(page, "**/api/v1/identity/reset-password", '""');
+    await mockJsonResponse(page, "**/api/v1/tenants/*/auth/reset-password", '""');
 
     await page.goto(VALID_LINK);
     await page.getByLabel("New password").fill("VeryStrong!Passw0rd");
@@ -49,7 +49,7 @@ test.describe("admin reset-password", () => {
 
     const reqPromise = page.waitForRequest(
       (r) =>
-        r.url().includes("/api/v1/identity/reset-password") && r.method() === "POST",
+        r.url().includes("/auth/reset-password") && r.method() === "POST",
       { timeout: 5_000 },
     );
     await page.getByRole("button", { name: /set new password/i }).click();
@@ -60,12 +60,13 @@ test.describe("admin reset-password", () => {
       password: "VeryStrong!Passw0rd",
       token: "ABC123",
     });
-    expect(req.headers().tenant).toBe("root");
+    expect(req.url()).toContain("/api/v1/tenants/root/auth/reset-password");
+    expect(req.headers().tenant).toBeUndefined();
     await expect(page).toHaveURL(/\/login$/);
   });
 
   test("surfaces a token-expired error inline", async ({ page }) => {
-    await mockProblemDetails(page, "**/api/v1/identity/reset-password", 400, {
+    await mockProblemDetails(page, "**/api/v1/tenants/*/auth/reset-password", 400, {
       title: "Invalid token",
       detail: "The reset token has expired or already been used.",
     });

@@ -23,10 +23,10 @@ import { cn } from "@/lib/cn";
 /**
  * BrandingSettings — tenant-facing theme editor for the *current* tenant.
  *
- * Mirrors the operator's TenantBrandingCard (clients/admin) but drops the
- * tenant targeting: the theme endpoints are current-tenant scoped, so a
- * tenant admin holding Tenants.UpdateTheme edits their own branding with no
- * `tenant:` header. The Branding tab only renders for holders of that
+ * Mirrors the operator's TenantBrandingCard (clients/admin): the theme endpoints
+ * are current-tenant scoped, so a tenant admin holding Tenants.UpdateTheme edits
+ * the branding of whichever tenant their token names. The Branding tab only
+ * renders for holders of that
  * permission (see settings-layout TABS); a direct-URL visit without it still
  * mounts this page, and the API answers 403 — surfaced as an error band.
  *

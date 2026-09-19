@@ -16,7 +16,7 @@ const JSON_HEADERS = { "Content-Type": "application/json" } as const;
  * Respond to any matching request with 200 OK + JSON body.
  *
  * @example
- *   await mockJsonResponse(page, "**\/api/v1/identity/forgot-password", "");
+ *   await mockJsonResponse(page, "**\/api/v1/tenants/*\/auth/forgot-password", "");
  */
 export async function mockJsonResponse<T>(
   page: Page,
@@ -73,16 +73,18 @@ export async function mockProblemDetails(
  *   await page.getByRole("button", { name: /send/i }).click();
  *   expect(await sentBody.value()).toMatchObject({ email: "...@..." });
  */
+type CapturedRequest = { body: unknown; headers: Record<string, string>; url: string };
+
 export function captureRequest(page: Page, urlGlob: string) {
-  let resolved: { body: unknown; headers: Record<string, string> } | null = null;
-  const waiters: Array<(v: { body: unknown; headers: Record<string, string> }) => void> = [];
+  let resolved: CapturedRequest | null = null;
+  const waiters: Array<(v: CapturedRequest) => void> = [];
 
   void page.route(urlGlob, async (route: Route) => {
     const req = route.request();
     const raw = req.postData();
     const body: unknown = raw ? JSON.parse(raw) : undefined;
     const headers = req.headers();
-    resolved = { body, headers };
+    resolved = { body, headers, url: req.url() };
     for (const w of waiters) w(resolved);
     waiters.length = 0;
     await route.fulfill({ status: 200, headers: JSON_HEADERS, body: '""' });
@@ -91,7 +93,7 @@ export function captureRequest(page: Page, urlGlob: string) {
   return {
     async value(timeoutMs = 5_000) {
       if (resolved) return resolved;
-      return await new Promise<{ body: unknown; headers: Record<string, string> }>(
+      return await new Promise<CapturedRequest>(
         (resolve, reject) => {
           const t = setTimeout(
             () => reject(new Error(`captureRequest timed out waiting for ${urlGlob}`)),
