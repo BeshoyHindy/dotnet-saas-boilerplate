@@ -35,7 +35,7 @@ var redisConnectionString = ReferenceExpression.Create(
     $"{redisEndpoint.Property(EndpointProperty.HostAndPort)}");
 
 // RedisInsight cache browser (dev-only) sidecar; RI_REDIS_* pre-registers the Valkey connection via the container-network alias "redis".
-builder.AddContainer("redis-insight", "redis/redisinsight", "latest")
+builder.AddContainer("redis-insight", "redis/redisinsight", "3.8.0")
     .WithHttpEndpoint(port: 5540, targetPort: 5540, name: "http")
     .WithEnvironment("RI_REDIS_HOST0", "redis")
     .WithEnvironment("RI_REDIS_PORT0", "6379")
@@ -154,6 +154,8 @@ var api = builder.AddProject<Projects.Boilerplate_Api>($"{appPrefix}-api")
     .WithEnvironment("MailOptions__DisplayName", "Boilerplate")
     .WithEnvironment("MailOptions__Smtp__Host", ReferenceExpression.Create($"{mailpitSmtp.Property(EndpointProperty.Host)}"))
     .WithEnvironment("MailOptions__Smtp__Port", ReferenceExpression.Create($"{mailpitSmtp.Property(EndpointProperty.Port)}"))
+    // Mailpit speaks plain SMTP and never advertises STARTTLS, which the SmtpOptions default requires.
+    .WithEnvironment("MailOptions__Smtp__SecureSocket", "None")
     .WithEnvironment("Storage__Provider", "s3")
     .WithEnvironment("Storage__S3__Bucket", MinioBucket)
     .WithEnvironment("Storage__S3__Region", "us-east-1")

@@ -122,10 +122,8 @@ services:
       DatabaseOptions__ConnectionString: Host=postgres;Port=5432;Database=${POSTGRES_DB:-boilerplate};Username=${POSTGRES_USER:-boilerplate};Password=${POSTGRES_PASSWORD:?run scripts/local-env.sh to generate .env}
       DatabaseOptions__MigrationsAssembly: Boilerplate.Migrations.PostgreSQL
       Seed__DefaultAdminPassword: ${SEED_ADMIN_PASSWORD:?run scripts/local-env.sh to generate .env}
-      # The migrator never mints tokens, but it loads IdentityModule, whose JwtOptions are
-      # validated on start — and in Production the validator rejects the "placeholder" key the
-      # migrator falls back to. Give it the API's key rather than a value shaped to slip past.
-      JwtOptions__SigningKey: ${JWT_SIGNING_KEY:?run scripts/local-env.sh to generate .env}
+      # No JwtOptions here on purpose: the migrator turns off EnableAuthentication, so it never
+      # needs a signing key it could not use anyway.
     command: ["apply", "--seed"]
 
   api:
@@ -139,6 +137,7 @@ services:
       postgres:   { condition: service_healthy }
       valkey:     { condition: service_healthy }
       minio:      { condition: service_healthy }
+      mailpit:    { condition: service_started }
       minio-init: { condition: service_completed_successfully }
       migrator:   { condition: service_completed_successfully }
     environment:
@@ -171,6 +170,9 @@ services:
       MailOptions__DisplayName: Boilerplate
       MailOptions__Smtp__Host: mailpit
       MailOptions__Smtp__Port: "1025"
+      # Mailpit speaks plain SMTP on the compose network and never advertises STARTTLS, which the
+      # default (StartTls) requires. A real relay keeps the default.
+      MailOptions__Smtp__SecureSocket: None
       OpenTelemetryOptions__Exporter__Otlp__Endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     ports:
       - "${APP_API_PORT:-8080}:8080"

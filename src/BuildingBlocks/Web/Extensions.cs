@@ -41,6 +41,11 @@ public static class Extensions
         var options = new AppPlatformOptions();
         configure?.Invoke(options);
 
+        // Publish the resolved options so modules configured later in the same build can honour them.
+        // IHostApplicationBuilder.Properties exists for exactly this — passing state between builder
+        // extensions — and keeps the flags out of DI, where a module would have to scan descriptors.
+        builder.SetHeroPlatformOptions(options);
+
         builder.Services.AddPermissions(SystemPermissions.All);
 
         builder.Services.AddScoped<CurrentUserMiddleware>();
@@ -236,6 +241,51 @@ public sealed class AppPlatformOptions
     public bool EnableMailing { get; set; } = false;
     public bool EnableOpenTelemetry { get; set; } = true;
     public bool EnableIdempotency { get; set; } = true;
+
+    /// <summary>
+    /// Registers JWT bearer authentication and the authorization policies. Turn it off in a host that
+    /// loads the modules for their data access but never authenticates a caller — the DbMigrator. Such
+    /// a host has no signing key, and requiring one would mean either shipping a placeholder (a secret
+    /// a Production validator has to be taught to ignore) or handing the migrator the API's key.
+    /// </summary>
+    public bool EnableAuthentication { get; set; } = true;
+}
+
+/// <summary>
+/// Lets a module read the <see cref="AppPlatformOptions"/> the host chose in
+/// <c>AddHeroPlatform</c>. Modules only receive the <see cref="IHostApplicationBuilder"/>, so the
+/// options travel in its <see cref="IHostApplicationBuilder.Properties"/> bag.
+/// </summary>
+public static class AppPlatformOptionsExtensions
+{
+    private const string PropertyKey = "Boilerplate.BuildingBlocks.Web.AppPlatformOptions";
+
+    /// <summary>
+    /// Publishes the options for modules configured later in the same build. <c>AddHeroPlatform</c>
+    /// calls this; a host that composes modules without the full platform can call it directly.
+    /// </summary>
+    public static IHostApplicationBuilder SetHeroPlatformOptions(this IHostApplicationBuilder builder, AppPlatformOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(options);
+
+        builder.Properties[PropertyKey] = options;
+        return builder;
+    }
+
+    /// <summary>
+    /// The options the host configured, or the defaults when a host wires modules without calling
+    /// <c>AddHeroPlatform</c> — defaults leave every feature in the state it had before the flag
+    /// existed, so a module that asks is never worse off than one that does not.
+    /// </summary>
+    public static AppPlatformOptions GetHeroPlatformOptions(this IHostApplicationBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        return builder.Properties.TryGetValue(PropertyKey, out var value) && value is AppPlatformOptions options
+            ? options
+            : new AppPlatformOptions();
+    }
 }
 
 public sealed class AppPipelineOptions

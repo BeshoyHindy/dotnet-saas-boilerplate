@@ -132,8 +132,8 @@ public class SmtpMailService(IOptions<MailOptions> settings, ILogger<SmtpMailSer
 
         try
         {
-            await client.ConnectAsync(_settings.Smtp!.Host!, _settings.Smtp.Port, SecureSocketOptions.StartTls, ct);
-            
+            await client.ConnectAsync(_settings.Smtp!.Host!, _settings.Smtp.Port, _settings.Smtp.SecureSocket, ct);
+
             if (!string.IsNullOrWhiteSpace(_settings.Smtp.UserName) && !string.IsNullOrWhiteSpace(_settings.Smtp.Password))
             {
                 await client.AuthenticateAsync(_settings.Smtp.UserName, _settings.Smtp.Password, ct);

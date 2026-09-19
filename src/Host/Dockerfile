@@ -11,7 +11,7 @@
 
 ARG DOTNET_VERSION=10.0
 
-# ── Shared build stage ──────────────────────────────────────────────
+# ── Shared restore stage ────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION} AS build
 WORKDIR /src
 
@@ -22,13 +22,23 @@ COPY src/ ./src/
 # Project-level restore, not `dotnet restore src/Boilerplate.slnx`: .dockerignore
 # drops src/Tests/ from the context, so the solution would reference projects that
 # aren't there. The two entrypoints pull the same transitive graph between them.
-RUN dotnet restore src/Host/Boilerplate.Api/Boilerplate.Api.csproj \
+# The cache mount keeps the NuGet package cache across builds; it is not part of
+# any layer, so it costs nothing in the final image.
+RUN --mount=type=cache,target=/root/.nuget/packages \
+    dotnet restore src/Host/Boilerplate.Api/Boilerplate.Api.csproj \
  && dotnet restore src/Host/Boilerplate.DbMigrator/Boilerplate.DbMigrator.csproj
 
-RUN dotnet publish src/Host/Boilerplate.Api/Boilerplate.Api.csproj \
+# ── Per-entrypoint publish stages ───────────────────────────────────
+# Split so `--target api` never publishes the migrator (and vice versa): BuildKit
+# only builds the stages a target actually depends on.
+FROM build AS publish-api
+RUN --mount=type=cache,target=/root/.nuget/packages \
+    dotnet publish src/Host/Boilerplate.Api/Boilerplate.Api.csproj \
     -c Release --no-restore -o /publish/api
 
-RUN dotnet publish src/Host/Boilerplate.DbMigrator/Boilerplate.DbMigrator.csproj \
+FROM build AS publish-migrator
+RUN --mount=type=cache,target=/root/.nuget/packages \
+    dotnet publish src/Host/Boilerplate.DbMigrator/Boilerplate.DbMigrator.csproj \
     -c Release --no-restore -o /publish/migrator
 
 # ── Shared runtime base ─────────────────────────────────────────────
@@ -44,7 +54,7 @@ USER $APP_UID
 
 # ── api ─────────────────────────────────────────────────────────────
 FROM runtime AS api
-COPY --from=build /publish/api .
+COPY --from=publish-api /publish/api .
 ENV ASPNETCORE_URLS=http://+:8080 \
     ASPNETCORE_ENVIRONMENT=Production \
     DOTNET_ENVIRONMENT=Production
@@ -55,7 +65,7 @@ ENTRYPOINT ["dotnet", "Boilerplate.Api.dll"]
 # One-shot: applies pending migrations under a Postgres advisory lock, then exits
 # 0/1. The API never migrates at startup; it waits for this container to complete.
 FROM runtime AS migrator
-COPY --from=build /publish/migrator .
+COPY --from=publish-migrator /publish/migrator .
 ENV DOTNET_ENVIRONMENT=Production
 ENTRYPOINT ["dotnet", "Boilerplate.DbMigrator.dll"]
 # Default verb; compose restates it explicitly so it is grep-able there.

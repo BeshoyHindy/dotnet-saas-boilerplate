@@ -47,18 +47,6 @@ builder.Configuration.AddJsonFile(Path.Combine(AppContext.BaseDirectory, $"appse
 builder.Configuration.AddEnvironmentVariables();
 builder.Configuration.AddCommandLine(args);
 
-// IdentityModule's JwtOptions.ValidateOnStart() trips on the empty SigningKey in base appsettings, but
-// the migrator never mints JWTs. Inject a labelled placeholder only when nothing real is configured.
-if (string.IsNullOrWhiteSpace(builder.Configuration["JwtOptions:SigningKey"]))
-{
-    builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
-    {
-        ["JwtOptions:SigningKey"] = "boilerplate-dbmigrator-placeholder-never-mints-tokens-32+",
-        ["JwtOptions:Issuer"] = builder.Configuration["JwtOptions:Issuer"] ?? "boilerplate",
-        ["JwtOptions:Audience"] = builder.Configuration["JwtOptions:Audience"] ?? "boilerplate.clients",
-    });
-}
-
 // Fail-fast with one clear line if DatabaseOptions__ConnectionString is unset, rather than letting
 // host-build-time option validation throw a stack trace.
 if (string.IsNullOrWhiteSpace(builder.Configuration["DatabaseOptions:ConnectionString"]))
@@ -110,6 +98,9 @@ builder.AddHeroPlatform(o =>
     o.EnableMailing = false;
     o.EnableIdempotency = false;
     o.EnableCaching = true;
+    // No HTTP surface and no tokens are ever minted here, so IdentityModule skips JWT bearer auth.
+    // That is what keeps the migrator free of a signing key: it needs no secret it cannot use.
+    o.EnableAuthentication = false;
 });
 
 // Registers EventingDbContext + its IDbInitializer, so the per-tenant migrate loop below
