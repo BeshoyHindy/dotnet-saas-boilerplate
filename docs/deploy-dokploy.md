@@ -80,23 +80,22 @@ CI publishes three images to GHCR:
 Production must name a fixed version. `latest` makes a redeploy irreproducible —
 the same button press a week later brings up different code.
 
-> **Until the CI-workflows change lands**, the console image and the `dev-*`
-> tags above do not exist yet, and CI still builds the two .NET images without
-> the Dockerfile. Build and push them by hand meanwhile:
->
-> ```bash
-> OWNER=<your-ghcr-owner>; TAG=<your-tag>
-> echo "$GHCR_TOKEN" | docker login ghcr.io -u "$OWNER" --password-stdin
-> docker build -f src/Host/Dockerfile --target api      -t "ghcr.io/$OWNER/boilerplate-api:$TAG" .
-> docker build -f src/Host/Dockerfile --target migrator -t "ghcr.io/$OWNER/boilerplate-db-migrator:$TAG" .
-> docker build clients/admin -t "ghcr.io/$OWNER/boilerplate-console:$TAG"
-> docker push "ghcr.io/$OWNER/boilerplate-api:$TAG"
-> docker push "ghcr.io/$OWNER/boilerplate-db-migrator:$TAG"
-> docker push "ghcr.io/$OWNER/boilerplate-console:$TAG"
-> ```
->
-> Set `IMAGE_TAG` to whatever `$TAG` you used. Nothing else in this guide
-> changes.
+`.github/workflows/backend.yml` publishes all three from one job, so a tag never
+exists for two images out of three. To build them by hand — a one-off tag, or a
+fork with Actions disabled:
+
+```bash
+OWNER=<your-ghcr-owner>; TAG=<your-tag>
+echo "$GHCR_TOKEN" | docker login ghcr.io -u "$OWNER" --password-stdin
+docker build -f src/Host/Dockerfile --target api      -t "ghcr.io/$OWNER/boilerplate-api:$TAG" .
+docker build -f src/Host/Dockerfile --target migrator -t "ghcr.io/$OWNER/boilerplate-db-migrator:$TAG" .
+docker build clients/admin -t "ghcr.io/$OWNER/boilerplate-console:$TAG"
+docker push "ghcr.io/$OWNER/boilerplate-api:$TAG"
+docker push "ghcr.io/$OWNER/boilerplate-db-migrator:$TAG"
+docker push "ghcr.io/$OWNER/boilerplate-console:$TAG"
+```
+
+Set `IMAGE_TAG` to whatever `$TAG` you used. Nothing else in this guide changes.
 
 If the packages are private, add the credentials once under **Settings →
 Registry** in Dokploy (a GitHub personal access token with `read:packages`);
