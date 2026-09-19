@@ -11,7 +11,6 @@ public interface ITokenService
     Task<TokenResponse> IssueAsync(
         string subject,
         IEnumerable<Claim> claims,
-        string? tenant = null,
         CancellationToken ct = default);
 
     /// <summary>

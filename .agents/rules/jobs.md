@@ -12,7 +12,7 @@ jobService.Enqueue("email", () => mailService.SendAsync(req, CancellationToken.N
 jobService.Schedule(() => DoLater(), TimeSpan.FromMinutes(5));
 ```
 
-Queues: `default`, `email` (5 workers, 30s poll). Storage auto-selected from `DatabaseOptions.Provider` (Postgres/MSSQL).
+Queues: `default`, `email` (5 workers, 30s poll). Storage is `Hangfire.PostgreSql` — `DatabaseOptions.Provider` must be `POSTGRESQL` (ADR-0003), any other value throws at startup.
 
 ## Recurring jobs — `IRecurringJobManager`
 

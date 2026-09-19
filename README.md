@@ -16,7 +16,7 @@ for local orchestration with .NET Aspire.
 - **Hosts**: `Boilerplate.Api` (composition root), `Boilerplate.DbMigrator` (one-shot migrate/seed —
   the API never migrates at startup), `Boilerplate.AppHost` (Aspire orchestrator).
 - **Clients**: `clients/admin` (operator console) and `clients/dashboard` (tenant app) — React 19 +
-  Vite + TypeScript, TanStack Query, React Router, Radix + Tailwind, SignalR/SSE.
+  Vite + TypeScript, TanStack Query, React Router, Radix + Tailwind.
 - **Deploy**: Docker Compose (`deploy/docker`) and Dokploy (`deploy/dokploy`).
 
 ## Prerequisites

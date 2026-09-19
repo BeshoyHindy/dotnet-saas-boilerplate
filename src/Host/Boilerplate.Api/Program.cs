@@ -1,4 +1,5 @@
 ﻿using Boilerplate.BuildingBlocks.Eventing;
+using Finbuckle.MultiTenant.AspNetCore.Extensions;
 using Boilerplate.BuildingBlocks.Web;
 using Boilerplate.BuildingBlocks.Web.Modules;
 using Boilerplate.Modules.Auditing;
@@ -66,8 +67,6 @@ builder.AddHeroPlatform(o =>
     o.EnableCaching = true;
     o.EnableMailing = true;
     o.EnableJobs = true;
-    o.EnableSse = true;
-    o.EnableRealtime = true;
 });
 
 // The transactional outbox is framework infrastructure with exactly one owner
@@ -82,13 +81,14 @@ builder.Services.AddHostedService<Boilerplate.Api.OrphanedOutboxRecurringJobClea
 
 var app = builder.Build();
 
-app.UseHeroMultiTenantDatabases();
+// Finbuckle tenant resolution, deliberately before UseHeroPlatform (and so before
+// UseAuthentication): resolution is header-driven, not claim-driven. This only installs the
+// resolution middleware — per-tenant databases are migrated by the DbMigrator host.
+app.UseMultiTenant();
 app.UseHeroPlatform(p =>
 {
     p.MapModules = true;
     p.ServeStaticFiles = true;
-    p.MapSseEndpoints = true;
-    p.MapRealtime = true;
 });
 
 app.MapGet("/", () => Results.Ok(new { message = "hello world!" }))

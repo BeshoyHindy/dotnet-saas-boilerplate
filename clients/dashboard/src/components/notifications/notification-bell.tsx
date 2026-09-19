@@ -9,21 +9,17 @@ import {
   markNotificationRead,
   type NotificationDto,
 } from "@/api/notifications";
-import { useRealtimeEvent } from "@/realtime/realtime-context";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { RealtimeStatusPill } from "@/components/realtime/realtime-status-pill";
 import { cn } from "@/lib/cn";
 
 /**
  * Bell icon + dropdown inbox. Calm header + scrollable list with a
- * "Mark all read" affordance. When the inbox is open and a
- * NotificationCreated event lands, we patch cache so the badge updates
- * without a refetch.
+ * "Mark all read" affordance.
  */
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
@@ -41,20 +37,6 @@ export function NotificationBell() {
     queryFn: () => listNotifications({ pageSize: 30 }),
     enabled: open,
     staleTime: 0,
-  });
-
-  // Live patch — increment badge count + prepend row when the realtime
-  // event fires. We don't depend on `open` here because the badge needs
-  // to keep updating regardless.
-  useRealtimeEvent<NotificationDto>("NotificationCreated", (payload) => {
-    queryClient.setQueryData<number | undefined>(
-      ["notifications", "unread-count"],
-      (prev) => (typeof prev === "number" ? prev + 1 : 1),
-    );
-    queryClient.setQueryData<NotificationDto[] | undefined>(
-      ["notifications", "inbox"],
-      (prev) => (prev ? [payload, ...prev] : [payload]),
-    );
   });
 
   const markAllMutation = useMutation({
@@ -171,8 +153,7 @@ export function NotificationBell() {
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-[var(--color-border)] px-4 py-2.5">
-          <RealtimeStatusPill announce />
+        <div className="flex items-center justify-end border-t border-[var(--color-border)] px-4 py-2.5">
           <button
             type="button"
             onClick={() => {

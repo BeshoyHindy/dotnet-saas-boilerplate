@@ -6,9 +6,7 @@ using Boilerplate.BuildingBlocks.Shared.Constants;
 using Boilerplate.BuildingBlocks.Web.Auth;
 using Boilerplate.BuildingBlocks.Web.Cors;
 using Boilerplate.BuildingBlocks.Web.Exceptions;
-using Boilerplate.BuildingBlocks.Web.FeatureFlags;
 using Boilerplate.BuildingBlocks.Web.Idempotency;
-using Boilerplate.BuildingBlocks.Web.Sse;
 using Boilerplate.BuildingBlocks.Web.Health;
 using Boilerplate.BuildingBlocks.Web.Mediator.Behaviors;
 using Boilerplate.BuildingBlocks.Web.Modules;
@@ -17,7 +15,6 @@ using Boilerplate.BuildingBlocks.Web.Observability.OpenTelemetry;
 using Boilerplate.BuildingBlocks.Web.OpenApi;
 using Boilerplate.BuildingBlocks.Web.Origin;
 using Boilerplate.BuildingBlocks.Web.RateLimiting;
-using Boilerplate.BuildingBlocks.Web.Realtime;
 using Boilerplate.BuildingBlocks.Web.Security;
 using Boilerplate.BuildingBlocks.Web.Versioning;
 using Microsoft.AspNetCore.Builder;
@@ -103,24 +100,9 @@ public static class Extensions
             }
         }
 
-        if (options.EnableFeatureFlags)
-        {
-            builder.Services.AddHeroFeatureFlags(builder.Configuration);
-        }
-
         if (options.EnableIdempotency)
         {
             builder.Services.AddHeroIdempotency(builder.Configuration);
-        }
-
-        if (options.EnableSse)
-        {
-            builder.Services.AddHeroSse();
-        }
-
-        if (options.EnableRealtime)
-        {
-            builder.Services.AddHeroRealtime(builder.Configuration);
         }
 
         builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -194,15 +176,6 @@ public static class Extensions
         // Always expose health endpoints
         app.MapHeroHealthEndpoints();
 
-        if (options.MapSseEndpoints)
-        {
-            app.MapHeroSseEndpoints();
-        }
-
-        if (options.MapRealtime)
-        {
-            app.MapHeroRealtime();
-        }
         app.UseMiddleware<CurrentUserMiddleware>();
         return app;
     }
@@ -228,10 +201,7 @@ public sealed class AppPlatformOptions
     public bool EnableJobs { get; set; } = false;
     public bool EnableMailing { get; set; } = false;
     public bool EnableOpenTelemetry { get; set; } = true;
-    public bool EnableFeatureFlags { get; set; } = false;
     public bool EnableIdempotency { get; set; } = true;
-    public bool EnableSse { get; set; } = false;
-    public bool EnableRealtime { get; set; } = false;
 }
 
 public sealed class AppPipelineOptions
@@ -240,6 +210,4 @@ public sealed class AppPipelineOptions
     public bool UseOpenApi { get; set; } = true;
     public bool ServeStaticFiles { get; set; } = true;
     public bool MapModules { get; set; } = true;
-    public bool MapSseEndpoints { get; set; } = false;
-    public bool MapRealtime { get; set; } = false;
 }

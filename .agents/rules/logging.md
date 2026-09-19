@@ -9,7 +9,7 @@
 ```csharp
 // good
 _logger.LogInformation("Cleaned up {Count} expired sessions for tenant {TenantId}", count, tenantId);
-// also good (hot path) — see OutboxDispatcher, InMemoryEventBus, AppHub
+// also good (hot path) — see OutboxDispatcher, InMemoryEventBus
 [LoggerMessage(Level = LogLevel.Warning, Message = "Outbox message {MessageId} dead-lettered")]
 private partial void LogDeadLettered(Guid messageId);
 // NEVER

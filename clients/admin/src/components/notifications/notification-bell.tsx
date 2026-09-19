@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, BellRing, CheckCheck } from "lucide-react";
+import { Bell, CheckCheck } from "lucide-react";
 import { toast } from "sonner";
 import {
   getUnreadCount,
@@ -10,21 +10,17 @@ import {
   markNotificationRead,
   type NotificationDto,
 } from "@/api/notifications";
-import { useRealtimeEvent } from "@/realtime/realtime-context";
 import { useAuth } from "@/auth/use-auth";
 import { cn } from "@/lib/cn";
 
 /**
  * NotificationBell — topbar trigger with unread badge and a popover preview
- * of the most recent items. Live-updates via the SignalR NotificationCreated
- * event (bumps the unread query + flashes the bell). Full inbox lives at
- * /notifications.
+ * of the most recent items. Full inbox lives at /notifications.
  */
 export function NotificationBell() {
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [pulse, setPulse] = useState(false);
 
   const unread = useQuery({
     queryKey: ["notifications", "unread-count"],
@@ -40,25 +36,6 @@ export function NotificationBell() {
     enabled: isAuthenticated && open,
     staleTime: 15_000,
   });
-
-  // Coalesce a burst of NotificationCreated events into a single refetch so a
-  // flood doesn't trigger a flood of badge/preview queries.
-  const refreshTimer = useRef<number | null>(null);
-  useRealtimeEvent<unknown>("NotificationCreated", () => {
-    setPulse(true);
-    window.setTimeout(() => setPulse(false), 1500);
-    if (refreshTimer.current !== null) return;
-    refreshTimer.current = window.setTimeout(() => {
-      refreshTimer.current = null;
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
-    }, 800);
-  });
-  useEffect(
-    () => () => {
-      if (refreshTimer.current !== null) window.clearTimeout(refreshTimer.current);
-    },
-    [],
-  );
 
   // Close the popover on Escape (it isn't a focus-trapping modal).
   useEffect(() => {
@@ -102,7 +79,7 @@ export function NotificationBell() {
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-ring)]",
         )}
       >
-        {pulse ? <BellRing className="h-4 w-4 text-[var(--color-accent-signal)]" /> : <Bell className="h-4 w-4" />}
+        <Bell className="h-4 w-4" />
         {count > 0 && (
           <span
             aria-hidden

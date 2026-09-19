@@ -60,7 +60,7 @@ src/
   Tests/               Unit, integration (Testcontainers), and architecture tests
 clients/
   admin/               Operator console (React 19 + Vite + Tailwind)
-  dashboard/           Tenant app (React 19 + Vite + Tailwind, SSE live feed)
+  dashboard/           Tenant app (React 19 + Vite + Tailwind)
 deploy/
   docker/              Production docker-compose + .env
   dokploy/             Dokploy deployment configuration

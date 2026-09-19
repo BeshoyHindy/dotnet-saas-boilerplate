@@ -1,7 +1,7 @@
 namespace Boilerplate.BuildingBlocks.Shared.Persistence;
 
 /// <summary>
-/// Supported database providers for the starter kit.
+/// Supported database providers for the starter kit. PostgreSQL is the only one (ADR-0003).
 /// </summary>
 public static class DbProviders
 {
@@ -9,9 +9,4 @@ public static class DbProviders
     /// PostgreSQL database provider.
     /// </summary>
     public const string PostgreSQL = "POSTGRESQL";
-
-    /// <summary>
-    /// Microsoft SQL Server (MSSQL) database provider.
-    /// </summary>
-    public const string MSSQL = "MSSQL";
 }

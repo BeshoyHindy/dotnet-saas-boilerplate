@@ -34,22 +34,16 @@ public static class Extensions
             var dbOptions = configuration.GetSection(nameof(DatabaseOptions)).Get<DatabaseOptions>()
                 ?? throw new CustomException("Database options not found");
 
-            switch (dbOptions.Provider.ToUpperInvariant())
+            if (!string.Equals(dbOptions.Provider, DbProviders.PostgreSQL, StringComparison.OrdinalIgnoreCase))
             {
-                case DbProviders.PostgreSQL:
-                    config.UsePostgreSqlStorage(o =>
-                    {
-                        o.UseNpgsqlConnection(dbOptions.ConnectionString);
-                    });
-                    break;
-
-                case DbProviders.MSSQL:
-                    config.UseSqlServerStorage(dbOptions.ConnectionString);
-                    break;
-
-                default:
-                    throw new CustomException($"Hangfire storage provider {dbOptions.Provider} is not supported");
+                throw new CustomException(
+                    $"Hangfire storage provider {dbOptions.Provider} is not supported. Only {DbProviders.PostgreSQL} is supported.");
             }
+
+            config.UsePostgreSqlStorage(o =>
+            {
+                o.UseNpgsqlConnection(dbOptions.ConnectionString);
+            });
 
             config.UseActivator(new AppJobActivator(provider.GetRequiredService<IServiceScopeFactory>()));
             config.UseFilter(new AppJobFilter(provider));

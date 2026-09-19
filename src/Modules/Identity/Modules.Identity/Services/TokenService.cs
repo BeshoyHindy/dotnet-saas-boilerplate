@@ -29,7 +29,6 @@ public sealed class TokenService : ITokenService
     public Task<TokenResponse> IssueAsync(
         string subject,
         IEnumerable<Claim> claims,
-        string? tenant = null,
         CancellationToken ct = default)
     {
         var (accessToken, accessTokenExpiry) = BuildAccessToken(subject, claims, lifetime: null);

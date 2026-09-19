@@ -7,16 +7,13 @@ import {
   MobileNavProvider,
   MobileNavRoot,
 } from "@/components/layout/mobile-nav";
-import { SseProvider } from "@/sse/sse-context";
-import { RealtimeProvider } from "@/realtime/realtime-context";
 import { CommandPaletteRoot } from "@/components/command-palette/command-palette";
 import { InactivityGuard } from "@/components/auth/inactivity-guard";
 import { cn } from "@/lib/cn";
 
 export function AppShell() {
   return (
-    <SseProvider>
-      <RealtimeProvider>
+    <>
       <MobileNavProvider>
         {/* Skip-to-content link — first focusable element. Visually
             hidden until focused, then it lifts up as a brand chip so
@@ -64,7 +61,6 @@ export function AppShell() {
 
       {/* Inactivity auto-logout — warning modal + countdown, signed-in only. */}
       <InactivityGuard />
-      </RealtimeProvider>
-    </SseProvider>
+    </>
   );
 }

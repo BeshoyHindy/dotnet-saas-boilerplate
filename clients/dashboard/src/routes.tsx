@@ -42,7 +42,6 @@ const ConfirmEmailPage = lazyNamed(
   "ConfirmEmailPage",
 );
 const OverviewPage = lazyNamed(() => import("@/pages/overview"), "OverviewPage");
-const ActivityPage = lazyNamed(() => import("@/pages/activity"), "ActivityPage");
 const NotFoundPage = lazyNamed(() => import("@/pages/not-found"), "NotFoundPage");
 const TenantDeactivatedPage = lazyNamed(
   () => import("@/pages/tenant-deactivated"),
@@ -176,7 +175,6 @@ export const router = createBrowserRouter([
         errorElement: <RouteError />,
         children: [
           { index: true, element: withSuspense(<OverviewPage />) },
-          { path: "activity", element: withSuspense(<ActivityPage />) },
           { path: "system/health", element: withSuspense(<HealthPage />) },
           { path: "system/audits", element: withSuspense(<AuditsPage />) },
           { path: "system/trash", element: withSuspense(<TrashPage />) },

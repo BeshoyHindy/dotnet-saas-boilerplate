@@ -1,4 +1,4 @@
-using Boilerplate.BuildingBlocks.Core.Context;
+﻿using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.BuildingBlocks.Core.Exceptions;
 using Boilerplate.BuildingBlocks.Shared.Constants;
 using Boilerplate.Modules.Auditing.Contracts;
@@ -98,7 +98,7 @@ public sealed class EndImpersonationCommandHandler
 
         var (subject, actorClaims) = actorClaimsResult.Value;
 
-        var token = await _tokenService.IssueAsync(subject, actorClaims, actorTenantId, cancellationToken);
+        var token = await _tokenService.IssueAsync(subject, actorClaims, cancellationToken);
         await _identityService.StoreRefreshTokenAsync(subject, token.RefreshToken, token.RefreshTokenExpiresAt, cancellationToken);
 
         await _securityAudit.ImpersonationEndedAsync(

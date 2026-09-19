@@ -14,10 +14,7 @@ import {
   ShieldCheck,
   Sparkles,
   UsersRound,
-  Wifi,
-  WifiOff,
   X,
-  Zap,
 } from "lucide-react";
 import {
   getMyStatus,
@@ -32,12 +29,10 @@ import {
   listAudits,
   type AuditSummaryDto,
 } from "@/api/audits";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EntityDetailSection } from "@/components/list";
 import { useAuth } from "@/auth/use-auth";
-import { useSseEvents, useSseStatus, type SseEvent, type SseStatus } from "@/sse/sse-context";
 import { cn } from "@/lib/cn";
 
 // ────────────────────────────────────────────────────────────────────────
@@ -112,25 +107,6 @@ function validityView(status: TenantStatusDto | undefined): {
     targetUtc: target,
     daysLeft: target ? daysUntil(target) : null,
   };
-}
-
-const timeFmt = new Intl.DateTimeFormat("en-US", {
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-});
-function formatClock(ts: number) {
-  return timeFmt.format(new Date(ts));
-}
-
-function eventTone(type: string): "default" | "success" | "warning" | "danger" | "brand" {
-  const t = type.toLowerCase();
-  if (t.includes("fail") || t.includes("error") || t.includes("revoke")) return "danger";
-  if (t.includes("warn") || t.includes("retry")) return "warning";
-  if (t.includes("login") || t.includes("issued") || t.includes("created")) return "success";
-  if (t.includes("token") || t.includes("auth")) return "brand";
-  return "default";
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -209,81 +185,6 @@ function StatCard({
     </Link>
   ) : (
     body
-  );
-}
-
-// ────────────────────────────────────────────────────────────────────────
-// System status — SSE pulse + event count + connection state.
-// ────────────────────────────────────────────────────────────────────────
-
-function SystemStatusBody({
-  sseStatus,
-  eventCount,
-}: {
-  sseStatus: SseStatus;
-  eventCount: number;
-}) {
-  const live = sseStatus === "connected";
-  const errored = sseStatus === "error";
-  const Icon = live ? Wifi : WifiOff;
-  const tone: "success" | "danger" | "default" = live ? "success" : errored ? "danger" : "default";
-
-  const toneBg =
-    tone === "success"
-      ? "bg-[oklch(from_var(--color-success)_l_c_h_/_0.10)] text-[var(--color-success)]"
-      : tone === "danger"
-        ? "bg-[oklch(from_var(--color-destructive)_l_c_h_/_0.10)] text-[var(--color-destructive)]"
-        : "bg-[var(--color-muted)] text-muted-foreground";
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-start gap-3">
-        <span
-          aria-hidden
-          className={cn(
-            "relative grid size-9 shrink-0 place-items-center rounded-lg",
-            toneBg,
-          )}
-        >
-          <Icon className="size-4" />
-          {live && (
-            <span
-              aria-hidden
-              className="pulse-dot absolute -right-0.5 -top-0.5 size-2 rounded-full"
-              style={{
-                backgroundColor: "var(--color-success)",
-                color: "var(--color-success)",
-              }}
-            />
-          )}
-        </span>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-[13px] font-semibold capitalize tracking-tight text-foreground">
-              {live ? "Stream live" : sseStatus}
-            </span>
-            {live && <Badge variant="success">SSE</Badge>}
-            {errored && <Badge variant="danger">offline</Badge>}
-          </div>
-          <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-            {live
-              ? "Backend events are flowing in real time."
-              : errored
-                ? "Stream disconnected. Events will queue once it recovers."
-                : "Waiting for the stream to come online."}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between border-t border-[oklch(from_var(--color-border)_l_c_h_/_0.5)] pt-3">
-        <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-          Events this session
-        </span>
-        <span className="font-display text-[16px] font-bold tabular-nums text-foreground">
-          {formatNumber(eventCount)}
-        </span>
-      </div>
-    </div>
   );
 }
 
@@ -432,13 +333,6 @@ const QUICK_ACTIONS: QuickAction[] = [
     icon: ScrollText,
     tone: "primary",
   },
-  {
-    to: "/activity",
-    title: "Live activity",
-    description: "Real-time event stream.",
-    icon: Activity,
-    tone: "warning",
-  },
 ];
 
 function QuickActionsBody() {
@@ -474,42 +368,6 @@ function QuickActionsBody() {
         </Link>
       ))}
     </div>
-  );
-}
-
-// ────────────────────────────────────────────────────────────────────────
-// Live feed body — slim version of the LiveFeed widget that drops the
-// outer Card chrome so it can be embedded inside an EntityDetailSection.
-// ────────────────────────────────────────────────────────────────────────
-
-function LiveFeedBody({ events }: { events: SseEvent[] }) {
-  const visible = useMemo(() => events.slice(0, 5), [events]);
-
-  if (visible.length === 0) {
-    return (
-      <div className="flex flex-col items-center gap-2 py-6 text-center">
-        <Activity className="size-4 text-muted-foreground" />
-        <div className="text-[13px] font-semibold tracking-tight text-foreground">
-          Listening for activity
-        </div>
-        <p className="max-w-sm text-[11.5px] text-muted-foreground">
-          Events will appear here as the backend publishes them.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <ul className="-my-1 divide-y divide-[oklch(from_var(--color-border)_l_c_h_/_0.5)]">
-      {visible.map((ev) => (
-        <li key={ev.id} className="flex items-center gap-3 py-2.5">
-          <span className="shrink-0 font-mono text-[10.5px] tabular-nums text-muted-foreground">
-            {formatClock(ev.receivedAt)}
-          </span>
-          <Badge variant={eventTone(ev.type)}>{ev.type}</Badge>
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -567,14 +425,6 @@ const SETUP_TILES: SetupTileSpec[] = [
     description: "Share documents and assets with your team.",
     icon: FolderOpen,
     tone: "success",
-  },
-  {
-    to: "/activity",
-    step: "03",
-    title: "Watch live",
-    description: "SSE stream right into the dashboard.",
-    icon: Activity,
-    tone: "warning",
   },
 ];
 
@@ -680,8 +530,6 @@ function SetupTile({ spec }: { spec: SetupTileSpec }) {
 
 export function OverviewPage() {
   const { user } = useAuth();
-  const { status: sseStatus, eventCount } = useSseStatus();
-  const { events } = useSseEvents();
 
   // Tenant status drives the "Valid for" stat card and its tone, plus the
   // global expiry/grace banner mounted in the AppShell.
@@ -792,12 +640,6 @@ export function OverviewPage() {
             Refresh
           </Button>
           <Button asChild variant="outline" size="sm">
-            <Link to="/activity">
-              <Activity className="mr-1.5 size-3.5" />
-              View activity
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
             <Link to="/system/audits">
               <ScrollText className="mr-1.5 size-3.5" />
               View audits
@@ -816,53 +658,13 @@ export function OverviewPage() {
           value={validityValue}
           sublabel={validitySub}
         />
-        <StatCard
-          index={1}
-          tone="info"
-          icon={Zap}
-          label="Live events"
-          value={<span className="tabular-nums">{formatNumber(eventCount)}</span>}
-          sublabel={
-            <span className="inline-flex items-center gap-1.5">
-              <span
-                aria-hidden
-                className={cn(
-                  "inline-block size-1.5 shrink-0 rounded-full",
-                  // Contained opacity pulse — the design-system .pulse-dot halo
-                  // (an overflowing ::before ring) gets clipped by this sublabel's
-                  // `truncate` (overflow-hidden), so it can't be used here.
-                  sseStatus === "connected" && "animate-pulse",
-                )}
-                style={{
-                  backgroundColor:
-                    sseStatus === "connected"
-                      ? "var(--color-success)"
-                      : sseStatus === "error"
-                        ? "var(--color-destructive)"
-                        : "var(--color-muted-foreground)",
-                }}
-              />
-              <span className="capitalize">{sseStatus}</span>
-            </span>
-          }
-          href="/activity"
-        />
       </div>
 
       {/* ── Multi-column widget grid ────────────────────────────────────
           Left rail (360px) holds system status. The right side fills with
           a 2-up grid of secondary widgets that all read at the same
           density. */}
-      <div className="flex flex-col gap-4 lg:flex-row">
-        {/* Left rail */}
-        <aside className="w-full space-y-4 lg:w-[360px] lg:shrink-0">
-          <EntityDetailSection title="System status" icon={Wifi}>
-            <SystemStatusBody sseStatus={sseStatus} eventCount={eventCount} />
-          </EntityDetailSection>
-        </aside>
-
-        {/* Right column — 2-up widget grid */}
-        <div className="grid w-full min-w-0 flex-1 grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid w-full min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
           <EntityDetailSection
             title="Recent audits"
             icon={ScrollText}
@@ -886,24 +688,7 @@ export function OverviewPage() {
           >
             <QuickActionsBody />
           </EntityDetailSection>
-
-          <EntityDetailSection
-            title="Live feed"
-            icon={Activity}
-            description="Real-time backend events over SSE."
-            action={
-              <Link
-                to="/activity"
-                className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Open <ArrowUpRight className="size-3" />
-              </Link>
-            }
-          >
-            <LiveFeedBody events={events} />
-          </EntityDetailSection>
         </div>
-      </div>
     </div>
   );
 }

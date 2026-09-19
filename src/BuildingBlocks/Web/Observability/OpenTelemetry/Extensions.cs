@@ -146,15 +146,10 @@ public static class Extensions
                         instrumentation.EnrichWithHttpResponse = EnrichWithHttpResponse;
                     })
                     .AddHttpClientInstrumentation()
+                    // EF Core and StackExchange.Redis instrumentation ship pre-release only
+                    // (1.19.0-beta.1 at time of writing); Npgsql's own ActivitySource already covers
+                    // the database spans. Add them back once they reach a stable release.
                     .AddNpgsql()
-                    .AddEntityFrameworkCoreInstrumentation()
-                    .AddRedisInstrumentation(redis =>
-                    {
-                        if (options.Data.FilterRedisCommands)
-                        {
-                            redis.SetVerboseDatabaseStatements = false;
-                        }
-                    })
                     .AddSource(builder.Environment.ApplicationName)
                     .AddSource("Boilerplate.Hangfire")
                     .AddSource(CachingTelemetry.ActivitySourceName);

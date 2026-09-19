@@ -1,6 +1,6 @@
 # Boilerplate — Dashboard
 
-Tenant-facing dashboard for the Boilerplate. Shows realtime telemetry over Server-Sent Events and the tenant's validity window.
+Tenant-facing dashboard for the Boilerplate. Shows the tenant's validity window and recent activity.
 
 Built with React 19, Vite 7, TypeScript, TanStack Query, React Router, Tailwind 4 + shadcn/ui, and Recharts. Standalone — not part of a pnpm workspace — so it plugs into .NET Aspire as a plain `ExecutableResource`.
 
@@ -60,36 +60,17 @@ src/
 ├── auth/                 # JWT-backed auth (own localStorage prefix: boilerplate.dashboard.*)
 ├── components/
 │   ├── layout/           # Sidebar, Topbar, AppShell
-│   ├── sse/              # SseStatusBadge, LiveFeed
 │   └── ui/               # shadcn primitives
 ├── lib/                  # api-client, query-client, cn
-├── pages/                # Overview, Activity, Login, NotFound
-├── sse/
-│   ├── sse-api.ts        # POST /api/v1/sse/token
-│   └── sse-context.tsx   # SSE connection manager (fetch-based streaming)
+├── pages/                # Overview, Login, NotFound
 ├── styles/globals.css    # Tailwind 4 CSS-first + shadcn variables
 ├── App.tsx, main.tsx, routes.tsx
 ```
 
-### Server-Sent Events
-
-EventSource can't send an `Authorization` header, so the flow is:
-
-1. `POST /api/v1/sse/token` (authenticated) — returns a short-lived opaque token.
-2. `GET /api/v1/sse/stream?token=<guid>` (anonymous, token-gated) — holds a long-lived `text/event-stream` response.
-
-This app uses **fetch streaming** (not the native `EventSource` API) so it can:
-
-- Mint a fresh single-use token on every (re)connect without relying on the browser's auto-reconnect, which would replay the already-consumed token and get 401'd.
-- Apply the tenant header to the stream request.
-- Use an explicit exponential backoff (1s → 30s).
-
-The `SseProvider` in `src/sse/sse-context.tsx` is mounted inside `AppShell`, so the stream is active only when authenticated. A bounded ring buffer (200 events) is exposed via `useSse()` and consumed by `LiveFeed` and `SseStatusBadge`.
-
 ### What the overview shows
 
 - **Valid for** — the tenant's validity window (days left / grace / expired) from `GET /api/v1/tenants/me/status`.
-- **Live activity** — rolling feed of SSE events as the backend publishes them.
+- **Recent audits** — the last 24 hours of audit events from `GET /api/v1/audits`.
 
 ## Authentication flow
 

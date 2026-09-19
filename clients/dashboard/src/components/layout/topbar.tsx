@@ -37,7 +37,6 @@ import {
 import { Avatar } from "@/components/ui/avatar";
 import { getMyProfile } from "@/api/identity";
 import { useAuth } from "@/auth/use-auth";
-import { useSseStatus } from "@/sse/sse-context";
 import { useTheme } from "@/components/theme/theme-provider";
 import { cn } from "@/lib/cn";
 
@@ -155,7 +154,6 @@ export function Topbar() {
     staleTime: 5 * 60 * 1000,
   });
   const avatarUrl = profile?.imageUrl ?? null;
-  const { status: sseStatus, eventCount } = useSseStatus();
   const { mode, setMode } = useTheme();
   const { setOpen: setPaletteOpen } = useCommandPalette();
   const navigate = useNavigate();
@@ -165,25 +163,6 @@ export function Topbar() {
     setConfirmOpen(false);
     logout();
   };
-
-  const presence = (() => {
-    if (sseStatus === "connected") {
-      return {
-        color: "var(--color-success)",
-        text: `Connected · ${new Intl.NumberFormat("en-US").format(eventCount)} events`,
-      };
-    }
-    if (sseStatus === "error") {
-      return { color: "var(--color-destructive)", text: "Stream offline" };
-    }
-    if (sseStatus === "connecting") {
-      return { color: "var(--color-muted-foreground)", text: "Connecting…" };
-    }
-    if (sseStatus === "reconnecting") {
-      return { color: "var(--color-warning)", text: "Reconnecting…" };
-    }
-    return { color: "var(--color-muted-foreground)", text: "Idle" };
-  })();
 
   return (
     <header
@@ -301,19 +280,6 @@ export function Topbar() {
                 {user.email}
               </p>
             )}
-            <div className="mt-1.5 flex items-center gap-1.5">
-              <span
-                aria-hidden
-                className={cn(
-                  "inline-flex size-1.5 rounded-full",
-                  sseStatus === "connected" && "pulse-dot",
-                )}
-                style={{ backgroundColor: presence.color, color: presence.color }}
-              />
-              <span className="text-[10px] text-[var(--color-muted-foreground)]">
-                {presence.text}
-              </span>
-            </div>
           </div>
 
           <DropdownMenuSeparator className="!my-0" />

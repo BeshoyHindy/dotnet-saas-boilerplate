@@ -1,4 +1,4 @@
-import type { Page, Route } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { mockJsonResponse } from "./api-mocks";
 
 /**
@@ -21,7 +21,7 @@ export const DEFAULT_PROFILE = {
 /**
  * Mock every API call the authenticated AppShell fires on load so any
  * protected page can be visited in isolation without hanging on the
- * topbar's notification badge or the SSE/realtime providers.
+ * topbar's notification badge.
  *
  * ORDERING: Playwright matches the MOST RECENTLY registered route first.
  * We register broad globs first and the more-specific ones last. Callers
@@ -29,12 +29,6 @@ export const DEFAULT_PROFILE = {
  * these defaults.
  */
 export async function installShellMocks(page: Page): Promise<void> {
-  // Long-lived realtime transports — abort so they neither keep the network
-  // busy nor spew reconnect noise. The shell simply shows an "offline" dot.
-  await page.route("**/api/v1/sse/**", (r: Route) => r.abort());
-  await page.route("**/negotiate**", (r: Route) => r.abort());
-  await page.route("**/api/v1/realtime/**", (r: Route) => r.abort());
-
   // Notifications — register the list glob first, then the more specific
   // unread-count (so the count request resolves to a number, not []).
   await mockJsonResponse(page, "**/api/v1/notifications**", []);

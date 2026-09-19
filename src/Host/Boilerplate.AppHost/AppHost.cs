@@ -134,7 +134,7 @@ builder.AddJavaScriptApp($"{appPrefix}-admin", "../../../clients/admin", "dev")
     .WithExternalHttpEndpoints()
     .WithEnvironment("VITE_API_BASE_URL", api.GetEndpoint("https"));
 
-// Tenant-facing dashboard (React + Vite, with SSE live feed)
+// Tenant-facing dashboard (React + Vite)
 builder.AddJavaScriptApp($"{appPrefix}-dashboard", "../../../clients/dashboard", "dev")
     .WithNpm()
     .WithReference(api)

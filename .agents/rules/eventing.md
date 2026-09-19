@@ -21,7 +21,7 @@ Inject **`IOutboxWriter`** (`Boilerplate.BuildingBlocks.Eventing.Abstractions`) 
 
 **Publishing is asynchronous.** The consumer runs on the next dispatch cycle, not inside the request. Don't write a caller — or a test — that assumes the side effect already happened. Integration tests drain explicitly via `OutboxDrain.DrainAsync`.
 
-Any exception to publishing via the outbox needs a strong reason (e.g. a handler pushing over SignalR where a delayed update would read as broken), documented in a comment at the call site.
+Any exception to publishing via the outbox needs a strong reason, documented in a comment at the call site.
 
 ## One store, owned by the framework
 
@@ -63,7 +63,7 @@ services.AddIntegrationEventHandlers(typeof(MyModule).Assembly);        // scans
 
 There is no per-module store registration — `AddEventingForDbContext<T>` was removed in #1349. A module publishes by injecting `IOutboxWriter`; nothing else is needed.
 
-Bus = `EventingOptions.Provider`: `"RabbitMQ"` → `RabbitMqEventBus` (durable topic exchange); else `InMemoryEventBus` (default).
+Bus = `InMemoryEventBus`, always. ADR-0003 dropped the RabbitMQ provider (and `EventingOptions.Provider` with it): the monolith runs handlers in-process and the outbox/inbox pair provides the durability a broker would.
 
 ## Gotchas
 

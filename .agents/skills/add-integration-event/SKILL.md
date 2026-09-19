@@ -60,7 +60,7 @@ The `OutboxDispatcherHostedService` later publishes it via `IEventBus`.
 `Modules.{Consumer}/IntegrationEventHandlers/{Event}IntegrationEventHandler.cs` — `sealed`, implement `IIntegrationEventHandler<T>`:
 
 ```csharp
-public sealed class {Event}IntegrationEventHandler({Consumer}DbContext db /*, IHubContext<AppHub> hub */)
+public sealed class {Event}IntegrationEventHandler({Consumer}DbContext db)
     : IIntegrationEventHandler<{Event}IntegrationEvent>
 {
     public async Task HandleAsync({Event}IntegrationEvent @event, CancellationToken cancellationToken)

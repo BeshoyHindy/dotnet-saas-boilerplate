@@ -16,13 +16,8 @@
 		<PackageReference Include="FluentValidation" />
 		<PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
 		<PackageReference Include="Mediator.Abstractions" />
-		<PackageReference Include="Microsoft.Extensions.Http.Resilience" />
-		<PackageReference Include="Microsoft.FeatureManagement.AspNetCore" />
 		<PackageReference Include="Microsoft.AspNetCore.OpenApi" />
-		<PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" />
 		<PackageReference Include="Npgsql.OpenTelemetry" />
-		<PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" />
-		<PackageReference Include="OpenTelemetry.Instrumentation.StackExchangeRedis" />
 		<PackageReference Include="Scalar.AspNetCore" />
 		<PackageReference Include="Serilog" />
 		<PackageReference Include="Serilog.AspNetCore" />

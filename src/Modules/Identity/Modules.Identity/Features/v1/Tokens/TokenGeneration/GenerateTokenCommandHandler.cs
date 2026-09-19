@@ -1,4 +1,4 @@
-using Finbuckle.MultiTenant.Abstractions;
+﻿using Finbuckle.MultiTenant.Abstractions;
 using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.BuildingBlocks.Eventing.Outbox;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
@@ -86,7 +86,7 @@ public sealed class GenerateTokenCommandHandler
             ct: cancellationToken);
 
         // Issue token
-        var token = await _tokenService.IssueAsync(subject, claims, /*extra*/ null, cancellationToken);
+        var token = await _tokenService.IssueAsync(subject, claims, cancellationToken);
 
         // Persist refresh token (hashed) for this user
         await _identityService.StoreRefreshTokenAsync(subject, token.RefreshToken, token.RefreshTokenExpiresAt, cancellationToken);
@@ -94,7 +94,7 @@ public sealed class GenerateTokenCommandHandler
         // Create user session for session management (non-blocking, fail gracefully)
         try
         {
-            var refreshTokenHash = Sha256Short(token.RefreshToken);
+            var refreshTokenHash = TokenFingerprint.Sha256Short(token.RefreshToken);
             await _sessionService.CreateSessionAsync(
                 subject,
                 refreshTokenHash,
@@ -111,7 +111,7 @@ public sealed class GenerateTokenCommandHandler
         }
 
         // 3) Audit token issuance with a fingerprint (never raw token)
-        var fingerprint = Sha256Short(token.AccessToken);
+        var fingerprint = TokenFingerprint.Sha256Short(token.AccessToken);
         await _securityAudit.TokenIssuedAsync(
             userId: subject,
             userName: claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? request.Email,
@@ -141,12 +141,5 @@ public sealed class GenerateTokenCommandHandler
         await _outboxStore.AddAsync(integrationEvent, cancellationToken).ConfigureAwait(false);
 
         return token;
-    }
-
-    private static string Sha256Short(string value)
-    {
-        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value));
-        // short printable fingerprint; store only this
-        return Convert.ToHexString(hash.AsSpan(0, 8));
     }
 }
