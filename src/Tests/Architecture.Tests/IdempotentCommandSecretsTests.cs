@@ -70,7 +70,7 @@ public sealed partial class IdempotentCommandSecretsTests
         IdempotentCommandTypes()
             .Select(t => t.Name)
             .OrderBy(n => n, StringComparer.Ordinal)
-            .ShouldBe(["CreateTenantCommand", "RegisterUserCommand", "RequestUploadUrlCommand"]);
+            .ShouldBe(["CreateTenantCommand", "RegisterUserCommand"]);
     }
 
     [Fact]
@@ -137,7 +137,7 @@ public sealed partial class IdempotentCommandSecretsTests
 
         foreach (var file in IdempotencyFilterOrderTests.EndpointSourceFiles())
         {
-            foreach (var chain in RouteChains.Split(File.ReadAllText(file)))
+            foreach (var chain in RouteChains.Split(File.ReadAllText(file), IdempotencyFilterOrderTests.Relative(file)))
             {
                 if (!chain.Contains(".WithIdempotency", StringComparison.Ordinal))
                 {
