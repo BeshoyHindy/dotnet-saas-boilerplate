@@ -15,9 +15,7 @@ public sealed class NotificationsDbContext : BaseDbContext
 
     public NotificationsDbContext(
         IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor,
-        DbContextOptions<NotificationsDbContext> options,
-        IOptions<DatabaseOptions> settings,
-        IHostEnvironment environment) : base(multiTenantContextAccessor, options, settings, environment) { }
+        DbContextOptions<NotificationsDbContext> options) : base(multiTenantContextAccessor, options) { }
 
     public DbSet<Notification> Notifications => Set<Notification>();
 

@@ -213,10 +213,13 @@ try
         {
             var rootTenant = new AppTenantInfo(
                 MultitenancyConstants.Root.Id,
-                MultitenancyConstants.Root.Name,
-                connectionString: string.Empty,
-                MultitenancyConstants.Root.EmailAddress,
-                issuer: MultitenancyConstants.Root.Issuer);
+                MultitenancyConstants.Root.Id,
+                MultitenancyConstants.Root.Name)
+            {
+                AdminEmail = MultitenancyConstants.Root.EmailAddress,
+                IsActive = true,
+                Issuer = MultitenancyConstants.Root.Issuer,
+            };
             rootTenant.SetValidity(TimeProvider.System.GetUtcNow().UtcDateTime.AddYears(1));
             await tenantDb.TenantInfo.AddAsync(rootTenant, CancellationToken.None).ConfigureAwait(false);
             await tenantDb.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);

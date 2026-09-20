@@ -3,10 +3,7 @@ using Finbuckle.MultiTenant.Abstractions;
 using Boilerplate.BuildingBlocks.Core.Domain;
 using Boilerplate.BuildingBlocks.Persistence.Context;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
-using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using Shouldly;
 using System.Reflection;
 using Xunit;
@@ -81,41 +78,28 @@ public sealed class TenantIsolationTests
     }
 
     /// <summary>
-    /// BaseDbContext takes (accessor, options, settings, environment). We stub
-    /// each with the minimum surface needed to reach OnModelCreating. The
-    /// concrete DbContext type drives DbContextOptions&lt;T&gt; via reflection
-    /// so we don't hand-roll one per module.
+    /// BaseDbContext takes (accessor, options). We stub each with the minimum
+    /// surface needed to reach OnModelCreating. The concrete DbContext type drives
+    /// DbContextOptions&lt;T&gt; via reflection so we don't hand-roll one per module.
     /// </summary>
     private static DbContext ConstructDbContext(Type dbContextType)
     {
         var optionsType = typeof(DbContextOptions<>).MakeGenericType(dbContextType);
         var builderType = typeof(DbContextOptionsBuilder<>).MakeGenericType(dbContextType);
         var builder = (DbContextOptionsBuilder)Activator.CreateInstance(builderType)!;
-        // Npgsql provider keeps OnConfiguring's per-tenant wiring a no-op (empty ConnectionString);
-        // the model builds lazily on first ctx.Model access, so no DB connection is opened.
+        // The model builds lazily on first ctx.Model access, so no DB connection is opened.
         builder.UseNpgsql("Host=arch;Database=arch;Username=arch;Password=arch");
         var options = builder.Options;
-
-        var settings = Options.Create(new DatabaseOptions
-        {
-            Provider = "postgresql",
-            ConnectionString = string.Empty,
-            MigrationsAssembly = "Boilerplate.Migrations.PostgreSQL",
-        });
 
         var ctor = dbContextType.GetConstructor([
             typeof(IMultiTenantContextAccessor<AppTenantInfo>),
             optionsType,
-            typeof(IOptions<DatabaseOptions>),
-            typeof(IHostEnvironment),
         ]) ?? throw new InvalidOperationException(
             $"{dbContextType.Name} does not have the expected BaseDbContext constructor signature.");
 
         return (DbContext)ctor.Invoke([
             new StubAccessor(),
             options,
-            settings,
-            new StubEnvironment(),
         ]);
     }
 
@@ -123,17 +107,13 @@ public sealed class TenantIsolationTests
     {
         public IMultiTenantContext<AppTenantInfo> MultiTenantContext { get; set; } =
             new MultiTenantContext<AppTenantInfo>(
-                new AppTenantInfo("arch", "arch", string.Empty, "arch@arch", "arch"));
+                new AppTenantInfo("arch", "arch", "arch")
+                {
+                    AdminEmail = "arch@arch",
+                    IsActive = true,
+                    Issuer = "arch",
+                });
 
         IMultiTenantContext IMultiTenantContextAccessor.MultiTenantContext => MultiTenantContext;
-    }
-
-    private sealed class StubEnvironment : IHostEnvironment
-    {
-        public string EnvironmentName { get; set; } = "Development";
-        public string ApplicationName { get; set; } = "arch";
-        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
-        public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } =
-            new Microsoft.Extensions.FileProviders.NullFileProvider();
     }
 }

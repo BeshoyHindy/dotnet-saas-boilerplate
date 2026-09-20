@@ -32,8 +32,10 @@ public sealed class TenantServiceStatusBoundaryTests
         var now = ValidUpto.AddSeconds(offsetSecondsFromValidUpto);
         _clock.GetUtcNow().Returns(new DateTimeOffset(now, TimeSpan.Zero));
 
-        var tenant = new AppTenantInfo(tenantId, "Acme", connectionString: null, adminEmail: "admin@acme.test")
+        var tenant = new AppTenantInfo(tenantId, tenantId, "Acme")
         {
+            AdminEmail = "admin@acme.test",
+            IsActive = true,
             ValidUpto = ValidUpto,
         };
         _store.GetAsync(tenantId).Returns(tenant);

@@ -46,8 +46,10 @@ public sealed class TenantServiceRenewClockTests
         _clock.GetUtcNow().Returns(fakeNow);
 
         const string tenantId = "acme";
-        var tenant = new AppTenantInfo(tenantId, "Acme", connectionString: null, adminEmail: "admin@acme.test")
+        var tenant = new AppTenantInfo(tenantId, tenantId, "Acme")
         {
+            AdminEmail = "admin@acme.test",
+            IsActive = true,
             // Past relative to both the real clock and the fake clock, so periodStart must equal "now".
             ValidUpto = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc),
         };

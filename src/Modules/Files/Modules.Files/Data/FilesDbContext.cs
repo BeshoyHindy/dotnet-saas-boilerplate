@@ -15,9 +15,7 @@ public sealed class FilesDbContext : BaseDbContext
 
     public FilesDbContext(
         IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor,
-        DbContextOptions<FilesDbContext> options,
-        IOptions<DatabaseOptions> settings,
-        IHostEnvironment environment) : base(multiTenantContextAccessor, options, settings, environment) { }
+        DbContextOptions<FilesDbContext> options) : base(multiTenantContextAccessor, options) { }
 
     public DbSet<FileAsset> FileAssets => Set<FileAsset>();
 

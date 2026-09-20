@@ -18,9 +18,7 @@ public sealed class AuditDbContext : BaseDbContext
 {
     public AuditDbContext(
     IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor,
-    DbContextOptions<AuditDbContext> options,
-    IOptions<DatabaseOptions> settings,
-    IHostEnvironment environment) : base(multiTenantContextAccessor, options, settings, environment) { }
+    DbContextOptions<AuditDbContext> options) : base(multiTenantContextAccessor, options) { }
 
     public DbSet<AuditRecord> AuditRecords => Set<AuditRecord>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)

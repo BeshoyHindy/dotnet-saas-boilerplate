@@ -58,7 +58,6 @@ public sealed class MultitenancyModule : IModule
 
         builder.Services.AddScoped<ITenantService, TenantService>();
         builder.Services.AddScoped<ITenantThemeService, TenantThemeService>();
-        builder.Services.AddTransient<IConnectionStringValidator, ConnectionStringValidator>();
         builder.Services.AddScoped<ITenantProvisioningService, TenantProvisioningService>();
         builder.Services.AddTransient<TenantProvisioningJob>();
         builder.Services.AddTransient<TenantExpiryScanJob>();

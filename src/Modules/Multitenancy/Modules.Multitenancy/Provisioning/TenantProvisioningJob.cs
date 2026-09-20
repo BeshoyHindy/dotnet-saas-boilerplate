@@ -11,9 +11,9 @@ namespace Boilerplate.Modules.Multitenancy.Provisioning;
 /// <summary>
 /// Provisioning is named work <i>about</i> a tenant, not work <i>as</i> one: a root operator
 /// enqueues it, the target tenant is an argument, and the bookkeeping it writes lives in the
-/// untenanted tenant catalog. Hence <see cref="SystemJobAttribute"/>. The two steps that really
-/// must run as the tenant — migrate and seed — enter it through <c>ITenantScope</c> inside
-/// <see cref="ITenantService"/>.
+/// untenanted tenant catalog. Hence <see cref="SystemJobAttribute"/>. The steps that write rows
+/// belonging to the new tenant — seeding above all, since the shared schema is already at head —
+/// enter it through <c>ITenantScope</c> inside <see cref="ITenantService"/>.
 /// </summary>
 [SystemJob]
 public sealed class TenantProvisioningJob

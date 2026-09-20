@@ -11,10 +11,11 @@ namespace Boilerplate.BuildingBlocks.Jobs;
 /// Builds the DI scope a job runs in — under the tenant the job was enqueued for.
 ///
 /// The tenant is opened through <see cref="ITenantScope"/>, so the full record is re-read from the
-/// tenant store (a dedicated connection string survives) and installed <b>before</b> the DI scope
-/// exists. Jobs are declared tenant-bound or <c>[SystemJob]</c>; there is no third, silent option:
-/// an unmarked job that arrives without a tenant parameter fails the job rather than running
-/// tenant-less against whatever database the default connection points at.
+/// tenant store — cache-first — and installed <b>before</b> the DI scope exists: an unknown or
+/// deactivated tenant fails the job here rather than running it. Jobs are declared tenant-bound or
+/// <c>[SystemJob]</c>; there is no third, silent option: an unmarked job that arrives without a
+/// tenant parameter fails rather than running tenant-less, with every tenant-filtered query in it
+/// unscoped.
 /// </summary>
 public class AppJobActivator : JobActivator
 {

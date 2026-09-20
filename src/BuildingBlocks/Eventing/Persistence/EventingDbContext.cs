@@ -25,10 +25,8 @@ public class EventingDbContext : BaseDbContext
 {
     public EventingDbContext(
         IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor,
-        DbContextOptions<EventingDbContext> options,
-        IOptions<DatabaseOptions> settings,
-        IHostEnvironment environment)
-        : base(multiTenantContextAccessor, options, settings, environment)
+        DbContextOptions<EventingDbContext> options)
+        : base(multiTenantContextAccessor, options)
     {
     }
 

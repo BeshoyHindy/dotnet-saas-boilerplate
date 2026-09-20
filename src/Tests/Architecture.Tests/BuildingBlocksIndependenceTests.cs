@@ -21,8 +21,8 @@ public class BuildingBlocksIndependenceTests
     private static readonly Assembly[] BuildingBlockAssemblies =
     [
         typeof(IAppCore).Assembly,               // Core
-        typeof(IConnectionStringValidator).Assembly,  // Persistence
-        typeof(IAppTenantInfo).Assembly,         // Shared
+        typeof(IScopedDbConnectionProvider).Assembly, // Persistence
+        typeof(AppTenantInfo).Assembly,          // Shared
         typeof(IAppWeb).Assembly                 // Web
     ];
 

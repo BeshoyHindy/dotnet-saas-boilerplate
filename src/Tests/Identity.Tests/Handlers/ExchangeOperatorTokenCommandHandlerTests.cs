@@ -214,8 +214,9 @@ public sealed class ExchangeOperatorTokenCommandHandlerTests
 
     private void ActiveTenant(string tenantId, bool isActive = true)
     {
-        var tenant = new AppTenantInfo(tenantId, "Acme", connectionString: null, adminEmail: "admin@acme.test")
+        var tenant = new AppTenantInfo(tenantId, tenantId, "Acme")
         {
+            AdminEmail = "admin@acme.test",
             IsActive = isActive,
         };
         _tenantStore.GetAsync(tenantId).Returns(Task.FromResult<AppTenantInfo?>(tenant));

@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Boilerplate.BuildingBlocks.Shared.Multitenancy;
 
-public class AppTenantInfo : TenantInfo, IAppTenantInfo
+public class AppTenantInfo : TenantInfo
 {
     // Parameterless constructor for tooling/EF.
     [SetsRequiredMembers]
@@ -21,20 +21,6 @@ public class AppTenantInfo : TenantInfo, IAppTenantInfo
         Name = name;
     }
 
-    [SetsRequiredMembers]
-    public AppTenantInfo(string id, string name, string? connectionString, string adminEmail, string? issuer = null)
-        : this(id, id, name)
-    {
-        ConnectionString = connectionString ?? string.Empty;
-        AdminEmail = adminEmail;
-        IsActive = true;
-        Issuer = issuer;
-
-        // Add Default 1 Month Validity for all new tenants. Something like a DEMO period for tenants.
-        ValidUpto = TimeProvider.System.GetUtcNow().UtcDateTime.AddMonths(1);
-    }
-
-    public string ConnectionString { get; set; } = string.Empty;
     public string AdminEmail { get; set; } = default!;
     public bool IsActive { get; set; }
     public DateTime ValidUpto { get; set; }
@@ -69,11 +55,5 @@ public class AppTenantInfo : TenantInfo, IAppTenantInfo
         }
 
         IsActive = false;
-    }
-
-    string? IAppTenantInfo.ConnectionString
-    {
-        get => ConnectionString;
-        set => ConnectionString = value ?? throw new InvalidOperationException("ConnectionString can't be null.");
     }
 }

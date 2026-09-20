@@ -21,11 +21,7 @@ public sealed class TenantFixtures
     /// tenant and nowhere else, which is what isolation assertions key off.
     /// </summary>
     /// <param name="prefix">Prefix for the generated tenant id and admin e-mail.</param>
-    /// <param name="connectionString">
-    /// A dedicated database for the tenant, or null to share the default one.
-    /// </param>
-    public async Task<(string TenantId, string AdminEmail)> CreateProvisionedTenantAsync(
-        string prefix, string? connectionString = null)
+    public async Task<(string TenantId, string AdminEmail)> CreateProvisionedTenantAsync(string prefix)
     {
         var unique = Guid.NewGuid().ToString("N")[..8];
         var tenantId = $"{prefix}-{unique}";
@@ -37,7 +33,6 @@ public sealed class TenantFixtures
         {
             id = tenantId,
             name = $"Tenant {tenantId}",
-            connectionString,
             adminEmail,
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer",

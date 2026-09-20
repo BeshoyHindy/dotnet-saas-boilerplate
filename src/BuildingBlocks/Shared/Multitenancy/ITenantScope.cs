@@ -5,14 +5,15 @@ namespace Boilerplate.BuildingBlocks.Shared.Multitenancy;
 ///
 /// Every entry point here does the same three things, in this order:
 /// <list type="number">
-///   <item>load the <b>full</b> <see cref="AppTenantInfo"/> from the tenant store — the record, not a
-///     fabricated id-only stub, so a dedicated per-tenant connection string survives;</item>
+///   <item>load the <b>full</b> <see cref="AppTenantInfo"/> from the tenant store — the record, not an
+///     id-only stub, so an unknown or deactivated tenant fails the work closed;</item>
 ///   <item>install it as the ambient Finbuckle context;</item>
-///   <item><b>then</b> create the DI scope, so every scoped service built inside it — DbContexts and
-///     the connections they capture at construction — is constructed under that tenant.</item>
+///   <item><b>then</b> create the DI scope, so every scoped service built inside it — every
+///     tenant-filtered <c>DbContext</c>, which captures its <c>TenantInfo</c> at construction — is
+///     constructed under that tenant.</item>
 /// </list>
 /// Getting that order wrong is the bug this abstraction exists to make unrepresentable: a scope
-/// created first hands its DbContexts a null tenant and the default connection string.
+/// created first hands its DbContexts a null tenant, and their queries are then unscoped.
 /// </summary>
 public interface ITenantScope
 {
