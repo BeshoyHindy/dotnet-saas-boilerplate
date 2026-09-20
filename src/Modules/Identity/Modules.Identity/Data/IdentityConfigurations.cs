@@ -19,6 +19,28 @@ public class ApplicationUserConfig : IEntityTypeConfiguration<AppUser>
         builder
             .Property(u => u.ObjectId)
                 .HasMaxLength(256);
+
+        // E-mail uniqueness is the database's answer, not a validator's read (#86). ASP.NET Identity
+        // maps NormalizedEmail as a plain lookup index and enforces `RequireUniqueEmail` with a query
+        // before the insert, so two concurrent sign-ups with the same address both passed. The index
+        // is widened with TenantId by hand because Finbuckle only adjusts indexes that are ALREADY
+        // unique — that is how UserNameIndex became (NormalizedUserName, TenantId), and this mirrors
+        // it, so an address is free again in every other tenant (ADR-0002).
+        //
+        // Postgres treats NULLs as distinct in a unique index, so users with no e-mail are unaffected.
+        var lookupIndex = builder.Metadata.GetIndexes().FirstOrDefault(index =>
+            index.Properties.Count == 1 &&
+            string.Equals(index.Properties[0].Name, nameof(AppUser.NormalizedEmail), StringComparison.Ordinal));
+
+        if (lookupIndex is not null)
+        {
+            builder.Metadata.RemoveIndex(lookupIndex);
+        }
+
+        builder
+            .HasIndex(nameof(AppUser.NormalizedEmail), "TenantId")
+            .HasDatabaseName("EmailIndex")
+            .IsUnique();
     }
 }
 

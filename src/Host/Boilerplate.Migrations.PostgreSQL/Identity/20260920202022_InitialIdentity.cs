@@ -471,7 +471,8 @@ namespace Boilerplate.Migrations.PostgreSQL.Identity
                 name: "EmailIndex",
                 schema: "identity",
                 table: "Users",
-                column: "NormalizedEmail");
+                columns: new[] { "NormalizedEmail", "TenantId" },
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "UserNameIndex",
