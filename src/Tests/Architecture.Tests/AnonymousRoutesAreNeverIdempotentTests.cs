@@ -35,7 +35,7 @@ public sealed class AnonymousRoutesAreNeverIdempotentTests
 
         foreach (var file in IdempotencyFilterOrderTests.EndpointSourceFiles())
         {
-            var chains = RouteChains.Split(File.ReadAllText(file));
+            var chains = RouteChains.Split(File.ReadAllText(file), IdempotencyFilterOrderTests.Relative(file));
             routesScanned += chains.Count;
 
             offenders.AddRange(chains
@@ -98,6 +98,26 @@ public sealed class AnonymousRoutesAreNeverIdempotentTests
 
         var chains = RouteChains.Split(Source);
 
+        chains.Count(IsAnonymousAndIdempotent).ShouldBe(1);
+    }
+
+    [Fact]
+    public void A_String_Interpolation_Hole_Should_Not_Truncate_The_Chain()
+    {
+        // The regression this guards: a naive "find the matching quote" scan treats the nested
+        // double-quote inside the interpolation hole as the outer $"..." literal's own closing quote,
+        // resumes scanning as if it were code, and reads "//x" as a comment that deletes the rest of
+        // the line — silently dropping both .AllowAnonymous() and .WithIdempotency() from the chain
+        // the scanner returns, so an offending route would have passed unseen.
+        const string Source = """
+            endpoints.MapPost("/a", () => Ok($"{Url("https://x")}")).AllowAnonymous().WithIdempotency();
+            """;
+
+        var chains = RouteChains.Split(Source);
+
+        chains.ShouldHaveSingleItem();
+        chains[0].ShouldContain(".AllowAnonymous()");
+        chains[0].ShouldContain(".WithIdempotency()");
         chains.Count(IsAnonymousAndIdempotent).ShouldBe(1);
     }
 

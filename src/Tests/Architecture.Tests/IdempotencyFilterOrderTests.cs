@@ -43,7 +43,7 @@ public sealed partial class IdempotencyFilterOrderTests
 
         foreach (var file in EndpointSourceFiles())
         {
-            var chains = RouteChains.Split(File.ReadAllText(file));
+            var chains = RouteChains.Split(File.ReadAllText(file), Relative(file));
             routesScanned += chains.Count;
 
             foreach (var chain in chains.Where(c => c.Contains(".WithIdempotency", StringComparison.Ordinal)))
@@ -179,6 +179,62 @@ public sealed partial class IdempotencyFilterOrderTests
         chains.ShouldHaveSingleItem();
         chains[0].ShouldNotContain("WithIdempotency");
         chains[0].ShouldContain(".AllowAnonymous();");
+    }
+
+    [Fact]
+    public void An_Escaped_Brace_In_An_Interpolated_String_Should_Not_Open_A_Hole()
+    {
+        // {{ }} is literal text inside $"...", not an interpolation hole — and the "//" a few
+        // characters later is still inside the same string literal, not a comment.
+        const string Source = """"
+            endpoints.MapGet("/things", () => TypedResults.Ok($"{{not a hole}} // still string"))
+            .WithIdempotency();
+            """";
+
+        var chains = RouteChains.Split(Source);
+
+        chains.ShouldHaveSingleItem();
+        chains[0].ShouldEndWith(".WithIdempotency();");
+    }
+
+    [Fact]
+    public void A_Nested_Interpolated_String_Inside_A_Hole_Should_Not_Truncate_The_Chain()
+    {
+        // The hole itself contains another $"..." literal — EndOfLiteral has to recurse into it
+        // rather than treating its first quote as the outer literal's close.
+        const string Source = """"
+            endpoints.MapGet("/things", (int id) => TypedResults.Ok($"{$"inner-{id}"}"))
+            .WithIdempotency();
+            """";
+
+        var chains = RouteChains.Split(Source);
+
+        chains.ShouldHaveSingleItem();
+        chains[0].ShouldEndWith(".WithIdempotency();");
+    }
+
+    [Fact]
+    public void Verbatim_And_Raw_Interpolated_Strings_Containing_A_Comment_Marker_Should_Stay_Whole()
+    {
+        // @$"..."/$@"..." (verbatim interpolated) and $"""..."""  (raw interpolated) both allow a
+        // literal "//" with no escaping at all; neither should be read as opening a comment.
+        const string Source = """""
+            endpoints.MapGet("/a", () => TypedResults.Ok(@$"{Url("https://a")}"))
+            .WithName("A")
+            .WithIdempotency();
+
+            endpoints.MapGet("/b", () => TypedResults.Ok($"""{Url("https://b")}"""))
+            .WithName("B")
+            .WithIdempotency();
+            """"";
+
+        var chains = RouteChains.Split(Source);
+
+        chains.Count.ShouldBe(2);
+        chains[0].ShouldContain(".WithName(\"A\")");
+        chains[0].ShouldEndWith(".WithIdempotency();");
+        chains[1].ShouldContain(".WithName(\"B\")");
+        chains[1].ShouldEndWith(".WithIdempotency();");
     }
 
     #endregion

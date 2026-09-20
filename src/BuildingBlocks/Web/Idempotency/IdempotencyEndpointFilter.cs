@@ -76,8 +76,9 @@ namespace Boilerplate.BuildingBlocks.Web.Idempotency;
 /// running host's built <see cref="Microsoft.AspNetCore.Http.Endpoint.Metadata"/>, so it sees
 /// anonymity declared as a route group, an <c>[AllowAnonymous]</c> attribute, or a chain call alike —
 /// every form this repository uses. <c>AnonymousRoutesAreNeverIdempotentTests</c> in
-/// Architecture.Tests is a cheap, text-only early warning for the chain-call form only; it cannot see
-/// the other two, which is why the integration test is the one that is authoritative.
+/// Architecture.Tests is a cheap, text-only early warning for the chain-call and
+/// <c>[AllowAnonymous]</c> attribute forms on a route's own chain; it cannot see route-group
+/// anonymity, which is why the integration test is the one that is authoritative.
 /// </para>
 /// <para>
 /// <b>A response that carries a short-lived capability is never marked idempotent either.</b>

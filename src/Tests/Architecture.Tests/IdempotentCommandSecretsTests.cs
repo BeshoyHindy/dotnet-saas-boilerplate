@@ -141,7 +141,7 @@ public sealed partial class IdempotentCommandSecretsTests
 
         foreach (var file in IdempotencyFilterOrderTests.EndpointSourceFiles())
         {
-            foreach (var chain in RouteChains.Split(File.ReadAllText(file)))
+            foreach (var chain in RouteChains.Split(File.ReadAllText(file), IdempotencyFilterOrderTests.Relative(file)))
             {
                 if (!chain.Contains(".WithIdempotency", StringComparison.Ordinal))
                 {
