@@ -96,7 +96,6 @@ public static class TenantSweepShape
         "GET api/v{version:apiVersion}/notifications/unread-count",
         "GET api/v{version:apiVersion}/tenants/",
         "GET api/v{version:apiVersion}/tenants/me/status",
-        "GET api/v{version:apiVersion}/tenants/migrations",
         "GET api/v{version:apiVersion}/tenants/theme",
         "GET api/v{version:apiVersion}/tenants/{tenant}/auth/confirm-email",
     };

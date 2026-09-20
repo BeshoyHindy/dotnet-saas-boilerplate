@@ -309,8 +309,6 @@ public static class TenantSweepExceptions
             ["GET api/v{version:apiVersion}/tenants/"] =
                 "the tenant catalog: Tenants.View is an IsRoot permission, so 403 is the right answer " +
                 "to a tenant admin and the root-token pass is what sweeps this route",
-            ["GET api/v{version:apiVersion}/tenants/migrations"] =
-                "the migration status of every tenant: Tenants.View is IsRoot, same as the catalog",
             ["GET api/v{version:apiVersion}/tenants/{tenant}/auth/confirm-email"] =
                 "not a collection at all — an anonymous confirmation action whose only route parameter " +
                 "is the sanctioned {tenant} segment, so the sweep classifies it as a list. It answers " +

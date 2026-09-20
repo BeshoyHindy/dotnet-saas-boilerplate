@@ -19,7 +19,6 @@ using Boilerplate.Modules.Multitenancy.Features.v1.AdjustTenantValidity;
 using Boilerplate.Modules.Multitenancy.Features.v1.ChangeTenantActivation;
 using Boilerplate.Modules.Multitenancy.Features.v1.CreateTenant;
 using Boilerplate.Modules.Multitenancy.Features.v1.GetMyTenantStatus;
-using Boilerplate.Modules.Multitenancy.Features.v1.GetTenantMigrations;
 using Boilerplate.Modules.Multitenancy.Features.v1.GetTenants;
 using Boilerplate.Modules.Multitenancy.Features.v1.GetTenantStatus;
 using Boilerplate.Modules.Multitenancy.Features.v1.GetTenantTheme;
@@ -122,10 +121,7 @@ public sealed class MultitenancyModule : IModule
             .AddDbContextCheck<TenantDbContext>(
                 name: "db:multitenancy",
                 failureStatus: HealthStatus.Unhealthy,
-                tags: [HealthTags.Ready])
-            .AddCheck<TenantMigrationsHealthCheck>(
-                name: "db:tenants-migrations",
-                failureStatus: HealthStatus.Unhealthy);
+                tags: [HealthTags.Ready]);
     }
 
     public void ConfigureMiddleware(IApplicationBuilder app)
@@ -225,7 +221,6 @@ public sealed class MultitenancyModule : IModule
         GetMyTenantStatusEndpoint.Map(group);
         GetTenantProvisioningStatusEndpoint.Map(group);
         RetryTenantProvisioningEndpoint.Map(group);
-        TenantMigrationsEndpoint.Map(group);
 
         // Theme endpoints
         GetTenantThemeEndpoint.Map(group);

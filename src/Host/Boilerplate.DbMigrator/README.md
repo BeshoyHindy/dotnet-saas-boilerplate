@@ -177,17 +177,19 @@ keep the seeder and replace `DemoDataset` with your own people.
 
 ## API behavior when schema is behind
 
-If the API boots against a database whose schema is behind the running
-build, the `db:tenants-migrations` health check returns `Unhealthy`
-and `GET /health/ready` returns `503 Service Unavailable` with the
-list of pending tenants + migration names in the response body.
-`GET /health/live` continues to return `200 OK` because the process
-itself is alive — so Kubernetes will not crash-loop the pod, but the
-readiness probe will keep it out of rotation until DbMigrator runs.
+**Ordering is the guarantee, not a probe.** The migrator runs to
+completion before the API starts — Aspire chains it as a
+`WaitForCompletion` dependency, the compose stacks sequence it the same
+way — and the API never migrates.
 
-This means: a failed (or skipped) migrator step surfaces as a clear
-operator-visible health-check failure rather than as cryptic EF
-errors per request.
+The `db:tenants-migrations` health check that reported pending
+migrations per tenant was removed with per-tenant databases (#75): with
+one shared schema it asked a single question once per tenant, and it was
+never tagged for readiness, so it never kept a pod out of rotation
+either. `db:multitenancy` is the readiness-tagged check and answers
+"can I reach the tenant catalog", so `GET /health/ready` returns `503
+Service Unavailable` while the database is unreachable — not while it is
+merely behind. Run `list-pending` for that answer.
 
 ## What it actually does
 
