@@ -18,6 +18,14 @@ namespace Architecture.Tests;
 /// It is still text, and it says so: a chain assembled across statements through a local variable is
 /// outside its reach. What it buys is that the tests built on it name a route rather than a file.
 /// </para>
+/// <para>
+/// <b>Comments are stripped from the chain it returns.</b> A callers' own text — including a comment
+/// explaining why a call is <i>absent</i> — sits inside the same substring a regex-based test greps,
+/// so a comment that names a method (<c>// not .WithIdempotency()</c>) would read as a call the source
+/// never makes. <see cref="Split"/> removes <c>//</c> and <c>/* */</c> comments before handing a chain
+/// back, the same literal-aware way <see cref="EndOfStatement"/> already has to walk past them to find
+/// the closing <c>;</c>; a comment-like sequence inside a string literal is left alone.
+/// </para>
 /// </remarks>
 internal static partial class RouteChains
 {
@@ -25,8 +33,9 @@ internal static partial class RouteChains
     private static partial Regex MapCall();
 
     /// <summary>
-    /// Every route registration in <paramref name="source"/>, each as the text of its own chain.
-    /// Nested <c>Map…(</c> calls inside an already-open chain are skipped: they belong to it.
+    /// Every route registration in <paramref name="source"/>, each as the text of its own chain, with
+    /// comments removed. Nested <c>Map…(</c> calls inside an already-open chain are skipped: they
+    /// belong to it.
     /// </summary>
     public static IReadOnlyList<string> Split(string source)
     {
@@ -43,11 +52,61 @@ internal static partial class RouteChains
             }
 
             var end = EndOfStatement(source, start.Index + start.Length);
-            chains.Add(source[start.Index..end]);
+            chains.Add(StripComments(source[start.Index..end]));
             consumedTo = end;
         }
 
         return chains;
+    }
+
+    /// <summary>
+    /// <paramref name="chain"/> with every <c>//</c> and <c>/* */</c> comment removed, outside any
+    /// string literal. Mirrors the literal handling in <see cref="EndOfStatement"/> rather than
+    /// sharing code with it, because that scan only needs to find an end index and this one needs to
+    /// rebuild the text around what it skips.
+    /// </summary>
+    private static string StripComments(string chain)
+    {
+        var result = new System.Text.StringBuilder(chain.Length);
+        var i = 0;
+
+        while (i < chain.Length)
+        {
+            var c = chain[i];
+
+            if (c is '"' or '\'')
+            {
+                var closingQuote = EndOfLiteral(chain, i);
+                result.Append(chain, i, closingQuote - i + 1);
+                i = closingQuote + 1;
+                continue;
+            }
+
+            if (c == '/' && i + 1 < chain.Length && chain[i + 1] == '/')
+            {
+                var newline = chain.IndexOf('\n', i);
+                if (newline < 0)
+                {
+                    break;
+                }
+
+                result.Append('\n');
+                i = newline + 1;
+                continue;
+            }
+
+            if (c == '/' && i + 1 < chain.Length && chain[i + 1] == '*')
+            {
+                var close = chain.IndexOf("*/", i + 2, StringComparison.Ordinal);
+                i = close < 0 ? chain.Length : close + 2;
+                continue;
+            }
+
+            result.Append(c);
+            i++;
+        }
+
+        return result.ToString();
     }
 
     /// <summary>

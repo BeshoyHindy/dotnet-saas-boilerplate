@@ -160,6 +160,27 @@ public sealed partial class IdempotencyFilterOrderTests
         chains[0].ShouldEndWith(".WithIdempotency();");
     }
 
+    [Fact]
+    public void A_Commented_Out_Call_Should_Be_Ignored()
+    {
+        // A comment explaining why a call is absent sits in the same text a regex-based test greps —
+        // without stripping, a comment that names the method would read as a call the source never
+        // makes. This is also why an endpoint's own comment may name .WithIdempotency() or
+        // .AllowAnonymous() plainly: RouteChains removes it before any scanner sees the chain.
+        const string Source = """
+            endpoints.MapPost("/register", (RegisterUserCommand command) => TypedResults.Ok())
+            // .WithIdempotency() // deliberately not idempotent: see #84
+            /* .WithIdempotency() */
+            .AllowAnonymous();
+            """;
+
+        var chains = RouteChains.Split(Source);
+
+        chains.ShouldHaveSingleItem();
+        chains[0].ShouldNotContain("WithIdempotency");
+        chains[0].ShouldContain(".AllowAnonymous();");
+    }
+
     #endregion
 
     /// <summary>

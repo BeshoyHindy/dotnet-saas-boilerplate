@@ -64,15 +64,20 @@ namespace Boilerplate.BuildingBlocks.Web.Idempotency;
 /// <b>An anonymous route is never marked idempotent.</b> For an anonymous caller there is no subject
 /// to bind the partition to, so it collapses to the client-supplied key alone: anyone who presents
 /// another caller's key on that route is handed their stored response. <c>SelfRegisterUser</c> used
-/// to be the one exception (#84) — it is not anymore, and it did not need to be: a retried
-/// registration is already safe, because <c>UserRegistrationService</c> refuses a duplicate
-/// email/username with 400 rather than creating a second user.
-/// <c>AnonymousRoutesAreNeverIdempotentTests</c> in Architecture.Tests fails the build if
-/// <c>.AllowAnonymous()</c> and <c>.WithIdempotency()</c> ever land on the same route chain again.
-/// This also covers a token-issuing endpoint — the same
-/// anonymous-partition hazard is why none of the anonymous <c>tenants/{tenant}/auth/*</c> routes that
-/// set a refresh cookie are marked idempotent either; response headers are stored by allow-list
-/// anyway, so <c>Set-Cookie</c> never reaches the cache regardless.
+/// to be the one exception (#84) — it is not anymore, and it did not need to be: a sequential retry
+/// of a registration is already safe, because <c>UserRegistrationService</c> refuses a duplicate
+/// email/username with 400 rather than creating a second user. This also covers a token-issuing
+/// endpoint — the same anonymous-partition hazard is why none of the anonymous
+/// <c>tenants/{tenant}/auth/*</c> routes that set a refresh cookie are marked idempotent either;
+/// response headers are stored by allow-list anyway, so <c>Set-Cookie</c> never reaches the cache
+/// regardless.
+/// <c>EndpointAuthorizationIntentTests</c>-adjacent
+/// <c>IdempotentEndpointAnonymityTests</c> (Integration.Tests) is what pins the rule: it reads the
+/// running host's built <see cref="Microsoft.AspNetCore.Http.Endpoint.Metadata"/>, so it sees
+/// anonymity declared as a route group, an <c>[AllowAnonymous]</c> attribute, or a chain call alike —
+/// every form this repository uses. <c>AnonymousRoutesAreNeverIdempotentTests</c> in
+/// Architecture.Tests is a cheap, text-only early warning for the chain-call form only; it cannot see
+/// the other two, which is why the integration test is the one that is authoritative.
 /// </para>
 /// <para>
 /// <b>A response that carries a short-lived capability is never marked idempotent either.</b>
@@ -80,9 +85,8 @@ namespace Boilerplate.BuildingBlocks.Web.Idempotency;
 /// but a replay entry lives for the idempotency TTL (24h), so a retry under the same key past the
 /// URL's expiry was handed a dead link rather than a fresh one. A repeated call is harmless without
 /// replay — it creates another pending <c>FileAsset</c> whose <c>UploadDeadline</c> passes and which
-/// <c>PurgeOrphanedFilesJob</c> deletes. The general rule an endpoint like this has to weigh: an
-/// endpoint whose success response is a capability that outlives its own TTL for the length of the
-/// replay entry must not be marked idempotent.
+/// <c>PurgeOrphanedFilesJob</c> deletes. The general rule an endpoint like this has to weigh: a
+/// response that expires sooner than the replay entry's TTL must not be marked idempotent.
 /// </para>
 /// <para>
 /// <b>Nothing may wrap it.</b> The filter writes the response itself and returns
@@ -233,8 +237,8 @@ public sealed class IdempotencyEndpointFilter : IEndpointFilter
         var logicalKey = CacheKeys.IdempotencyEntry(binding, idempotencyKey);
 
         // No tenant at all: declare the entry global rather than invent a tenant for it. Nothing in
-        // the kit reaches this branch today (all four idempotent endpoints resolve a tenant), so it
-        // is the defensive path for a future tenant-less idempotent endpoint.
+        // the kit reaches this branch today (both idempotent endpoints resolve a tenant), so it is
+        // the defensive path for a future tenant-less idempotent endpoint.
         return keyScope.HasTenant ? keyScope.TenantKey(logicalKey) : CacheKeyScope.GlobalKey(logicalKey);
     }
 
@@ -584,6 +588,21 @@ public sealed class IdempotencyEndpointFilter : IEndpointFilter
     }
 }
 
+/// <summary>Marker interface for <see cref="IdempotentEndpointMetadata"/>.</summary>
+public interface IIdempotentEndpointMetadata;
+
+/// <summary>
+/// Marks an endpoint as carrying <see cref="IdempotencyEndpointFilter"/>, attached by
+/// <see cref="IdempotencyEndpointExtensions.WithIdempotency"/> alongside the filter itself. Endpoint
+/// metadata, not text, is what <c>EndpointAuthorizationIntentTests</c>-style guards can trust: a route
+/// group's <c>.AllowAnonymous()</c> or a handler's <c>[AllowAnonymous]</c> attribute never appears in
+/// the endpoint's own source text, so a scan of the file that maps the route cannot see it. Reading
+/// the built <see cref="Microsoft.AspNetCore.Http.Endpoint.Metadata"/> — the same collection the
+/// authorization middleware itself reads — sees every route-group, attribute and chain-call form
+/// alike, because ASP.NET Core has already merged them by the time the host is running.
+/// </summary>
+public sealed class IdempotentEndpointMetadata : IIdempotentEndpointMetadata;
+
 public static class IdempotencyEndpointExtensions
 {
     /// <summary>
@@ -593,6 +612,8 @@ public static class IdempotencyEndpointExtensions
     public static RouteHandlerBuilder WithIdempotency(this RouteHandlerBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        return builder.AddEndpointFilter<IdempotencyEndpointFilter>();
+        return builder
+            .AddEndpointFilter<IdempotencyEndpointFilter>()
+            .WithMetadata(new IdempotentEndpointMetadata());
     }
 }
