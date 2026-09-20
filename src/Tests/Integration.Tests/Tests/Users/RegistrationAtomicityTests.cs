@@ -2,11 +2,13 @@ using Boilerplate.BuildingBlocks.Eventing.Persistence;
 using Boilerplate.BuildingBlocks.Mailing;
 using Boilerplate.BuildingBlocks.Mailing.Services;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Identity.Contracts.Services;
 using Boilerplate.Modules.Identity.Data;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
+using System.Security.Claims;
 
 namespace Integration.Tests.Tests.Users;
 
@@ -31,6 +33,9 @@ public sealed class RegistrationAtomicityTests
 
     /// <summary>Subject of the mail registration owes a self-registered user.</summary>
     private const string ConfirmationSubject = "Confirm Your Email Address";
+
+    /// <summary>Subject of the mail every registration's integration event sends, self-served or not.</summary>
+    private const string WelcomeSubject = "Welcome!";
 
     /// <summary>
     /// How long a mail that must NOT arrive is given to arrive anyway. The pre-fix path enqueued it
@@ -197,14 +202,101 @@ public sealed class RegistrationAtomicityTests
         await Task.Delay(MailGracePeriod);
 
         // Assert
+        (await CountOutboxRowsMentioningAsync(email)).ShouldBe(
+            1,
+            "one sign-up is one UserRegisteredIntegrationEvent — a second publisher means a second of every mail hung off it");
         CountMailsTo(mail, email, ConfirmationSubject).ShouldBe(
             1,
             "a committed registration owes the user exactly one confirmation link");
+        CountMailsTo(mail, email, WelcomeSubject).ShouldBe(
+            1,
+            "and exactly one welcome");
+    }
+
+    [Fact]
+    public async Task GetOrCreateFromPrincipal_Should_PublishOneEvent_And_SendNoConfirmation()
+    {
+        // Arrange — an externally authenticated user arrives with their address already proven, so
+        // the confirmation link would be a link to nothing they need.
+        var mail = (NoOpMailService)_factory.Services.GetRequiredService<IMailService>();
+        mail.Clear();
+
+        var unique = Guid.NewGuid().ToString("N")[..8];
+        var email = $"extmail-{unique}@example.com";
+
+        // Act
+        var userId = await SignInExternallyAsync(email);
+        userId.ShouldNotBeNullOrWhiteSpace();
+
+        await OutboxDrain.DrainAsync(_factory.Services);
+        await Task.Delay(MailGracePeriod);
+
+        // Assert
+        (await CountOutboxRowsMentioningAsync(email)).ShouldBe(1, "one sign-up, one event");
+        CountMailsTo(mail, email, WelcomeSubject).ShouldBe(1);
+        CountMailsTo(mail, email, ConfirmationSubject).ShouldBe(
+            0,
+            "the address arrived confirmed; a confirmation link would ask the user to prove it twice");
+    }
+
+    #endregion
+
+    #region External sign-in
+
+    [Fact]
+    public async Task GetOrCreateFromPrincipal_Should_ReturnOneUser_When_TheSameIdentitySignsInConcurrently()
+    {
+        // A first sign-in through an external provider is a registration, and N devices (or N retries
+        // of one flaky callback) can make it at once. Losing that race is not an error — the user the
+        // call was asked to get-or-create exists — so every racer must come back with the winner's id
+        // rather than a failed login.
+        var unique = Guid.NewGuid().ToString("N")[..8];
+        var email = $"external-{unique}@example.com";
+
+        var ids = await Task.WhenAll(Enumerable.Range(0, Racers)
+            .Select(_ => Task.Run(() => SignInExternallyAsync(email))));
+
+        ids.Distinct(StringComparer.Ordinal).Count().ShouldBe(
+            1,
+            $"every racer must be handed the same user; got [{string.Join(", ", ids.Distinct(StringComparer.Ordinal))}]");
+        ids.ShouldAllBe(id => !string.IsNullOrWhiteSpace(id));
+        (await CountUsersAsync(TestConstants.RootTenantId, email)).ShouldBe(
+            1,
+            "and the tenant must hold exactly one row for that address");
     }
 
     #endregion
 
     #region Helpers
+
+    /// <summary>
+    /// Signs in through the external-authentication path — the service seam, because no endpoint maps
+    /// it today. The tenant context is installed INLINE in this method: Finbuckle keeps it in an
+    /// AsyncLocal, so a set made anywhere else does not reach the call below.
+    /// </summary>
+    private async Task<string> SignInExternallyAsync(string email)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var tenant = await scope.ServiceProvider
+            .GetRequiredService<IMultiTenantStore<AppTenantInfo>>()
+            .GetAsync(TestConstants.RootTenantId);
+        scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()
+            .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
+
+        // No name claim, so every racer derives the same username from the address — the username
+        // index collides alongside the e-mail one, which is the worst case this path has.
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(
+            [
+                new Claim(ClaimTypes.Email, email),
+                new Claim(ClaimTypes.GivenName, "Ext"),
+                new Claim(ClaimTypes.Surname, "Auth"),
+            ],
+            authenticationType: "IntegrationTestExternalProvider"));
+
+        return await scope.ServiceProvider
+            .GetRequiredService<IUserService>()
+            .GetOrCreateFromPrincipalAsync(principal);
+    }
 
     private static object NewRegistration(string email, string userName) => new
     {

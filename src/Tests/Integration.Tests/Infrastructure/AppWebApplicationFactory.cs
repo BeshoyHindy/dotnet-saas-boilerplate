@@ -228,6 +228,9 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
             // so an armed registration's publish writes its row and then throws. IOutboxWriter is
             // registered as a forward to IOutboxStore, so decorating the one covers both, and every
             // unarmed publish — including the dispatcher's own reads and marks — is the production path.
+            // Installed suite-wide but inert everywhere else: only a registration whose address was
+            // explicitly armed throws, and Arm refuses any address not starting with
+            // FaultInjectingOutboxStore.EmailPrefix, which no other test uses.
             services.RemoveAll<Boilerplate.BuildingBlocks.Eventing.Outbox.IOutboxStore>();
             services.AddScoped<Boilerplate.BuildingBlocks.Eventing.Outbox.EfCoreOutboxStore>();
             services.AddScoped<Boilerplate.BuildingBlocks.Eventing.Outbox.IOutboxStore, FaultInjectingOutboxStore>();

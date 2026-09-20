@@ -12,7 +12,6 @@ using Boilerplate.Modules.Identity.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using System.Globalization;
 using System.Net;
 using System.Security.Claims;
@@ -60,13 +59,12 @@ internal sealed class UserRegistrationService(
                 return user.Id;
             }, cancellationToken).ConfigureAwait(false);
         }
-        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        catch (DbUpdateException ex) when (RegistrationConflict.IsDuplicateUser(ex))
         {
             // Two sign-ins with the same external identity raced and the other one won. The user this
             // call was asked to get-or-create now exists, which is the answer the caller wanted: find
-            // it and hand it back rather than failing a login that has nothing wrong with it.
-            db.ChangeTracker.Clear();
-
+            // it and hand it back rather than failing a login that has nothing wrong with it. The
+            // change tracker was already cleared on the way out of the transaction.
             var winner = await userManager.FindByEmailAsync(email);
             return winner?.Id ?? throw new CustomException(
                 "Failed to create user from external principal.",
@@ -103,14 +101,14 @@ internal sealed class UserRegistrationService(
                 return user.Id;
             }, cancellationToken).ConfigureAwait(false);
         }
-        catch (DbUpdateException ex) when (IsUniqueViolation(ex))
+        catch (DbUpdateException ex) when (RegistrationConflict.IsDuplicateUser(ex))
         {
             // A concurrent registration got there first. Identity's pre-insert duplicate check lost
             // the race to the index, so say what that check would have said: this is the caller's
             // duplicate (400), not a server fault (500).
             throw new CustomException(
                 RegistrationFailedMessage,
-                [DuplicateReasonFor(ex, email, userName)],
+                [RegistrationConflict.DuplicateReasonFor(ex, email, userName)],
                 HttpStatusCode.BadRequest);
         }
     }
@@ -213,7 +211,9 @@ internal sealed class UserRegistrationService(
     /// retry-on-failure today, so it executes exactly once; wrapping it anyway is what keeps
     /// enabling retries a configuration change rather than a crash (a user-initiated transaction
     /// under a retrying strategy throws). The change tracker is cleared at the top of each attempt
-    /// so a retry starts from committed state instead of the failed attempt's leftovers.</para>
+    /// so a retry starts from committed state instead of the failed attempt's leftovers, and again
+    /// on the way out of a failed one — the rows were rolled back, so a context still tracking them
+    /// would re-insert them on the next save anything in this scope makes.</para>
     /// </summary>
     private async Task<string> InTransactionAsync(
         Func<CancellationToken, Task<string>> register,
@@ -225,36 +225,26 @@ internal sealed class UserRegistrationService(
             {
                 db.ChangeTracker.Clear();
 
-                // Disposal rolls back anything not committed, which is the whole point: every exit
-                // that is not the commit below leaves the database as it found it.
-                await using var transaction = await db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+                try
+                {
+                    // Disposal rolls back anything not committed, which is the whole point: every exit
+                    // that is not the commit below leaves the database as it found it.
+                    await using var transaction = await db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
 
-                var userId = await register(ct).ConfigureAwait(false);
+                    var userId = await register(ct).ConfigureAwait(false);
 
-                await transaction.CommitAsync(ct).ConfigureAwait(false);
-                return userId;
+                    await transaction.CommitAsync(ct).ConfigureAwait(false);
+                    return userId;
+                }
+                catch
+                {
+                    // One place for every failed exit — the caller that maps a duplicate to 400, the
+                    // caller that re-finds the winner, and the failure nobody catches all leave the
+                    // scoped context as clean as the database.
+                    db.ChangeTracker.Clear();
+                    throw;
+                }
             }).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// True when the write lost a race to one of the user table's unique indexes. Postgres reports
-    /// both the username and the e-mail index the same way; only the constraint name differs.
-    /// </summary>
-    private static bool IsUniqueViolation(DbUpdateException exception) =>
-        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
-
-    /// <summary>
-    /// The reason line a lost race gets, worded exactly like the one ASP.NET Identity's pre-insert
-    /// check produces for the same collision — the caller cannot tell which of the two refused them,
-    /// and has no reason to care.
-    /// </summary>
-    private static string DuplicateReasonFor(DbUpdateException exception, string email, string userName)
-    {
-        var constraint = (exception.InnerException as PostgresException)?.ConstraintName;
-
-        return string.Equals(constraint, "UserNameIndex", StringComparison.Ordinal)
-            ? string.Format(CultureInfo.InvariantCulture, "User name '{0}' is already taken.", userName)
-            : string.Format(CultureInfo.InvariantCulture, "Email '{0}' is already taken.", email);
     }
 
     private void EnsureValidTenant()

@@ -40,13 +40,23 @@ committed user by definition. Both build the message through `ConfirmationMailBu
 links cannot drift apart. **A test asserting the registration mail must drain the outbox first**
 (`OutboxDrain.DrainAsync`).
 
+`AppUser.RecordRegistered` stays inside that transaction, and its handler (`UserRegisteredHandler`)
+**logs only** — like every other Identity domain-event handler. It used to publish
+`UserRegisteredIntegrationEvent` as well, which meant two events per sign-up, two welcome mails and
+(once the mail moved) two confirmation mails. The service publishes that event itself so the row
+sits inside the transaction; a publish from a domain-event handler runs inside
+`DomainEventsInterceptor`, which logs and swallows handler failures, so a failed write there would
+leave a committed user nobody was ever told about. **Don't reinstate a publish in that handler.**
+
 **E-mail uniqueness is an index, not a query.** `EmailIndex` is `(NormalizedEmail, TenantId)` UNIQUE,
 mirroring how Finbuckle widens `UserNameIndex` — so an address is free again in every other tenant,
 and NULL e-mails stay allowed (Postgres treats NULLs as distinct). Identity's `RequireUniqueEmail`
-check runs before the insert and two concurrent sign-ups both passed it. A `23505` on either index
-during registration is mapped to the same 400 the pre-insert check gives ("Unable to register the
-user." plus the taken-email/username reason), never a 500; `GetOrCreateFromPrincipalAsync` instead
-re-finds the winner by e-mail and returns it, because a lost race there is still a valid login.
+check runs before the insert and two concurrent sign-ups both passed it. A `23505` on **those two
+named indexes** is mapped by `RegistrationConflict` to the same 400 the pre-insert check gives
+("Unable to register the user." plus the taken-email/username reason); any other unique violation is
+rethrown and stays a 500, because answering "that e-mail is taken" to a collision somewhere else
+would be a lie that also hides the bug. `GetOrCreateFromPrincipalAsync` instead re-finds the winner
+by e-mail and returns it, because a lost race there is still a valid login.
 
 ## Avatars: the client never names one (#83)
 
