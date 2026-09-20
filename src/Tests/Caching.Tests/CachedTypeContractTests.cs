@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using Boilerplate.BuildingBlocks.Web.Idempotency;
 using Boilerplate.Modules.Identity;
 using Boilerplate.Modules.Multitenancy.Contracts.Dtos;
 
@@ -30,8 +29,11 @@ public sealed class CachedTypeContractTests
                 typeof(BrandAssetsDto),
                 typeof(TypographyDto),
                 typeof(LayoutDto),
-                typeof(CachedIdempotentResponse),
             };
+
+            // CachedIdempotentResponse is deliberately absent: since #82 the idempotency filter keeps
+            // its entries in IDistributedCache itself and deserializes them per read, so there is no
+            // L1 object to reuse and [ImmutableObject(true)] would promise something nothing relies on.
 
             // Reach into the Identity runtime assembly for the internal PermissionSet type.
             var permissionSet = typeof(IdentityModule).Assembly

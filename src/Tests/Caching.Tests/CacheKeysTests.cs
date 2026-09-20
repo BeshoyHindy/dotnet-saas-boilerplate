@@ -29,22 +29,12 @@ public sealed class CacheKeysTests
     }
 
     [Fact]
-    public void IdempotencyEntry_Should_Carry_Only_The_ClientKey()
+    public void IdempotencyEntry_Should_Carry_TheCallerBinding_Then_TheClientKey()
     {
-        CacheKeys.IdempotencyEntry("req-42").ShouldBe("idem:req-42");
-    }
-
-    [Fact]
-    public void GlobalIdempotencyEntry_Should_PartitionBySubject_When_Authenticated()
-    {
-        CacheKeys.GlobalIdempotencyEntry("user-7", "req-42").ShouldBe("idem:s:user-7:req-42");
-    }
-
-    [Fact]
-    public void GlobalIdempotencyEntry_Should_FallBackToAnonymousPartition_When_NoSubject()
-    {
-        CacheKeys.GlobalIdempotencyEntry(null, "req-42").ShouldBe("idem:anon:req-42");
-        CacheKeys.GlobalIdempotencyEntry(string.Empty, "req-42").ShouldBe("idem:anon:req-42");
+        // The binding (subject + method + path, hashed by the filter) comes first and the
+        // client-chosen key last: nothing follows the untrusted part, so nothing in it can be
+        // arranged to name another caller's partition.
+        CacheKeys.IdempotencyEntry("ab12", "req-42").ShouldBe("idem:ab12:req-42");
     }
 
     [Fact]
@@ -64,6 +54,5 @@ public sealed class CacheKeysTests
     {
         CacheKeys.Tags.Permissions.ShouldBe("permissions");
         CacheKeys.Tags.Themes.ShouldBe("themes");
-        CacheKeys.Tags.Idempotency.ShouldBe("idempotency");
     }
 }

@@ -41,8 +41,8 @@ var perms = await cache.GetOrCreateAsync(
 ```
 
 - **Keys & tags live in `CacheKeys.cs`**, tenant-free. Existing: `UserPermissions(userId)`,
-  `TenantTheme`, `DefaultTheme`, `IdempotencyEntry(key)`, `GlobalIdempotencyEntry(subject, key)`,
-  `ImpersonationGrantStatus(jti)`; tags `Permissions`, `Themes`, `Idempotency`, `User(id)`.
+  `TenantTheme`, `DefaultTheme`, `IdempotencyEntry(binding, key)`, `ImpersonationGrantStatus(jti)`;
+  tags `Permissions`, `Themes`, `User(id)`.
   An architecture test rejects a `CacheKeys` member that takes a tenant, and rejects an inline key or
   tag string at any call site outside the block.
 - Invalidate with `RemoveAsync(key)` or `RemoveByTagAsync(tag)` in the relevant mutation handler.
@@ -75,7 +75,9 @@ reviewer can see the claim "this belongs to no tenant" without reading the metho
 Use it when both are true: the data is not a tenant's, **and** the read can happen with no tenant
 established. Today that is the impersonation-grant revocation marker — read from the JwtBearer
 `OnTokenValidated` hook, which runs *before* tenant resolution, and backing an `IGlobalEntity` keyed
-by a globally unique `jti` — plus the idempotency filter's tenant-less branch.
+by a globally unique `jti`. The idempotency filter's tenant-less branch lands in the same `g:`
+namespace, but by asking `CacheKeyScope.GlobalKey` for the key rather than by injecting this cache —
+it does not go through `HybridCache` at all (below).
 
 ## Reaching another tenant's entries
 
@@ -93,9 +95,21 @@ under the wrong tenant.
 `TenantTag(logical)`, the static `GlobalKey`/`GlobalTag`, plus `HasTenant`/`AmbientTenantId` for
 deciding between the two caches. Ask it — don't rebuild the format.
 
-`IdempotencyEndpointFilter` is the only caller: HybridCache has no get-only probe
-(dotnet/aspnetcore#57191), so it reads L2 by key and must name the physical one. An architecture test
-keeps `IDistributedCache` to a stale-failing allow-list (that probe, and the Redis health check).
+`IdempotencyEndpointFilter` is the only caller, and it is the one piece of application code that
+uses **`IDistributedCache` directly** — for both the read and the write. That is deliberate (#82):
+
+- HybridCache has no get-only read (dotnet/aspnetcore#57191), and a replay store needs exactly
+  get + set-with-TTL. A `GetOrCreateAsync` whose factory runs the endpoint is not that.
+- HybridCache's L2 payload is **framed**, so a writer and a reader that are not both HybridCache
+  cannot agree on the bytes. The filter therefore owns its entry format end to end: a small versioned
+  JSON envelope (`CachedIdempotentResponse`, field `v`), where an unknown version or unreadable bytes
+  are a **miss**, never an exception on the replay path.
+- Tenant scoping still comes from here: `TenantKey(logical)` when a tenant is ambient,
+  `GlobalKey(logical)` when there is none. The filter names the physical key; it does not invent one.
+
+An architecture test keeps `IDistributedCache` to a stale-failing allow-list (that filter, and the
+Redis health check). Replay entries carry no tag — nothing can invalidate them in bulk, and their TTL
+is the whole lifetime story.
 
 ## Gotchas
 
@@ -103,19 +117,17 @@ keeps `IDistributedCache` to a stale-failing allow-list (that probe, and the Red
   cross-node staleness is bounded only by the 2-min local expiration. Don't rely on instant
   cross-node invalidation; keep local expiration short for hot, mutable data.
 - **HybridCache ignores `MemoryDistributedCache` as an L2** (it would only duplicate L1). So with no
-  Redis configured — including the integration test host — nothing reaches L2 at all, and anything
-  that reads L2 directly sees nothing.
+  Redis configured — including the integration test host — nothing HybridCache writes reaches L2 at
+  all. `IDistributedCache` itself works fine there; it is the layering that opts out, which is why
+  the idempotency filter (its own reader *and* writer) replays in that host and the old
+  HybridCache-write/L2-probe split was invisible there.
 - **HybridCache does not write bare JSON to L2.** It writes a framed payload (version byte, expiry,
-  key, tags, then the value). Anything reading those bytes directly has to account for that — the
-  idempotency filter's direct `IDistributedCache` probe does not, so replay currently fails against a
-  real Redis L2 (see below).
+  key, tags, then the value). Nothing may read those bytes directly and expect its own format back;
+  the idempotency filter used to, which is why its first replay of every key was a 500 against Redis
+  (#82). Anything that needs its own entries in L2 owns both sides of them, as the filter now does.
 - Don't reach for `IDistributedCache` directly — it skips the tenant prefix, the telemetry and the
   tag bookkeeping. The allow-list above is the whole set of exceptions.
 
 ## Related, tracked separately
 
 Storage paths are not yet tenant-prefixed by the building block — that is #78.
-
-*Make idempotent replay work against a real distributed cache* — the idempotency probe reads L2 by
-key through `IDistributedCache`, which returns HybridCache's framed payload rather than the bare
-JSON the filter expects, so replay against a real Redis L2 currently fails. Not fixed here.

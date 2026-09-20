@@ -151,13 +151,16 @@ public sealed partial class CacheTenantScopingTests
     #region (c) IDistributedCache is an allow-list
 
     /// <summary>
-    /// Talking to L2 directly skips the prefix, the telemetry and the tag bookkeeping. Three places
+    /// Talking to L2 directly skips the prefix, the telemetry and the tag bookkeeping. Two places
     /// have a reason to; everything else uses <c>HybridCache</c>. Say why in the file, not only here.
     /// </summary>
     private static readonly string[] DistributedCacheAllowList =
     [
-        // HybridCache has no get-only probe (dotnet/aspnetcore#57191), so the replay check reads L2
-        // by key — the physical key, which it asks CacheKeyScope for rather than rebuilding.
+        // The filter owns its replay entry end to end — it reads *and* writes it here. HybridCache
+        // has no get-only read (dotnet/aspnetcore#57191) and frames its L2 payload, so a reader and a
+        // writer that are not both HybridCache cannot agree on the bytes (#82, see caching.md).
+        // Tenant scoping is unchanged: it asks CacheKeyScope for the physical key rather than
+        // rebuilding the format.
         "src/BuildingBlocks/Web/Idempotency/IdempotencyEndpointFilter.cs",
 
         // A liveness probe for the Redis connection itself, not an application entry.
