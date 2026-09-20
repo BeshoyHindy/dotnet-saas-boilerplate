@@ -12,6 +12,7 @@ using Boilerplate.Modules.Identity.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Security.Claims;
@@ -35,6 +36,16 @@ internal sealed class UserRegistrationService(
     /// </summary>
     private const string RegistrationFailedMessage = "Unable to register the user.";
 
+    /// <summary>What an external create is refused with when the username is not the caller's to take.</summary>
+    private const string ExternalCreateFailedMessage = "Failed to create user from external principal.";
+
+    /// <summary>
+    /// How many usernames one external sign-in may try. Each retry draws fresh randomness, so two is
+    /// already generous; the bound is here so a name that can never be taken ends as an error rather
+    /// than a loop.
+    /// </summary>
+    private const int MaxUserNameAttempts = 3;
+
     public async Task<string> GetOrCreateFromPrincipalAsync(ClaimsPrincipal principal, CancellationToken cancellationToken = default)
     {
         EnsureValidTenant();
@@ -48,29 +59,52 @@ internal sealed class UserRegistrationService(
             return existingUser.Id;
         }
 
-        try
-        {
-            return await InTransactionAsync(async ct =>
-            {
-                var user = await CreateUserFromPrincipalAsync(principal, email);
-                await AssignDefaultRoleAndGroupsAsync(user, "ExternalAuth", ct);
-                await PublishUserRegisteredAsync(user, "Identity.ExternalAuth", ct);
+        // That check can be true again a millisecond later, so losing the create is a normal outcome
+        // here rather than an error: the user this call was asked to get-or-create exists, and the
+        // caller wanted their id. A username collision is the opposite — the row belongs to a
+        // stranger who derived the same name — so it is retried under another name, never adopted.
+        string? retryUserName = null;
 
-                return user.Id;
-            }, cancellationToken).ConfigureAwait(false);
-        }
-        catch (DbUpdateException ex) when (RegistrationConflict.IsDuplicateUser(ex))
+        for (var attempt = 1; attempt <= MaxUserNameAttempts; attempt++)
         {
-            // Two sign-ins with the same external identity raced and the other one won. The user this
-            // call was asked to get-or-create now exists, which is the answer the caller wanted: find
-            // it and hand it back rather than failing a login that has nothing wrong with it. The
-            // change tracker was already cleared on the way out of the transaction.
-            var winner = await userManager.FindByEmailAsync(email);
-            return winner?.Id ?? throw new CustomException(
-                "Failed to create user from external principal.",
-                errors: null,
-                HttpStatusCode.BadRequest);
+            try
+            {
+                return await InTransactionAsync(async ct =>
+                {
+                    var user = await CreateUserFromPrincipalAsync(principal, email, retryUserName);
+                    await AssignDefaultRoleAndGroupsAsync(user, "ExternalAuth", ct);
+                    await PublishUserRegisteredAsync(user, "Identity.ExternalAuth", ct);
+
+                    return user.Id;
+                }, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (RegistrationConflict.Describe(ex).IsDuplicate)
+            {
+                // Whichever shape refused this attempt — the unique index (23505, a DbUpdateException)
+                // or Identity's own pre-insert validators a moment after the winner committed
+                // (DuplicateEmail/DuplicateUserName, no exception of its own) — the question is the
+                // same: does this address have a user now? The change tracker was cleared on the way
+                // out of the transaction, so this reads committed state.
+                var winner = await userManager.FindByEmailAsync(email);
+                if (winner is not null)
+                {
+                    return winner.Id;
+                }
+
+                // The address is still free, so nothing raced this identity: someone else holds the
+                // username. Retrying is the only answer that neither fails a valid sign-in nor hands
+                // the caller a stranger's account.
+                if (!RegistrationConflict.Describe(ex).UserNameTaken || attempt >= MaxUserNameAttempts)
+                {
+                    throw;
+                }
+
+                retryUserName = UniqueUserNameFor(ExtractUserInfoFromPrincipal(principal, email).userName);
+            }
         }
+
+        // The loop either returns, or rethrows on its last attempt.
+        throw new UnreachableException();
     }
 
     public async Task<string> RegisterAsync(
@@ -262,11 +296,20 @@ internal sealed class UserRegistrationService(
             ?? throw new CustomException("Email claim is required for external authentication.");
     }
 
-    private async Task<AppUser> CreateUserFromPrincipalAsync(ClaimsPrincipal principal, string email)
+    /// <param name="principal">The externally authenticated caller.</param>
+    /// <param name="email">The address the provider vouches for.</param>
+    /// <param name="userNameOverride">
+    /// A username to use instead of the derived one — set by a retry whose derived name turned out to
+    /// belong to someone else.
+    /// </param>
+    private async Task<AppUser> CreateUserFromPrincipalAsync(
+        ClaimsPrincipal principal,
+        string email,
+        string? userNameOverride = null)
     {
         var (firstName, lastName, userName) = ExtractUserInfoFromPrincipal(principal, email);
 
-        userName = await EnsureUniqueUserNameAsync(userName);
+        userName = userNameOverride ?? await EnsureUniqueUserNameAsync(userName);
 
         var user = new AppUser
         {
@@ -282,11 +325,15 @@ internal sealed class UserRegistrationService(
         var result = await userManager.CreateAsync(user);
         if (!result.Succeeded)
         {
-            var errors = result.Errors.Select(e => e.Description).ToList();
-            throw new CustomException(
-                "Failed to create user from external principal.",
-                errors,
-                HttpStatusCode.BadRequest);
+            // A duplicate carries which field collided, because the caller recovers from an address
+            // collision and must not recover from a username one. It is still the same 400, with the
+            // same message and the same reasons, for anyone who just lets it escape.
+            throw RegistrationConflict.Describe(result).IsDuplicate
+                ? new DuplicateUserException(ExternalCreateFailedMessage, result)
+                : new CustomException(
+                    ExternalCreateFailedMessage,
+                    result.Errors.Select(e => e.Description).ToList(),
+                    HttpStatusCode.BadRequest);
         }
 
         return user;
@@ -314,9 +361,31 @@ internal sealed class UserRegistrationService(
     {
         if (await userManager.FindByNameAsync(userName) is not null)
         {
-            return $"{userName}_{Guid.NewGuid():N}"[..20];
+            return UniqueUserNameFor(userName);
         }
         return userName;
+    }
+
+    /// <summary>
+    /// A username derived from <paramref name="userName"/> that nobody else is holding.
+    ///
+    /// The random half is what makes it unique, so the stem is trimmed to fit around it rather than
+    /// the other way round. It used to be <c>$"{userName}_{Guid}"[..20]</c>, which for any name of 20
+    /// characters or more truncated the randomness clean off and returned a deterministic prefix — so
+    /// the second caller to need a fallback got the name the first one had already been given, while
+    /// their own address was still free. That is the one collision this path must never produce,
+    /// because the name is all that separates two people who happen to share a mailbox local part.
+    /// </summary>
+    private static string UniqueUserNameFor(string userName)
+    {
+        const int suffixLength = 8;
+        const int maxLength = 20;
+
+        var stem = userName.Length > maxLength - suffixLength - 1
+            ? userName[..(maxLength - suffixLength - 1)]
+            : userName;
+
+        return $"{stem}_{Guid.NewGuid():N}"[..(stem.Length + 1 + suffixLength)];
     }
 
     private static void ValidatePasswordMatch(string password, string confirmPassword)

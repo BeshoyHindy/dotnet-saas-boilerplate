@@ -55,8 +55,21 @@ check runs before the insert and two concurrent sign-ups both passed it. A `2350
 named indexes** is mapped by `RegistrationConflict` to the same 400 the pre-insert check gives
 ("Unable to register the user." plus the taken-email/username reason); any other unique violation is
 rethrown and stays a 500, because answering "that e-mail is taken" to a collision somewhere else
-would be a lie that also hides the bug. `GetOrCreateFromPrincipalAsync` instead re-finds the winner
-by e-mail and returns it, because a lost race there is still a valid login.
+would be a lie that also hides the bug.
+
+**A lost race arrives in two shapes, and code that knows one of them is code that passes `dotnet
+test` and fails in production.** If the loser's write reaches the database first, the index refuses
+it — `DbUpdateException` wrapping `23505`. If the winner commits a moment earlier, Identity's own
+pre-insert validators refuse it — a failed `IdentityResult` carrying `DuplicateEmail` /
+`DuplicateUserName`, and no exception at all. `RegistrationConflict.Describe` reads both into one
+answer (matching Identity on `IdentityError.Code`, never on the localizable description).
+`GetOrCreateFromPrincipalAsync` handles both the same way: re-find the winner by e-mail and return
+their id, because a lost race there is still a valid login. **But only when the address collided.**
+A username collision with the address still free is a *stranger* who derived the same name, and
+returning their id would sign the caller into someone else's account — so that retries under a fresh
+name (bounded, `MaxUserNameAttempts`), and the fallback name always carries its random half
+(`UniqueUserNameFor`; the old `$"{name}_{guid}"[..20]` truncated the randomness off for any name ≥20
+characters and handed two different people the same fallback).
 
 ## Avatars: the client never names one (#83)
 

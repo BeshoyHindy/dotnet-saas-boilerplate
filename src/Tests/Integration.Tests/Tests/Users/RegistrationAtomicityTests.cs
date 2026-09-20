@@ -250,11 +250,26 @@ public sealed class RegistrationAtomicityTests
         // of one flaky callback) can make it at once. Losing that race is not an error — the user the
         // call was asked to get-or-create exists — so every racer must come back with the winner's id
         // rather than a failed login.
+        //
+        // The gate pins the losing interleaving instead of hoping for it: every racer but the first
+        // is held after its "does this address exist?" query came back empty, and released once the
+        // winner has committed. That is the window where the index is not what refuses the loser —
+        // Identity's pre-insert validators are, with a DuplicateEmail result the caller never sees
+        // as a DbUpdateException.
+        using var gate = new ExternalSignInGate();
         var unique = Guid.NewGuid().ToString("N")[..8];
         var email = $"external-{unique}@example.com";
 
-        var ids = await Task.WhenAll(Enumerable.Range(0, Racers)
-            .Select(_ => Task.Run(() => SignInExternallyAsync(email))));
+        var racers = Enumerable.Range(0, Racers)
+            .Select(_ => Task.Run(() => SignInExternallyAsync(email, gate.PrincipalFor(email))))
+            .ToArray();
+
+        // The unheld racer is the winner; everyone else is parked at the gate until it has committed.
+        var winner = await Task.WhenAny(racers);
+        await winner;
+        gate.ReleaseHeld();
+
+        var ids = await Task.WhenAll(racers);
 
         ids.Distinct(StringComparer.Ordinal).Count().ShouldBe(
             1,
@@ -263,6 +278,42 @@ public sealed class RegistrationAtomicityTests
         (await CountUsersAsync(TestConstants.RootTenantId, email)).ShouldBe(
             1,
             "and the tenant must hold exactly one row for that address");
+    }
+
+    [Fact]
+    public async Task GetOrCreateFromPrincipal_Should_CreateSeparateUsers_When_OtherAddressesDeriveTheSameUserName()
+    {
+        // A username taken by SOMEONE ELSE is not this identity's race, and must never be answered
+        // with that someone else's id — it would sign the caller into a stranger's account. Three
+        // addresses at three domains share one local part, so all three derive the same username and
+        // must still end up as three people.
+        //
+        // The third one is the case: the derived name is taken, so registration falls back to a
+        // uniquified one — and that fallback must actually be unique. It used to be
+        // $"{name}_{guid}"[..20], which for a local part this long truncates the random half clean
+        // off, handing the third arrival exactly the name the second one already holds while their
+        // address is still free.
+        var localPart = $"twins-{Guid.NewGuid():N}"[..24];
+        var addresses = new[]
+        {
+            $"{localPart}@first.example.com",
+            $"{localPart}@second.example.com",
+            $"{localPart}@third.example.com",
+        };
+
+        var ids = new List<string>();
+        foreach (var address in addresses)
+        {
+            ids.Add(await SignInExternallyAsync(address));
+        }
+
+        ids.Distinct(StringComparer.Ordinal).Count().ShouldBe(
+            3,
+            "three addresses are three people, whatever their usernames derive to");
+        foreach (var address in addresses)
+        {
+            (await CountUsersAsync(TestConstants.RootTenantId, address)).ShouldBe(1);
+        }
     }
 
     #endregion
@@ -274,7 +325,12 @@ public sealed class RegistrationAtomicityTests
     /// it today. The tenant context is installed INLINE in this method: Finbuckle keeps it in an
     /// AsyncLocal, so a set made anywhere else does not reach the call below.
     /// </summary>
-    private async Task<string> SignInExternallyAsync(string email)
+    /// <param name="email">The address the provider vouches for.</param>
+    /// <param name="principal">
+    /// A principal to sign in with — an <see cref="ExternalSignInGate"/> one when the test needs the
+    /// race pinned. Omitted, a plain principal is built for the address.
+    /// </param>
+    private async Task<string> SignInExternallyAsync(string email, ClaimsPrincipal? principal = null)
     {
         using var scope = _factory.Services.CreateScope();
         var tenant = await scope.ServiceProvider
@@ -283,9 +339,9 @@ public sealed class RegistrationAtomicityTests
         scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()
             .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
 
-        // No name claim, so every racer derives the same username from the address — the username
-        // index collides alongside the e-mail one, which is the worst case this path has.
-        var principal = new ClaimsPrincipal(new ClaimsIdentity(
+        // No name claim, so the username is derived from the address — every racer for one address
+        // derives the same one, which is the worst case this path has.
+        principal ??= new ClaimsPrincipal(new ClaimsIdentity(
             [
                 new Claim(ClaimTypes.Email, email),
                 new Claim(ClaimTypes.GivenName, "Ext"),
