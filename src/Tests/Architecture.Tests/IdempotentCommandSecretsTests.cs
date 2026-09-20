@@ -69,7 +69,7 @@ public sealed partial class IdempotentCommandSecretsTests
         IdempotentCommandTypes()
             .Select(t => t.Name)
             .OrderBy(n => n, StringComparer.Ordinal)
-            .ShouldBe(["CreateTenantCommand", "RegisterUserCommand", "RequestUploadUrlCommand"]);
+            .ShouldBe(["CreateTenantCommand", "RegisterUserCommand"]);
     }
 
     [Fact]

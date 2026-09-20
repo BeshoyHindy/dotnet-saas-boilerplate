@@ -55,7 +55,7 @@ public sealed partial class IdempotencyFilterOrderTests
 
         // Anti-vacuous: a scanner that stopped finding routes would pass in silence.
         routesScanned.ShouldBeGreaterThan(20, "the scan should be seeing every mapped route in the modules.");
-        idempotentRoutes.ShouldBe(4, "the kit has four idempotent endpoints; update this when that changes.");
+        idempotentRoutes.ShouldBe(2, "the kit has two idempotent endpoints; update this when that changes.");
 
         offenders.ShouldBeEmpty(
             "the idempotency filter writes the response and returns Empty, so nothing may wrap it: put " +

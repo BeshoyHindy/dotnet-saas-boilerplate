@@ -61,20 +61,28 @@ namespace Boilerplate.BuildingBlocks.Web.Idempotency;
 /// retry that differs <i>only</i> in an excluded field replays instead of answering 422.
 /// </para>
 /// <para>
-/// <b>Do not put this on a token-issuing endpoint.</b> For an anonymous caller the partition is the
-/// client-supplied key alone (there is no subject to bind to), so a caller who guesses another's key
-/// would be handed that response. None of the kit's idempotent endpoints issue tokens, and the
-/// anonymous <c>tenants/{tenant}/auth/*</c> routes that set a refresh cookie are deliberately not
-/// marked idempotent. Response headers are stored by allow-list anyway, so <c>Set-Cookie</c> never
-/// reaches the cache.
+/// <b>An anonymous route is never marked idempotent.</b> For an anonymous caller there is no subject
+/// to bind the partition to, so it collapses to the client-supplied key alone: anyone who presents
+/// another caller's key on that route is handed their stored response. <c>SelfRegisterUser</c> used
+/// to be the one exception (#84) — it is not anymore, and it did not need to be: a retried
+/// registration is already safe, because <c>UserRegistrationService</c> refuses a duplicate
+/// email/username with 400 rather than creating a second user.
+/// <c>AnonymousRoutesAreNeverIdempotentTests</c> in Architecture.Tests fails the build if
+/// <c>.AllowAnonymous()</c> and <c>.WithIdempotency()</c> ever land on the same route chain again.
+/// This also covers a token-issuing endpoint — the same
+/// anonymous-partition hazard is why none of the anonymous <c>tenants/{tenant}/auth/*</c> routes that
+/// set a refresh cookie are marked idempotent either; response headers are stored by allow-list
+/// anyway, so <c>Set-Cookie</c> never reaches the cache regardless.
 /// </para>
 /// <para>
-/// <b>Ask the same question of a short-lived capability.</b> <c>RequestUploadUrl</c> is idempotent
-/// and its response is a presigned PUT URL valid for minutes, stored in an entry that lives for 24h:
-/// a retry under the same key past that expiry is handed a dead link rather than a fresh one, and
-/// the presigned URL sits in the cache until the entry does. It stays a private file URL either
-/// way — the partition is tenant + subject — so it is a usability cost, not a leak. An endpoint that
-/// minted a capability usable by somebody else would be the leak, and must not be marked idempotent.
+/// <b>A response that carries a short-lived capability is never marked idempotent either.</b>
+/// <c>RequestUploadUrl</c> used to be (#85): its response is a presigned PUT URL valid for minutes,
+/// but a replay entry lives for the idempotency TTL (24h), so a retry under the same key past the
+/// URL's expiry was handed a dead link rather than a fresh one. A repeated call is harmless without
+/// replay — it creates another pending <c>FileAsset</c> whose <c>UploadDeadline</c> passes and which
+/// <c>PurgeOrphanedFilesJob</c> deletes. The general rule an endpoint like this has to weigh: an
+/// endpoint whose success response is a capability that outlives its own TTL for the length of the
+/// replay entry must not be marked idempotent.
 /// </para>
 /// <para>
 /// <b>Nothing may wrap it.</b> The filter writes the response itself and returns

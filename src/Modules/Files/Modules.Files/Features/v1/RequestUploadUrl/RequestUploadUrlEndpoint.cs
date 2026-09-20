@@ -1,5 +1,4 @@
 using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
-using Boilerplate.BuildingBlocks.Web.Idempotency;
 using Boilerplate.Modules.Files.Contracts.Authorization;
 using Boilerplate.Modules.Files.Contracts.v1.Commands;
 using Mediator;
@@ -17,6 +16,10 @@ public static class RequestUploadUrlEndpoint
                     TypedResults.Ok(await mediator.Send(command, ct)))
             .WithName("RequestFileUploadUrl")
             .WithSummary("Mint a presigned PUT URL for a file upload")
-            .RequirePermission(FilesPermissions.Upload)
-            .WithIdempotency();
+            // Deliberately not idempotent: the response is a presigned URL that lives minutes while a
+            // replay entry lives 24h, so a replay would hand back a dead link (#85). A repeated call
+            // is harmless without it — it creates another pending FileAsset whose UploadDeadline
+            // passes and which PurgeOrphanedFilesJob deletes. General rule: a response carrying a
+            // short-lived capability must not be marked idempotent.
+            .RequirePermission(FilesPermissions.Upload);
 }
