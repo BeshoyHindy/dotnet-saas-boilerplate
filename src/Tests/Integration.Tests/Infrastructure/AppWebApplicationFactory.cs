@@ -224,6 +224,14 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
             // tenant fails the real Migrations step; every other tenant sees a no-op.
             services.AddScoped<IDbInitializer, FaultInjectingDbInitializer>();
 
+            // Fault-injection seam for the registration-atomicity suite (#86): the real store, wrapped
+            // so an armed registration's publish writes its row and then throws. IOutboxWriter is
+            // registered as a forward to IOutboxStore, so decorating the one covers both, and every
+            // unarmed publish — including the dispatcher's own reads and marks — is the production path.
+            services.RemoveAll<Boilerplate.BuildingBlocks.Eventing.Outbox.IOutboxStore>();
+            services.AddScoped<Boilerplate.BuildingBlocks.Eventing.Outbox.EfCoreOutboxStore>();
+            services.AddScoped<Boilerplate.BuildingBlocks.Eventing.Outbox.IOutboxStore, FaultInjectingOutboxStore>();
+
             // Probe handler for the tenant-context tests: registered here so it is dispatched by the
             // real bus, through the real IEventTenantScope, with a real inbox — the whole point is
             // that nothing in that path is substituted.
