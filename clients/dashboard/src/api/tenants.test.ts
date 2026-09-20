@@ -1,10 +1,20 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_DARK_PALETTE,
   DEFAULT_LIGHT_PALETTE,
   themeFingerprint,
+  updateTenantTheme,
   type TenantThemeDraft,
 } from "@/api/tenants";
+
+// The real client builds a Request from a relative URL, which undici (jsdom's fetch) refuses; the
+// question here is what `updateTenantTheme` puts in the body, so the transport is stubbed out.
+const { put } = vi.hoisted(() => ({ put: vi.fn() }));
+vi.mock("@/lib/api-client", () => ({
+  api: { PUT: put },
+  unwrap: (r: { data: unknown }) => r.data,
+  unwrapVoid: () => undefined,
+}));
 
 type DraftAssets = TenantThemeDraft["brandAssets"];
 
@@ -80,5 +90,64 @@ describe("themeFingerprint", () => {
       );
 
     expect(withFile("a.png")).not.toBe(withFile("b.png"));
+  });
+});
+
+/**
+ * #83: the save sends the theme's WRITE model, which carries bytes and delete flags and no URL.
+ * The draft the editor holds does carry the URLs the server issued — it shows them — so the one
+ * place the two halves are separated again is here, and this is what pins it. A client that put a
+ * URL back on the wire would be naming an object it may not own: inside one tenant that could be
+ * another user's avatar, which the next replace would delete.
+ */
+describe("updateTenantTheme", () => {
+  const sent = () => put.mock.calls[0][1].body as Record<string, unknown>;
+
+  beforeEach(() => {
+    put.mockReset();
+    put.mockResolvedValue({ data: undefined, error: undefined, response: { status: 204 } });
+  });
+
+  it("puts to the theme route and sends no asset URL at all", async () => {
+    await updateTenantTheme(
+      theme({
+        brandAssets: assets({
+          logoUrl: "https://cdn.example.com/uploads/tenants/acme/appuser/someone-else/theirs.png",
+          logoDarkUrl: "https://cdn.example.com/dark.png",
+          faviconUrl: "https://cdn.example.com/fav.ico",
+        }),
+      }),
+    );
+
+    expect(put).toHaveBeenCalledTimes(1);
+    expect(put.mock.calls[0][0]).toBe("/api/v1/tenants/theme");
+    expect(JSON.stringify(sent())).not.toContain("cdn.example.com");
+    expect(Object.keys(sent().brandAssets as object).sort()).toEqual([
+      "deleteFavicon",
+      "deleteLogo",
+      "deleteLogoDark",
+      "favicon",
+      "logo",
+      "logoDark",
+    ]);
+  });
+
+  it("forwards a staged upload for the slot it was staged on", async () => {
+    const logo = { fileName: "logo.png", contentType: "image/png", data: [1, 2, 3] };
+
+    await updateTenantTheme(theme({ brandAssets: assets({ logo }) }));
+
+    expect(sent().brandAssets).toMatchObject({ logo, logoDark: null, favicon: null });
+  });
+
+  it("forwards a removal as its flag, not as an empty URL", async () => {
+    await updateTenantTheme(theme({ brandAssets: assets({ logoUrl: null, deleteLogo: true }) }));
+
+    expect(sent().brandAssets).toMatchObject({
+      logo: null,
+      deleteLogo: true,
+      deleteLogoDark: false,
+      deleteFavicon: false,
+    });
   });
 });
