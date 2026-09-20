@@ -32,11 +32,6 @@ public static class ServiceCollectionExtensions
         // so background publishers establish the tenant before tenant-filtered handler DbContexts build.
         services.TryAddSingleton<IEventTenantScope, NullEventTenantScope>();
 
-        // Which databases the dispatcher drains. Defaults to the configured connection only;
-        // the multitenancy module replaces both so per-tenant databases are drained too.
-        services.TryAddSingleton<IEventingDrainTargetProvider, SingleDatabaseDrainTargetProvider>();
-        services.TryAddSingleton<IEventingDrainScope, NullEventingDrainScope>();
-
         var options = configuration.GetSection(nameof(EventingOptions)).Get<EventingOptions>() ?? new EventingOptions();
 
         // The monolith's bus is in-process: handlers run in the same host, and cross-process

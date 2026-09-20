@@ -5,9 +5,9 @@ using Microsoft.Extensions.Logging;
 namespace Boilerplate.BuildingBlocks.Eventing.Persistence;
 
 /// <summary>
-/// Migrates the framework eventing schema. Runs per tenant like every other
-/// <see cref="IDbInitializer"/>, so a tenant with a dedicated database gets its
-/// own outbox/inbox tables next to the business data they accompany.
+/// Migrates the framework <c>framework</c> schema that owns the outbox and inbox
+/// tables. Like every other <see cref="IDbInitializer"/> it is idempotent, so the
+/// migrator and the provisioning Migrations step can both run it.
 /// </summary>
 public sealed partial class EventingDbInitializer : IDbInitializer
 {

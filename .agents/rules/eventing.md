@@ -29,13 +29,7 @@ Any exception to publishing via the outbox needs a strong reason, documented in 
 
 `OutboxMessages`/`InboxMessages` live in schema `framework`, owned by `EventingDbContext` (`src/BuildingBlocks/Eventing/Persistence/`) — **not** by any module's context. That is what keeps `IOutboxStore`/`IInboxStore` to a single, non-keyed DI registration: registering them per module DbContext made .NET DI resolve whichever module registered last for the whole application, so a second module publishing broke every module's outbox (issue #1349). `EventingRegistrationTests` guards the registration count; don't add a second one.
 
-`EventingDbContext` derives from `BaseDbContext`, so a tenant with a dedicated database gets its outbox rows in that database, next to the business data they accompany.
-
-## Dispatch across tenant databases
-
-Because rows follow the tenant connection, the dispatcher can't just poll one database. Each cycle it asks `IEventingDrainTargetProvider` for the drain targets and runs one pass per target inside `IEventingDrainScope`, which installs the tenant context **before** the scope's `EventingDbContext` is built (it captures `TenantInfo`, and with it the connection string, at construction).
-
-Defaults in BuildingBlocks are single-database (`SingleDatabaseDrainTargetProvider`, `NullEventingDrainScope`); the multitenancy module replaces them with `TenantStoreDrainTargetProvider` (default DB + one target per distinct **active** per-tenant connection string; tenants sharing a database collapse to one target) and `FinbuckleEventingDrainScope`. One unreachable tenant database is logged and skipped, not fatal to the cycle.
+`EventingDbContext` derives from `BaseDbContext`, so its rows sit in the one shared database next to the business data they accompany, and one dispatcher pass per cycle sees every tenant's rows.
 
 ## Multi-instance safety
 
@@ -70,7 +64,7 @@ Bus = `InMemoryEventBus`, always. ADR-0003 dropped the RabbitMQ provider (and `E
 ## Gotchas
 
 - **Renaming/moving an integration event type breaks deserialization** — the outbox stores the assembly-qualified type name; `Type.GetType()` returns null → the message dead-letters. Keep event type names/namespaces stable, or migrate dead rows.
-- **Handlers never restore the tenant themselves.** `IEventTenantScope.DispatchAsync` does it: it loads the event's tenant as a full record from the store (cache-first through `ITenantScope`), installs it, and hands the bus the DI scope the handlers are resolved from — so a handler's DbContext is built under the right tenant, with that tenant's connection string. Writing `IMultiTenantContextSetter` in a handler is an architecture test failure.
+- **Handlers never restore the tenant themselves.** `IEventTenantScope.DispatchAsync` does it: it loads the event's tenant as a full record from the store (cache-first through `ITenantScope`), installs it, and hands the bus the DI scope the handlers are resolved from — so a handler's DbContext is built with the right tenant already ambient, and an unknown or deactivated tenant fails the dispatch closed. Writing `IMultiTenantContextSetter` in a handler is an architecture test failure.
 - In-memory bus runs handlers **synchronously in the publisher's scope** — keep handler work minimal; exceptions surface to the originating request (relevant for Notifications consuming other modules' events). Via the outbox that scope is the dispatcher's, not the request's.
 - Set `UseHostedServiceDispatcher=false` to drive the outbox via Hangfire instead of the hosted service.
-- A background publisher must publish **inside** `ITenantScope.RunAsync`, resolving `IOutboxWriter` from that scope — otherwise, with per-tenant databases, the row lands in the wrong one and that tenant's dispatcher never sees it (see `TenantExpiryScanJob`).
+- A background publisher must publish **inside** `ITenantScope.RunAsync`, resolving `IOutboxWriter` from that scope — otherwise the outbox row is stamped with whatever tenant happened to be ambient (usually none), and the handler is later dispatched under the wrong one or throws for a blank `TenantId` (see `TenantExpiryScanJob`).

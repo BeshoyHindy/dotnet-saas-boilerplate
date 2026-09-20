@@ -87,8 +87,9 @@ public sealed partial class InMemoryEventBus : IEventBus
 
     /// <summary>
     /// ADR-0002: tenant-less dispatch is a declaration, not a null field. Without this an event whose
-    /// TenantId was simply never set runs its handlers against whatever the default connection points
-    /// at — the same silent cross-tenant read <c>[SystemJob]</c> exists to prevent on the job side.
+    /// TenantId was simply never set runs its handlers with no tenant ambient, so every tenant-filtered
+    /// read in them is unscoped — the same silent cross-tenant read <c>[SystemJob]</c> exists to
+    /// prevent on the job side.
     /// </summary>
     private static void RequireTenantOrGlobalDeclaration(IIntegrationEvent @event, Type eventType)
     {

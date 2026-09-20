@@ -7,12 +7,13 @@ namespace Boilerplate.Modules.Multitenancy.Services;
 /// <summary>
 /// Finbuckle-backed <see cref="IEventTenantScope"/>, implemented entirely on top of
 /// <see cref="ITenantScope"/>: the event's tenant is loaded from the store as a full record and
-/// installed before the handlers' DI scope exists, so a handler's DbContext picks up that tenant's
-/// own connection string instead of the default one.
+/// installed before the handlers' DI scope exists, so a handler's DbContext is built with the
+/// tenant filter already pointed at the right tenant.
 ///
-/// It used to fabricate <c>new AppTenantInfo(tenantId, tenantId)</c> — identity only. That was
-/// enough for the row-level filter in the shared-database model and silently wrong for a tenant
-/// with a dedicated database: the handler read and wrote the default one.
+/// The record, not <c>new AppTenantInfo(tenantId, tenantId)</c>: an id-only stub would dispatch an
+/// event for a tenant the store no longer knows, or one an operator has deactivated. Going through
+/// <see cref="ITenantScope"/> makes both fail closed, and it is cache-first, so the record costs a
+/// cache read rather than a catalog query.
 /// </summary>
 public sealed class FinbuckleEventTenantScope : IEventTenantScope
 {

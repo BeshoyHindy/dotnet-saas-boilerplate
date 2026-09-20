@@ -13,10 +13,9 @@ namespace Boilerplate.BuildingBlocks.Eventing.Persistence;
 /// <summary>
 /// The single context owning the transactional outbox and inbox.
 ///
-/// Derives from <see cref="BaseDbContext"/> so it inherits per-tenant connection
-/// routing: for a tenant with a dedicated database, the outbox row lands in that
-/// same database as the business data it accompanies. That is what makes the
-/// outbox transactional on every supported deployment topology.
+/// Derives from <see cref="BaseDbContext"/>, so it shares the DI scope's connection
+/// with the module context that wrote the business data and joins that transaction.
+/// That is what makes the outbox transactional.
 ///
 /// Owning these tables here — rather than once per module DbContext — is what
 /// keeps <c>IOutboxStore</c>/<c>IInboxStore</c> to a single, unambiguous DI
