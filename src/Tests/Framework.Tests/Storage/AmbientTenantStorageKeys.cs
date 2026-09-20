@@ -39,4 +39,10 @@ internal sealed class AmbientTenantStorageKeys : ITenantStorageKeys
     public string Authorize(string? storageKey) => _inner.Authorize(storageKey);
 
     public bool TryAuthorize(string? storageKey, out string key) => _inner.TryAuthorize(storageKey, out key);
+
+    public string ComposeAsset(string ownerType, string owner, string fileName) =>
+        _inner.ComposeAsset(ownerType, owner, fileName);
+
+    public bool TryAuthorizeOwnedAsset(string ownerType, string owner, string? storageKey, out string key) =>
+        _inner.TryAuthorizeOwnedAsset(ownerType, owner, storageKey, out key);
 }

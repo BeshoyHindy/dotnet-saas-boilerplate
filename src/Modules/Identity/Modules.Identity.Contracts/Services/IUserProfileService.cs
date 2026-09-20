@@ -24,16 +24,16 @@ public interface IUserProfileService
     Task<int> GetCountAsync(CancellationToken cancellationToken);
 
     /// <summary>
-    /// Updates a user's profile.
+    /// Updates a user's profile, including the avatar.
+    ///
+    /// <para><b>An avatar arrives as bytes, never as a URL (#83).</b> <paramref name="image"/> is
+    /// uploaded here and the column is set to what the Storage block hands back, so
+    /// <c>AppUser.ImageUrl</c> only ever holds a value this server issued for this user. There is
+    /// deliberately no "set my image URL" entry point: the one it replaced let a user name any
+    /// string, including another user's avatar in the same tenant, which the next replace would then
+    /// delete. <paramref name="deleteCurrentImage"/> is the removal path.</para>
     /// </summary>
     Task UpdateAsync(string userId, string firstName, string lastName, string phoneNumber, FileUploadRequest image, bool deleteCurrentImage, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Sets the profile image URL directly (no upload). Used by the presigned-upload flow:
-    /// the client uploads via the Files module, then calls this with the resulting durable
-    /// <c>publicUrl</c>. Passing <c>null</c> clears the image.
-    /// </summary>
-    Task SetImageUrlAsync(string userId, string? imageUrl, CancellationToken cancellationToken);
 
     /// <summary>
     /// Checks if a user exists with the given email.

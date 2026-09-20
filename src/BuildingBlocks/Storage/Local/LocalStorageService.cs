@@ -5,7 +5,6 @@ using Boilerplate.BuildingBlocks.Storage.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Logging;
-using System.Text.RegularExpressions;
 using System.Threading;
 
 namespace Boilerplate.BuildingBlocks.Storage.Local;
@@ -17,14 +16,8 @@ namespace Boilerplate.BuildingBlocks.Storage.Local;
 /// prefixes is refused before any path is touched. Production refuses to boot on this provider
 /// (<c>ProductionConfigurationGuard</c>) because it serves everything it stores anonymously.
 /// </summary>
-public sealed partial class LocalStorageService : IStorageService
+public sealed class LocalStorageService : IStorageService
 {
-    // Source-generated, compiled once — the inline Regex.Replace calls re-parsed the pattern on every upload.
-    [GeneratedRegex("[^a-z0-9]")]
-    private static partial Regex FolderSanitizer();
-
-    [GeneratedRegex(@"[^a-zA-Z0-9_\.-]")]
-    private static partial Regex FileNameSanitizer();
     private readonly string _rootPath;
     private readonly ITenantStorageKeys _keys;
     private readonly ILogger<LocalStorageService> _logger;
@@ -44,7 +37,7 @@ public sealed partial class LocalStorageService : IStorageService
         _contentTypeProvider = new FileExtensionContentTypeProvider();
     }
 
-    public async Task<string> UploadAsync<T>(FileUploadRequest request, FileType fileType, CancellationToken cancellationToken = default)
+    public async Task<string> UploadAsync<T>(FileUploadRequest request, FileType fileType, string owner, CancellationToken cancellationToken = default)
         where T : class
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -63,11 +56,9 @@ public sealed partial class LocalStorageService : IStorageService
             throw new InvalidOperationException($"File exceeds max size of {rules.MaxSizeInMB} MB.");
         }
 
-#pragma warning disable CA1308 // folder names are intentionally lower-case for URLs/paths
-        var folder = FolderSanitizer().Replace(typeof(T).Name.ToLowerInvariant(), "_");
-#pragma warning restore CA1308
-        var safeFileName = $"{Guid.NewGuid():N}_{SanitizeFileName(request.FileName)}";
-        var key = _keys.Compose(StorageSpace.Public, $"{folder}/{safeFileName}");
+        // The layout — owner type, owner, guid, file name — is the key block's, not this provider's,
+        // so both providers place an object exactly where RemoveIfOwnedAsync<T> will look for it.
+        var key = _keys.ComposeAsset(typeof(T).Name, owner, request.FileName);
         var fullPath = ResolveDiskPath(key);
 
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
@@ -138,6 +129,25 @@ public sealed partial class LocalStorageService : IStorageService
         return true;
     }
 
+    public async Task<bool> RemoveIfOwnedAsync<T>(string? storedHandle, string owner, CancellationToken cancellationToken = default)
+        where T : class
+    {
+        if (!_keys.TryAuthorizeOwnedAsset(typeof(T).Name, owner, ToKey(storedHandle), out var key))
+        {
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation(
+                    "Skipping local object {Handle}: not an asset {OwnerType} {Owner} owns in tenant {TenantId}.",
+                    storedHandle, typeof(T).Name, owner, _keys.TenantId);
+            }
+
+            return false;
+        }
+
+        await RemoveAuthorizedAsync(key).ConfigureAwait(false);
+        return true;
+    }
+
     /// <summary>
     /// Deletes an already-authorized key. Both public delete entry points route here instead of
     /// calling each other, so ownership is checked exactly once per call rather than
@@ -154,11 +164,6 @@ public sealed partial class LocalStorageService : IStorageService
         }
 
         return Task.CompletedTask;
-    }
-
-    private static string SanitizeFileName(string fileName)
-    {
-        return FileNameSanitizer().Replace(fileName, "_");
     }
 
     // Dev-only presigning fallback when Storage:Provider != s3 (prod uses S3StorageService). Token

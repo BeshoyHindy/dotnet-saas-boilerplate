@@ -33,6 +33,12 @@ public sealed class TenantStorageKeys(IMultiTenantContextAccessor<AppTenantInfo>
     public string Compose(StorageSpace space, string relativePath) =>
         TenantStorageKeyRules.Compose(TenantId, space, relativePath);
 
+    public string ComposeAsset(string ownerType, string owner, string fileName) =>
+        TenantStorageKeyRules.ComposePublicAsset(TenantId, ownerType, owner, fileName);
+
+    public bool TryAuthorizeOwnedAsset(string ownerType, string owner, string? storageKey, out string key) =>
+        TenantStorageKeyRules.TryAuthorizeOwnedAsset(TenantId, ownerType, owner, storageKey, out key);
+
     public string Authorize(string? storageKey) =>
         TryAuthorize(storageKey, out var key) ? key : throw new StorageKeyNotOwnedException();
 

@@ -28,6 +28,13 @@ public partial class UpdateTenantThemeCommandValidator : AbstractValidator<Updat
         RuleFor(x => x.Theme.Layout)
             .NotNull()
             .SetValidator(new LayoutValidator());
+
+        // An oversize or wrong-extension upload used to reach IStorageService.UploadAsync, which
+        // throws InvalidOperationException — a 500 for a caller's mistake. Gate it here so it is a
+        // 400 and nothing is written.
+        RuleFor(x => x.Theme.BrandAssets)
+            .NotNull()
+            .SetValidator(new BrandAssetUploadsValidator());
     }
 
     [GeneratedRegex("^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$")]

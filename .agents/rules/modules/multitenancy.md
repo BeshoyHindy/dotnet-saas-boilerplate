@@ -5,6 +5,12 @@ Tenant catalog, provisioning, activation/upgrade, per-tenant theming (Finbuckle.
 **Entities / DbContext:** `AppTenantInfo` (catalog), `TenantProvisioning` + `TenantProvisioningStep`, `TenantTheme`. `TenantDbContext` holds the tenant catalog in the main DB.
 **Areas:** CreateTenant, ChangeTenantActivation, UpgradeTenant, Get(Tenants/Status/Migrations), TenantProvisioning (status/retry), TenantTheme (get/update/reset). Full list: `Features/v1/` or `/scalar`.
 
+## Brand assets: the client never names one (#83)
+
+The theme has **two** DTOs, and the split is the guarantee: `TenantThemeDto` is the read model and carries `brandAssets.logoUrl`/`logoDarkUrl`/`faviconUrl`; `TenantThemeUpdateDto` is what `PUT /tenants/theme` accepts and has **no URL fields** — a slot is set by uploading bytes (`brandAssets.logo`) and cleared by its flag (`deleteLogo`). `MapDtoToEntity` no longer copies any URL. A request that still carries `logoUrl` is *ignored*, not rejected: the property does not exist on the write model, so the deserializer drops it.
+
+Each slot is its own storage **owner** (`logo`, `logo-dark`, `favicon`), so `TenantThemeService` uploads with `UploadAsync<TenantTheme>(…, owner: slot, …)` and drops the previous value with `RemoveIfOwnedAsync<TenantTheme>(old, slot, ct)`. Replacing the logo therefore cannot delete the favicon — or a user's avatar, which is a key this tenant owns too, and which a tenant admin could previously park in `LogoUrl` and have the next save delete. See `storage.md`.
+
 ## Gotchas
 
 - **One strategy, no chain** (ADR-0002) — `TokenOrRouteTenantStrategy` is the only `IMultiTenantStrategy`, and an architecture test fails the build if a header/query/host/base-path/claim/route strategy reappears anywhere under `src/`. Authenticated → the token's `tenant` claim; anonymous → the `{tenant}` route value, but only on endpoints carrying `[TenantFromRoute]` (the `api/v1/tenants/{tenant}/auth/...` group). Stores are unchanged: DistributedCache → EFCoreStore.

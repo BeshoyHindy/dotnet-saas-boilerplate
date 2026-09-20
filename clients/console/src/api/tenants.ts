@@ -123,9 +123,24 @@ export async function retryTenantProvisioning(id: string): Promise<TenantProvisi
 
 export type PaletteDto = Schemas["PaletteDto"];
 export type BrandAssetsDto = Schemas["BrandAssetsDto"];
+export type BrandAssetUploadsDto = Schemas["BrandAssetUploadsDto"];
 export type TypographyDto = Schemas["TypographyDto"];
 export type LayoutDto = Schemas["LayoutDto"];
 export type TenantThemeDto = Schemas["TenantThemeDto"];
+
+/**
+ * The editors' working copy: the theme as the API returned it, plus whatever asset is staged for
+ * THIS save.
+ *
+ * The two halves are separate on the wire since issue #83. The response's `brandAssets` carries the
+ * URLs the server issued; the request's carries bytes and delete flags and **no URL at all** — there
+ * is no field to paste a link into, which is the point: the column can only ever hold a value the
+ * server produced for that asset. Carrying both on one draft object is a UI convenience;
+ * `updateTenantTheme` is what separates them again.
+ */
+export type TenantThemeDraft = TenantThemeDto & {
+  brandAssets: BrandAssetsDto & Partial<BrandAssetUploadsDto>;
+};
 
 export const DEFAULT_LIGHT_PALETTE: PaletteDto = {
   primary: "#2563EB",
@@ -156,9 +171,33 @@ export async function getTenantTheme(): Promise<TenantThemeDto> {
   return unwrap(await api.GET("/api/v1/tenants/theme", {}));
 }
 
-/** Save the caller's tenant theme. Needs MultitenancyPermissions.Tenants.UpdateTheme. */
-export async function updateTenantTheme(theme: TenantThemeDto): Promise<void> {
-  unwrapVoid(await api.PUT("/api/v1/tenants/theme", { body: theme }));
+/**
+ * Save the caller's tenant theme. Needs MultitenancyPermissions.Tenants.UpdateTheme.
+ *
+ * Sends the write model only: a staged file per slot, or the flag that removes what is stored. The
+ * draft's `logoUrl`/`logoDarkUrl`/`faviconUrl` are deliberately left behind — the server issues
+ * those, and sending one back would be a client naming an asset URL (#83).
+ */
+export async function updateTenantTheme(draft: TenantThemeDraft): Promise<void> {
+  const assets = draft.brandAssets;
+  unwrapVoid(
+    await api.PUT("/api/v1/tenants/theme", {
+      body: {
+        lightPalette: draft.lightPalette,
+        darkPalette: draft.darkPalette,
+        typography: draft.typography,
+        layout: draft.layout,
+        brandAssets: {
+          logo: assets.logo ?? null,
+          logoDark: assets.logoDark ?? null,
+          favicon: assets.favicon ?? null,
+          deleteLogo: assets.deleteLogo ?? false,
+          deleteLogoDark: assets.deleteLogoDark ?? false,
+          deleteFavicon: assets.deleteFavicon ?? false,
+        },
+      },
+    }),
+  );
 }
 
 /**
@@ -168,7 +207,7 @@ export async function updateTenantTheme(theme: TenantThemeDto): Promise<void> {
  * every render. The replacer collapses each `FileUploadRequest` to its name and length, which is
  * all the dirty check needs.
  */
-export function themeFingerprint(theme: TenantThemeDto): string {
+export function themeFingerprint(theme: TenantThemeDraft): string {
   const uploads = new Set(["logo", "logoDark", "favicon"]);
   return JSON.stringify(theme, (key, value) =>
     uploads.has(key) && value

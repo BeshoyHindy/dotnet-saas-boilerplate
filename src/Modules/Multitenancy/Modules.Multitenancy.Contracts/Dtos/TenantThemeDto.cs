@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using Boilerplate.BuildingBlocks.Shared.Storage;
 
 namespace Boilerplate.Modules.Multitenancy.Contracts.Dtos;
 
@@ -51,23 +50,17 @@ public sealed record PaletteDto
     };
 }
 
+/// <summary>
+/// The brand assets as the API <b>returns</b> them: the URLs the server issued. There is no input
+/// counterpart here on purpose — uploads and removals live on <see cref="BrandAssetUploadsDto"/>,
+/// and a client never names an asset URL (#83).
+/// </summary>
 [ImmutableObject(true)]
 public sealed record BrandAssetsDto
 {
-    // Current URLs (returned from API)
     public string? LogoUrl { get; init; }
     public string? LogoDarkUrl { get; init; }
     public string? FaviconUrl { get; init; }
-
-    // File uploads (same pattern as profile picture)
-    public FileUploadRequest? Logo { get; init; }
-    public FileUploadRequest? LogoDark { get; init; }
-    public FileUploadRequest? Favicon { get; init; }
-
-    // Flags to delete current assets
-    public bool DeleteLogo { get; init; }
-    public bool DeleteLogoDark { get; init; }
-    public bool DeleteFavicon { get; init; }
 }
 
 [ImmutableObject(true)]
