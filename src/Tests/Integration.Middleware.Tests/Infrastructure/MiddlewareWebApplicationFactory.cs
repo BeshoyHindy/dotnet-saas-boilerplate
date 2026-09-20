@@ -276,10 +276,13 @@ public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Prog
             {
                 rootTenant = new AppTenantInfo(
                     MultitenancyConstants.Root.Id,
-                    MultitenancyConstants.Root.Name,
-                    string.Empty,
-                    MultitenancyConstants.Root.EmailAddress,
-                    issuer: MultitenancyConstants.Root.Issuer);
+                    MultitenancyConstants.Root.Id,
+                    MultitenancyConstants.Root.Name)
+                {
+                    AdminEmail = MultitenancyConstants.Root.EmailAddress,
+                    IsActive = true,
+                    Issuer = MultitenancyConstants.Root.Issuer,
+                };
 
                 var validUpto = DateTime.UtcNow.AddYears(1);
                 rootTenant.SetValidity(validUpto);

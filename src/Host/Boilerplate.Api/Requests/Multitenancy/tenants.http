@@ -24,7 +24,6 @@ Authorization: Bearer {{token}}
 {
   "id": "demo",
   "name": "Demo tenant",
-  "connectionString": "",
   "adminEmail": "admin@demo.example.com",
   "issuer": "https://demo.example.com"
 }

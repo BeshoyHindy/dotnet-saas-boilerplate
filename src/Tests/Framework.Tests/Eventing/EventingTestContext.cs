@@ -1,12 +1,9 @@
 using Boilerplate.BuildingBlocks.Eventing.Persistence;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
-using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace Framework.Tests.Eventing;
@@ -31,21 +28,11 @@ internal static class EventingTestContext
             .UseSqlite(connection)
             .Options;
 
-        var settings = Options.Create(new DatabaseOptions
-        {
-            Provider = "postgresql",
-            ConnectionString = string.Empty,
-            MigrationsAssembly = "Boilerplate.Migrations.PostgreSQL",
-        });
-
-        var environment = Substitute.For<IHostEnvironment>();
-        environment.EnvironmentName.Returns("Production");
-
         // UseSqlite(DbConnection) does NOT transfer ownership of an externally-supplied
         // connection to EF Core — disposing the DbContext alone would leak the native SQLite
         // handle. SqliteOwnedEventingDbContext takes ownership explicitly and disposes the
         // connection alongside itself, so a plain `await using` at the call site is enough.
-        var context = new SqliteOwnedEventingDbContext(accessor, options, settings, environment, connection);
+        var context = new SqliteOwnedEventingDbContext(accessor, options, connection);
         context.Database.EnsureCreated();
         return context;
     }
@@ -63,10 +50,8 @@ internal static class EventingTestContext
         public SqliteOwnedEventingDbContext(
             IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor,
             DbContextOptions<EventingDbContext> options,
-            IOptions<DatabaseOptions> settings,
-            IHostEnvironment environment,
             SqliteConnection connection)
-            : base(multiTenantContextAccessor, options, settings, environment)
+            : base(multiTenantContextAccessor, options)
         {
             _connection = connection;
         }

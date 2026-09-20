@@ -7,11 +7,11 @@ namespace Integration.Tests.Tests.Multitenancy;
 
 /// <summary>
 /// Coverage for the retry-provisioning endpoint
-/// (<c>POST /api/v1/tenants/{tenantId}/provisioning/retry</c>). A tenant is driven
-/// into the <c>Failed</c> state by giving it a syntactically-valid but unreachable
-/// connection string (the format-only validator accepts it, then the Migrations step
-/// can't connect). Retry must then start a fresh provisioning attempt with a new
-/// correlation id. Also covers authentication and the not-found path.
+/// (<c>POST /api/v1/tenants/{tenantId}/provisioning/retry</c>). A tenant is driven into the
+/// <c>Failed</c> state by arming <see cref="FaultInjectingDbInitializer"/> for its id, which
+/// throws on the Migrations step. Retry must then start a fresh provisioning attempt with a new
+/// correlation id — and once the seam is disarmed, that attempt must complete. Also covers
+/// authentication and the not-found path.
 /// </summary>
 [Collection(AppCollectionDefinition.Name)]
 public sealed class RetryTenantProvisioningTests
@@ -21,11 +21,6 @@ public sealed class RetryTenantProvisioningTests
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
     };
-
-    // Syntactically valid Postgres connection string pointing at a dead endpoint with a
-    // short timeout so the Migrations step fails fast instead of hanging the test.
-    private const string UnreachableConnectionString =
-        "Host=127.0.0.1;Port=59999;Database=boilerplate_unreachable;Username=nope;Password=nope;Timeout=2;Command Timeout=2";
 
     private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
@@ -44,13 +39,13 @@ public sealed class RetryTenantProvisioningTests
         // Arrange — create a tenant whose provisioning will fail at the Migrations step.
         using var rootClient = await _auth.CreateRootAdminClientAsync();
         var unique = Guid.NewGuid().ToString("N")[..8];
-        var tenantId = $"retry-{unique}";
+        var tenantId = $"{FaultInjectingDbInitializer.TenantIdPrefix}retry-{unique}";
+        FaultInjectingDbInitializer.Arm(tenantId);
 
         var createResponse = await rootClient.PostAsJsonAsync(TestConstants.TenantsBasePath, new
         {
             id = tenantId,
             name = $"Retry {tenantId}",
-            connectionString = UnreachableConnectionString,
             adminEmail = $"retry-{unique}@tenant.com",
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer",
@@ -63,7 +58,10 @@ public sealed class RetryTenantProvisioningTests
         var firstCorrelation = failedStatus.CorrelationId;
         firstCorrelation.ShouldNotBeNullOrEmpty();
 
-        // Act — retry provisioning. A new attempt is started (new correlation id).
+        // Act — disarm the seam, then retry provisioning. A new attempt is started (new
+        // correlation id) and, with the injected failure gone, it must reach Completed.
+        FaultInjectingDbInitializer.Disarm(tenantId);
+
         var retryResponse = await rootClient.PostAsync(
             $"{TestConstants.TenantsBasePath}/{tenantId}/provisioning/retry", content: null);
 
@@ -74,12 +72,15 @@ public sealed class RetryTenantProvisioningTests
         retryStatus.TenantId.ShouldBe(tenantId);
         retryStatus.CorrelationId.ShouldNotBe(firstCorrelation, "retry must create a new provisioning attempt");
         retryStatus.Steps.Count.ShouldBe(4);
+
+        var afterRetry = await PollUntilTerminalAsync(rootClient, tenantId);
+        afterRetry.Status.ShouldBe("Completed", "the second attempt runs with the fault seam disarmed");
     }
 
     [Fact]
     public async Task RetryProvisioning_Should_Succeed_When_RetriedAfterCompletion()
     {
-        // Arrange — a healthy tenant (null connection string => shared DB) provisions OK.
+        // Arrange — a healthy tenant (the fault seam is never armed for it) provisions OK.
         using var rootClient = await _auth.CreateRootAdminClientAsync();
         var unique = Guid.NewGuid().ToString("N")[..8];
         var tenantId = $"retry-ok-{unique}";
@@ -88,7 +89,6 @@ public sealed class RetryTenantProvisioningTests
         {
             id = tenantId,
             name = $"Retry OK {tenantId}",
-            connectionString = (string?)null,
             adminEmail = $"retry-ok-{unique}@tenant.com",
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer",

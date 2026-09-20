@@ -1,4 +1,3 @@
-using Boilerplate.BuildingBlocks.Persistence;
 using Boilerplate.Modules.Multitenancy.Contracts;
 using Boilerplate.Modules.Multitenancy.Contracts.v1.CreateTenant;
 using Boilerplate.Modules.Multitenancy.Features.v1.CreateTenant;
@@ -21,16 +20,12 @@ public sealed class CreateTenantCommandValidatorTests
         _tenantService.ExistsWithIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(false);
         _tenantService.ExistsWithNameAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(false);
 
-        var connectionStrings = Substitute.For<IConnectionStringValidator>();
-        connectionStrings.TryValidate(Arg.Any<string>()).Returns(true);
-
-        _sut = new CreateTenantCommandValidator(_tenantService, connectionStrings, TimeProvider.System);
+        _sut = new CreateTenantCommandValidator(_tenantService, TimeProvider.System);
     }
 
     private static CreateTenantCommand CommandWithId(string id) => new(
         Id: id,
         Name: $"Tenant {id}",
-        ConnectionString: null,
         AdminEmail: "admin@tenant.com",
         AdminPassword: "123Pa$$word!",
         Issuer: null,

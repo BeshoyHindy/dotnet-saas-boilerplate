@@ -46,7 +46,7 @@ dotnet ef migrations add {Name} \
 ```
 
 - **`migrations remove` operates on the snapshot** — run a full build *before* `migrations add` so the snapshot is current, or you can lose the previous migration.
-- The DB is **not** migrated at API startup. The `DbMigrator` host is a separate step: `apply` (default), `seed`, `list-pending`; flags `--tenant <id>`, `--catalog-only`, `--seed`. It migrates the tenant catalog first, then each tenant's per-module schema, serialized by a Postgres advisory lock.
+- The DB is **not** migrated at API startup. The `DbMigrator` host is a separate step: `apply` (default), `seed`, `list-pending`; flags `--tenant <id>`, `--catalog-only`, `--seed`. It migrates the tenant catalog first, then the shared module schema once, then seeds per tenant — all serialized by a Postgres advisory lock.
 - `dotnet-ef` is pinned in `.config/dotnet-tools.json` — run `dotnet tool restore` first.
 
 ## Tests + EF

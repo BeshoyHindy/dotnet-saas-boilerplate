@@ -57,7 +57,6 @@ namespace Boilerplate.Migrations.PostgreSQL.MultiTenancy
                 columns: table => new
                 {
                     Id = table.Column<string>(type: "text", nullable: false),
-                    ConnectionString = table.Column<string>(type: "text", nullable: false),
                     AdminEmail = table.Column<string>(type: "text", nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
                     ValidUpto = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),

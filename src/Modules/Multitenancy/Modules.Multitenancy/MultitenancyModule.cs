@@ -19,7 +19,6 @@ using Boilerplate.Modules.Multitenancy.Features.v1.AdjustTenantValidity;
 using Boilerplate.Modules.Multitenancy.Features.v1.ChangeTenantActivation;
 using Boilerplate.Modules.Multitenancy.Features.v1.CreateTenant;
 using Boilerplate.Modules.Multitenancy.Features.v1.GetMyTenantStatus;
-using Boilerplate.Modules.Multitenancy.Features.v1.GetTenantMigrations;
 using Boilerplate.Modules.Multitenancy.Features.v1.GetTenants;
 using Boilerplate.Modules.Multitenancy.Features.v1.GetTenantStatus;
 using Boilerplate.Modules.Multitenancy.Features.v1.GetTenantTheme;
@@ -59,7 +58,6 @@ public sealed class MultitenancyModule : IModule
 
         builder.Services.AddScoped<ITenantService, TenantService>();
         builder.Services.AddScoped<ITenantThemeService, TenantThemeService>();
-        builder.Services.AddTransient<IConnectionStringValidator, ConnectionStringValidator>();
         builder.Services.AddScoped<ITenantProvisioningService, TenantProvisioningService>();
         builder.Services.AddTransient<TenantProvisioningJob>();
         builder.Services.AddTransient<TenantExpiryScanJob>();
@@ -88,14 +86,6 @@ public sealed class MultitenancyModule : IModule
         // always wins over a host that also passed AddHeroCaching(..., singleTenant: true).
         builder.Services.Replace(
             ServiceDescriptor.Singleton<ICacheTenantAccessor, FinbuckleCacheTenantAccessor>());
-
-        // Same idea one level up: the outbox dispatcher must visit every database that can hold
-        // outbox rows. Without these, a tenant with a dedicated connection string writes rows the
-        // dispatcher never polls. Scoped provider — IMultiTenantStore is scoped.
-        builder.Services.Replace(
-            ServiceDescriptor.Singleton<IEventingDrainScope, FinbuckleEventingDrainScope>());
-        builder.Services.Replace(
-            ServiceDescriptor.Scoped<IEventingDrainTargetProvider, TenantStoreDrainTargetProvider>());
 
         builder.Services
             .AddMultiTenant<AppTenantInfo>(options =>
@@ -130,10 +120,7 @@ public sealed class MultitenancyModule : IModule
             .AddDbContextCheck<TenantDbContext>(
                 name: "db:multitenancy",
                 failureStatus: HealthStatus.Unhealthy,
-                tags: [HealthTags.Ready])
-            .AddCheck<TenantMigrationsHealthCheck>(
-                name: "db:tenants-migrations",
-                failureStatus: HealthStatus.Unhealthy);
+                tags: [HealthTags.Ready]);
     }
 
     public void ConfigureMiddleware(IApplicationBuilder app)
@@ -233,7 +220,6 @@ public sealed class MultitenancyModule : IModule
         GetMyTenantStatusEndpoint.Map(group);
         GetTenantProvisioningStatusEndpoint.Map(group);
         RetryTenantProvisioningEndpoint.Map(group);
-        TenantMigrationsEndpoint.Map(group);
 
         // Theme endpoints
         GetTenantThemeEndpoint.Map(group);

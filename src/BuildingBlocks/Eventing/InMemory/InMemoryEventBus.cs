@@ -61,8 +61,8 @@ public sealed partial class InMemoryEventBus : IEventBus
 
         // The tenant scope owns both the ambient tenant and the DI scope, so the tenant is installed
         // BEFORE any handler — or the DbContext it holds — is constructed. A context built first
-        // captures a null tenant and the default connection string, which is what broke background
-        // dispatch.
+        // captures a null tenant, and every tenant-filtered read in the handler is then unscoped,
+        // which is what broke background dispatch.
         await _tenantScope.DispatchAsync(
             @event.TenantId,
             async (provider, token) =>
@@ -87,8 +87,9 @@ public sealed partial class InMemoryEventBus : IEventBus
 
     /// <summary>
     /// ADR-0002: tenant-less dispatch is a declaration, not a null field. Without this an event whose
-    /// TenantId was simply never set runs its handlers against whatever the default connection points
-    /// at — the same silent cross-tenant read <c>[SystemJob]</c> exists to prevent on the job side.
+    /// TenantId was simply never set runs its handlers with no tenant ambient, so every tenant-filtered
+    /// read in them is unscoped — the same silent cross-tenant read <c>[SystemJob]</c> exists to
+    /// prevent on the job side.
     /// </summary>
     private static void RequireTenantOrGlobalDeclaration(IIntegrationEvent @event, Type eventType)
     {

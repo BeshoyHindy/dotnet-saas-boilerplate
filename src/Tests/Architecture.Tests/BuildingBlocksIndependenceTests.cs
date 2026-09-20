@@ -21,8 +21,8 @@ public class BuildingBlocksIndependenceTests
     private static readonly Assembly[] BuildingBlockAssemblies =
     [
         typeof(IAppCore).Assembly,               // Core
-        typeof(IConnectionStringValidator).Assembly,  // Persistence
-        typeof(IAppTenantInfo).Assembly,         // Shared
+        typeof(IScopedDbConnectionProvider).Assembly, // Persistence
+        typeof(AppTenantInfo).Assembly,          // Shared
         typeof(IAppWeb).Assembly                 // Web
     ];
 
@@ -198,7 +198,7 @@ public class BuildingBlocksIndependenceTests
         CheckBuildingBlockDependencies("Eventing.Abstractions", [], layerViolations);
 
         // Eventing should depend on Core, Eventing.Abstractions, and Persistence (EventingDbContext
-        // derives from BaseDbContext for per-tenant connection routing, issue #1349).
+        // derives from BaseDbContext so the outbox row joins the business transaction, issue #1349).
         CheckBuildingBlockDependencies("Eventing", ["Core", "Eventing.Abstractions", "Persistence"], layerViolations);
 
         layerViolations.ShouldBeEmpty(

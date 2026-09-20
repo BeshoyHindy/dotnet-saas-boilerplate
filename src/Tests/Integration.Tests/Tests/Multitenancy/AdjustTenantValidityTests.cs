@@ -159,7 +159,6 @@ public sealed class AdjustTenantValidityTests
         {
             id = tenantId,
             name = $"Adjust {tenantId}",
-            connectionString = (string?)null,
             adminEmail,
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer",

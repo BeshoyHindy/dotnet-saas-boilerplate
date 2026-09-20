@@ -14,10 +14,14 @@ public sealed class TenantScopeTests
     private const string TenantId = "acme";
 
     [Fact]
-    public async Task RunAsync_Should_Install_The_Full_Store_Record_Including_ConnectionString()
+    public async Task RunAsync_Should_Install_The_Full_Store_Record_Including_AdminEmail_And_ActivationState()
     {
         var harness = new Harness();
-        harness.Store.Seed(new AppTenantInfo(TenantId, "Acme", "Host=acme-db", "admin@acme.test"));
+        harness.Store.Seed(new AppTenantInfo(TenantId, TenantId, "Acme")
+        {
+            AdminEmail = "admin@acme.test",
+            IsActive = true,
+        });
 
         AppTenantInfo? seen = null;
         await harness.Sut.RunAsync(TenantId, (_, _) =>
@@ -28,10 +32,11 @@ public sealed class TenantScopeTests
 
         seen.ShouldNotBeNull();
         seen!.Id.ShouldBe(TenantId);
-        seen.ConnectionString.ShouldBe(
-            "Host=acme-db",
-            "an id-only stub would silently route the tenant's work to the default database");
-        seen.AdminEmail.ShouldBe("admin@acme.test");
+        seen.AdminEmail.ShouldBe(
+            "admin@acme.test",
+            "an id-only stub would leave the work with no way to tell who the tenant admin is");
+        seen.IsActive.ShouldBeTrue(
+            "the activation state is what lets a job or a dispatch fail closed on a deactivated tenant");
     }
 
     [Fact]
@@ -254,12 +259,12 @@ public sealed class TenantScopeTests
     {
         var cacheStore = new FakeTenantStore();
         var efStore = new FakeTenantStore();
-        efStore.Seed(new AppTenantInfo(TenantId, "Acme", "Host=acme-db", "admin@acme.test"));
+        efStore.Seed(new AppTenantInfo(TenantId, TenantId, "Acme") { AdminEmail = "admin@acme.test" });
         var harness = new Harness(stores: [cacheStore, efStore]);
 
         var tenant = await harness.Sut.GetTenantAsync(TenantId);
 
-        tenant.ConnectionString.ShouldBe("Host=acme-db");
+        tenant.AdminEmail.ShouldBe("admin@acme.test");
         (await cacheStore.GetAsync(TenantId)).ShouldNotBeNull(
             "a miss on the first store must warm it, so the next lookup is a hit there too");
     }

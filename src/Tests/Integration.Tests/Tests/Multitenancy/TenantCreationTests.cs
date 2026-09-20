@@ -26,7 +26,6 @@ public sealed class TenantCreationTests
         {
             id = tenantId,
             name = $"Test Tenant {uniqueId}",
-            connectionString = (string?)null,
             adminEmail = $"admin-{uniqueId}@tenant.com",
             adminPassword = TestConstants.DefaultPassword,
             issuer = "test.issuer"
@@ -48,7 +47,6 @@ public sealed class TenantCreationTests
         {
             id = tenantId,
             name = $"Default Validity {uniqueId}",
-            connectionString = (string?)null,
             adminEmail = $"tvdef-{uniqueId}@tenant.com",
             adminPassword = TestConstants.DefaultPassword,
             issuer = "tvdef.issuer"
@@ -73,7 +71,6 @@ public sealed class TenantCreationTests
         {
             id = tenantId,
             name = $"Explicit Validity {uniqueId}",
-            connectionString = (string?)null,
             adminEmail = $"tvexp-{uniqueId}@tenant.com",
             adminPassword = TestConstants.DefaultPassword,
             issuer = "tvexp.issuer",
@@ -95,7 +92,6 @@ public sealed class TenantCreationTests
         {
             id = $"tv-past-{uniqueId}",
             name = $"Past Validity {uniqueId}",
-            connectionString = (string?)null,
             adminEmail = $"tvpast-{uniqueId}@tenant.com",
             adminPassword = TestConstants.DefaultPassword,
             issuer = "tvpast.issuer",
@@ -114,7 +110,6 @@ public sealed class TenantCreationTests
         {
             id = $"dup-{uniqueId}",
             name = $"Dup Tenant {uniqueId}",
-            connectionString = (string?)null,
             adminEmail = $"dupadmin-{uniqueId}@tenant.com",
             adminPassword = TestConstants.DefaultPassword,
             issuer = "dup.issuer"
@@ -137,7 +132,6 @@ public sealed class TenantCreationTests
         {
             id = "noauth",
             name = "No Auth Tenant",
-            connectionString = (string?)null,
             adminEmail = "noauth@tenant.com",
             issuer = "noauth.issuer"
         });

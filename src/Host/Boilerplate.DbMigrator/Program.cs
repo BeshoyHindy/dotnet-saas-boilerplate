@@ -121,8 +121,8 @@ builder.AddHeroPlatform(o =>
     o.EnableAuthentication = false;
 });
 
-// Registers EventingDbContext + its IDbInitializer, so the per-tenant migrate loop below
-// creates the framework outbox/inbox schema alongside every module's (issue #1349).
+// Registers EventingDbContext + its IDbInitializer, so the schema pass below creates the framework
+// outbox/inbox schema alongside every module's (issue #1349).
 builder.Services.AddEventingCore(builder.Configuration);
 
 builder.AddModules(moduleAssemblies);
@@ -172,7 +172,7 @@ try
     await Console.Out.WriteLineAsync("[migrator] advisory lock acquired").ConfigureAwait(false);
 
     // ── Step 1 — tenant catalog ───────────────────────────────────────────
-    // Always applied first: the per-tenant migrator below reads every tenant out of this database.
+    // Always applied first: the schema and seed passes below read every tenant out of this database.
     using (var scope = host.Services.CreateScope())
     {
         var tenantDb = scope.ServiceProvider.GetRequiredService<TenantDbContext>();
@@ -204,8 +204,8 @@ try
             await Console.Out.WriteLineAsync("[tenant-catalog] already at head").ConfigureAwait(false);
         }
 
-        // Seed the root tenant the first time the catalog comes up so the
-        // per-tenant pass below has at least one tenant to iterate.
+        // Seed the root tenant the first time the catalog comes up so the passes
+        // below have at least one tenant to enter.
         var seeded = await tenantDb.TenantInfo
             .FindAsync([MultitenancyConstants.Root.Id], CancellationToken.None)
             .ConfigureAwait(false);
@@ -213,10 +213,13 @@ try
         {
             var rootTenant = new AppTenantInfo(
                 MultitenancyConstants.Root.Id,
-                MultitenancyConstants.Root.Name,
-                connectionString: string.Empty,
-                MultitenancyConstants.Root.EmailAddress,
-                issuer: MultitenancyConstants.Root.Issuer);
+                MultitenancyConstants.Root.Id,
+                MultitenancyConstants.Root.Name)
+            {
+                AdminEmail = MultitenancyConstants.Root.EmailAddress,
+                IsActive = true,
+                Issuer = MultitenancyConstants.Root.Issuer,
+            };
             rootTenant.SetValidity(TimeProvider.System.GetUtcNow().UtcDateTime.AddYears(1));
             await tenantDb.TenantInfo.AddAsync(rootTenant, CancellationToken.None).ConfigureAwait(false);
             await tenantDb.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
@@ -224,43 +227,68 @@ try
         }
     }
 
-    // ── Step 2 — per-tenant migrations + (optional) seeds ────────────────
+    // ── Step 2 — the shared module schema, then per-tenant seeds ─────────
+    // Every tenant lives in the one shared database (#75), so schema is migrated ONCE, not once per
+    // tenant. Seeding is the part that is genuinely per tenant — tenant-scoped roles, groups and the
+    // tenant admin — so that pass still walks the catalog, and --tenant scopes it.
     if (!cli.CatalogOnly)
     {
         var tenantStore = host.Services.GetRequiredService<IMultiTenantStore<AppTenantInfo>>();
         var tenantService = host.Services.GetRequiredService<ITenantService>();
 
         var allTenants = (await tenantStore.GetAllAsync().ConfigureAwait(false)).ToList();
-        var tenants = string.IsNullOrEmpty(cli.Tenant)
-            ? allTenants
-            : allTenants.Where(t => string.Equals(t.Id, cli.Tenant, StringComparison.OrdinalIgnoreCase)).ToList();
+        var rootTenant = allTenants.FirstOrDefault(t =>
+            string.Equals(t.Id, MultitenancyConstants.Root.Id, StringComparison.OrdinalIgnoreCase));
 
-        if (tenants.Count == 0)
+        // 2a — schema, once. Run inside the root tenant's scope because a module's DbContext is
+        // tenant-filtered and needs an ambient tenant to be constructed at all.
+        if (cli.Command == "list-pending")
         {
-            await Console.Out.WriteLineAsync($"[migrator] no tenants matched {cli.Tenant ?? "(all)"}")
-                .ConfigureAwait(false);
+            using var pendingScope = host.Services.CreateScope();
+            foreach (var (name, pendingNames) in await ModuleSchema
+                .GetPendingAsync(pendingScope.ServiceProvider, moduleAssemblies, CancellationToken.None)
+                .ConfigureAwait(false))
+            {
+                await Console.Out.WriteLineAsync(string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"[{name}] {pendingNames.Count} pending migration(s)"))
+                    .ConfigureAwait(false);
+                foreach (var migration in pendingNames)
+                {
+                    await Console.Out.WriteLineAsync($"  · {migration}").ConfigureAwait(false);
+                }
+            }
         }
-
-        foreach (var tenant in tenants)
+        else if (cli.Command != "seed")
         {
-            if (cli.Command == "list-pending")
+            if (rootTenant is null)
             {
                 await Console.Out.WriteLineAsync(
-                    $"[{tenant.Id}] migrations are evaluated per-tenant by each module's IDbInitializer")
+                    "[migrator] the root tenant is missing from the catalog; cannot migrate the module schema")
                     .ConfigureAwait(false);
-                continue;
             }
-            if (cli.Command == "seed")
+            else
             {
-                await Console.Out.WriteLineAsync($"[{tenant.Id}] seeding…").ConfigureAwait(false);
-                await tenantService.SeedTenantAsync(tenant, CancellationToken.None).ConfigureAwait(false);
-                continue;
+                await Console.Out.WriteLineAsync("[module-schema] migrating…").ConfigureAwait(false);
+                await tenantService.MigrateTenantAsync(rootTenant, CancellationToken.None).ConfigureAwait(false);
+                await Console.Out.WriteLineAsync("[module-schema] done").ConfigureAwait(false);
+            }
+        }
+
+        // 2b — seeds, per tenant.
+        if (cli.Command == "seed" || (cli.Command != "list-pending" && cli.SeedAfter))
+        {
+            var tenants = string.IsNullOrEmpty(cli.Tenant)
+                ? allTenants
+                : allTenants.Where(t => string.Equals(t.Id, cli.Tenant, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            if (tenants.Count == 0)
+            {
+                await Console.Out.WriteLineAsync($"[migrator] no tenants matched {cli.Tenant ?? "(all)"}")
+                    .ConfigureAwait(false);
             }
 
-            await Console.Out.WriteLineAsync($"[{tenant.Id}] migrating…").ConfigureAwait(false);
-            await tenantService.MigrateTenantAsync(tenant, CancellationToken.None).ConfigureAwait(false);
-
-            if (cli.SeedAfter)
+            foreach (var tenant in tenants)
             {
                 await Console.Out.WriteLineAsync($"[{tenant.Id}] seeding…").ConfigureAwait(false);
                 await tenantService.SeedTenantAsync(tenant, CancellationToken.None).ConfigureAwait(false);

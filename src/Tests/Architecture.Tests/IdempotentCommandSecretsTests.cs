@@ -14,11 +14,12 @@ namespace Architecture.Tests;
 /// the other half of the question — whether a command actually binds something secret-shaped that
 /// neither of those catches.
 ///
-/// <para>It exists because that is exactly what happened: <c>CreateTenantCommand.ConnectionString</c>
-/// is a database credential, the name list did not know the word, and nothing failed. The probe below
-/// is deliberately <i>wider</i> than the production rule — it flags "connection", "salt", "private"
-/// and friends that <see cref="SensitiveFieldNames"/> does not — so a new command has to be looked at
-/// rather than silently accepted.</para>
+/// <para>It exists because that is exactly what happened: <c>CreateTenantCommand</c> once bound a
+/// <c>ConnectionString</c> — a database credential — the name list did not know the word, and
+/// nothing failed. That field is gone with per-tenant databases (#75), but the rule it earned is
+/// not. The probe below is deliberately <i>wider</i> than the production rule — it flags
+/// "connection", "salt", "private" and friends that <see cref="SensitiveFieldNames"/> does not — so
+/// a new command has to be looked at rather than silently accepted.</para>
 ///
 /// <para><b>How it finds the commands.</b> The route chains carrying <c>.WithIdempotency()</c>
 /// (<see cref="RouteChains"/>), the <c>…Command</c> type names bound in each, resolved against the
@@ -75,16 +76,11 @@ public sealed partial class IdempotentCommandSecretsTests
     [Fact]
     public void The_Probe_Should_Recognise_The_Field_That_Got_Through()
     {
-        // The regression itself: ConnectionString is secret-shaped, and before this branch the
-        // production rule did not know it. Both halves must hold now.
+        // The field that got through is gone (#75), but the word must stay known to both halves:
+        // a consumer of this template that adds its own connection-string-bearing command gets the
+        // protection for free.
         LooksSecret("ConnectionString").ShouldBeTrue();
         SensitiveFieldNames.IsSensitive("ConnectionString").ShouldBeTrue();
-
-        var connectionString = typeof(Boilerplate.Modules.Multitenancy.Contracts.v1.CreateTenant.CreateTenantCommand)
-            .GetProperty("ConnectionString");
-
-        connectionString.ShouldNotBeNull();
-        connectionString.IsDefined(typeof(NotFingerprintedAttribute), inherit: true).ShouldBeTrue();
     }
 
     /// <summary>

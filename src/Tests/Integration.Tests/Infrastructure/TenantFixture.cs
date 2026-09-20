@@ -30,7 +30,6 @@ internal static class TenantFixture
         {
             id = tenantId,
             name = $"Test {tenantId}",
-            connectionString = (string?)null,
             adminEmail,
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer",

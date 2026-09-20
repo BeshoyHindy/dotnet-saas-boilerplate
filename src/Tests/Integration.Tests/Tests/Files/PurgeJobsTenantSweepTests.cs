@@ -9,72 +9,71 @@ using Integration.Tests.Infrastructure;
 namespace Integration.Tests.Tests.Files;
 
 /// <summary>
-/// The two purge sweeps are <c>[SystemJob]</c>s. They used to read whichever database the default
-/// connection pointed at, with <c>IgnoreQueryFilters()</c> standing in for a tenant — which means a
-/// tenant with a <b>dedicated connection string</b> was never swept: its rows live in another
-/// database entirely, and the sweep never opened it.
+/// The two purge sweeps are <c>[SystemJob]</c>s. They used to read the database with
+/// <c>IgnoreQueryFilters()</c> standing in for a tenant, which made them cross-tenant by accident;
+/// they are now tenant sweeps, fanning out through <c>ITenantScope.RunForEachTenantAsync</c> and
+/// lifting only the named <c>SoftDelete</c> filter inside each pass (#74).
 ///
-/// The proof is a row seeded into a tenant's own database (the second database lives in the same
-/// Postgres container, created by provisioning's migrate step) plus a control row in the default
-/// one: a single run must take both.
+/// The proof is rows seeded into two different ordinary tenants plus a control row in root: one run
+/// must take all of them, and must leave the rows that are still inside their window alone. A sweep
+/// that visited only the ambient tenant would fail here.
 /// </summary>
 [Collection(AppCollectionDefinition.Name)]
-public sealed class PurgeJobsDedicatedDatabaseTests
+public sealed class PurgeJobsTenantSweepTests
 {
     private readonly AppWebApplicationFactory _factory;
     private readonly TenantFixtures _tenants;
 
-    public PurgeJobsDedicatedDatabaseTests(AppWebApplicationFactory factory)
+    public PurgeJobsTenantSweepTests(AppWebApplicationFactory factory)
     {
         _factory = factory;
         _tenants = new TenantFixtures(factory);
     }
 
     [Fact]
-    public async Task PurgeDeletedFiles_Should_Reach_A_Tenant_With_Its_Own_Database()
+    public async Task PurgeDeletedFiles_Should_Sweep_Every_Tenant_In_One_Run()
     {
-        var tenantId = await CreateTenantWithOwnDatabaseAsync("filedelded");
+        var (first, _) = await _tenants.CreateProvisionedTenantAsync("filedel1");
+        var (second, _) = await _tenants.CreateProvisionedTenantAsync("filedel2");
 
-        var purgeable = await SeedSoftDeletedFileAsync(tenantId, DateTimeOffset.UtcNow.AddDays(-90));
-        var recent = await SeedSoftDeletedFileAsync(tenantId, DateTimeOffset.UtcNow);
-        var inDefaultDatabase = await SeedSoftDeletedFileAsync(
+        var purgeableInFirst = await SeedSoftDeletedFileAsync(first, DateTimeOffset.UtcNow.AddDays(-90));
+        var recentInFirst = await SeedSoftDeletedFileAsync(first, DateTimeOffset.UtcNow);
+        var purgeableInSecond = await SeedSoftDeletedFileAsync(second, DateTimeOffset.UtcNow.AddDays(-90));
+        var purgeableInRoot = await SeedSoftDeletedFileAsync(
             TestConstants.RootTenantId, DateTimeOffset.UtcNow.AddDays(-90));
 
         await RunJobAsync<PurgeDeletedFilesJob>(j => j.RunAsync(CancellationToken.None));
 
-        (await FileExistsAsync(tenantId, purgeable)).ShouldBeFalse(
-            "the sweep must open the tenant's own database, not only the default one");
-        (await FileExistsAsync(tenantId, recent)).ShouldBeTrue("this one is still inside the retention window");
-        (await FileExistsAsync(TestConstants.RootTenantId, inDefaultDatabase)).ShouldBeFalse(
-            "the default database must still be swept");
+        (await FileExistsAsync(first, purgeableInFirst)).ShouldBeFalse(
+            "one run must visit every tenant, not just the one that happens to be ambient");
+        (await FileExistsAsync(second, purgeableInSecond)).ShouldBeFalse(
+            "the second tenant must be swept by the same run");
+        (await FileExistsAsync(TestConstants.RootTenantId, purgeableInRoot)).ShouldBeFalse(
+            "root is a tenant like any other and must be swept too");
+        (await FileExistsAsync(first, recentInFirst)).ShouldBeTrue(
+            "this one is still inside the retention window");
     }
 
     [Fact]
-    public async Task PurgeOrphanedFiles_Should_Reach_A_Tenant_With_Its_Own_Database()
+    public async Task PurgeOrphanedFiles_Should_Sweep_Every_Tenant_In_One_Run()
     {
-        var tenantId = await CreateTenantWithOwnDatabaseAsync("fileorpded");
+        var (first, _) = await _tenants.CreateProvisionedTenantAsync("fileorp1");
+        var (second, _) = await _tenants.CreateProvisionedTenantAsync("fileorp2");
 
-        var expired = await SeedPendingFileAsync(tenantId, DateTimeOffset.UtcNow.AddHours(-2));
-        var live = await SeedPendingFileAsync(tenantId, DateTimeOffset.UtcNow.AddHours(2));
+        var expiredInFirst = await SeedPendingFileAsync(first, DateTimeOffset.UtcNow.AddHours(-2));
+        var liveInFirst = await SeedPendingFileAsync(first, DateTimeOffset.UtcNow.AddHours(2));
+        var expiredInSecond = await SeedPendingFileAsync(second, DateTimeOffset.UtcNow.AddHours(-2));
 
         await RunJobAsync<PurgeOrphanedFilesJob>(j => j.RunAsync(CancellationToken.None));
 
-        (await FileExistsAsync(tenantId, expired)).ShouldBeFalse(
-            "the expired pending row lives in the tenant's own database and must be purged there");
-        (await FileExistsAsync(tenantId, live)).ShouldBeTrue("its upload window has not closed yet");
+        (await FileExistsAsync(first, expiredInFirst)).ShouldBeFalse(
+            "an expired pending row must be purged in every tenant the sweep visits");
+        (await FileExistsAsync(second, expiredInSecond)).ShouldBeFalse(
+            "the second tenant must be swept by the same run");
+        (await FileExistsAsync(first, liveInFirst)).ShouldBeTrue("its upload window has not closed yet");
     }
 
     // ─── helpers ─────────────────────────────────────────────────────
-
-    private async Task<string> CreateTenantWithOwnDatabaseAsync(string prefix)
-    {
-        // EF's Migrate() creates a Postgres database that does not exist yet, so provisioning's
-        // migrate step both creates and schemas this one — exactly the production path.
-        var databaseName = $"tenant_{prefix}_{Guid.NewGuid():N}"[..40];
-        var (tenantId, _) = await _tenants.CreateProvisionedTenantAsync(
-            prefix, _factory.ConnectionStringForDatabase(databaseName));
-        return tenantId;
-    }
 
     private async Task RunJobAsync<TJob>(Func<TJob, Task> invoke) where TJob : notnull
     {
@@ -126,7 +125,7 @@ public sealed class PurgeJobsDedicatedDatabaseTests
 
     /// <summary>
     /// Soft-deleted rows are hidden by the named <c>SoftDelete</c> filter; the tenant filter stays on,
-    /// so this reads the tenant's own database and nothing else.
+    /// so this reads that tenant's rows and nothing else.
     /// </summary>
     private Task<bool> FileExistsAsync(string tenantId, Guid id) =>
         _factory.Services.GetRequiredService<ITenantScope>().RunAsync(

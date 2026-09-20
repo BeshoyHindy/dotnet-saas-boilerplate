@@ -2,12 +2,9 @@ using Finbuckle.MultiTenant.Abstractions;
 using Finbuckle.MultiTenant.Identity.EntityFrameworkCore;
 using Boilerplate.BuildingBlocks.Persistence;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
-using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Boilerplate.Modules.Identity.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 
 namespace Boilerplate.Modules.Identity.Data;
 
@@ -21,9 +18,6 @@ public class IdentityDbContext : MultiTenantIdentityDbContext<AppUser,
     IdentityUserToken<string>,
     IdentityUserPasskey<string>>
 {
-    private readonly DatabaseOptions _settings;
-    private new AppTenantInfo TenantInfo { get; set; }
-    private readonly IHostEnvironment _environment;
     public DbSet<PasswordHistory> PasswordHistories => Set<PasswordHistory>();
 
     public DbSet<UserSession> UserSessions => Set<UserSession>();
@@ -38,16 +32,9 @@ public class IdentityDbContext : MultiTenantIdentityDbContext<AppUser,
 
     public IdentityDbContext(
         IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor,
-        DbContextOptions<IdentityDbContext> options,
-        IOptions<DatabaseOptions> settings,
-        IHostEnvironment environment) : base(multiTenantContextAccessor, options)
+        DbContextOptions<IdentityDbContext> options) : base(multiTenantContextAccessor, options)
     {
         ArgumentNullException.ThrowIfNull(multiTenantContextAccessor);
-        ArgumentNullException.ThrowIfNull(settings);
-
-        _environment = environment;
-        _settings = settings.Value;
-        TenantInfo = multiTenantContextAccessor.MultiTenantContext.TenantInfo!;
     }
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -62,17 +49,5 @@ public class IdentityDbContext : MultiTenantIdentityDbContext<AppUser,
         // Default-on tenant isolation: non-IGlobalEntity entities get IsMultiTenant() automatically (ImpersonationGrant opts out).
         // Identity tables are already IsMultiTenant in IdentityConfigurations.cs; auto-apply detects that annotation and skips them.
         builder.ApplyTenantIsolationByDefault();
-    }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        if (!string.IsNullOrWhiteSpace(TenantInfo?.ConnectionString))
-        {
-            optionsBuilder.ConfigureHeroDatabase(
-                _settings.Provider,
-                TenantInfo.ConnectionString,
-                _settings.MigrationsAssembly,
-                _environment.IsDevelopment());
-        }
     }
 }

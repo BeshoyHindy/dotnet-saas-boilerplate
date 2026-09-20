@@ -10,16 +10,15 @@ using System.Collections.Concurrent;
 namespace Integration.Tests.Tests.Jobs;
 
 /// <summary>
-/// What a unit of background work saw: the tenant that was ambient while it ran, the connection
-/// string that tenant carried (empty = the default database), and the tenant-filtered rows it could
-/// actually read.
+/// What a unit of background work saw: the tenant that was ambient while it ran, and the
+/// tenant-filtered rows it could actually read.
 /// </summary>
-public sealed record TenantObservation(string? TenantId, string? ConnectionString, IReadOnlyList<string> VisibleUserEmails);
+public sealed record TenantObservation(string? TenantId, IReadOnlyList<string> VisibleUserEmails);
 
 /// <summary>
 /// A tenant-bound job. Unmarked on purpose: it must be enqueued under a tenant and must run under
-/// that tenant. It also writes one inbox row keyed by the marker, which is the evidence for "the
-/// work landed in the tenant's own database" — that row exists in exactly one database.
+/// that tenant. It also writes one inbox row keyed by the marker, stamped with the tenant that was
+/// ambient — evidence that the work ran as the right tenant and not merely with the right argument.
 /// </summary>
 [AutomaticRetry(Attempts = 0)]
 public sealed class TenantProbeJob(
@@ -39,7 +38,7 @@ public sealed class TenantProbeJob(
 
         await inbox.MarkProcessedAsync(marker, $"job-probe:{marker}", tenant?.Id, "probe", cancellationToken);
 
-        Observations[marker] = new TenantObservation(tenant?.Id, tenant?.ConnectionString, emails);
+        Observations[marker] = new TenantObservation(tenant?.Id, emails);
     }
 }
 
@@ -89,6 +88,6 @@ public sealed class TenantProbeHandler(
 
         await inbox.MarkProcessedAsync(@event.Marker, $"event-probe:{@event.Marker}", tenant?.Id, "probe", ct);
 
-        Observations[@event.Marker] = new TenantObservation(tenant?.Id, tenant?.ConnectionString, emails);
+        Observations[@event.Marker] = new TenantObservation(tenant?.Id, emails);
     }
 }

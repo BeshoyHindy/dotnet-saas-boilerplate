@@ -87,7 +87,6 @@ public sealed class TenantExpiryEnforcementTests
         {
             id = tenantId,
             name = $"Expiry Tenant {uniqueId}",
-            connectionString = (string?)null,
             adminEmail = $"expiry-{uniqueId}@tenant.com",
             adminPassword = TestConstants.DefaultPassword,
             issuer = "expiry.issuer"

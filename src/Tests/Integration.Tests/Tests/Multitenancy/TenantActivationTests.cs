@@ -25,7 +25,6 @@ public sealed class TenantActivationTests
         {
             id = tenantId,
             name = $"Deactivate Tenant {uniqueId}",
-            connectionString = (string?)null,
             adminEmail = $"deact-{uniqueId}@tenant.com",
             adminPassword = TestConstants.DefaultPassword,
             issuer = "deact.issuer"
@@ -51,7 +50,6 @@ public sealed class TenantActivationTests
         {
             id = tenantId,
             name = $"Toggle Tenant {uniqueId}",
-            connectionString = (string?)null,
             adminEmail = $"toggle-{uniqueId}@tenant.com",
             adminPassword = TestConstants.DefaultPassword,
             issuer = "toggle.issuer"
@@ -82,7 +80,6 @@ public sealed class TenantActivationTests
         {
             id = tenantId,
             name = $"Blocked Tenant {uniqueId}",
-            connectionString = (string?)null,
             adminEmail = $"blocked-{uniqueId}@tenant.com",
             adminPassword = TestConstants.DefaultPassword,
             issuer = "blocked.issuer"

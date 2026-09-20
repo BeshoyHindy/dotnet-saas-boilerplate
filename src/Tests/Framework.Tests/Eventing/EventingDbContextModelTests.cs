@@ -3,12 +3,9 @@ using Boilerplate.BuildingBlocks.Eventing.Inbox;
 using Boilerplate.BuildingBlocks.Eventing.Outbox;
 using Boilerplate.BuildingBlocks.Eventing.Persistence;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
-using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using NSubstitute;
 using Shouldly;
 using Xunit;
@@ -26,17 +23,7 @@ public class EventingDbContextModelTests
             .UseNpgsql("Host=arch;Database=arch;Username=arch;Password=arch")
             .Options;
 
-        var settings = Options.Create(new DatabaseOptions
-        {
-            Provider = "postgresql",
-            ConnectionString = string.Empty,
-            MigrationsAssembly = "Boilerplate.Migrations.PostgreSQL",
-        });
-
-        var environment = Substitute.For<IHostEnvironment>();
-        environment.EnvironmentName.Returns("Production");
-
-        return new EventingDbContext(accessor, options, settings, environment);
+        return new EventingDbContext(accessor, options);
     }
 
     [Fact]

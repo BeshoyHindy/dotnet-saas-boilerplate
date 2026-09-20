@@ -23,8 +23,9 @@ public sealed class SqlAuditSink : IAuditSink
         if (batch.Count == 0) return;
 
         // One tenant scope per group: the AuditDbContext has to be built under the tenant whose rows
-        // it is about — for the tenant filter, and for a dedicated connection string. Envelopes with
-        // no tenant are platform events and are filed against the root tenant, as before.
+        // it is about, because it captures its TenantInfo — and with it the tenant filter — at
+        // construction. Envelopes with no tenant are platform events and are filed against the root
+        // tenant, as before.
         foreach (var group in batch.GroupBy(e => e.TenantId))
         {
             var tenantId = group.Key ?? MultitenancyConstants.Root.Id;

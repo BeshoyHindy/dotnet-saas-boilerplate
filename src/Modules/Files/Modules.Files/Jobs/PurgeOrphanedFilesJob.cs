@@ -52,7 +52,7 @@ public sealed class PurgeOrphanedFilesJob(
         IServiceProvider tenantServices, DateTimeOffset now, CancellationToken cancellationToken)
     {
         // Both the context and the storage client come from the tenant's own scope: FilesDbContext
-        // captures the tenant's connection string at construction.
+        // captures its TenantInfo — and with it the tenant filter — at construction.
         var db = tenantServices.GetRequiredService<FilesDbContext>();
         var storage = tenantServices.GetRequiredService<IStorageService>();
 

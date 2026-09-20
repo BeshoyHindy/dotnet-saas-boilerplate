@@ -175,7 +175,7 @@ public sealed class IdempotencyEndpointFilterTests
     /// <summary>A payload whose second field does not read as a secret and says so at the property.</summary>
     private sealed record Enrolment(string Name, [property: NotFingerprinted] string Voucher);
 
-    /// <summary>The shape of CreateTenantCommand's credential-bearing pair, caught by name alone.</summary>
+    /// <summary>A payload carrying a connection string, caught by name alone — no mark needed.</summary>
     private sealed record Provisioning(string Name, string ConnectionString);
 
     private sealed record Created(int Id);
@@ -774,9 +774,9 @@ public sealed class IdempotencyEndpointFilterTests
     [Fact]
     public async Task A_ConnectionString_Should_Not_Enter_TheFingerprint()
     {
-        // The field that got through the first time: a per-tenant database connection string, on a
-        // command CreateTenant binds, hashed into an entry that lives 24h. Covered by name here so a
-        // consumer's own command is safe without marking anything.
+        // The field that got through the first time — a connection string hashed into an entry that
+        // lives 24h. The kit binds none today (#75 cut per-tenant databases), and the name rule stays
+        // so a consumer's own connection-string-bearing command is safe without marking anything.
         var (provider, tenant, l2) = BuildServices();
         await using (provider)
         {

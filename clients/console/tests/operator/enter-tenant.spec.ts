@@ -29,7 +29,6 @@ const TENANT = {
   adminEmail: "admin@acme.com",
   isActive: true,
   validUpto: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-  hasConnectionString: false,
   issuer: null,
   expiryState: "Active",
   graceEndsUtc: new Date(Date.now() + 372 * 24 * 60 * 60 * 1000).toISOString(),

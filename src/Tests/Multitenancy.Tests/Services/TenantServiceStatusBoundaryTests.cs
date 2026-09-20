@@ -1,6 +1,5 @@
 using Finbuckle.MultiTenant.Abstractions;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
-using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Boilerplate.Modules.Multitenancy;
 using Boilerplate.Modules.Multitenancy.Services;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -33,8 +32,10 @@ public sealed class TenantServiceStatusBoundaryTests
         var now = ValidUpto.AddSeconds(offsetSecondsFromValidUpto);
         _clock.GetUtcNow().Returns(new DateTimeOffset(now, TimeSpan.Zero));
 
-        var tenant = new AppTenantInfo(tenantId, "Acme", connectionString: null, adminEmail: "admin@acme.test")
+        var tenant = new AppTenantInfo(tenantId, tenantId, "Acme")
         {
+            AdminEmail = "admin@acme.test",
+            IsActive = true,
             ValidUpto = ValidUpto,
         };
         _store.GetAsync(tenantId).Returns(tenant);
@@ -42,7 +43,6 @@ public sealed class TenantServiceStatusBoundaryTests
         var sut = new TenantService(
             _store,
             tenantScope: null!,
-            Options.Create(new DatabaseOptions { ConnectionString = "Host=localhost;Database=boilerplate;Username=x;Password=y" }),
             serviceProvider: null!,
             dbContext: null!,
             provisioningService: null!,

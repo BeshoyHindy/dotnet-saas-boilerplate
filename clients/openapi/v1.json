@@ -459,12 +459,6 @@
           "adminPassword": {
             "type": "string"
           },
-          "connectionString": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
           "id": {
             "type": "string"
           },
@@ -488,7 +482,6 @@
         "required": [
           "id",
           "name",
-          "connectionString",
           "adminEmail",
           "adminPassword",
           "issuer"
@@ -1664,12 +1657,6 @@
           "adminEmail": {
             "type": "string"
           },
-          "connectionString": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
           "id": {
             "type": "string"
           },
@@ -1699,54 +1686,6 @@
           },
           "message": {
             "type": "string"
-          },
-          "tenantId": {
-            "type": "string"
-          },
-          "validUpto": {
-            "format": "date-time",
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        },
-        "type": "object"
-      },
-      "TenantMigrationStatusDto": {
-        "properties": {
-          "error": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "hasPendingMigrations": {
-            "type": "boolean"
-          },
-          "isActive": {
-            "type": "boolean"
-          },
-          "lastAppliedMigration": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "name": {
-            "type": "string"
-          },
-          "pendingMigrations": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "provider": {
-            "type": [
-              "null",
-              "string"
-            ]
           },
           "tenantId": {
             "type": "string"
@@ -1871,9 +1810,6 @@
           "graceEndsUtc": {
             "format": "date-time",
             "type": "string"
-          },
-          "hasConnectionString": {
-            "type": "boolean"
           },
           "id": {
             "type": "string"
@@ -5663,42 +5599,6 @@
           }
         ],
         "summary": "Get the calling tenant's status",
-        "tags": [
-          "Tenants"
-        ]
-      }
-    },
-    "/api/v1/tenants/migrations": {
-      "get": {
-        "description": "Retrieve migration status for each tenant, including pending migrations and provider information.",
-        "operationId": "GetTenantMigrations",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/TenantMigrationStatusDto"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ],
-        "summary": "Get per-tenant migration status",
         "tags": [
           "Tenants"
         ]

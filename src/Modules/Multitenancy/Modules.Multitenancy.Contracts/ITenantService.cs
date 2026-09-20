@@ -15,7 +15,7 @@ public interface ITenantService
 
     Task<TenantStatusDto> GetStatusAsync(string id, CancellationToken cancellationToken = default);
 
-    Task<string> CreateAsync(string id, string name, string? connectionString, string adminEmail, string? issuer, DateTime validUpto, CancellationToken cancellationToken);
+    Task<string> CreateAsync(string id, string name, string adminEmail, string? issuer, DateTime validUpto, CancellationToken cancellationToken);
 
     Task<string> ActivateAsync(string id, CancellationToken cancellationToken);
 

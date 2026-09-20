@@ -31,10 +31,6 @@ namespace Boilerplate.Migrations.PostgreSQL.MultiTenancy
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("ConnectionString")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("Identifier")
                         .IsRequired()
                         .HasColumnType("text");

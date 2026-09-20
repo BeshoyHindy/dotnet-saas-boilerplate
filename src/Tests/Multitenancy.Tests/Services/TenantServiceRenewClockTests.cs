@@ -1,6 +1,5 @@
 using Finbuckle.MultiTenant.Abstractions;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
-using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Boilerplate.Modules.Multitenancy;
 using Boilerplate.Modules.Multitenancy.Provisioning;
 using Boilerplate.Modules.Multitenancy.Services;
@@ -31,7 +30,6 @@ public sealed class TenantServiceRenewClockTests
         return new TenantService(
             _store,
             tenantScope: null!,          // RenewAsync never migrates or seeds
-            Options.Create(new DatabaseOptions { ConnectionString = "Host=localhost;Database=boilerplate;Username=x;Password=y" }),
             _serviceProvider,
             dbContext: null!,            // RenewAsync never touches the DbContext
             provisioningService: null!,  // RenewAsync never touches provisioning
@@ -48,8 +46,10 @@ public sealed class TenantServiceRenewClockTests
         _clock.GetUtcNow().Returns(fakeNow);
 
         const string tenantId = "acme";
-        var tenant = new AppTenantInfo(tenantId, "Acme", connectionString: null, adminEmail: "admin@acme.test")
+        var tenant = new AppTenantInfo(tenantId, tenantId, "Acme")
         {
+            AdminEmail = "admin@acme.test",
+            IsActive = true,
             // Past relative to both the real clock and the fake clock, so periodStart must equal "now".
             ValidUpto = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc),
         };

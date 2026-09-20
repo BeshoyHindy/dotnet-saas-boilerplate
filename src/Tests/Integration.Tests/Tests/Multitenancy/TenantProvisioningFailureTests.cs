@@ -11,16 +11,13 @@ namespace Integration.Tests.Tests.Multitenancy;
 /// when a provisioning step throws, the overall status transitions to <c>Failed</c> with the
 /// failing step recorded, and the tenant cannot be activated while status != <c>Completed</c>.
 ///
-/// Fault-injection seam (option a — a legitimate input that fails a step end-to-end):
-/// the create endpoint accepts any *well-formed* connection string (the
-/// <c>ConnectionStringValidator</c> only parses it, it does not probe reachability). A
-/// connection string pointed at a port nothing listens on (127.0.0.1:1) is therefore accepted,
-/// persisted on the tenant, and — because <c>BaseDbContext.OnConfiguring</c> routes a tenant
-/// with a non-empty connection string to that DB — the Migrations step's
-/// <c>GetPendingMigrationsAsync</c> throws a real Npgsql connection failure. The
-/// <c>TenantProvisioningJob</c> catch block converts that to
-/// <c>MarkFailedAsync(..., Migrations, ...)</c>. No production code or shared test infra is
-/// modified; the failure flows through the exact production pipeline.
+/// Fault-injection seam: <see cref="FaultInjectingDbInitializer"/>, a test-only
+/// <c>IDbInitializer</c> armed for one tenant id. <c>ITenantService.MigrateTenantAsync</c>
+/// iterates every registered initializer inside <c>ITenantScope.RunAsync</c>, so the armed
+/// tenant's <c>MigrateAsync</c> throws on the exact <c>Migrations</c> step these tests assert on,
+/// and the <c>TenantProvisioningJob</c> catch block converts it to
+/// <c>MarkFailedAsync(..., Migrations, ...)</c>. No production code is substituted; the failure
+/// flows through the exact production pipeline.
 /// </summary>
 [Collection(AppCollectionDefinition.Name)]
 public sealed class TenantProvisioningFailureTests
@@ -30,11 +27,6 @@ public sealed class TenantProvisioningFailureTests
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true
     };
-
-    // Well-formed (passes ConnectionStringValidator) but unreachable: port 1 refuses
-    // connections immediately, and the short timeouts keep the failing job fast.
-    private const string UnreachableConnectionString =
-        "Host=127.0.0.1;Port=1;Database=does_not_exist;Username=postgres;Password=x;Timeout=3;Command Timeout=3";
 
     private readonly AppWebApplicationFactory _factory;
     private readonly AuthHelper _auth;
@@ -53,13 +45,13 @@ public sealed class TenantProvisioningFailureTests
         // Arrange
         using var rootClient = await _auth.CreateRootAdminClientAsync();
         var uniqueId = Guid.NewGuid().ToString("N")[..8];
-        var tenantId = $"fail-{uniqueId}";
+        var tenantId = $"{FaultInjectingDbInitializer.TenantIdPrefix}fail-{uniqueId}";
+        FaultInjectingDbInitializer.Arm(tenantId);
 
         var createResponse = await rootClient.PostAsJsonAsync(TestConstants.TenantsBasePath, new
         {
             id = tenantId,
             name = $"Provisioning Failure Tenant {uniqueId}",
-            connectionString = UnreachableConnectionString,
             adminEmail = $"fail-admin-{uniqueId}@tenant.com",
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer"
@@ -75,8 +67,8 @@ public sealed class TenantProvisioningFailureTests
         status.Error.ShouldNotBeNullOrWhiteSpace();
         status.CurrentStep.ShouldNotBeNull();
 
-        // The Database step (no DB I/O) completes; Migrations is where the bad
-        // connection string first opens a connection, so it is the failing step.
+        // The Database step (bookkeeping only) completes; Migrations is where the armed
+        // initializer throws, so it is the failing step.
         var migrationsStep = status.Steps.SingleOrDefault(s => s.Step == "Migrations");
         migrationsStep.ShouldNotBeNull("Migrations step missing from provisioning status.");
         migrationsStep.Status.ShouldBe("Failed");
@@ -99,13 +91,13 @@ public sealed class TenantProvisioningFailureTests
         // Arrange — create a tenant whose provisioning fails on the Migrations step.
         using var rootClient = await _auth.CreateRootAdminClientAsync();
         var uniqueId = Guid.NewGuid().ToString("N")[..8];
-        var tenantId = $"failguard-{uniqueId}";
+        var tenantId = $"{FaultInjectingDbInitializer.TenantIdPrefix}guard-{uniqueId}";
+        FaultInjectingDbInitializer.Arm(tenantId);
 
         var createResponse = await rootClient.PostAsJsonAsync(TestConstants.TenantsBasePath, new
         {
             id = tenantId,
             name = $"Activation Guard Tenant {uniqueId}",
-            connectionString = UnreachableConnectionString,
             adminEmail = $"failguard-admin-{uniqueId}@tenant.com",
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer"
@@ -134,13 +126,13 @@ public sealed class TenantProvisioningFailureTests
         // deactivate it, then prove reactivation is blocked by the provisioning guard.
         using var rootClient = await _auth.CreateRootAdminClientAsync();
         var uniqueId = Guid.NewGuid().ToString("N")[..8];
-        var tenantId = $"reactivate-{uniqueId}";
+        var tenantId = $"{FaultInjectingDbInitializer.TenantIdPrefix}reactivate-{uniqueId}";
+        FaultInjectingDbInitializer.Arm(tenantId);
 
         var createResponse = await rootClient.PostAsJsonAsync(TestConstants.TenantsBasePath, new
         {
             id = tenantId,
             name = $"Reactivate Blocked Tenant {uniqueId}",
-            connectionString = UnreachableConnectionString,
             adminEmail = $"reactivate-admin-{uniqueId}@tenant.com",
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer"

@@ -186,7 +186,6 @@ public sealed class ChangeTenantActivationValidationTests
         {
             id = tenantId,
             name = $"Activation {tenantId}",
-            connectionString = (string?)null,
             adminEmail,
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer",

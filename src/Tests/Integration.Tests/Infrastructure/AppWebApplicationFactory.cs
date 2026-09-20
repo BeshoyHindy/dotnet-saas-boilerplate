@@ -83,18 +83,6 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
     /// <summary>The MinIO endpoint URL exposed to the host configuration; useful for tests that need to PUT bytes directly.</summary>
     public string MinioServiceUrl => _minio.GetConnectionString();
 
-    /// <summary>
-    /// The container's connection string. Tests that need a *second* database — a tenant with a
-    /// dedicated connection string — derive one from it by swapping the Database keyword, so both
-    /// live in the same container and no second container is started.
-    /// </summary>
-    public string PostgresConnectionString => _postgres.GetConnectionString();
-
-    /// <summary>A connection string for <paramref name="databaseName"/> on the same server.</summary>
-    public string ConnectionStringForDatabase(string databaseName) =>
-        new Npgsql.NpgsqlConnectionStringBuilder(_postgres.GetConnectionString()) { Database = databaseName }
-            .ConnectionString;
-
     private async Task CreateMinioBucketAsync()
     {
         var config = new AmazonS3Config
@@ -231,6 +219,11 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
                 JwtBearerDefaults.AuthenticationScheme,
                 options => options.RequireHttpsMetadata = false);
 
+            // Fault-injection seam for the provisioning failure/retry suites. Appended to the
+            // IDbInitializer enumerable ITenantService.MigrateTenantAsync iterates, so an armed
+            // tenant fails the real Migrations step; every other tenant sees a no-op.
+            services.AddScoped<IDbInitializer, FaultInjectingDbInitializer>();
+
             // Probe handler for the tenant-context tests: registered here so it is dispatched by the
             // real bus, through the real IEventTenantScope, with a real inbox — the whole point is
             // that nothing in that path is substituted.
@@ -326,10 +319,13 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
             {
                 rootTenant = new AppTenantInfo(
                     MultitenancyConstants.Root.Id,
-                    MultitenancyConstants.Root.Name,
-                    string.Empty,
-                    MultitenancyConstants.Root.EmailAddress,
-                    issuer: MultitenancyConstants.Root.Issuer);
+                    MultitenancyConstants.Root.Id,
+                    MultitenancyConstants.Root.Name)
+                {
+                    AdminEmail = MultitenancyConstants.Root.EmailAddress,
+                    IsActive = true,
+                    Issuer = MultitenancyConstants.Root.Issuer,
+                };
 
                 var validUpto = DateTime.UtcNow.AddYears(1);
                 rootTenant.SetValidity(validUpto);

@@ -7,12 +7,12 @@ namespace Boilerplate.BuildingBlocks.Shared.Multitenancy;
 /// The single place in the product that writes Finbuckle's ambient tenant context
 /// (<see cref="IMultiTenantContextSetter"/>, an <c>AsyncLocal</c>).
 ///
-/// Everything that needs to "become" a tenant outside a request — jobs, event dispatch, the outbox
-/// drain, provisioning, migrations, health probes — goes through <see cref="ITenantScope"/>, which
-/// goes through here. An architecture test pins <see cref="IMultiTenantContextSetter"/> to this file
-/// so the hand-rolled "create a scope, then set the tenant" blocks cannot come back: that order is
-/// wrong, because a <c>MultiTenantDbContext</c> captures its <c>TenantInfo</c> — and with it the
-/// per-tenant connection string — at construction.
+/// Everything that needs to "become" a tenant outside a request — jobs, event dispatch,
+/// provisioning, migrations, seeding — goes through <see cref="ITenantScope"/>, which goes through
+/// here. An architecture test pins <see cref="IMultiTenantContextSetter"/> to this file so the
+/// hand-rolled "create a scope, then set the tenant" blocks cannot come back: that order is wrong,
+/// because a <c>MultiTenantDbContext</c> captures its <c>TenantInfo</c> — and with it the tenant
+/// query filter — at construction.
 /// </summary>
 public sealed class AmbientTenantContext
 {

@@ -1,4 +1,3 @@
-using Boilerplate.BuildingBlocks.Eventing.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -65,48 +64,19 @@ public sealed partial class OutboxDispatcherHostedService : BackgroundService
     }
 
     /// <summary>
-    /// Drains one cycle: every database that can hold outbox rows, not just the default one.
-    /// A tenant with a dedicated connection string writes its rows into its own database, so a
-    /// single-database poll leaves them undispatched forever.
+    /// Drains one cycle. There is one database (#75), and outbox rows are <c>IGlobalEntity</c> with
+    /// an explicit <c>TenantId</c> column, so a single pass sees every tenant's rows.
     /// </summary>
     /// <remarks>Internal rather than private so the per-cycle behaviour is testable without timing.</remarks>
     internal async Task DispatchOutboxAsync(CancellationToken ct)
     {
-        // Resolved per cycle: tenants — and therefore databases — can be added at runtime.
-        using var providerScope = _scopeFactory.CreateScope();
-        var targetProvider = providerScope.ServiceProvider.GetRequiredService<IEventingDrainTargetProvider>();
-        var drainScope = providerScope.ServiceProvider.GetRequiredService<IEventingDrainScope>();
+        ct.ThrowIfCancellationRequested();
 
-        var targets = await targetProvider.GetTargetsAsync(ct).ConfigureAwait(false);
-
-        foreach (var target in targets)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            try
-            {
-                // The tenant context must be installed BEFORE the scope's EventingDbContext is
-                // constructed — BaseDbContext captures TenantInfo, and with it the connection
-                // string, at construction time.
-                using (drainScope.Begin(target))
-                {
-                    using var scope = _scopeFactory.CreateScope();
-                    var dispatcher = scope.ServiceProvider.GetRequiredService<OutboxDispatcher>();
-                    await dispatcher.DispatchAsync(ct).ConfigureAwait(false);
-                }
-            }
-            // Broad catch is intentional: one unreachable tenant database must not stop the
-            // others from draining this cycle.
-            catch (Exception ex) when (!ct.IsCancellationRequested)
-            {
-                LogDrainFailed(ex, target.TenantId ?? "(default)");
-            }
-        }
+        using var scope = _scopeFactory.CreateScope();
+        var dispatcher = scope.ServiceProvider.GetRequiredService<OutboxDispatcher>();
+        await dispatcher.DispatchAsync(ct).ConfigureAwait(false);
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Outbox dispatcher hosted service started. Dispatch interval: {Interval}s")]
     private partial void LogServiceStarted(double interval);
-
-    [LoggerMessage(Level = LogLevel.Error, Message = "Failed to drain the outbox for tenant {TenantId}")]
-    private partial void LogDrainFailed(Exception exception, string tenantId);
 }

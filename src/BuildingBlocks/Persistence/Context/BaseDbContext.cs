@@ -2,12 +2,7 @@
 using Finbuckle.MultiTenant.EntityFrameworkCore;
 using Boilerplate.BuildingBlocks.Core.Domain;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
-using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 
 namespace Boilerplate.BuildingBlocks.Persistence.Context;
 
@@ -16,16 +11,10 @@ namespace Boilerplate.BuildingBlocks.Persistence.Context;
 /// </summary>
 /// <param name="multiTenantContextAccessor">Accessor for multi-tenant context information.</param>
 /// <param name="options">Database context options.</param>
-/// <param name="settings">Database configuration settings.</param>
-/// <param name="environment">Host environment information.</param>
 public class BaseDbContext(IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor,
-    DbContextOptions options,
-    IOptions<DatabaseOptions> settings,
-    IHostEnvironment environment)
+    DbContextOptions options)
     : MultiTenantDbContext(multiTenantContextAccessor, options)
 {
-    private readonly DatabaseOptions _settings = settings.Value;
-
     /// <summary>
     /// Configures the model by applying global query filters for soft delete functionality.
     /// </summary>
@@ -39,48 +28,6 @@ public class BaseDbContext(IMultiTenantContextAccessor<AppTenantInfo> multiTenan
         // Default-on tenant isolation: entities not marked IGlobalEntity get IsMultiTenant().
         // Subclasses must call base.OnModelCreating AFTER ApplyConfigurationsFromAssembly so per-entity configs are in place.
         modelBuilder.ApplyTenantIsolationByDefault();
-    }
-
-    /// <summary>
-    /// Configures the database connection using tenant-specific connection string if available.
-    /// </summary>
-    /// <param name="optionsBuilder">The options builder for configuring the database connection.</param>
-    /// <exception cref="ArgumentNullException">Thrown when optionsBuilder is null.</exception>
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        ArgumentNullException.ThrowIfNull(optionsBuilder);
-
-        var tenantConnectionString = multiTenantContextAccessor?.MultiTenantContext.TenantInfo?.ConnectionString;
-        if (string.IsNullOrWhiteSpace(tenantConnectionString))
-        {
-            return;
-        }
-
-        // Route the tenant connection through the scope's connection provider too. Opening a
-        // private connection here would defeat the sharing that lets an outbox write join the
-        // business transaction — a tenant-database context would be the one case that silently
-        // lost atomicity. Falls back to the connection string when no provider is available
-        // (hand-constructed contexts in tests, design-time tooling).
-        var connectionProvider = optionsBuilder.Options
-            .FindExtension<CoreOptionsExtension>()?
-            .ApplicationServiceProvider?
-            .GetService<IScopedDbConnectionProvider>();
-
-        if (connectionProvider is null)
-        {
-            optionsBuilder.ConfigureHeroDatabase(
-                _settings.Provider,
-                tenantConnectionString,
-                _settings.MigrationsAssembly,
-                environment.IsDevelopment());
-            return;
-        }
-
-        optionsBuilder.ConfigureHeroDatabase(
-            _settings.Provider,
-            connectionProvider.GetConnection(_settings.Provider, tenantConnectionString),
-            _settings.MigrationsAssembly,
-            environment.IsDevelopment());
     }
 
     /// <summary>

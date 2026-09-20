@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Boilerplate.Migrations.PostgreSQL.MultiTenancy
 {
     [DbContext(typeof(TenantDbContext))]
-    [Migration("20260918215121_InitialMultiTenancy")]
+    [Migration("20260920190457_InitialMultiTenancy")]
     partial class InitialMultiTenancy
     {
         /// <inheritdoc />
@@ -31,10 +31,6 @@ namespace Boilerplate.Migrations.PostgreSQL.MultiTenancy
                         .HasColumnType("text");
 
                     b.Property<string>("AdminEmail")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("ConnectionString")
                         .IsRequired()
                         .HasColumnType("text");
 

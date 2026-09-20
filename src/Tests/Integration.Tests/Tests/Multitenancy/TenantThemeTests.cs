@@ -393,7 +393,6 @@ public sealed class TenantThemeTests : IAsyncLifetime
         {
             id = tenantId,
             name = $"Theme {tenantId}",
-            connectionString = (string?)null,
             adminEmail,
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer",

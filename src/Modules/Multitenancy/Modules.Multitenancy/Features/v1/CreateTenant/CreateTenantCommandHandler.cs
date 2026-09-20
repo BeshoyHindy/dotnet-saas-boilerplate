@@ -26,7 +26,6 @@ public sealed class CreateTenantCommandHandler(
         var tenantId = await tenantService.CreateAsync(
             command.Id,
             command.Name,
-            command.ConnectionString,
             command.AdminEmail,
             command.Issuer,
             validUpto,

@@ -9,7 +9,7 @@ skill — follow it. This playbook covers the surrounding facts and troubleshoot
 - All migrations live in **one** project, `src/Host/Boilerplate.Migrations.PostgreSQL`, foldered **per module/context** (`Identity/`, `Files/`, …), each with its own `{X}DbContextModelSnapshot`.
 - Startup project is `src/Host/Boilerplate.Api`. Always pass `--context {X}DbContext` and `--output-dir {X}`.
 - `dotnet-ef` is pinned — `dotnet tool restore` first.
-- **The DB is NOT migrated on API startup.** The `DbMigrator` host applies it: it migrates the tenant catalog (`TenantDbContext`) first, then each tenant's per-module schema, serialized by a Postgres advisory lock. (`UseMultiTenant()` in the API only registers Finbuckle's tenant resolution — it does not run migrations.)
+- **The DB is NOT migrated on API startup.** The `DbMigrator` host applies it: it migrates the tenant catalog (`TenantDbContext`) first, then the shared module schema once, then seeds per tenant — all serialized by a Postgres advisory lock. (`UseMultiTenant()` in the API only registers Finbuckle's tenant resolution — it does not run migrations.)
 - **Build before `migrations add`** — it reads the snapshot, which regenerates from a build; a stale snapshot silently loses changes. `migrations remove` rewrites the snapshot, so only ever remove the latest and rebuild after.
 
 ## Context names (real)

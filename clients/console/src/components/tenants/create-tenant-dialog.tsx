@@ -50,7 +50,6 @@ const schema = z.object({
     .min(8, "At least 8 characters.")
     .max(128, "Maximum 128 characters."),
   issuer: z.string().trim().min(2, "Required.").max(256),
-  connectionString: z.string().trim().max(2048).optional(),
   // Optional: a `type="date"` input yields a `YYYY-MM-DD` string. Left empty,
   // the server falls back to its own default validity window.
   validUpto: z
@@ -225,7 +224,6 @@ export function CreateTenantDialog({
       adminEmail: "",
       adminPassword: "",
       issuer: "",
-      connectionString: "",
       validUpto: "",
     },
   });
@@ -263,7 +261,6 @@ export function CreateTenantDialog({
         adminEmail: values.adminEmail,
         adminPassword: values.adminPassword,
         issuer: values.issuer,
-        connectionString: values.connectionString?.trim() ? values.connectionString : null,
         validUpto: values.validUpto?.trim() ? new Date(values.validUpto).toISOString() : null,
       }),
     onSuccess: (result) => {
@@ -471,7 +468,7 @@ export function CreateTenantDialog({
                 <Input id="ct-validUpto" type="date" {...register("validUpto")} />
               </Field>
 
-              {/* Advanced disclosure — issuer + dedicated database */}
+              {/* Advanced disclosure — issuer */}
               <div className="rounded-lg border border-[var(--color-border)]">
                 <button
                   type="button"
@@ -484,7 +481,7 @@ export function CreateTenantDialog({
                   <span className="text-[12.5px] font-medium text-[var(--color-foreground)]">
                     Advanced
                     <span className="ml-1.5 font-normal text-[var(--color-muted-foreground)]">
-                      issuer, dedicated database
+                      issuer
                     </span>
                   </span>
                   <ChevronDown
@@ -514,20 +511,6 @@ export function CreateTenantDialog({
                           setIssuerDirty(true);
                           void issuerField.onChange(e);
                         }}
-                      />
-                    </Field>
-
-                    <Field
-                      id="ct-connectionString"
-                      label="Connection string"
-                      hint="Optional. Leave blank to use the shared catalog database."
-                      error={errors.connectionString?.message}
-                    >
-                      <Input
-                        id="ct-connectionString"
-                        placeholder="Host=…;Database=…"
-                        className="font-mono"
-                        {...register("connectionString")}
                       />
                     </Field>
                   </div>

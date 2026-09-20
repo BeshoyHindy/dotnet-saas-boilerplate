@@ -246,7 +246,6 @@ public sealed class RenewTenantTests
         {
             id = tenantId,
             name = $"Renew {tenantId}",
-            connectionString = (string?)null,
             adminEmail,
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer",
