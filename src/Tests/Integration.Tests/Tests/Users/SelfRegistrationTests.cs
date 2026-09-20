@@ -77,4 +77,44 @@ public sealed class SelfRegistrationTests
 
         secondResponse.IsSuccessStatusCode.ShouldBeFalse();
     }
+
+    [Fact]
+    public async Task SelfRegister_Should_NotReplay_When_RepeatedWithSameIdempotencyKey()
+    {
+        // Anonymous routes are never marked idempotent (#84): the same Idempotency-Key header must
+        // not replay the first response. The second attempt is refused as a duplicate (400), the same
+        // as it would be without the header at all.
+        using var client = _factory.CreateClient();
+        var uniqueId = Guid.NewGuid().ToString("N")[..8];
+        var payload = new
+        {
+            firstName = "Idem",
+            lastName = "Self",
+            email = $"selfidem-{uniqueId}@example.com",
+            userName = $"selfidem-{uniqueId}",
+            password = "Test@1234!",
+            confirmPassword = "Test@1234!"
+        };
+        var idempotencyKey = $"self-register-{uniqueId}";
+
+        using var firstRequest = BuildRequest(payload, idempotencyKey);
+        var firstResponse = await client.SendAsync(firstRequest);
+        firstResponse.StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        using var secondRequest = BuildRequest(payload, idempotencyKey);
+        var secondResponse = await client.SendAsync(secondRequest);
+
+        secondResponse.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        secondResponse.Headers.Contains("Idempotency-Replayed").ShouldBeFalse();
+    }
+
+    private static HttpRequestMessage BuildRequest(object payload, string idempotencyKey)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.RootAuthBasePath}/register")
+        {
+            Content = JsonContent.Create(payload)
+        };
+        request.Headers.Add("Idempotency-Key", idempotencyKey);
+        return request;
+    }
 }
