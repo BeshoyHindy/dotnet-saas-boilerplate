@@ -1,7 +1,8 @@
 # Boilerplate DbMigrator
 
 One-shot console application that applies EF Core migrations across the
-tenant catalog and every tenant's per-module databases, then exits.
+tenant catalog and the shared application schema, seeds per tenant, then
+exits.
 
 ## Why a separate project
 
@@ -22,13 +23,13 @@ runtime app starts. This project is that step.
 ## Usage
 
 ```bash
-# Default — apply pending migrations for the tenant catalog + every tenant.
+# Default — apply pending migrations for the tenant catalog + the shared schema.
 dotnet run --project src/Host/Boilerplate.DbMigrator -- apply
 
-# Apply only to one tenant.
-dotnet run --project src/Host/Boilerplate.DbMigrator -- apply --tenant root
+# Seed only one tenant (schema is shared, so it is always migrated once).
+dotnet run --project src/Host/Boilerplate.DbMigrator -- seed --tenant root
 
-# Apply only the tenant catalog (no per-tenant pass).
+# Apply only the tenant catalog (no module schema, no seeds).
 dotnet run --project src/Host/Boilerplate.DbMigrator -- apply --catalog-only
 
 # Preview what would run without touching the database.
@@ -200,13 +201,18 @@ merely behind. Run `list-pending` for that answer.
    with the migrator.
 3. Applies `TenantDbContext` migrations and seeds the root tenant if
    missing.
-4. Reads every `AppTenantInfo` from the catalog and, for each, calls
-   `ITenantService.MigrateTenantAsync` (and `SeedTenantAsync` if
-   `--seed` is set) which walks every registered `IDbInitializer`
-   inside a scoped multi-tenant context.
-5. With `--demo`, runs `DemoSeed/DemoSeeder` last, once every existing
-   tenant is at head.
+4. Migrates the shared module schema **once**, through
+   `ITenantService.MigrateTenantAsync` in the root tenant's scope, which
+   walks every registered `IDbInitializer`. Every tenant lives in this
+   one database (#75), so running it per tenant would be the same
+   migration N times.
+5. With `seed` or `--seed`, reads every `AppTenantInfo` from the catalog
+   and calls `ITenantService.SeedTenantAsync` for each — this pass *is*
+   per tenant, because it writes tenant-scoped roles, groups and the
+   tenant admin. `--tenant <id>` scopes it.
+6. With `--demo`, runs `DemoSeed/DemoSeeder` last, once the schema is at
+   head.
 
-The per-tenant pass reuses `TenantService.MigrateTenantAsync` — the
-exact code path the runtime app uses today — so behavior is identical
-between the migrator and the API's startup pass when both are enabled.
+Both passes reuse `TenantService` — the exact code path tenant
+provisioning uses at runtime — so behaviour is identical between the
+migrator and the provisioning job.

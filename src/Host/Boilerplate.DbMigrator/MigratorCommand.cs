@@ -5,8 +5,8 @@ namespace Boilerplate.DbMigrator;
 /// a handful of flags — keep this honest and minimal.
 ///
 /// Verbs:   apply | seed | list-pending  (default: apply)
-/// Flags:   --tenant &lt;id&gt;   scope to one tenant id
-///          --catalog-only   skip per-tenant migrations
+/// Flags:   --tenant &lt;id&gt;   scope the seed pass to one tenant id
+///          --catalog-only   skip the module schema + seed pass
 ///          --seed           after apply, also run SeedAsync per tenant
 ///          --demo           after apply, also seed the demo accounts (never in Production)
 ///          --help / -h      print help text
@@ -59,7 +59,7 @@ internal sealed record MigratorCommand(
 
     public const string HelpText = """
         Boilerplate DbMigrator — apply EF Core migrations across the tenant catalog
-        and every tenant's per-module databases.
+        and the shared application schema.
 
         Usage:
           dotnet run --project src/Host/Boilerplate.DbMigrator -- [verb] [options]
@@ -70,8 +70,10 @@ internal sealed record MigratorCommand(
           list-pending    Print pending migrations without applying anything.
 
         Options:
-          --tenant <id>        Restrict to a single tenant id (default: all tenants).
-          --catalog-only       Skip the per-tenant pass; only the tenant catalog is migrated.
+          --tenant <id>        Restrict the SEED pass to a single tenant id (default: all
+                               tenants). Schema is shared, so it is always migrated once.
+          --catalog-only       Skip the module schema + seed pass; only the tenant catalog
+                               is migrated.
           --seed               After apply, also call ITenantService.SeedTenantAsync.
           --demo               After apply, seed the demo accounts: the 'acme' and 'globex'
                                tenants, their users, custom roles and groups. Needs
