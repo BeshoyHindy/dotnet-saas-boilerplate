@@ -4,7 +4,7 @@
 
 ## `IStorageService`
 
-`ComposeKey(space, relativePath)`, `UploadAsync<T>(FileUploadRequest, FileType, ct)`, `RemoveAsync(path, ct)`, `RemoveIfOwnedAsync(handle, ct)`, `DownloadAsync`, `ExistsAsync`, `GetSizeAsync` (0 if absent), `GenerateUploadUrlAsync`/`GenerateDownloadUrlAsync` (presigned), `HeadObjectAsync`, `BuildPublicUrl(key)→string` (string, not Uri — local storage returns a server-relative path).
+`ComposeKey(space, relativePath)`, `UploadAsync<T>(FileUploadRequest, FileType, owner, ct)`, `RemoveAsync(path, ct)`, `RemoveIfOwnedAsync(handle, ct)`, `RemoveIfOwnedAsync<T>(handle, owner, ct)`, `DownloadAsync`, `ExistsAsync`, `GetSizeAsync` (0 if absent), `GenerateUploadUrlAsync`/`GenerateDownloadUrlAsync` (presigned), `HeadObjectAsync`, `BuildPublicUrl(key)→string` (string, not Uri — local storage returns a server-relative path).
 
 `FileType`: `Image` (5MB), `Document`, `Pdf` (10MB) — `FileTypeMetadata.GetRules` enforces extension + size. **Always propagate `CancellationToken`.**
 
@@ -31,7 +31,15 @@ Local/dev without MinIO uses `LocalPresignTokenStore` (in-memory one-shot tokens
 var key = storage.ComposeKey(StorageSpace.Private, $"{ownerType}/{yyyy}/{MM}/{id:N}/{file}");
 ```
 
-`UploadAsync<T>` is the public-space shortcut (avatars, brand assets): it composes `uploads/tenants/{tenantId}/{typeName}/{guid}_{file}` and returns `BuildPublicUrl` of it.
+`UploadAsync<T>` is the public-space shortcut (avatars, brand assets): it composes `uploads/tenants/{tenantId}/{typeName}/{owner}/{guid}_{file}` and returns `BuildPublicUrl` of it.
+
+## Inside one tenant, the owner segment (#83)
+
+**Clients never supply asset URLs; the server persists only what it issued.** There is no endpoint that takes a URL for an avatar or a brand asset — an upload goes in, the URL the block returns comes out (`PUT /identity/profile` with `image`/`deleteCurrentImage`; `PUT /tenants/theme` with `brandAssets.logo`/`deleteLogo`, whose write model has no URL fields at all). Anything that adds one back reopens this: a column a client can name is a column that can name somebody else's object.
+
+The tenant prefix answers "may this tenant touch this key" and inside one tenant answers nothing, so `UploadAsync<T>` takes a mandatory **owner** — the user id for an avatar, the asset slot (`logo`, `logo-dark`, `favicon`) for a brand asset — and writes it as a key segment. **The replace/remove path uses `RemoveIfOwnedAsync<T>(handle, owner, ct)`, not the tenant-wide `RemoveIfOwnedAsync`**: it deletes only a key this owner's own upload composed. Without it, user X pointing `ImageUrl` at user Y's avatar and then replacing their own deleted Y's bytes — the tenant did own that key.
+
+Old rows keep whatever they hold (arbitrary URLs, pre-#78 flat keys, pre-#83 keys with no owner segment); reads still return them, the first replace/remove **skips and logs** them instead of deleting, and the column is then overwritten with a server-issued value. There is no migration and no backfill. The owner is composed by the block (`TenantStorageKeyRules.ComposePublicAsset`) and sanitized to a single segment, so a caller cannot widen what a delete matches.
 
 **Never write `tenants/` or `uploads/` into a key, and never interpolate a tenant id into one.** `Architecture.Tests/StorageKeyOwnershipTests` scans production sources for both. `StorageKeyBuilder` (Files) builds the relative part only.
 
@@ -39,7 +47,7 @@ var key = storage.ComposeKey(StorageSpace.Private, $"{ownerType}/{yyyy}/{MM}/{id
 
 **No ambient tenant → `MissingStorageTenantException`.** There is no fallback and no tenant-less space. Work outside a request (jobs, fan-outs, anything at startup) must enter the tenant through `ITenantScope` first, as the Files purge jobs do — and so must a test that pokes storage directly.
 
-**Deleting what you replaced:** use `RemoveIfOwnedAsync`, not `RemoveAsync`. Columns like `AppUser.ImageUrl` and `TenantTheme.LogoUrl` hold a URL a user may have pasted, or a key from before this rule; those are skipped and logged rather than turned into a 500. `RemoveAsync` is strict and throws.
+**Deleting what you replaced:** use `RemoveIfOwnedAsync`, not `RemoveAsync` — and for anything `UploadAsync` wrote, the **owner-scoped `RemoveIfOwnedAsync<T>(handle, owner, ct)`** (above). Columns like `AppUser.ImageUrl` and `TenantTheme.LogoUrl` may still hold a URL a user pasted before #83, or a key from before this rule; those are skipped and logged rather than turned into a 500. `RemoveAsync` is strict and throws.
 
 Still true, and still worth doing: never pass a caller-supplied string to `DownloadAsync`/`GenerateDownloadUrlAsync` — look the key up from a tenant-filtered row first, as the Files module does. The block is the floor, not the plan.
 

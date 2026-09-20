@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, Fingerprint, UserCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/auth/use-auth";
-import { getMyProfile, setProfileImage, updateMyProfile } from "@/api/identity";
+import { getMyProfile, updateMyProfile } from "@/api/identity";
 import { ApiRequestError } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -118,16 +118,6 @@ export function ProfileSettings() {
     onError: imageError,
   });
 
-  /** "Paste URL" mode: an image the user hosts elsewhere, persisted as-is. */
-  const imageUrlMutation = useMutation({
-    mutationFn: (url: string) => setProfileImage(url),
-    onSuccess: () => {
-      toast.success("Profile image updated");
-      queryClient.invalidateQueries({ queryKey: PROFILE_KEY });
-    },
-    onError: imageError,
-  });
-
   return (
     <form onSubmit={onSubmit} className="space-y-5 app-enter">
       {profileQuery.isError && (
@@ -144,17 +134,13 @@ export function ProfileSettings() {
       <SettingsSection
         title="Photo"
         icon={Camera}
-        description="Shown in the topbar and on your activity. Square crops work best — JPG, PNG, or WebP."
+        description="Shown in the topbar and on your activity. Square crops work best — upload a JPG, PNG or ICO; the server stores it and hands back its address."
       >
         <ImageInput
           value={profile?.imageUrl ?? ""}
           onUpload={(image) => uploadMutation.mutate(image)}
-          onChange={(next) =>
-            next.length > 0 ? imageUrlMutation.mutate(next) : clearMutation.mutate()
-          }
-          busy={
-            uploadMutation.isPending || clearMutation.isPending || imageUrlMutation.isPending
-          }
+          onRemove={() => clearMutation.mutate()}
+          busy={uploadMutation.isPending || clearMutation.isPending}
           shape="circle"
         />
       </SettingsSection>

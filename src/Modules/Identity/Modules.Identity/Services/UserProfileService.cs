@@ -85,14 +85,15 @@ internal sealed class UserProfileService(
         // image is optional: text-only edits forward a null FileUploadRequest, so guard before
         // dereferencing Data or the common no-image update path NREs.
         //
-        // The previous value is dropped with RemoveIfOwnedAsync, not RemoveAsync: ImageUrl is a URL
-        // column, and what is in it may not be one of this tenant's keys at all — PUT
-        // /identity/profile/image lets a user store any URL, and a development database predating
-        // tenant-prefixed keys still holds flat `uploads/{type}/…` values. Neither is ours to
-        // delete, and neither should turn saving a profile into a 500.
+        // The previous value is dropped with the OWNER-scoped RemoveIfOwnedAsync<AppUser> (#83), not
+        // the tenant-wide one: tenant ownership cannot tell this user's avatar from the user's at the
+        // next desk, and before the URL input was removed a caller could put someone else's avatar in
+        // this column precisely so that the next replace would delete it. What this skips over — a
+        // legacy row holding a pasted URL, or a key from before the owner segment — is logged, not
+        // thrown, so an old row still saves and is then overwritten with a server-issued value.
         if (image?.Data != null)
         {
-            var imageString = await storageService.UploadAsync<AppUser>(image, FileType.Image, cancellationToken);
+            var imageString = await storageService.UploadAsync<AppUser>(image, FileType.Image, user.Id, cancellationToken);
             user.ImageUrl = new Uri(imageString, UriKind.RelativeOrAbsolute);
 
             // Unconditionally, not `if (deleteCurrentImage)`: the validator rejects a request that
@@ -102,12 +103,12 @@ internal sealed class UserProfileService(
             // TenantThemeService has always done for a brand asset.
             if (imageUri != null)
             {
-                await storageService.RemoveIfOwnedAsync(imageUri.ToString(), cancellationToken);
+                await storageService.RemoveIfOwnedAsync<AppUser>(imageUri.ToString(), user.Id, cancellationToken);
             }
         }
         else if (deleteCurrentImage && imageUri != null)
         {
-            await storageService.RemoveIfOwnedAsync(imageUri.ToString(), cancellationToken);
+            await storageService.RemoveIfOwnedAsync<AppUser>(imageUri.ToString(), user.Id, cancellationToken);
             user.ImageUrl = null;
         }
 
@@ -126,25 +127,6 @@ internal sealed class UserProfileService(
         {
             throw new CustomException("Update profile failed");
         }
-    }
-
-    public async Task SetImageUrlAsync(string userId, string? imageUrl, CancellationToken cancellationToken)
-    {
-        EnsureValidTenant();
-        var user = await userManager.FindByIdAsync(userId)
-            ?? throw new NotFoundException("user not found");
-
-        user.ImageUrl = string.IsNullOrWhiteSpace(imageUrl)
-            ? null
-            : new Uri(imageUrl, UriKind.RelativeOrAbsolute);
-
-        var result = await userManager.UpdateAsync(user);
-        if (!result.Succeeded)
-        {
-            throw new CustomException("Update profile image failed");
-        }
-
-        await signInManager.RefreshSignInAsync(user);
     }
 
     public async Task<bool> ExistsWithEmailAsync(string email, string? exceptId = null, CancellationToken cancellationToken = default)

@@ -96,14 +96,11 @@ export async function resendUserConfirmationEmail(userId: string): Promise<void>
   );
 }
 
-/**
- * Persist an avatar URL the user hosts elsewhere (the picker's "Paste URL" mode); pass null to
- * clear. Uploaded avatars do NOT come through here — they ride on `updateMyProfile({ image })`,
- * which stores the bytes under `uploads/` and derives the durable URL server-side.
- */
-export async function setProfileImage(imageUrl: string | null): Promise<void> {
-  unwrapVoid(await api.PUT("/api/v1/identity/profile/image", { body: { imageUrl } }));
-}
+// There is no `setProfileImage(url)` any more (#83). PUT /identity/profile/image accepted any
+// string, so a user could point their avatar at another user's — and the next replace deleted that
+// other user's object, which the tenant legitimately owned. An avatar is now uploaded with
+// `updateMyProfile({ image })` and cleared with `updateMyProfile({ deleteCurrentImage: true })`;
+// the URL is the server's answer, never the client's request.
 
 /**
  * The signed-in user's effective permissions. The JWT carries only role names;

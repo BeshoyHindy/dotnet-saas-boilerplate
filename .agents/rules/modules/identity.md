@@ -17,6 +17,12 @@ Auth (JWT + ASP.NET Identity), users, roles, permissions, sessions, impersonatio
 
 `ChangePassword`/`Update`/`Delete` etc. flow facade → service → EF/UserManager. `CancellationToken` is `= default` on these interfaces and propagated into EF sinks (note: `UserManager`/`RoleManager` have no CT overloads, so private helpers that only call them don't take one).
 
+## Avatars: the client never names one (#83)
+
+`AppUser.ImageUrl` holds **only a URL this server issued for this user**. `PUT /identity/profile` takes the bytes (`image`) or the removal flag (`deleteCurrentImage`) and writes the column from what `IStorageService.UploadAsync<AppUser>(…, owner: user.Id, …)` returns; the old `PUT /identity/profile/image`, which accepted any string up to 2048 characters, is **gone**, and so is `IUserProfileService.SetImageUrlAsync`. Don't add either back — a column a client can name is a column that can name another user's avatar.
+
+The avatar's object key carries the user id (`uploads/tenants/{t}/appuser/{userId}/…`) and the replace/remove path calls the owner-scoped `RemoveIfOwnedAsync<AppUser>(old, user.Id, ct)`, so one user's avatar change can never delete another's object — the tenant owns both keys, which is exactly why tenant scoping was not enough. A row still holding an arbitrary URL is skipped and logged on that first delete, then overwritten. See `storage.md`.
+
 ## Permission gating footgun
 
 `RequiredPermissionAttribute` implements `Boilerplate.BuildingBlocks.Shared.Identity.Authorization.IRequiredPermissionMetadata`. **Never let a second/duplicate `IRequiredPermissionMetadata` appear** — it silently disables **all** `.RequirePermission()` gates across the app. Permission constants live in `Shared/Identity/*Permissions.cs`.

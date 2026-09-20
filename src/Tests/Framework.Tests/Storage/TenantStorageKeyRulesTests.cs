@@ -85,6 +85,86 @@ public sealed class TenantStorageKeyRulesTests
 
     #endregion
 
+    #region Public assets carry their owner (#83)
+
+    [Fact]
+    public void ComposePublicAsset_Should_PutTheOwnerBetweenTheTypeAndTheFile()
+    {
+        var key = TenantStorageKeyRules.ComposePublicAsset("acme", "AppUser", "USER-1", "My Avatar.png");
+
+        key.ShouldStartWith("uploads/tenants/acme/appuser/user-1/");
+        key.ShouldEndWith("_My_Avatar.png");
+        TenantStorageKeyRules.TryAuthorize("acme", key, out _).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ComposePublicAsset_Should_GiveEachCallItsOwnObject()
+    {
+        var first = TenantStorageKeyRules.ComposePublicAsset("acme", "AppUser", "user-1", "a.png");
+        var second = TenantStorageKeyRules.ComposePublicAsset("acme", "AppUser", "user-1", "a.png");
+
+        first.ShouldNotBe(second);
+    }
+
+    [Theory]
+    [InlineData("..")]
+    [InlineData(".")]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ComposePublicAsset_Should_Refuse_AnOwnerThatIsNotASegmentAtAll(string owner)
+    {
+        Should.Throw<ArgumentException>(
+            () => TenantStorageKeyRules.ComposePublicAsset("acme", "AppUser", owner, "a.png"));
+    }
+
+    [Fact]
+    public void ComposePublicAsset_Should_CollapseAnOwnerToOneSegment_NeverNestOrEscape()
+    {
+        // The owner is always the server's own value (a user id, an asset slot), but it decides what
+        // a later delete may match, so it gets no say in the key's shape: separators are replaced
+        // rather than honoured, which makes a widened prefix impossible rather than merely unlikely.
+        var key = TenantStorageKeyRules.ComposePublicAsset("acme", "AppUser", "user-1/../user-2", "a.png");
+
+        key.ShouldStartWith("uploads/tenants/acme/appuser/user-1-..-user-2/");
+        TenantStorageKeyRules.TryAuthorizeOwnedAsset("acme", "AppUser", "user-1", key, out _).ShouldBeFalse();
+        TenantStorageKeyRules.TryAuthorizeOwnedAsset("acme", "AppUser", "user-2", key, out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void TryAuthorizeOwnedAsset_Should_Accept_OnlyTheOwnersOwnObjects()
+    {
+        var mine = TenantStorageKeyRules.ComposePublicAsset("acme", "AppUser", "user-1", "a.png");
+        var theirs = TenantStorageKeyRules.ComposePublicAsset("acme", "AppUser", "user-2", "a.png");
+
+        TenantStorageKeyRules.TryAuthorizeOwnedAsset("acme", "AppUser", "user-1", mine, out var key).ShouldBeTrue();
+        key.ShouldBe(mine);
+
+        // Tenant-wide ownership says yes to the other user's key — that is exactly the gap this
+        // closes, so the owner-scoped answer must be no.
+        TenantStorageKeyRules.TryAuthorize("acme", theirs, out _).ShouldBeTrue();
+        TenantStorageKeyRules.TryAuthorizeOwnedAsset("acme", "AppUser", "user-1", theirs, out var refused).ShouldBeFalse();
+        refused.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("https://cdn.example.com/avatars/me.png")]        // an arbitrary URL from an old row
+    [InlineData("uploads/appuser/legacy_avatar.png")]             // pre-#78 flat key
+    [InlineData("uploads/tenants/acme/appuser/pre-owner.png")]    // pre-#83 key: no owner segment
+    [InlineData("uploads/tenants/acme/tenanttheme/logo/x.png")]   // another owner type entirely
+    [InlineData("uploads/tenants/globex/appuser/user-1/x.png")]   // another tenant
+    [InlineData("tenants/acme/myfiles/2026/09/ab/x.pdf")]         // the private space
+    [InlineData("uploads/tenants/acme/appuser/user-10/x.png")]    // owner ours is a prefix of
+    [InlineData(null)]
+    [InlineData("")]
+    public void TryAuthorizeOwnedAsset_Should_Refuse(string? candidate)
+    {
+        TenantStorageKeyRules.TryAuthorizeOwnedAsset("acme", "AppUser", "user-1", candidate, out var key)
+            .ShouldBeFalse();
+        key.ShouldBeEmpty();
+    }
+
+    #endregion
+
     #region Ownership
 
     [Theory]

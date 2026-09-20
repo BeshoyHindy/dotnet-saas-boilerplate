@@ -21,6 +21,9 @@ public sealed class S3StorageServiceTests
     private const string Bucket = "test-bucket";
     private const string ServiceUrl = "http://minio:9000";
 
+    /// <summary>The owner an upload belongs to inside the tenant — a user id, an asset slot (#83).</summary>
+    private const string Owner = "owner-1";
+
     private readonly IAmazonS3 _s3 = Substitute.For<IAmazonS3>();
     private readonly AmbientTenantStorageKeys _keys = new("acme");
 
@@ -52,14 +55,14 @@ public sealed class S3StorageServiceTests
     {
         var sut = Create();
 
-        var url = await sut.UploadAsync<Probe>(PngRequest(), FileType.Image);
+        var url = await sut.UploadAsync<Probe>(PngRequest(), FileType.Image, Owner);
 
         var put = _s3.ReceivedCalls()
             .Select(c => c.GetArguments()[0])
             .OfType<PutObjectRequest>()
             .Single();
 
-        put.Key.ShouldStartWith("uploads/tenants/acme/probe/");
+        put.Key.ShouldStartWith("uploads/tenants/acme/probe/owner-1/");
         put.Key.ShouldEndWith("_avatar.png");
         url.ShouldBe($"{ServiceUrl}/{Bucket}/{put.Key}");
     }
@@ -69,9 +72,9 @@ public sealed class S3StorageServiceTests
     {
         var sut = Create();
 
-        await sut.UploadAsync<Probe>(PngRequest(), FileType.Image);
+        await sut.UploadAsync<Probe>(PngRequest(), FileType.Image, Owner);
         _keys.Current = "globex";
-        await sut.UploadAsync<Probe>(PngRequest(), FileType.Image);
+        await sut.UploadAsync<Probe>(PngRequest(), FileType.Image, Owner);
 
         var keys = _s3.ReceivedCalls()
             .Select(c => c.GetArguments()[0])
@@ -104,7 +107,7 @@ public sealed class S3StorageServiceTests
         var request = PngRequest();
         request.ContentType = "text/html";
 
-        await sut.UploadAsync<Probe>(request, FileType.Image);
+        await sut.UploadAsync<Probe>(request, FileType.Image, Owner);
 
         var put = _s3.ReceivedCalls()
             .Select(c => c.GetArguments()[0])
@@ -186,7 +189,7 @@ public sealed class S3StorageServiceTests
         // Before #78 that bucket segment survived into the key and the delete quietly hit nothing,
         // which is why replacing an avatar left the old object behind.
         var sut = Create();
-        var url = await sut.UploadAsync<Probe>(PngRequest(), FileType.Image);
+        var url = await sut.UploadAsync<Probe>(PngRequest(), FileType.Image, Owner);
 
         await sut.RemoveAsync(url);
 
@@ -300,16 +303,51 @@ public sealed class S3StorageServiceTests
     }
 
     [Fact]
+    public async Task RemoveIfOwnedAsyncOfT_Should_Refuse_AnotherOwnersObject_AndDelete_ItsOwn()
+    {
+        // Same tenant, two owners. The tenant-wide overload cannot tell them apart — inside one
+        // tenant both keys are "ours" — so the owner-scoped one is what stands between a user
+        // replacing their avatar and a user deleting someone else's (#83).
+        var sut = Create();
+        var theirs = await sut.UploadAsync<Probe>(PngRequest(), FileType.Image, "user-b");
+        var mine = await sut.UploadAsync<Probe>(PngRequest(), FileType.Image, "user-a");
+        var mineKey = _s3.ReceivedCalls()
+            .Select(c => c.GetArguments()[0]).OfType<PutObjectRequest>().Last().Key;
+
+        (await sut.RemoveIfOwnedAsync<Probe>(theirs, "user-a")).ShouldBeFalse();
+        await _s3.DidNotReceive().DeleteObjectAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+
+        (await sut.RemoveIfOwnedAsync<Probe>(mine, "user-a")).ShouldBeTrue();
+        await _s3.Received(1).DeleteObjectAsync(Bucket, mineKey, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RemoveIfOwnedAsyncOfT_Should_Skip_AnArbitraryUrl_AndAPreOwnerKey_WithoutCallingS3()
+    {
+        var sut = Create();
+
+        (await sut.RemoveIfOwnedAsync<Probe>("https://cdn.example.com/avatars/me.png", Owner)).ShouldBeFalse();
+        (await sut.RemoveIfOwnedAsync<Probe>("uploads/tenants/acme/probe/pre-owner.png", Owner)).ShouldBeFalse();
+        (await sut.RemoveIfOwnedAsync<Probe>("uploads/tenants/globex/probe/owner-1/x.png", Owner)).ShouldBeFalse();
+        (await sut.RemoveIfOwnedAsync<Probe>(null, Owner)).ShouldBeFalse();
+
+        _s3.ReceivedCalls().ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task EveryOperation_Should_Throw_When_ThereIsNoAmbientTenant()
     {
         var sut = Create();
         _keys.Current = null;
 
         await Should.ThrowAsync<MissingStorageTenantException>(
-            () => sut.UploadAsync<Probe>(PngRequest(), FileType.Image));
+            () => sut.UploadAsync<Probe>(PngRequest(), FileType.Image, Owner));
         await Should.ThrowAsync<MissingStorageTenantException>(() => sut.ExistsAsync("tenants/acme/x.png"));
         await Should.ThrowAsync<MissingStorageTenantException>(() => sut.RemoveAsync("tenants/acme/x.png"));
         await Should.ThrowAsync<MissingStorageTenantException>(() => sut.RemoveIfOwnedAsync("tenants/acme/x.png"));
+        await Should.ThrowAsync<MissingStorageTenantException>(
+            () => sut.RemoveIfOwnedAsync<Probe>("uploads/tenants/acme/probe/owner-1/x.png", Owner));
         Should.Throw<MissingStorageTenantException>(() => sut.ComposeKey(StorageSpace.Private, "x.png"));
 
         _s3.ReceivedCalls().ShouldBeEmpty();

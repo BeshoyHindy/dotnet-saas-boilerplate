@@ -20,9 +20,10 @@ public interface ITenantThemeService
     Task<TenantThemeDto> GetDefaultThemeAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// Updates the theme for the specified tenant.
+    /// Updates the theme for the specified tenant. Takes the <b>write</b> model: brand assets arrive
+    /// as bytes to upload or a flag to remove, never as a URL (#83).
     /// </summary>
-    Task UpdateThemeAsync(string tenantId, TenantThemeDto theme, CancellationToken ct = default);
+    Task UpdateThemeAsync(string tenantId, TenantThemeUpdateDto theme, CancellationToken ct = default);
 
     /// <summary>
     /// Resets the theme for the specified tenant to defaults.

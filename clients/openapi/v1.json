@@ -312,7 +312,7 @@
         ],
         "type": "object"
       },
-      "BrandAssetsDto": {
+      "BrandAssetUploadsDto": {
         "properties": {
           "deleteFavicon": {
             "type": "boolean"
@@ -333,12 +333,6 @@
               }
             ]
           },
-          "faviconUrl": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
           "logo": {
             "oneOf": [
               {
@@ -357,6 +351,17 @@
               {
                 "$ref": "#/components/schemas/FileUploadRequest"
               }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "BrandAssetsDto": {
+        "properties": {
+          "faviconUrl": {
+            "type": [
+              "null",
+              "string"
             ]
           },
           "logoDarkUrl": {
@@ -1625,20 +1630,6 @@
           null
         ]
       },
-      "SetProfileImageCommand": {
-        "properties": {
-          "imageUrl": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        },
-        "required": [
-          "imageUrl"
-        ],
-        "type": "object"
-      },
       "StartImpersonationCommand": {
         "properties": {
           "durationMinutes": {
@@ -1916,6 +1907,26 @@
           },
           "isDefault": {
             "type": "boolean"
+          },
+          "layout": {
+            "$ref": "#/components/schemas/LayoutDto"
+          },
+          "lightPalette": {
+            "$ref": "#/components/schemas/PaletteDto"
+          },
+          "typography": {
+            "$ref": "#/components/schemas/TypographyDto"
+          }
+        },
+        "type": "object"
+      },
+      "TenantThemeUpdateDto": {
+        "properties": {
+          "brandAssets": {
+            "$ref": "#/components/schemas/BrandAssetUploadsDto"
+          },
+          "darkPalette": {
+            "$ref": "#/components/schemas/PaletteDto"
           },
           "layout": {
             "$ref": "#/components/schemas/LayoutDto"
@@ -4225,42 +4236,6 @@
         ]
       }
     },
-    "/api/v1/identity/profile/image": {
-      "put": {
-        "description": "Persists a durable image URL on the current user's profile. Typically called after the Files module's presigned-upload flow returns a publicUrl. Pass a null/empty body to clear.",
-        "operationId": "SetProfileImage",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SetProfileImageCommand"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "204": {
-            "description": "No Content"
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ],
-        "summary": "Set the authenticated user's avatar URL",
-        "tags": [
-          "Identity"
-        ]
-      }
-    },
     "/api/v1/identity/register": {
       "post": {
         "description": "Create a new user account.",
@@ -5762,13 +5737,13 @@
         ]
       },
       "put": {
-        "description": "Update the theme settings for the current tenant, including colors, typography, and layout.",
+        "description": "Update the theme settings for the current tenant: colors, typography, layout, and the brand assets. A brand asset is uploaded as bytes or removed with its delete flag — the asset URLs are response-only, so a client cannot point one at an object the server did not issue for that asset.",
         "operationId": "UpdateTenantTheme",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TenantThemeDto"
+                "$ref": "#/components/schemas/TenantThemeUpdateDto"
               }
             }
           },

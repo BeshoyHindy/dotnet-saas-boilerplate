@@ -23,13 +23,19 @@ public interface IStorageService
 {
     /// <summary>
     /// Writes <paramref name="request"/> into the <see cref="StorageSpace.Public"/> space as
-    /// <c>uploads/tenants/{tenantId}/{typeName}/{guid}_{file}</c> and returns the durable unsigned
-    /// URL for it (see <see cref="BuildPublicUrl"/>) — what <c>AppUser.ImageUrl</c> and
+    /// <c>uploads/tenants/{tenantId}/{typeName}/{owner}/{guid}_{file}</c> and returns the durable
+    /// unsigned URL for it (see <see cref="BuildPublicUrl"/>) — what <c>AppUser.ImageUrl</c> and
     /// <c>TenantTheme</c>'s brand-asset columns persist.
+    ///
+    /// <para><paramref name="owner"/> names <b>who inside the tenant</b> the object belongs to: the
+    /// user id for an avatar, the asset slot for a brand asset. It is mandatory because every public
+    /// asset has one, and because <see cref="RemoveIfOwnedAsync{T}"/> — the only way the object is
+    /// ever deleted — decides what it may delete from exactly this segment (#83).</para>
     /// </summary>
     Task<string> UploadAsync<T>(
         FileUploadRequest request,
         FileType fileType,
+        string owner,
         CancellationToken cancellationToken = default) where T : class;
 
     /// <summary>
@@ -67,11 +73,33 @@ public interface IStorageService
     /// delete was attempted.
     ///
     /// <para>The handle being skipped is the realistic one: a development database written before
-    /// keys carried a tenant still holds flat <c>uploads/{typeName}/…</c> values, and
-    /// <c>PUT /identity/profile/image</c> lets a user store any URL at all. Neither should turn a
-    /// profile save into a 500, and neither is ours to delete.</para>
+    /// keys carried a tenant still holds flat <c>uploads/{typeName}/…</c> values, and a row written
+    /// before #83 may hold whatever URL a user once pasted. Neither should turn a profile save into
+    /// a 500, and neither is ours to delete.</para>
+    ///
+    /// <para><b>This tenant-wide check is not the one an avatar or brand asset wants</b> — use the
+    /// owner-scoped overload below. Inside a tenant, another user's avatar is a key this tenant
+    /// owns.</para>
     /// </summary>
     Task<bool> RemoveIfOwnedAsync(string? storedHandle, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// <see cref="RemoveIfOwnedAsync"/> narrowed to one owner inside the tenant: deletes
+    /// <paramref name="storedHandle"/> only when it is a key <see cref="UploadAsync{T}"/> composed
+    /// for this same <typeparamref name="T"/> and <paramref name="owner"/>, and otherwise skips and
+    /// logs. Returns whether a delete was attempted.
+    ///
+    /// <para><b>Use this, not the tenant-wide overload, for anything <c>UploadAsync</c> wrote</b>
+    /// (#83). Tenant ownership is not enough for a column a user controls: inside one tenant, a
+    /// persisted value pointing at <i>another</i> user's avatar is a key this tenant does own, so the
+    /// tenant-wide delete would happily remove it. The two values this skips over are the ones that
+    /// exist in the wild — a row written before the server stopped accepting URLs, and a key from
+    /// before the owner segment — and neither is this owner's to delete.</para>
+    /// </summary>
+    Task<bool> RemoveIfOwnedAsync<T>(
+        string? storedHandle,
+        string owner,
+        CancellationToken cancellationToken = default) where T : class;
 
     /// <summary>
     /// Mint a short-lived presigned PUT URL the browser uses to upload bytes directly to S3-compatible storage.

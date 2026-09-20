@@ -11,6 +11,12 @@ public sealed class LocalStorageServiceTests : IDisposable
 {
     private sealed class Probe { }
 
+    /// <summary>
+    /// The owner every upload here belongs to — a user id for an avatar, an asset slot for a brand
+    /// asset (#83). It becomes a segment of the key, which is what lets a delete be owner-scoped.
+    /// </summary>
+    private const string Owner = "owner-1";
+
     private readonly string _root;
     private readonly AmbientTenantStorageKeys _keys = new("acme");
     private readonly LocalStorageService _sut;
@@ -44,11 +50,11 @@ public sealed class LocalStorageServiceTests : IDisposable
         var request = PngRequest();
 
         // Act
-        var path = await _sut.UploadAsync<Probe>(request, FileType.Image);
+        var path = await _sut.UploadAsync<Probe>(request, FileType.Image, Owner);
 
-        // Assert — `uploads/` stays outermost (it is what the deploy bucket policy publishes) and
-        // the tenant is a directory level inside it.
-        path.ShouldStartWith("uploads/tenants/acme/probe/");
+        // Assert — `uploads/` stays outermost (it is what the deploy bucket policy publishes), the
+        // tenant is a directory level inside it, and the owner is a level inside that (#83).
+        path.ShouldStartWith("uploads/tenants/acme/probe/owner-1/");
         path.ShouldContain("_avatar.png");
         path.ShouldNotContain("\\");
         File.Exists(Path.Combine(_root, path.Replace('/', Path.DirectorySeparatorChar))).ShouldBeTrue();
@@ -57,10 +63,10 @@ public sealed class LocalStorageServiceTests : IDisposable
     [Fact]
     public async Task UploadAsync_Should_ProduceDifferentPaths_When_TwoTenantsUploadTheSameFile()
     {
-        var acme = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image);
+        var acme = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image, Owner);
 
         _keys.Current = "globex";
-        var globex = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image);
+        var globex = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image, Owner);
 
         acme.ShouldStartWith("uploads/tenants/acme/");
         globex.ShouldStartWith("uploads/tenants/globex/");
@@ -73,7 +79,7 @@ public sealed class LocalStorageServiceTests : IDisposable
         var request = PngRequest();
 
         // Act
-        var path = await _sut.UploadAsync<Probe>(request, FileType.Image);
+        var path = await _sut.UploadAsync<Probe>(request, FileType.Image, Owner);
         var exists = await _sut.ExistsAsync(path);
         var size = await _sut.GetSizeAsync(path);
         var download = await _sut.DownloadAsync(path);
@@ -97,7 +103,7 @@ public sealed class LocalStorageServiceTests : IDisposable
         var request = PngRequest();
         request.ContentType = "text/html";
 
-        var path = await _sut.UploadAsync<Probe>(request, FileType.Image);
+        var path = await _sut.UploadAsync<Probe>(request, FileType.Image, Owner);
         var download = await _sut.DownloadAsync(path);
 
         download!.ContentType.ShouldBe("image/png");
@@ -108,7 +114,7 @@ public sealed class LocalStorageServiceTests : IDisposable
     public async Task RemoveAsync_Should_DeleteFile_When_FileExists()
     {
         // Arrange
-        var path = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image);
+        var path = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image, Owner);
         var diskPath = path.Replace('/', Path.DirectorySeparatorChar);
 
         // Act — a backslash-separated form of the same key still resolves (Windows callers).
@@ -123,7 +129,7 @@ public sealed class LocalStorageServiceTests : IDisposable
     {
         // What AppUser.ImageUrl and TenantTheme persist is BuildPublicUrl's output, not the key.
         // Mapping it back is the block's job; a caller must not have to.
-        var path = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image);
+        var path = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image, Owner);
         var url = _sut.BuildPublicUrl(path);
 
         url.ShouldBe($"/{path}");
@@ -136,7 +142,7 @@ public sealed class LocalStorageServiceTests : IDisposable
     public async Task HeadObjectAsync_Should_ReturnMetadata_When_FileExists()
     {
         // Arrange
-        var path = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image);
+        var path = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image, Owner);
 
         // Act
         var metadata = await _sut.HeadObjectAsync(path);
@@ -164,7 +170,7 @@ public sealed class LocalStorageServiceTests : IDisposable
     public async Task EveryKeyTakingOperation_Should_Refuse_AnotherTenantsRealKey()
     {
         // Arrange — tenant A stores a file, then tenant B comes along holding its exact key.
-        var key = await _sut.UploadAsync<Probe>(PngRequest("secret.png"), FileType.Image);
+        var key = await _sut.UploadAsync<Probe>(PngRequest("secret.png"), FileType.Image, Owner);
         var diskPath = Path.Combine(_root, key.Replace('/', Path.DirectorySeparatorChar));
         _keys.Current = "globex";
 
@@ -217,12 +223,79 @@ public sealed class LocalStorageServiceTests : IDisposable
     [Fact]
     public async Task RemoveIfOwnedAsync_Should_Delete_When_TheHandleIsOurs()
     {
-        var key = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image);
+        var key = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image, Owner);
 
         (await _sut.RemoveIfOwnedAsync(_sut.BuildPublicUrl(key))).ShouldBeTrue();
 
         (await _sut.ExistsAsync(key)).ShouldBeFalse();
     }
+
+    #endregion
+
+    #region Owner scoping inside one tenant (#83)
+
+    [Fact]
+    public async Task UploadAsync_Should_GiveTwoOwnersSeparatePrefixes_When_TheyUploadTheSameFile()
+    {
+        var mine = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image, "user-a");
+        var theirs = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image, "user-b");
+
+        mine.ShouldStartWith("uploads/tenants/acme/probe/user-a/");
+        theirs.ShouldStartWith("uploads/tenants/acme/probe/user-b/");
+    }
+
+    [Fact]
+    public async Task RemoveIfOwnedAsyncOfT_Should_Refuse_AnotherOwnersObject_InTheSameTenant()
+    {
+        // The hole #83 closes. Tenant ownership says yes to this key — it is this tenant's — so the
+        // tenant-wide overload would delete it. Inside one tenant that is the difference between
+        // "replace my avatar" and "delete the avatar of whoever I named".
+        var theirs = await _sut.UploadAsync<Probe>(PngRequest("theirs.png"), FileType.Image, "user-b");
+
+        (await _sut.RemoveIfOwnedAsync<Probe>(theirs, "user-a")).ShouldBeFalse();
+
+        (await _sut.ExistsAsync(theirs)).ShouldBeTrue("another owner's bytes must survive");
+        (await _sut.RemoveIfOwnedAsync(theirs)).ShouldBeTrue("…while the tenant-wide overload would have deleted them");
+    }
+
+    [Fact]
+    public async Task RemoveIfOwnedAsyncOfT_Should_Delete_TheOwnersOwnObject_ByKeyOrByPersistedUrl()
+    {
+        var byKey = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image, Owner);
+        (await _sut.RemoveIfOwnedAsync<Probe>(byKey, Owner)).ShouldBeTrue();
+        (await _sut.ExistsAsync(byKey)).ShouldBeFalse();
+
+        var byUrl = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image, Owner);
+        (await _sut.RemoveIfOwnedAsync<Probe>(_sut.BuildPublicUrl(byUrl), Owner)).ShouldBeTrue();
+        (await _sut.ExistsAsync(byUrl)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task RemoveIfOwnedAsyncOfT_Should_Skip_TheValuesAnExistingRowMayHold()
+    {
+        // No migration backfills these (#83): the first replace or remove leaves them alone and the
+        // column is then overwritten with a server-issued value.
+        (await _sut.RemoveIfOwnedAsync<Probe>("https://cdn.example.com/avatars/me.png", Owner)).ShouldBeFalse();
+        (await _sut.RemoveIfOwnedAsync<Probe>("uploads/probe/legacy_avatar.png", Owner)).ShouldBeFalse();
+        (await _sut.RemoveIfOwnedAsync<Probe>("uploads/tenants/acme/probe/pre-owner.png", Owner)).ShouldBeFalse();
+        (await _sut.RemoveIfOwnedAsync<Probe>("tenants/globex/probe/theirs.png", Owner)).ShouldBeFalse();
+        (await _sut.RemoveIfOwnedAsync<Probe>(null, Owner)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task RemoveIfOwnedAsyncOfT_Should_Refuse_AnOwnerSegmentThatTriesToWidenTheMatch()
+    {
+        // A separator inside the owner would make the prefix match more than the owner's own
+        // objects; the key grammar has no character to express one, so it is sanitized away.
+        var key = await _sut.UploadAsync<Probe>(PngRequest(), FileType.Image, "user-a");
+
+        (await _sut.RemoveIfOwnedAsync<Probe>(key, "user-a/../user-b")).ShouldBeFalse();
+        (await _sut.ExistsAsync(key)).ShouldBeTrue();
+    }
+
+    #endregion
+
+    #region Cross-tenant refusal, continued
 
     [Fact]
     public async Task EveryOperation_Should_Throw_When_ThereIsNoAmbientTenant()
@@ -231,10 +304,12 @@ public sealed class LocalStorageServiceTests : IDisposable
         _keys.Current = null;
 
         await Should.ThrowAsync<MissingStorageTenantException>(
-            () => _sut.UploadAsync<Probe>(PngRequest(), FileType.Image));
+            () => _sut.UploadAsync<Probe>(PngRequest(), FileType.Image, Owner));
         await Should.ThrowAsync<MissingStorageTenantException>(() => _sut.ExistsAsync("tenants/acme/x.png"));
         await Should.ThrowAsync<MissingStorageTenantException>(() => _sut.RemoveAsync("tenants/acme/x.png"));
         await Should.ThrowAsync<MissingStorageTenantException>(() => _sut.RemoveIfOwnedAsync("tenants/acme/x.png"));
+        await Should.ThrowAsync<MissingStorageTenantException>(
+            () => _sut.RemoveIfOwnedAsync<Probe>("uploads/tenants/acme/probe/owner-1/x.png", Owner));
         Should.Throw<MissingStorageTenantException>(() => _sut.ComposeKey(StorageSpace.Private, "x.png"));
     }
 
@@ -320,7 +395,7 @@ public sealed class LocalStorageServiceTests : IDisposable
 
         // Act & Assert
         await Should.ThrowAsync<InvalidOperationException>(() =>
-            _sut.UploadAsync<Probe>(request, FileType.Image));
+            _sut.UploadAsync<Probe>(request, FileType.Image, Owner));
     }
 
     [Fact]
@@ -336,7 +411,7 @@ public sealed class LocalStorageServiceTests : IDisposable
 
         // Act & Assert
         await Should.ThrowAsync<InvalidOperationException>(() =>
-            _sut.UploadAsync<Probe>(request, FileType.Image));
+            _sut.UploadAsync<Probe>(request, FileType.Image, Owner));
     }
 
     [Fact]
