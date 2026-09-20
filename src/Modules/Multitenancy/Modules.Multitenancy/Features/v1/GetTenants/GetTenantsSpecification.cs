@@ -15,7 +15,6 @@ internal sealed class GetTenantsSpecification : Specification<AppTenantInfo, Ten
         {
             ["id"] = t => t.Id!,
             ["name"] = t => t.Name!,
-            ["connectionstring"] = t => t.ConnectionString!,
             ["adminemail"] = t => t.AdminEmail!,
             ["isactive"] = t => t.IsActive,
             ["validupto"] = t => t.ValidUpto,
@@ -31,7 +30,6 @@ internal sealed class GetTenantsSpecification : Specification<AppTenantInfo, Ten
         {
             Id = t.Id!,
             Name = t.Name!,
-            ConnectionString = t.ConnectionString,
             AdminEmail = t.AdminEmail!,
             IsActive = t.IsActive,
             ValidUpto = t.ValidUpto,

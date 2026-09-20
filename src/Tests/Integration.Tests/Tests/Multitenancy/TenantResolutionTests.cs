@@ -327,7 +327,6 @@ public sealed class TenantResolutionTests : IAsyncLifetime
         {
             id = tenantId,
             name = $"TRES {tenantId}",
-            connectionString = (string?)null,
             adminEmail,
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer",

@@ -121,7 +121,6 @@ public sealed class FileTenantIsolationTests
         {
             id = tenantId,
             name = $"Tenant {tenantId}",
-            connectionString = (string?)null,
             adminEmail,
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer"

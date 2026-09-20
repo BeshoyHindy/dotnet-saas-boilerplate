@@ -21,7 +21,6 @@ public sealed class TenantService : ITenantService
 {
     private readonly IMultiTenantStore<AppTenantInfo> _tenantStore;
     private readonly ITenantScope _tenantScope;
-    private readonly DatabaseOptions _config;
     private readonly IServiceProvider _serviceProvider;
     private readonly TenantDbContext _dbContext;
     private readonly ITenantProvisioningService _provisioningService;
@@ -32,7 +31,6 @@ public sealed class TenantService : ITenantService
     public TenantService(
         IMultiTenantStore<AppTenantInfo> tenantStore,
         ITenantScope tenantScope,
-        IOptions<DatabaseOptions> config,
         IServiceProvider serviceProvider,
         TenantDbContext dbContext,
         ITenantProvisioningService provisioningService,
@@ -40,11 +38,9 @@ public sealed class TenantService : ITenantService
         IOptions<TenantValidityOptions> validityOptions,
         ILogger<TenantService> logger)
     {
-        ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(validityOptions);
         _tenantStore = tenantStore;
         _tenantScope = tenantScope;
-        _config = config.Value;
         _serviceProvider = serviceProvider;
         _dbContext = dbContext;
         _provisioningService = provisioningService;
@@ -74,18 +70,15 @@ public sealed class TenantService : ITenantService
 
     public async Task<string> CreateAsync(string id,
         string name,
-        string? connectionString,
         string adminEmail, string? issuer, DateTime validUpto, CancellationToken cancellationToken)
     {
-        if (connectionString?.Trim() == _config.ConnectionString.Trim())
+        AppTenantInfo tenant = new(id, id, name)
         {
-            connectionString = string.Empty;
-        }
-
-        AppTenantInfo tenant = new(id, name, connectionString, adminEmail, issuer)
-        {
-            // Set ValidUpto directly: SetValidity() forbids moving the date backward, and the ctor
-            // seeds now+1mo, so it would reject a term computed from an earlier 'now'.
+            AdminEmail = adminEmail,
+            IsActive = true,
+            Issuer = issuer,
+            // Set ValidUpto directly rather than through SetValidity(), which forbids moving the
+            // date backward and would reject a term computed from an earlier 'now'.
             ValidUpto = DateTime.SpecifyKind(validUpto, DateTimeKind.Utc),
         };
         await _tenantStore.AddAsync(tenant).ConfigureAwait(false);
@@ -196,7 +189,6 @@ public sealed class TenantService : ITenantService
             Name = tenant.Name!,
             IsActive = tenant.IsActive,
             ValidUpto = tenant.ValidUpto,
-            HasConnectionString = !string.IsNullOrWhiteSpace(tenant.ConnectionString),
             AdminEmail = tenant.AdminEmail!,
             Issuer = tenant.Issuer,
             ExpiryState = expiryState,

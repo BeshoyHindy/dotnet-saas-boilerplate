@@ -80,7 +80,7 @@ public sealed class RetryTenantProvisioningTests
     [Fact]
     public async Task RetryProvisioning_Should_Succeed_When_RetriedAfterCompletion()
     {
-        // Arrange — a healthy tenant (null connection string => shared DB) provisions OK.
+        // Arrange — a healthy tenant (the fault seam is never armed for it) provisions OK.
         using var rootClient = await _auth.CreateRootAdminClientAsync();
         var unique = Guid.NewGuid().ToString("N")[..8];
         var tenantId = $"retry-ok-{unique}";
@@ -89,7 +89,6 @@ public sealed class RetryTenantProvisioningTests
         {
             id = tenantId,
             name = $"Retry OK {tenantId}",
-            connectionString = (string?)null,
             adminEmail = $"retry-ok-{unique}@tenant.com",
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer",

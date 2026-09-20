@@ -115,7 +115,6 @@ internal sealed class DemoSeeder
             await tenantService.CreateAsync(
                 demo.Id,
                 demo.Name,
-                connectionString: null,
                 demo.AdminEmail,
                 demo.Issuer,
                 validUpto: TimeProvider.System.GetUtcNow().UtcDateTime.AddYears(1),

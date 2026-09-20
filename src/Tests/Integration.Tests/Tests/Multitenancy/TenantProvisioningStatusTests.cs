@@ -40,7 +40,6 @@ public sealed class TenantProvisioningStatusTests
         {
             id = tenantId,
             name = $"Provisioning Test Tenant {uniqueId}",
-            connectionString = (string?)null,
             adminEmail,
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer"

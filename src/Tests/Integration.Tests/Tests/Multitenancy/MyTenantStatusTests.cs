@@ -83,7 +83,6 @@ public sealed class MyTenantStatusTests
         {
             id = tenantId,
             name = $"MyStatus {tenantId}",
-            connectionString = (string?)null,
             adminEmail,
             adminPassword = TestConstants.DefaultPassword,
             issuer = $"{tenantId}.issuer",

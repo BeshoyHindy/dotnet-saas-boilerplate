@@ -1,6 +1,5 @@
 using Finbuckle.MultiTenant.Abstractions;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
-using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Boilerplate.Modules.Multitenancy;
 using Boilerplate.Modules.Multitenancy.Services;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -42,7 +41,6 @@ public sealed class TenantServiceStatusBoundaryTests
         var sut = new TenantService(
             _store,
             tenantScope: null!,
-            Options.Create(new DatabaseOptions { ConnectionString = "Host=localhost;Database=boilerplate;Username=x;Password=y" }),
             serviceProvider: null!,
             dbContext: null!,
             provisioningService: null!,

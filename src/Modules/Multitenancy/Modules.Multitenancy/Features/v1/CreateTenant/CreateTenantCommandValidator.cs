@@ -1,5 +1,4 @@
 ﻿using FluentValidation;
-using Boilerplate.BuildingBlocks.Persistence;
 using Boilerplate.Modules.Multitenancy.Contracts;
 using Boilerplate.Modules.Multitenancy.Contracts.v1.CreateTenant;
 using System.Text.RegularExpressions;
@@ -22,7 +21,6 @@ public sealed partial class CreateTenantCommandValidator : AbstractValidator<Cre
 
     public CreateTenantCommandValidator(
         ITenantService tenantService,
-        IConnectionStringValidator connectionStringValidator,
         TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(timeProvider);
@@ -38,10 +36,6 @@ public sealed partial class CreateTenantCommandValidator : AbstractValidator<Cre
             .NotEmpty()
             .MustAsync(async (name, ct) => !await tenantService.ExistsWithNameAsync(name!, ct).ConfigureAwait(false))
             .WithMessage((_, name) => $"Tenant {name} already exists.");
-
-        RuleFor(t => t.ConnectionString).Cascade(CascadeMode.Stop)
-            .Must((_, cs) => string.IsNullOrWhiteSpace(cs) || connectionStringValidator.TryValidate(cs))
-            .WithMessage("Connection string invalid.");
 
         RuleFor(t => t.AdminEmail).Cascade(CascadeMode.Stop)
             .NotEmpty()
