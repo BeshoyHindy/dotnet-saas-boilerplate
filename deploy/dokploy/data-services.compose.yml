@@ -1,0 +1,185 @@
+# Dokploy stack 1 of 2 — the data plane (ADR-0005).
+#
+# PostgreSQL, Valkey and MinIO, plus a one-shot bucket creator. Kept in its own
+# Dokploy Compose service so that redeploying the application (app.compose.yml)
+# can never recreate, restart or wipe the database: the two stacks are separate
+# docker compose projects with separate lifecycles and separate volumes.
+#
+# Because they are separate projects, service-name DNS does NOT cross between
+# them. Every service therefore joins the shared external `dokploy-network`
+# under an explicit `${STACK_NAME}-…` alias, and app.compose.yml dials those
+# aliases. STACK_NAME is what keeps staging and production apart on one server.
+#
+# Nothing here publishes a host port. The only service the outside world may
+# reach is MinIO, and it is reached through Traefik on STORAGE_DOMAIN.
+#
+# Deploy this stack FIRST and only again when a data-service version changes.
+# See docs/deploy-dokploy.md.
+
+services:
+  # ── PostgreSQL ──────────────────────────────────────────────────────
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      # postgres:18+ wants a single mount at /var/lib/postgresql and puts the
+      # cluster in a major-version subdirectory under it; mounting .../data
+      # instead is refused at startup.
+      - pg_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      dokploy-network:
+        aliases:
+          - ${STACK_NAME}-postgres
+
+  # ── Valkey (BSD-licensed Redis fork) ────────────────────────────────
+  # No password: it is reachable only from inside dokploy-network, and a
+  # credential here would be one more secret to rotate for no added boundary.
+  # CachingOptions__Redis in app.compose.yml matches this (no auth, no TLS).
+  valkey:
+    image: valkey/valkey:9.1.0-alpine
+    restart: unless-stopped
+    command: ["valkey-server", "--appendonly", "yes"]
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "PING"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    networks:
+      dokploy-network:
+        aliases:
+          - ${STACK_NAME}-valkey
+
+  # ── MinIO (S3-compatible object storage) ────────────────────────────
+  # quay.io, not docker.io: MinIO no longer publishes to Docker Hub.
+  #
+  # Routed through Traefik on STORAGE_DOMAIN because the API signs presigned
+  # upload/download URLs against Storage__S3__ServiceUrl and hands them to the
+  # browser — the signature covers the host, so the host the API signs with has
+  # to be the host the browser resolves. app.compose.yml therefore points
+  # ServiceUrl at https://${STORAGE_DOMAIN}, not at the internal alias.
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      # Presigned URLs and redirects must carry the public host, not the
+      # container's.
+      MINIO_SERVER_URL: https://${STORAGE_DOMAIN}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    expose:
+      - "9000"
+    networks:
+      dokploy-network:
+        aliases:
+          - ${STACK_NAME}-minio
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=dokploy-network"
+      - "traefik.http.routers.${STACK_NAME}-storage-web.rule=Host(`${STORAGE_DOMAIN}`)"
+      - "traefik.http.routers.${STACK_NAME}-storage-web.entrypoints=web"
+      - "traefik.http.routers.${STACK_NAME}-storage-web.middlewares=${STACK_NAME}-storage-https"
+      - "traefik.http.routers.${STACK_NAME}-storage-web.service=${STACK_NAME}-storage"
+      - "traefik.http.routers.${STACK_NAME}-storage.rule=Host(`${STORAGE_DOMAIN}`)"
+      - "traefik.http.routers.${STACK_NAME}-storage.entrypoints=websecure"
+      - "traefik.http.routers.${STACK_NAME}-storage.tls.certresolver=${TRAEFIK_CERT_RESOLVER}"
+      - "traefik.http.routers.${STACK_NAME}-storage.service=${STACK_NAME}-storage"
+      # One redirect middleware per service, never a shared name: Traefik reports
+      # a middleware defined by two different containers as a configuration error.
+      - "traefik.http.middlewares.${STACK_NAME}-storage-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.${STACK_NAME}-storage-https.redirectscheme.permanent=true"
+      - "traefik.http.services.${STACK_NAME}-storage.loadbalancer.server.port=9000"
+      # S3 signatures cover the Host header, so Traefik must forward the one the
+      # client signed. (It is Traefik's default; stated so a future edit has to
+      # delete it on purpose.)
+      - "traefik.http.services.${STACK_NAME}-storage.loadbalancer.passhostheader=true"
+      - "traefik.http.services.${STACK_NAME}-storage.loadbalancer.healthcheck.path=/minio/health/live"
+      - "traefik.http.services.${STACK_NAME}-storage.loadbalancer.healthcheck.interval=10s"
+      - "traefik.http.services.${STACK_NAME}-storage.loadbalancer.healthcheck.timeout=5s"
+      - "traefik.http.services.${STACK_NAME}-storage.loadbalancer.healthcheck.hostname=${STORAGE_DOMAIN}"
+
+  # ── One-shot: create the bucket the Files module writes to ──────────
+  # The application never auto-creates it, so without this the first upload
+  # fails with NoSuchBucket. Idempotent (--ignore-existing), so it is safe on
+  # every redeploy.
+  minio-init:
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MC_HOST_local: http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000
+    entrypoint: ["mc"]
+    command: ["mb", "--ignore-existing", "local/${STORAGE_BUCKET}"]
+    networks:
+      - dokploy-network
+
+  # ── One-shot: open anonymous reads on the `uploads/` prefix ONLY ────
+  # Avatars and tenant branding go through IStorageService.UploadAsync, which
+  # returns BuildPublicUrl(key) — an unsigned URL under `uploads/` that the
+  # browser fetches straight from MinIO in an <img src>. MinIO buckets are
+  # private by default, so without this grant every avatar and logo 403s.
+  #
+  # The prefix is deliberately `uploads/` and NOT the bucket. Files-module
+  # objects live under `tenants/…` where public and private files share one key
+  # space and visibility is a database column (FileAsset.Visibility), so opening
+  # that prefix would make ChangeFileVisibility meaningless: a file flipped back
+  # to Private would stay fetchable at its known URL forever. Widening this to
+  # `local/${STORAGE_BUCKET}` is a data leak, not a convenience — the contract
+  # test asserts the prefix for that reason.
+  #
+  # Within `uploads/` the objects are themselves tenant-prefixed —
+  # `uploads/tenants/{tenantId}/…`, composed by the Storage block (ADR-0002,
+  # issue #78). That is a property of the keys, not of this grant: it stays at
+  # the `uploads/` top level so one one-shot covers every tenant, including the
+  # ones provisioned after the stack was deployed. Narrowing it to a single
+  # tenant would 403 every other tenant's branding.
+  #
+  # A separate one-shot rather than `mb && anonymous set` in one: the mc image is
+  # not guaranteed to ship a shell, and `entrypoint: ["mc"]` keeps both steps
+  # shell-free. Both are idempotent.
+  minio-public-prefix:
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    restart: "no"
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      MC_HOST_local: http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000
+    entrypoint: ["mc"]
+    command: ["anonymous", "set", "download", "local/${STORAGE_BUCKET}/uploads"]
+    networks:
+      - dokploy-network
+
+volumes:
+  pg_data:
+  valkey_data:
+  minio_data:
+
+networks:
+  # Created by the Dokploy installer; every stack on the server shares it and
+  # Traefik watches it. Declared external so a redeploy never recreates it.
+  dokploy-network:
+    external: true

@@ -1,0 +1,252 @@
+# Dokploy stack 2 of 2 — the application (ADR-0005).
+#
+# Pull-only: every image comes from GHCR at ${IMAGE_TAG}. There is deliberately
+# no `build:` key anywhere in this file — CI builds and pushes the images, and
+# Dokploy never compiles anything. That is what makes a deploy a tag change and
+# a rollback the previous tag.
+#
+#   staging     tracks develop   IMAGE_TAG=dev-<sha> (or dev-latest)
+#   production  tracks v* on main IMAGE_TAG=<x.y.z> — always a fixed version,
+#                                 never `latest`, so a redeploy is reproducible.
+#
+# Ordering: `migrator` runs once, applies pending migrations under a PostgreSQL
+# advisory lock, seeds the root tenant and exits; `api` starts only on
+# service_completed_successfully. The API never migrates at startup, so a failed
+# migration fails the deploy instead of half-starting the app.
+#
+# The data plane lives in data-services.compose.yml — a different docker compose
+# project — so it is addressed by its `${STACK_NAME}-…` aliases on the shared
+# external dokploy-network, not by bare service names.
+#
+# Requires Compose Type = "Docker Compose" in Dokploy. Docker Stack (Swarm) has
+# no `service_completed_successfully` and ignores container-level `labels`.
+#
+# See docs/deploy-dokploy.md.
+
+services:
+  # ── One-shot migrator ───────────────────────────────────────────────
+  # No JwtOptions on purpose: the migrator turns off EnableAuthentication, so it
+  # never needs a signing key it could not use anyway. Giving it one would widen
+  # the blast radius of this stack's environment for nothing.
+  migrator:
+    image: ${IMAGE_REGISTRY}/${IMAGE_OWNER}/boilerplate-db-migrator:${IMAGE_TAG}
+    pull_policy: always
+    restart: "no"
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      DatabaseOptions__Provider: POSTGRESQL
+      DatabaseOptions__ConnectionString: Host=${STACK_NAME}-postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      DatabaseOptions__MigrationsAssembly: Boilerplate.Migrations.PostgreSQL
+      Seed__DefaultAdminPassword: ${SEED_ADMIN_PASSWORD}
+    command: ["apply", "--seed"]
+    networks:
+      - dokploy-network
+
+  # ── API ─────────────────────────────────────────────────────────────
+  # The runtime image is chiseled — no shell, no curl — so a container
+  # HEALTHCHECK is impossible. Readiness is the Traefik load-balancer
+  # healthcheck on /health/ready below (ADR-0005).
+  api:
+    image: ${IMAGE_REGISTRY}/${IMAGE_OWNER}/boilerplate-api:${IMAGE_TAG}
+    pull_policy: always
+    restart: unless-stopped
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      DatabaseOptions__Provider: POSTGRESQL
+      DatabaseOptions__ConnectionString: Host=${STACK_NAME}-postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD};Minimum Pool Size=5
+      DatabaseOptions__MigrationsAssembly: Boilerplate.Migrations.PostgreSQL
+      CachingOptions__Redis: ${STACK_NAME}-valkey:6379
+      CachingOptions__EnableSsl: "false"
+      JwtOptions__SigningKey: ${JWT_SIGNING_KEY}
+      # Mailed links go to a tenant's users, so the origin the API writes into them is
+      # the DASHBOARD's. Both clients are in the CORS allow-list (ADR-0008).
+      OriginOptions__OriginUrl: https://${DASHBOARD_DOMAIN}
+      CorsOptions__AllowedOrigins__0: https://${DASHBOARD_DOMAIN}
+      CorsOptions__AllowedOrigins__1: https://${CONSOLE_DOMAIN}
+      # Host allow-list. Must contain API_DOMAIN and must not contain "*", or the
+      # host refuses to boot. It is also the Host that Traefik's healthcheck
+      # sends (see the healthcheck.hostname label), so a mismatch shows up as a
+      # permanently unhealthy backend, not as a 400 you would ever see.
+      AllowedHosts: ${ALLOWED_HOSTS}
+      # appsettings.Production.json already sets ProxyOptions.Enabled=true with
+      # TrustAnyProxy=false, which fails the boot until a proxy is named. Naming
+      # the network rather than trusting everyone matters here: dokploy-network
+      # is shared with every other stack on the server, and a trusted neighbour
+      # could spoof X-Forwarded-For into the rate limiter and the audit trail.
+      # X-Forwarded-Host is never honoured — Traefik passes the original Host
+      # through instead (passhostheader below).
+      ProxyOptions__KnownNetworks__0: ${PROXY_KNOWN_NETWORK}
+      Storage__Provider: s3
+      # Public, not internal: presigned URLs are signed against this host and the
+      # signature covers it, so the browser has to resolve the same name.
+      Storage__S3__ServiceUrl: https://${STORAGE_DOMAIN}
+      Storage__S3__PublicBaseUrl: https://${STORAGE_DOMAIN}/${STORAGE_BUCKET}
+      Storage__S3__Region: ${STORAGE_REGION}
+      Storage__S3__Bucket: ${STORAGE_BUCKET}
+      Storage__S3__AccessKey: ${MINIO_ROOT_USER}
+      Storage__S3__SecretKey: ${MINIO_ROOT_PASSWORD}
+      Storage__S3__ForcePathStyle: "true"
+      MailOptions__UseSendGrid: "false"
+      MailOptions__From: ${MAIL_FROM}
+      MailOptions__DisplayName: ${MAIL_DISPLAY_NAME}
+      MailOptions__Smtp__Host: ${SMTP_HOST}
+      MailOptions__Smtp__Port: ${SMTP_PORT}
+      MailOptions__Smtp__UserName: ${SMTP_USERNAME}
+      MailOptions__Smtp__Password: ${SMTP_PASSWORD}
+      # StartTls is the default and the right one for a real relay; only a plain
+      # local catcher needs None.
+      MailOptions__Smtp__SecureSocket: ${SMTP_SECURE_SOCKET}
+      # appsettings.Production.json ships Exporter.Otlp.Enabled=false, so an
+      # endpoint on its own exports nothing. Both keys or neither.
+      OpenTelemetryOptions__Exporter__Otlp__Enabled: ${OTEL_EXPORTER_ENABLED}
+      OpenTelemetryOptions__Exporter__Otlp__Endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+    expose:
+      - "8080"
+    networks:
+      dokploy-network:
+        aliases:
+          - ${STACK_NAME}-api
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=dokploy-network"
+      - "traefik.http.routers.${STACK_NAME}-api-web.rule=Host(`${API_DOMAIN}`)"
+      - "traefik.http.routers.${STACK_NAME}-api-web.entrypoints=web"
+      - "traefik.http.routers.${STACK_NAME}-api-web.middlewares=${STACK_NAME}-api-https"
+      - "traefik.http.routers.${STACK_NAME}-api-web.service=${STACK_NAME}-api"
+      - "traefik.http.routers.${STACK_NAME}-api.rule=Host(`${API_DOMAIN}`)"
+      - "traefik.http.routers.${STACK_NAME}-api.entrypoints=websecure"
+      - "traefik.http.routers.${STACK_NAME}-api.tls.certresolver=${TRAEFIK_CERT_RESOLVER}"
+      - "traefik.http.routers.${STACK_NAME}-api.service=${STACK_NAME}-api"
+      - "traefik.http.middlewares.${STACK_NAME}-api-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.${STACK_NAME}-api-https.redirectscheme.permanent=true"
+      - "traefik.http.services.${STACK_NAME}-api.loadbalancer.server.port=8080"
+      # The original Host must survive the hop: AllowedHosts filtering runs on it
+      # and Identity interpolates it into confirmation and password-reset links.
+      # X-Forwarded-Host is ignored by the app by design, so this is the only way
+      # the real host reaches it.
+      - "traefik.http.services.${STACK_NAME}-api.loadbalancer.passhostheader=true"
+      # The readiness gate. /health/ready runs only the checks the API cannot
+      # serve without; Traefik takes the container out of rotation when it fails,
+      # which is the closest thing a shell-less image has to a healthcheck.
+      - "traefik.http.services.${STACK_NAME}-api.loadbalancer.healthcheck.path=/health/ready"
+      - "traefik.http.services.${STACK_NAME}-api.loadbalancer.healthcheck.interval=10s"
+      - "traefik.http.services.${STACK_NAME}-api.loadbalancer.healthcheck.timeout=5s"
+      # Without this the probe carries the container IP as its Host and host
+      # filtering answers 400, so the backend would never come up healthy.
+      - "traefik.http.services.${STACK_NAME}-api.loadbalancer.healthcheck.hostname=${API_DOMAIN}"
+
+  #if (frontend)
+  # ── Dashboard (the tenant app: React SPA served by nginx) ───────────
+  # Configured at container start: the entrypoint renders /config.json, the nginx
+  # site and the Content-Security-Policy from these variables, so one image serves
+  # every environment (ADR-0008).
+  dashboard:
+    image: ${IMAGE_REGISTRY}/${IMAGE_OWNER}/boilerplate-dashboard:${IMAGE_TAG}
+    pull_policy: always
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      # The origin nginx proxies /api and /health to — a server-side address, not a
+      # browser one. The browser only ever talks to DASHBOARD_DOMAIN, which is what lets
+      # the SameSite=Strict refresh cookie work with CORS credentials off (ADR-0002).
+      # It goes back out through Traefik so the Host header stays API_DOMAIN, which is
+      # what ALLOWED_HOSTS names.
+      APP_API_URL: https://${API_DOMAIN}
+      # Named in the Content-Security-Policy: the browser fetches presigned
+      # upload/download URLs straight from object storage.
+      APP_STORAGE_URL: https://${STORAGE_DOMAIN}
+      APP_DEFAULT_TENANT: ${APP_DEFAULT_TENANT}
+    # 8080: the image runs nginx unprivileged, so it cannot bind :80.
+    expose:
+      - "8080"
+    networks:
+      dokploy-network:
+        aliases:
+          - ${STACK_NAME}-dashboard
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=dokploy-network"
+      - "traefik.http.routers.${STACK_NAME}-dashboard-web.rule=Host(`${DASHBOARD_DOMAIN}`)"
+      - "traefik.http.routers.${STACK_NAME}-dashboard-web.entrypoints=web"
+      - "traefik.http.routers.${STACK_NAME}-dashboard-web.middlewares=${STACK_NAME}-dashboard-https"
+      - "traefik.http.routers.${STACK_NAME}-dashboard-web.service=${STACK_NAME}-dashboard"
+      - "traefik.http.routers.${STACK_NAME}-dashboard.rule=Host(`${DASHBOARD_DOMAIN}`)"
+      - "traefik.http.routers.${STACK_NAME}-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.${STACK_NAME}-dashboard.tls.certresolver=${TRAEFIK_CERT_RESOLVER}"
+      - "traefik.http.routers.${STACK_NAME}-dashboard.service=${STACK_NAME}-dashboard"
+      - "traefik.http.middlewares.${STACK_NAME}-dashboard-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.${STACK_NAME}-dashboard-https.redirectscheme.permanent=true"
+      - "traefik.http.services.${STACK_NAME}-dashboard.loadbalancer.server.port=8080"
+      - "traefik.http.services.${STACK_NAME}-dashboard.loadbalancer.passhostheader=true"
+      # /config.json only exists once the entrypoint has rendered it, so it is a
+      # real readiness signal for this image rather than a liveness one.
+      - "traefik.http.services.${STACK_NAME}-dashboard.loadbalancer.healthcheck.path=/config.json"
+      - "traefik.http.services.${STACK_NAME}-dashboard.loadbalancer.healthcheck.interval=10s"
+      - "traefik.http.services.${STACK_NAME}-dashboard.loadbalancer.healthcheck.timeout=5s"
+      - "traefik.http.services.${STACK_NAME}-dashboard.loadbalancer.healthcheck.hostname=${DASHBOARD_DOMAIN}"
+
+  # ── Console (the operator tool: same image shape, different app) ────
+  console:
+    image: ${IMAGE_REGISTRY}/${IMAGE_OWNER}/boilerplate-console:${IMAGE_TAG}
+    pull_policy: always
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      # The origin nginx proxies /api and /health to — a server-side address, not a
+      # browser one. The browser only ever talks to CONSOLE_DOMAIN, which is what lets
+      # the SameSite=Strict refresh cookie work with CORS credentials off (ADR-0002).
+      # It goes back out through Traefik so the Host header stays API_DOMAIN, which is
+      # what ALLOWED_HOSTS names.
+      APP_API_URL: https://${API_DOMAIN}
+      # Named in the console's Content-Security-Policy: the browser fetches presigned
+      # upload/download URLs straight from object storage.
+      APP_STORAGE_URL: https://${STORAGE_DOMAIN}
+      # Operators live in the root tenant; the console's sign-in form has no tenant field.
+      APP_DEFAULT_TENANT: ${APP_DEFAULT_TENANT}
+      # Only so a tenant user who lands here can be pointed at the app that is theirs.
+      APP_DASHBOARD_URL: https://${DASHBOARD_DOMAIN}
+    # 8080: the console image runs nginx unprivileged, so it cannot bind :80.
+    expose:
+      - "8080"
+    networks:
+      dokploy-network:
+        aliases:
+          - ${STACK_NAME}-console
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=dokploy-network"
+      - "traefik.http.routers.${STACK_NAME}-console-web.rule=Host(`${CONSOLE_DOMAIN}`)"
+      - "traefik.http.routers.${STACK_NAME}-console-web.entrypoints=web"
+      - "traefik.http.routers.${STACK_NAME}-console-web.middlewares=${STACK_NAME}-console-https"
+      - "traefik.http.routers.${STACK_NAME}-console-web.service=${STACK_NAME}-console"
+      - "traefik.http.routers.${STACK_NAME}-console.rule=Host(`${CONSOLE_DOMAIN}`)"
+      - "traefik.http.routers.${STACK_NAME}-console.entrypoints=websecure"
+      - "traefik.http.routers.${STACK_NAME}-console.tls.certresolver=${TRAEFIK_CERT_RESOLVER}"
+      - "traefik.http.routers.${STACK_NAME}-console.service=${STACK_NAME}-console"
+      - "traefik.http.middlewares.${STACK_NAME}-console-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.${STACK_NAME}-console-https.redirectscheme.permanent=true"
+      - "traefik.http.services.${STACK_NAME}-console.loadbalancer.server.port=8080"
+      - "traefik.http.services.${STACK_NAME}-console.loadbalancer.passhostheader=true"
+      # /config.json only exists once the entrypoint has rendered it, so it is a
+      # real readiness signal for this image rather than a liveness one.
+      - "traefik.http.services.${STACK_NAME}-console.loadbalancer.healthcheck.path=/config.json"
+      - "traefik.http.services.${STACK_NAME}-console.loadbalancer.healthcheck.interval=10s"
+      - "traefik.http.services.${STACK_NAME}-console.loadbalancer.healthcheck.timeout=5s"
+      - "traefik.http.services.${STACK_NAME}-console.loadbalancer.healthcheck.hostname=${CONSOLE_DOMAIN}"
+  #endif
+
+networks:
+  # Created by the Dokploy installer; Traefik watches it. Declared external so a
+  # redeploy never recreates it — and so this stack can reach the data-services
+  # stack, which is a separate compose project.
+  dokploy-network:
+    external: true

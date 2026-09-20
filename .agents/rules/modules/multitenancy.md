@@ -1,0 +1,27 @@
+# Module: Multitenancy
+
+Tenant catalog, provisioning, activation/upgrade, per-tenant theming (Finbuckle.MultiTenant). Foundational — registered early.
+
+**Entities / DbContext:** `AppTenantInfo` (catalog), `TenantProvisioning` + `TenantProvisioningStep`, `TenantTheme`. `TenantDbContext` holds the tenant catalog in the main DB.
+**Areas:** CreateTenant, ChangeTenantActivation, UpgradeTenant, Get(Tenants/Status), TenantProvisioning (status/retry), TenantTheme (get/update/reset). Full list: `Features/v1/` or `/scalar`.
+
+## Brand assets: the client never names one (#83)
+
+The theme has **two** DTOs, and the split is the guarantee: `TenantThemeDto` is the read model and carries `brandAssets.logoUrl`/`logoDarkUrl`/`faviconUrl`; `TenantThemeUpdateDto` is what `PUT /tenants/theme` accepts and has **no URL fields** — a slot is set by uploading bytes (`brandAssets.logo`) and cleared by its flag (`deleteLogo`). `MapDtoToEntity` no longer copies any URL. A request that still carries `logoUrl` is *ignored*, not rejected: the property does not exist on the write model, so the deserializer drops it.
+
+Each slot is its own storage **owner** (`logo`, `logo-dark`, `favicon`), so `TenantThemeService` uploads with `UploadAsync<TenantTheme>(…, owner: slot, …)` and drops the previous value with `RemoveIfOwnedAsync<TenantTheme>(old, slot, ct)`. Replacing the logo therefore cannot delete the favicon — or a user's avatar, which is a key this tenant owns too, and which a tenant admin could previously park in `LogoUrl` and have the next save delete. See `storage.md`.
+
+## Gotchas
+
+- **One strategy, no chain** (ADR-0002) — `TokenOrRouteTenantStrategy` is the only `IMultiTenantStrategy`, and an architecture test fails the build if a header/query/host/base-path/claim/route strategy reappears anywhere under `src/`. Authenticated → the token's `tenant` claim; anonymous → the `{tenant}` route value, but only on endpoints carrying `[TenantFromRoute]` (the `api/v1/tenants/{tenant}/auth/...` group). Stores are unchanged: DistributedCache → EFCoreStore.
+- **`UseMultiTenant()` lives in `ConfigureMiddleware`**, not the host, so it runs after `UseRouting()`/`UseAuthentication()` — the strategy needs both the principal and the matched endpoint. Module order 200 keeps it ahead of every module that reads the tenant.
+- **Authenticated + no resolvable tenant → 401**, enforced by the guard right after `UseMultiTenant()` (claim missing, blank, or naming a tenant the store doesn't know).
+- **There is no root-operator cross-tenant override.** A root caller is pinned to `root` like anyone else. Crossing a boundary is `POST /api/v1/identity/operator/token-exchange` (#9): a short-lived, access-only token whose `tenant` claim is the target and whose subject is a real user there, audited and revocable by jti. Never reintroduce a caller-supplied tenant input.
+- **A deactivated tenant cannot be entered.** The exchange refuses it (403) rather than issuing a token the deactivated-tenant guard below would reject on arrival — an exchanged token resolves to the *target* tenant, so it is not exempt the way a root token is. Reactivate to inspect.
+- **`ITenantInitialPasswordBuffer`** (singleton) — the tenant admin password is **operator-supplied**, not a constant. `CreateTenantCommandHandler` calls `Store(tenantId, password)` **before** kicking off provisioning; the background seed step `TryConsume`s it (`ConcurrentDictionary`, consume = remove).
+- **Provisioning** runs 4 steps (Database → Migrations → Seeding → CacheWarm) via a Hangfire `TenantProvisioningJob`, falling back to inline execution if Hangfire storage is unavailable. **Activation is gated on `Status == Completed`.** The job is `[SystemJob]` — it is work *about* a tenant, enqueued by a root operator, with the target tenant as an argument.
+- **`ITenantScope` is the only way to enter a tenant outside a request** (ADR-0002). `RunAsync(tenantId, work)` loads the full `AppTenantInfo` (cache-first — it tries the 60-minute `DistributedCacheStore` before the EF store, same as the HTTP path, and warms the cache on a miss), installs the ambient context, and *then* creates the DI scope — that order is what makes the tenant filter right, since a `MultiTenantDbContext` captures `TenantInfo` at construction, and it is what makes an unknown or deactivated tenant fail the work closed. `RunForEachTenantAsync` is the fan-out and always reads the EF store, since the cache store can't enumerate. `ITenantService.MigrateTenantAsync`/`SeedTenantAsync`, `SqlAuditSink`, the role-permission syncer, jobs and event dispatch all go through it.
+- **Only `AmbientTenantContext` may write `IMultiTenantContextSetter`** — an architecture test (`AmbientTenantContextTests`) fails the build on any other production file, because the hand-rolled "create a scope, then set the tenant" pattern it replaces is wrong in every case.
+- `ITenantScope.Begin` is **synchronous by design** and exists only for Hangfire's `JobActivator.BeginScope`: the ambient tenant is an `AsyncLocal`, and a write in the continuation of an `async` method is discarded when it returns. Use `RunAsync` everywhere else.
+
+Tenant **isolation** mechanics (default-on filter, `IGlobalEntity` opt-out, `base.OnModelCreating` last) live in `database.md`.

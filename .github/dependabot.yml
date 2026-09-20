@@ -1,0 +1,98 @@
+# Dependabot (issue #19).
+#
+# Tuned for Actions minutes, not for freshness. Four ecosystems, one grouped
+# pull request each, once a month, at most two open at a time — a dependency
+# update costs a full CI run, so the unit of work is "this month's updates",
+# not "this package". `directories:` (plural) collapses every lockfile of an
+# ecosystem into that single PR.
+#
+# Everything targets `develop`, not the default-in-name-only `main`: under
+# gitflow (ADR-0007) `develop` integrates, and a PR against `main` would bypass
+# every gate this repo runs.
+#
+# Security updates ignore all of this and open immediately, which is the point:
+# they are the ones worth a run.
+version: 2
+
+updates:
+  # ── .NET ────────────────────────────────────────────────────────────
+  # Versions are centralized in src/Directory.Packages.props; Dependabot edits
+  # that file directly.
+  - package-ecosystem: nuget
+    directory: '/'
+    target-branch: develop
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      nuget:
+        patterns: ['*']
+
+#if (frontend || sandcastle)
+  # ── Node ────────────────────────────────────────────────────────────
+  # Independent pnpm lockfiles: the repo root (the sandcastle orchestrator) and one
+  # per client — neither client is a workspace package (ADR-0008), because each
+  # container image is built from its own directory as the Docker context, so its
+  # manifest and lockfile have to live beside it. One PR covers them all.
+  - package-ecosystem: npm
+    directories:
+      #if (sandcastle)
+      - '/'
+      #endif
+      #if (frontend)
+      - '/clients/dashboard'
+      - '/clients/console'
+      #endif
+    target-branch: develop
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      npm:
+        patterns: ['*']
+    # typescript-eslint throws on TypeScript 7 (peer range <6.1.0), so lint cannot
+    # run on it. Drop this once typescript-eslint supports TS 7.
+    ignore:
+      - dependency-name: typescript
+        versions: ['>=7.0.0']
+#endif
+
+  # ── GitHub Actions ──────────────────────────────────────────────────
+  # The workflows pin major tags; this keeps those majors from going stale and
+  # is the only automated way a deprecated runner image or action surfaces.
+  - package-ecosystem: github-actions
+    directory: '/'
+    target-branch: develop
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      actions:
+        patterns: ['*']
+
+  # ── Container base images ───────────────────────────────────────────
+  # The .NET hosts (src/Host/Dockerfile, both targets) and each client's nginx
+  # image. A bump here runs the migrator smoke and nothing else — backend.yml's
+  # `docker` path filter keeps the .NET suites out of it.
+  - package-ecosystem: docker
+    directories:
+      - '/src/Host'
+      #if (frontend)
+      - '/clients/dashboard'
+      - '/clients/console'
+      #endif
+    target-branch: develop
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      docker:
+        patterns: ['*']

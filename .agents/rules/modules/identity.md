@@ -1,0 +1,129 @@
+# Module: Identity
+
+Auth (JWT + ASP.NET Identity), users, roles, permissions, sessions, impersonation, 2FA.
+
+## Service shape
+
+`IUserService` is a **facade** that delegates to focused single-responsibility services — change behavior in the specific service, not the facade:
+
+| Interface | Concern |
+|---|---|
+| `IUserRegistrationService` | register, external-principal create, email/phone confirm |
+| `IUserProfileService` | get/list/count, update profile, image, existence checks |
+| `IUserStatusService` | activate/deactivate (`DeleteAsync` == deactivate), audited toggles |
+| `IUserRoleService` | role assignment, admin-role guards |
+| `IUserPasswordService` | forgot/reset/change password, history + expiry |
+| `IUserPermissionService` | effective permissions, cache invalidation |
+
+`ChangePassword`/`Update`/`Delete` etc. flow facade → service → EF/UserManager. `CancellationToken` is `= default` on these interfaces and propagated into EF sinks (note: `UserManager`/`RoleManager` have no CT overloads, so private helpers that only call them don't take one).
+
+## Registration is one transaction (#86)
+
+`UserRegistrationService.RegisterAsync` wraps the whole sign-up in a single
+`IdentityDbContext` transaction: the user row, the `Basic` role, the tenant's default groups,
+`RecordRegistered` and the `UserRegisteredIntegrationEvent` outbox row commit together or not at all.
+`UserManager` writes through that same scoped context, and the outbox joins the ambient transaction
+through the shared scope connection (`eventing.md` §Atomicity) — so one `BeginTransaction` covers
+every write. It was four independent commits, and a failure after the first left a user with no
+role, no groups and no event, which every retry was then refused on as a duplicate. **Don't add a
+step to registration outside that transaction.**
+
+**The confirmation mail is sent from the event, not inline** — `UserRegisteredConfirmationMailHandler`
+reacts to `UserRegisteredIntegrationEvent`, skipping a user whose e-mail is already confirmed (which
+is how external-auth sign-ups are excluded). A mail queued mid-registration could announce a sign-up
+that then rolled back; hanging it off the event means no row, no event, no mail, and the outbox's
+retries mean a committed sign-up cannot lose it. A rare duplicate is acceptable — the link is the
+same one. The `origin` the link is built on is configuration (`MailLinkOrigin`), resolvable in the
+dispatcher, so nothing request-derived rides on the event; `RegisterAsync` therefore takes no
+`origin` at all. The resend endpoint still queues its copy on the `email` job queue — it has a
+committed user by definition. Both build the message through `ConfirmationMailBuilder`, so the two
+links cannot drift apart. **A test asserting the registration mail must drain the outbox first**
+(`OutboxDrain.DrainAsync`).
+
+`AppUser.RecordRegistered` stays inside that transaction, and its handler (`UserRegisteredHandler`)
+**logs only** — like every other Identity domain-event handler. It used to publish
+`UserRegisteredIntegrationEvent` as well, which meant two events per sign-up, two welcome mails and
+(once the mail moved) two confirmation mails. The service publishes that event itself so the row
+sits inside the transaction; a publish from a domain-event handler runs inside
+`DomainEventsInterceptor`, which logs and swallows handler failures, so a failed write there would
+leave a committed user nobody was ever told about. **Don't reinstate a publish in that handler.**
+
+**E-mail uniqueness is an index, not a query.** `EmailIndex` is `(NormalizedEmail, TenantId)` UNIQUE,
+mirroring how Finbuckle widens `UserNameIndex` — so an address is free again in every other tenant,
+and NULL e-mails stay allowed (Postgres treats NULLs as distinct). Identity's `RequireUniqueEmail`
+check runs before the insert and two concurrent sign-ups both passed it. A `23505` on **those two
+named indexes** is mapped by `RegistrationConflict` to the same 400 the pre-insert check gives
+("Unable to register the user." plus the taken-email/username reason); any other unique violation is
+rethrown and stays a 500, because answering "that e-mail is taken" to a collision somewhere else
+would be a lie that also hides the bug.
+
+**A lost race arrives in two shapes, and code that knows one of them is code that passes `dotnet
+test` and fails in production.** If the loser's write reaches the database first, the index refuses
+it — `DbUpdateException` wrapping `23505`. If the winner commits a moment earlier, Identity's own
+pre-insert validators refuse it — a failed `IdentityResult` carrying `DuplicateEmail` /
+`DuplicateUserName`, and no exception at all. `RegistrationConflict.Describe` reads both into one
+answer (matching Identity on `IdentityError.Code`, never on the localizable description).
+`GetOrCreateFromPrincipalAsync` handles both the same way: re-find the winner by e-mail and return
+their id, because a lost race there is still a valid login. **But only when the address collided.**
+A username collision with the address still free is a *stranger* who derived the same name, and
+returning their id would sign the caller into someone else's account — so that retries under a fresh
+name (bounded, `MaxUserNameAttempts`), and the fallback name always carries its random half
+(`UniqueUserNameFor`; the old `$"{name}_{guid}"[..20]` truncated the randomness off for any name ≥20
+characters and handed two different people the same fallback).
+
+## Avatars: the client never names one (#83)
+
+`AppUser.ImageUrl` holds **only a URL this server issued for this user**. `PUT /identity/profile` takes the bytes (`image`) or the removal flag (`deleteCurrentImage`) and writes the column from what `IStorageService.UploadAsync<AppUser>(…, owner: user.Id, …)` returns; the old `PUT /identity/profile/image`, which accepted any string up to 2048 characters, is **gone**, and so is `IUserProfileService.SetImageUrlAsync`. Don't add either back — a column a client can name is a column that can name another user's avatar.
+
+The avatar's object key carries the user id (`uploads/tenants/{t}/appuser/{userId}/…`) and the replace/remove path calls the owner-scoped `RemoveIfOwnedAsync<AppUser>(old, user.Id, ct)`, so one user's avatar change can never delete another's object — the tenant owns both keys, which is exactly why tenant scoping was not enough. A row still holding an arbitrary URL is skipped and logged on that first delete, then overwritten. See `storage.md`.
+
+## Permission gating footgun
+
+`RequiredPermissionAttribute` implements `Boilerplate.BuildingBlocks.Shared.Identity.Authorization.IRequiredPermissionMetadata`. **Never let a second/duplicate `IRequiredPermissionMetadata` appear** — it silently disables **all** `.RequirePermission()` gates across the app. Permission constants live in `Shared/Identity/*Permissions.cs`.
+
+## Hosted services (background)
+
+- `RolePermissionSyncHostedService` — best-effort sync of the permission catalog; loops, catches `Exception` *with* an `OperationCanceledException` filter, logs and continues.
+- `SessionCleanupHostedService` — hourly expired-session purge; OCE handled by a preceding catch.
+
+These are the model for background loops: stay alive, log with context, never swallow cancellation. See `api-conventions.md`.
+
+## Tokens / sessions
+
+Login `POST /api/v1/tenants/{tenant}/auth/token` (no client-app header: the operator/tenant app boundary it enforced died with the second client — ADR-0004). Refresh `POST /api/v1/tenants/{tenant}/auth/refresh` cross-checks subject. Both live in the anonymous auth group alongside forgot-password, reset-password, confirm-email and register — the only endpoints that take the tenant from the route (ADR-0002). Admin can't demote/deactivate the last admin or the root-tenant seed admin (guards in `UserRoleService`/`UserStatusService`).
+
+**One session store, and it *is* the refresh token** (`UserSession`, one tenant-isolated row per device):
+
+- `ITokenService` mints **access tokens only**. `ISessionService.CreateSessionAsync` mints the refresh token, so login creates the session *before* the access token — its id becomes the `sid` claim. **A session-creation failure fails the login** (no try/catch): a login with no session row can neither refresh nor be revoked.
+- The token is `"{tenantId}.{32 CSPRNG bytes, base64url}"` (`RefreshTokenValue`), stored only as SHA-256. The prefix is routing metadata, never a credential — it must equal the resolved tenant, and the hash lookup runs inside the tenant query filter. **No `IgnoreQueryFilters()` anywhere on the token path.**
+- `RotateRefreshTokenAsync` is one compare-and-set `ExecuteUpdate`, so N concurrent refreshes yield exactly one winner (losers get `Superseded`). A `PreviousTokenHash` hit is reuse → the session is revoked. A `SecurityStamp` change (password reset, credential change) kills the session. `sid` survives rotation.
+- Browsers also get the token as `HttpOnly; Secure; SameSite=Strict` cookie (`RefreshTokenCookie`) pinned by `Path` to the tenant's refresh route; the refresh endpoint falls back to it when the body omits the token. CORS still allows no credentials (#13), so the cookie is same-site only and body delivery remains the client path.
+- **Every response that is not a successful rotation clears the cookie**, via `DeleteWhenResponseStarts` — an `OnStarting` callback, because `UseExceptionHandler` wipes headers before re-running the pipeline and an eager `Set-Cookie` would vanish from exactly the 401s that need it (same reason as the security headers; see `security.md`). `Delete` must keep every attribute identical to `Append`, `Path` above all: a browser matches a deletion by name + Path, so a mismatch silently leaves the credential in place.
+- **End-impersonation returns no token.** The actor's own session is never taken away while they act as someone else, so End just marks the grant ended (which kills the acting token on its next request). The old access-only token it used to mint had no refresh counterpart — a credential nothing could renew.
+
+### Logout
+
+`POST /api/v1/tenants/{tenant}/auth/logout` — **`AllowAnonymous` on purpose**: it has to work when the access token is already gone, which is the state a signing-out browser is in. It revokes the session named by the caller's `sid` claim, or failing that the session the supplied refresh token belongs to (body or cookie, current *or* previous hash), and always clears the cookie. Always 204 — a different answer for a live token than a dead one would be an oracle. Both clients call it best-effort from `logout()` before clearing local state.
+
+Clearing localStorage alone is **not** a logout: the SPA cannot delete an HttpOnly cookie and `/auth/refresh` accepts that cookie on its own. Note the cookie's `Path` is the refresh route, so a browser does not send it to `/logout` — identification comes from the `sid` claim or the body token, while the deletion works regardless (a `Set-Cookie` may name any `Path`).
+
+### `sid` is issued, not enforced
+
+`sid` names the session row, but **nothing validates it per request** — there is no session lookup in the auth pipeline, by design (it would put a database read on every call). So revoking a session stops *refresh* immediately and stops API access only once the current access token expires (`JwtOptions.AccessTokenMinutes`, default 30). Revocation is eventually consistent for API access, and that window is the deliberate price of stateless JWT validation. Shorten `AccessTokenMinutes` if an application needs a tighter bound; don't add a per-request `sid` check without deciding how to pay for it.
+
+## Acting as someone else (impersonation + operator token exchange)
+
+`IImpersonationTokenIssuer` is **the** place a token is minted for another identity. Two surfaces call it and they share everything downstream — one `ImpersonationGrant` table, one jti revocation list, one lifetime ceiling (`OperatorExchange:MaxMinutes`, clamped server-side), one audit record:
+
+- `POST /identity/impersonation/start` — **same tenant only**. A cross-tenant caller (root included) gets 403 pointing at the exchange.
+- `POST /identity/operator/token-exchange` — **root only** (`SystemPermissions.Platform.CrossTenantImpersonate`, the catalog's "Cross-Tenant Impersonate"), plus a root-tenant check in the handler. The subject is a real user of the target tenant (`targetUserId`, else the tenant record's `AdminEmail`), so the normal permission pipeline applies unchanged. Reason required; unknown tenant 404, deactivated tenant 403, unknown user 404, deactivated user 409. No refresh token, no session row, no cookie.
+
+Neither accepts a caller that already carries `act_sub` (no nesting). The audit row lands in the **ambient** tenant — the caller's own — so an operator finds their crossings in root. `BuildClaimsForUserAsync`/`FindTenantUserAsync` read the target user with `IgnoreQueryFilters` from the ambient database.
+
+`RevokeImpersonationGrant` takes effect immediately on the instance that handled the revoke, and within the `ImpersonationGrantService` local cache's expiration (up to 1 minute, see `Services/ImpersonationGrantService.cs`) on any other instance — not the flat "~1 second" the endpoint used to claim.
+
+**An acting token (`act_sub` present) must never be able to change or reveal the subject's own credentials.** `.DenyWhenActing()` (`BuildingBlocks/Shared/Identity/Authorization/DenyWhenActingEndpointFilter.cs`) throws `ForbiddenException` (403) when the caller's token carries `act_sub`; it is applied to 2FA enroll/verify/disable and change-password. It is deliberately **not** applied to session revocation, profile name/image updates, or the impersonation end/revoke endpoints — those either don't touch credentials or are how an actor cleans up after themself.
+
+## Tests
+
+`Identity.Tests` is the largest unit suite. When asserting a forwarded `CancellationToken`, assert the specific token (see `testing.md`).

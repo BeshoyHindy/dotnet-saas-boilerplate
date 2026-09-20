@@ -1,0 +1,126 @@
+name: Template Smoke
+
+# Guards the distribution path (ADR-0001): the repository root IS a `dotnet new`
+# template, and scaffolding from it must produce a project that builds with
+# warnings as errors, passes its architecture and unit suites, builds its client,
+# runs its orchestrator tests, and carries no trace of the placeholder name.
+#
+# Every job runs the SAME script a developer runs — scripts/template-smoke.sh —
+# so a red job is reproducible in one command locally.
+#
+# Pull requests only, and only when something the scaffold ships changed. This
+# workflow produces a verdict, not an artifact, so re-running it on the push that
+# merges the PR would re-prove the same commit at full price. Gitflow (ADR-0007):
+# `develop` integrates, so the gate runs on PRs into `develop`, `main` and the
+# release/hotfix branches that feed `main`.
+
+on:
+  pull_request:
+    branches: [develop, main, 'release/**', 'hotfix/**']
+    paths:
+      - '.template.config/**'
+      - 'src/**'
+      - 'clients/**'
+      - 'deploy/**'
+      - 'docs/**'
+      - 'scripts/template-smoke.sh'
+      - 'scripts/brand-gate.sh'
+      - '.github/**'
+      - 'docker-compose.yml'
+      - '.env.example'
+      - 'README-template.md'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'sandcastle.config.mts'
+      - '.sandcastle/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_NOLOGO: true
+
+jobs:
+  smoke:
+    # One matrix leg for the default parameter set, plus one per parameter turned
+    # off. Each leg is a full scaffold + build, so the matrix is exactly four legs
+    # — combinations (no frontend AND no aspire) are not worth a runner each; the
+    # conditions they exercise are independent.
+    name: ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: default (frontend + aspire + sandcastle)
+            frontend: 'true'
+            aspire: 'true'
+            sandcastle: 'true'
+          - label: no frontend
+            frontend: 'false'
+            aspire: 'true'
+            sandcastle: 'true'
+          - label: no aspire
+            frontend: 'true'
+            aspire: 'false'
+            sandcastle: 'true'
+          - label: no sandcastle
+            frontend: 'true'
+            aspire: 'true'
+            sandcastle: 'false'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Scaffold, build and gate
+        env:
+          FRONTEND: ${{ matrix.frontend }}
+          ASPIRE: ${{ matrix.aspire }}
+          SANDCASTLE: ${{ matrix.sandcastle }}
+        run: |
+          bash scripts/template-smoke.sh \
+            --frontend "$FRONTEND" --aspire "$ASPIRE" --sandcastle "$SANDCASTLE"
+
+  # Single required status check — see backend.yml for the rationale.
+  template-smoke:
+    name: Template Smoke
+    needs: [smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if a smoke leg failed
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "::error::A template smoke leg failed or was cancelled."
+          exit 1
+      - name: Success
+        run: echo "Template smoke passed."

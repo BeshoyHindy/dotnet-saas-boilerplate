@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<RootNamespace>Boilerplate.Migrations.PostgreSQL</RootNamespace>
+		<AssemblyName>Boilerplate.Migrations.PostgreSQL</AssemblyName>
+		<IsPackable>false</IsPackable>
+		<!-- Suppress analyzer warnings for EF Core auto-generated migration files -->
+		<NoWarn>$(NoWarn);CA1062;CA1861</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\..\BuildingBlocks\Persistence\Boilerplate.BuildingBlocks.Persistence.csproj" />
+	  <ProjectReference Include="..\..\Modules\Auditing\Modules.Auditing\Boilerplate.Modules.Auditing.csproj" />
+	  <ProjectReference Include="..\..\Modules\Identity\Modules.Identity\Boilerplate.Modules.Identity.csproj" />
+	  <ProjectReference Include="..\..\Modules\Multitenancy\Modules.Multitenancy\Boilerplate.Modules.Multitenancy.csproj" />
+	  <ProjectReference Include="..\..\Modules\Notifications\Modules.Notifications\Boilerplate.Modules.Notifications.csproj" />
+	  <ProjectReference Include="..\..\Modules\Files\Modules.Files\Boilerplate.Modules.Files.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Audit\" />
+	  <Folder Include="MultiTenancy\" />
+	  <Folder Include="Notifications\" />
+	  <Folder Include="Files\" />
+	</ItemGroup>
+
+</Project>

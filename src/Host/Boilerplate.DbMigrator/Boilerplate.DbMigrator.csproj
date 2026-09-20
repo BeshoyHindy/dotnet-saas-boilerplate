@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Boilerplate.DbMigrator</RootNamespace>
+    <AssemblyName>Boilerplate.DbMigrator</AssemblyName>
+    <IsPackable>false</IsPackable>
+
+    <!-- Same local secret store as the API: the migrator seeds the root admin, so it needs the
+         seed password without it ever being committed. Bootstrap: `bash scripts/dev-secrets.sh`. -->
+    <UserSecretsId>0f2b2a2e-3d3c-4f0d-9d5f-2c9a1a9d6b71</UserSecretsId>
+
+    <!-- No Container* properties: the one-shot job image is the `migrator` target of
+         src/Host/Dockerfile (same chiseled, non-root base as the API, built by CI with
+         Buildx per ADR-0005). The SDK's PublishContainer target is not used; a second
+         definition of the same image only drifts. -->
+
+    <!-- This is an internal operator-facing CLI — no localization, all
+         operator messages are literal strings. CA1303 (use resource tables
+         for user-facing strings) is the wrong rule for this project. -->
+    <NoWarn>$(NoWarn);CA1303</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The demo seeder (DemoSeed/) is exercised end to end by the integration suite: it signs the
+         seeded accounts in through the real login endpoint. Internal + this, rather than public,
+         because CA1515 is right that an application assembly has no public API. -->
+    <InternalsVisibleTo Include="Boilerplate.Integration.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Mediator.Abstractions" />
+    <PackageReference Include="Mediator.SourceGenerator">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\BuildingBlocks\Web\Boilerplate.BuildingBlocks.Web.csproj" />
+    <ProjectReference Include="..\..\Modules\Auditing\Modules.Auditing\Boilerplate.Modules.Auditing.csproj" />
+    <ProjectReference Include="..\..\Modules\Auditing\Modules.Auditing.Contracts\Boilerplate.Modules.Auditing.Contracts.csproj" />
+    <ProjectReference Include="..\..\Modules\Files\Modules.Files\Boilerplate.Modules.Files.csproj" />
+    <ProjectReference Include="..\..\Modules\Files\Modules.Files.Contracts\Boilerplate.Modules.Files.Contracts.csproj" />
+    <ProjectReference Include="..\..\Modules\Identity\Modules.Identity\Boilerplate.Modules.Identity.csproj" />
+    <ProjectReference Include="..\..\Modules\Multitenancy\Modules.Multitenancy\Boilerplate.Modules.Multitenancy.csproj" />
+    <ProjectReference Include="..\Boilerplate.Migrations.PostgreSQL\Boilerplate.Migrations.PostgreSQL.csproj" />
+  </ItemGroup>
+
+  <!-- Share configuration with the API so connection strings + tenant options
+       stay in lock-step. Production deployments override via env vars. -->
+  <ItemGroup>
+    <None Include="..\Boilerplate.Api\appsettings.json"
+          Link="appsettings.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Boilerplate.Api\appsettings.Development.json"
+          Link="appsettings.Development.json"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<RootNamespace>Boilerplate.BuildingBlocks.Jobs</RootNamespace>
+		<AssemblyName>Boilerplate.BuildingBlocks.Jobs</AssemblyName>
+		<NoWarn>$(NoWarn);CA1031;S3376;S3993</NoWarn>
+	</PropertyGroup>
+	
+	<ItemGroup>
+		<PackageReference Include="Hangfire" />
+		<PackageReference Include="Hangfire.PostgreSql" />
+		<PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+		<PackageReference Include="Microsoft.Extensions.Options" />
+		<PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+	</ItemGroup>
+	
+	<ItemGroup>
+	  <ProjectReference Include="..\Core\Boilerplate.BuildingBlocks.Core.csproj" />
+	  <ProjectReference Include="..\Shared\Boilerplate.BuildingBlocks.Shared.csproj" />
+	</ItemGroup>
+</Project>

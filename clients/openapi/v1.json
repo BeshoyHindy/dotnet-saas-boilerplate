@@ -1,0 +1,6379 @@
+{
+  "components": {
+    "schemas": {
+      "AddUsersRequest": {
+        "properties": {
+          "userIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "userIds"
+        ],
+        "type": "object"
+      },
+      "AddUsersToGroupResponse": {
+        "properties": {
+          "addedCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "alreadyMemberUserIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "addedCount",
+          "alreadyMemberUserIds"
+        ],
+        "type": "object"
+      },
+      "AdjustTenantValidityCommand": {
+        "properties": {
+          "tenantId": {
+            "type": "string"
+          },
+          "validUpto": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId",
+          "validUpto"
+        ],
+        "type": "object"
+      },
+      "AdjustTenantValidityCommandResponse": {
+        "properties": {
+          "tenantId": {
+            "type": "string"
+          },
+          "validUpto": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId",
+          "validUpto"
+        ],
+        "type": "object"
+      },
+      "AdminRevokeAllSessionsCommand": {
+        "properties": {
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "userId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId"
+        ],
+        "type": "object"
+      },
+      "AssignUserRolesCommand": {
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "userRoles": {
+            "items": {
+              "$ref": "#/components/schemas/UserRoleDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "userId"
+        ],
+        "type": "object"
+      },
+      "AuditDetailDto": {
+        "properties": {
+          "correlationId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "eventType": {
+            "$ref": "#/components/schemas/AuditEventType"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "occurredAtUtc": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "receivedAtUtc": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "requestId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "severity": {
+            "$ref": "#/components/schemas/AuditSeverity"
+          },
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "spanId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "tags": {
+            "$ref": "#/components/schemas/AuditTag"
+          },
+          "tenantId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "traceId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "userId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "userName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "AuditEventType": {
+        "enum": [
+          "None",
+          "EntityChange",
+          "Security",
+          "Activity",
+          "Exception"
+        ]
+      },
+      "AuditSeverity": {
+        "enum": [
+          "None",
+          "Trace",
+          "Debug",
+          "Information",
+          "Warning",
+          "Error",
+          "Critical"
+        ]
+      },
+      "AuditSummaryAggregateDto": {
+        "properties": {
+          "eventsBySeverity": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "eventsBySource": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "eventsByTenant": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "object"
+          },
+          "eventsByType": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "AuditSummaryDto": {
+        "properties": {
+          "correlationId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "eventType": {
+            "$ref": "#/components/schemas/AuditEventType"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "occurredAtUtc": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "requestId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "severity": {
+            "$ref": "#/components/schemas/AuditSeverity"
+          },
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "tags": {
+            "$ref": "#/components/schemas/AuditTag"
+          },
+          "tenantId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "traceId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "userId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "userName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "AuditTag": {
+        "type": "string"
+      },
+      "Body": {
+        "properties": {
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "type": "object"
+      },
+      "BrandAssetUploadsDto": {
+        "properties": {
+          "deleteFavicon": {
+            "type": "boolean"
+          },
+          "deleteLogo": {
+            "type": "boolean"
+          },
+          "deleteLogoDark": {
+            "type": "boolean"
+          },
+          "favicon": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FileUploadRequest"
+              }
+            ]
+          },
+          "logo": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FileUploadRequest"
+              }
+            ]
+          },
+          "logoDark": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FileUploadRequest"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "BrandAssetsDto": {
+        "properties": {
+          "faviconUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "logoDarkUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "logoUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ChangePasswordCommand": {
+        "properties": {
+          "confirmNewPassword": {
+            "type": "string"
+          },
+          "newPassword": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ChangeTenantActivationCommand": {
+        "properties": {
+          "isActive": {
+            "type": "boolean"
+          },
+          "tenantId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId",
+          "isActive"
+        ],
+        "type": "object"
+      },
+      "ChangeVisibilityRequest": {
+        "properties": {
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility"
+          }
+        },
+        "required": [
+          "visibility"
+        ],
+        "type": "object"
+      },
+      "CreateGroupCommand": {
+        "properties": {
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "roleIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "isDefault",
+          "roleIds"
+        ],
+        "type": "object"
+      },
+      "CreateTenantCommand": {
+        "properties": {
+          "adminEmail": {
+            "type": "string"
+          },
+          "adminPassword": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "issuer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "validUpto": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "adminEmail",
+          "adminPassword",
+          "issuer"
+        ],
+        "type": "object"
+      },
+      "CreateTenantCommandResponse": {
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "provisioningCorrelationId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "provisioningCorrelationId",
+          "status"
+        ],
+        "type": "object"
+      },
+      "DisableTwoFactorCommand": {
+        "properties": {
+          "currentPassword": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "currentPassword"
+        ],
+        "type": "object"
+      },
+      "EndImpersonationResponse": {
+        "properties": {
+          "actorTenantId": {
+            "type": "string"
+          },
+          "actorUserId": {
+            "type": "string"
+          },
+          "endedAtUtc": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "impersonatedTenantId": {
+            "type": "string"
+          },
+          "impersonatedUserId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "actorUserId",
+          "actorTenantId",
+          "impersonatedUserId",
+          "impersonatedTenantId",
+          "endedAtUtc"
+        ],
+        "type": "object"
+      },
+      "EndSessionCommand": {
+        "properties": {
+          "refreshToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "refreshToken"
+        ],
+        "type": "object"
+      },
+      "ExceptionArea": {
+        "enum": [
+          "None",
+          "Api",
+          "Worker",
+          "Ui",
+          "Infra",
+          "Unknown",
+          null
+        ]
+      },
+      "ExchangeOperatorTokenCommand": {
+        "properties": {
+          "durationMinutes": {
+            "format": "int32",
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "targetTenantId": {
+            "type": "string"
+          },
+          "targetUserId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "targetTenantId",
+          "targetUserId",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "FileAssetDto": {
+        "properties": {
+          "contentType": {
+            "type": "string"
+          },
+          "createdAtUtc": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "createdByUserId": {
+            "default": "",
+            "type": "string"
+          },
+          "deletedBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "deletedOnUtc": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "originalFileName": {
+            "type": "string"
+          },
+          "ownerId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ownerType": {
+            "type": "string"
+          },
+          "publicUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "scanStatus": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "sizeBytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/FileAssetStatus"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility"
+          }
+        },
+        "required": [
+          "id",
+          "ownerType",
+          "ownerId",
+          "originalFileName",
+          "contentType",
+          "sizeBytes",
+          "visibility",
+          "status",
+          "scanStatus",
+          "createdAtUtc",
+          "publicUrl"
+        ],
+        "type": "object"
+      },
+      "FileAssetStatus": {
+        "enum": [
+          "PendingUpload",
+          "Available",
+          "Quarantined"
+        ]
+      },
+      "FileUploadRequest": {
+        "description": "Represents a file upload request with filename, content type, and data.",
+        "properties": {
+          "contentType": {
+            "type": "string"
+          },
+          "data": {
+            "items": {
+              "format": "uint8",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "fileName": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ForgotPasswordCommand": {
+        "properties": {
+          "email": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "GenerateTokenCommand": {
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "twoFactorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "type": "object"
+      },
+      "GroupDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "isSystemGroup": {
+            "type": "boolean"
+          },
+          "memberCount": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "roleIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "roleNames": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "GroupMemberDto": {
+        "properties": {
+          "addedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "addedBy": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "firstName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "lastName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "userId": {
+            "type": "string"
+          },
+          "userName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "ImpersonationGrantDto": {
+        "properties": {
+          "actorTenantId": {
+            "type": "string"
+          },
+          "actorUserId": {
+            "type": "string"
+          },
+          "actorUserName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "endedAtUtc": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "expiresAtUtc": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "impersonatedTenantId": {
+            "type": "string"
+          },
+          "impersonatedUserId": {
+            "type": "string"
+          },
+          "impersonatedUserName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "jti": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "revokeReason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "revokedAtUtc": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "revokedByUserId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "revokedByUserName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "startedAtUtc": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ImpersonationGrantStatus"
+          }
+        },
+        "required": [
+          "id",
+          "jti",
+          "actorUserId",
+          "actorUserName",
+          "actorTenantId",
+          "impersonatedUserId",
+          "impersonatedUserName",
+          "impersonatedTenantId",
+          "reason",
+          "startedAtUtc",
+          "expiresAtUtc",
+          "endedAtUtc",
+          "revokedAtUtc",
+          "revokedByUserId",
+          "revokedByUserName",
+          "revokeReason",
+          "status"
+        ],
+        "type": "object"
+      },
+      "ImpersonationGrantStatus": {
+        "enum": [
+          "Active",
+          "Ended",
+          "Revoked",
+          "Expired"
+        ]
+      },
+      "ImpersonationResponse": {
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "accessTokenExpiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "actorTenantId": {
+            "type": "string"
+          },
+          "actorUserId": {
+            "type": "string"
+          },
+          "impersonatedTenantId": {
+            "type": "string"
+          },
+          "impersonatedUserId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "accessToken",
+          "accessTokenExpiresAt",
+          "actorUserId",
+          "actorTenantId",
+          "impersonatedUserId",
+          "impersonatedTenantId"
+        ],
+        "type": "object"
+      },
+      "JsonElement": {},
+      "LayoutDto": {
+        "properties": {
+          "borderRadius": {
+            "type": "string"
+          },
+          "defaultElevation": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "NotificationDto": {
+        "properties": {
+          "body": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAtUtc": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "link": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "metadataJson": {
+            "type": "string"
+          },
+          "readAtUtc": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "source": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "title",
+          "body",
+          "link",
+          "source",
+          "metadataJson",
+          "readAtUtc",
+          "createdAtUtc"
+        ],
+        "type": "object"
+      },
+      "OperatorTokenExchangeResponse": {
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "accessTokenExpiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "actorTenantId": {
+            "type": "string"
+          },
+          "actorUserId": {
+            "type": "string"
+          },
+          "grantId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "jti": {
+            "type": "string"
+          },
+          "targetTenantId": {
+            "type": "string"
+          },
+          "targetUserId": {
+            "type": "string"
+          },
+          "targetUserName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "accessToken",
+          "accessTokenExpiresAt",
+          "targetTenantId",
+          "targetUserId",
+          "targetUserName",
+          "actorUserId",
+          "actorTenantId",
+          "grantId",
+          "jti"
+        ],
+        "type": "object"
+      },
+      "PagedResponseOfAuditSummaryDto": {
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AuditSummaryDto"
+            },
+            "type": "array"
+          },
+          "pageNumber": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PagedResponseOfFileAssetDto": {
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FileAssetDto"
+            },
+            "type": "array"
+          },
+          "pageNumber": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PagedResponseOfRoleDto": {
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RoleDto"
+            },
+            "type": "array"
+          },
+          "pageNumber": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PagedResponseOfTenantDto": {
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TenantDto"
+            },
+            "type": "array"
+          },
+          "pageNumber": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PagedResponseOfUserDto": {
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UserDto"
+            },
+            "type": "array"
+          },
+          "pageNumber": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PagedResponseOfUserSessionDto": {
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UserSessionDto"
+            },
+            "type": "array"
+          },
+          "pageNumber": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PaletteDto": {
+        "properties": {
+          "background": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "info": {
+            "type": "string"
+          },
+          "primary": {
+            "type": "string"
+          },
+          "secondary": {
+            "type": "string"
+          },
+          "success": {
+            "type": "string"
+          },
+          "surface": {
+            "type": "string"
+          },
+          "tertiary": {
+            "type": "string"
+          },
+          "warning": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PermissionCatalogEntryDto": {
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "isBasic": {
+            "type": "boolean"
+          },
+          "isRoot": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "resource": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "resource",
+          "action",
+          "isBasic",
+          "isRoot"
+        ],
+        "type": "object"
+      },
+      "PresignedDownloadResponse": {
+        "properties": {
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "url": {
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expiresAt"
+        ],
+        "type": "object"
+      },
+      "PresignedUploadResponse": {
+        "properties": {
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "fileAssetId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "requiredHeaders": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "uploadUrl": {
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fileAssetId",
+          "uploadUrl",
+          "requiredHeaders",
+          "expiresAt"
+        ],
+        "type": "object"
+      },
+      "RefreshTokenCommand": {
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          },
+          "token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "token",
+          "refreshToken"
+        ],
+        "type": "object"
+      },
+      "RefreshTokenCommandResponse": {
+        "properties": {
+          "refreshToken": {
+            "type": "string"
+          },
+          "refreshTokenExpiryTime": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "refreshToken",
+          "refreshTokenExpiryTime"
+        ],
+        "type": "object"
+      },
+      "RegisterUserCommand": {
+        "properties": {
+          "confirmPassword": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "phoneNumber": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "userName": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RegisterUserResponse": {
+        "properties": {
+          "userId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId"
+        ],
+        "type": "object"
+      },
+      "RenewTenantCommand": {
+        "properties": {
+          "months": {
+            "format": "int32",
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "tenantId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId"
+        ],
+        "type": "object"
+      },
+      "RenewTenantCommandResponse": {
+        "properties": {
+          "tenantId": {
+            "type": "string"
+          },
+          "validUpto": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId",
+          "validUpto"
+        ],
+        "type": "object"
+      },
+      "RequestUploadUrlCommand": {
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "ownerId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ownerType": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "visibility": {
+            "$ref": "#/components/schemas/Visibility"
+          }
+        },
+        "required": [
+          "ownerType",
+          "ownerId",
+          "fileName",
+          "contentType",
+          "sizeBytes",
+          "visibility",
+          "category"
+        ],
+        "type": "object"
+      },
+      "ResetPasswordCommand": {
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RevokeAllSessionsCommand": {
+        "properties": {
+          "exceptSessionId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "RevokeSessionsResponse": {
+        "properties": {
+          "revokedCount": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revokedCount"
+        ],
+        "type": "object"
+      },
+      "RoleDto": {
+        "properties": {
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "SecurityAction": {
+        "enum": [
+          "None",
+          "LoginSucceeded",
+          "LoginFailed",
+          "TokenIssued",
+          "TokenRevoked",
+          "PasswordChanged",
+          "RoleAssigned",
+          "RoleRevoked",
+          "PermissionDenied",
+          "PolicyFailed",
+          "ImpersonationStarted",
+          "ImpersonationEnded",
+          null
+        ]
+      },
+      "StartImpersonationCommand": {
+        "properties": {
+          "durationMinutes": {
+            "format": "int32",
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "targetTenantId": {
+            "type": "string"
+          },
+          "targetUserId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetUserId",
+          "targetTenantId",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "TenantDto": {
+        "properties": {
+          "adminEmail": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "issuer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "validUpto": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TenantLifecycleResultDto": {
+        "properties": {
+          "isActive": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "validUpto": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "TenantProvisioningStatusDto": {
+        "properties": {
+          "completedUtc": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "correlationId": {
+            "type": "string"
+          },
+          "createdUtc": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "currentStep": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "startedUtc": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/TenantProvisioningStepDto"
+            },
+            "type": "array"
+          },
+          "tenantId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenantId",
+          "status",
+          "correlationId",
+          "currentStep",
+          "error",
+          "createdUtc",
+          "startedUtc",
+          "completedUtc",
+          "steps"
+        ],
+        "type": "object"
+      },
+      "TenantProvisioningStepDto": {
+        "properties": {
+          "completedUtc": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "startedUtc": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "type": "string"
+          },
+          "step": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "step",
+          "status",
+          "startedUtc",
+          "completedUtc",
+          "error"
+        ],
+        "type": "object"
+      },
+      "TenantStatusDto": {
+        "properties": {
+          "adminEmail": {
+            "type": "string"
+          },
+          "expiryState": {
+            "type": "string"
+          },
+          "graceEndsUtc": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "issuer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "validUpto": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TenantThemeDto": {
+        "properties": {
+          "brandAssets": {
+            "$ref": "#/components/schemas/BrandAssetsDto"
+          },
+          "darkPalette": {
+            "$ref": "#/components/schemas/PaletteDto"
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "layout": {
+            "$ref": "#/components/schemas/LayoutDto"
+          },
+          "lightPalette": {
+            "$ref": "#/components/schemas/PaletteDto"
+          },
+          "typography": {
+            "$ref": "#/components/schemas/TypographyDto"
+          }
+        },
+        "type": "object"
+      },
+      "TenantThemeUpdateDto": {
+        "properties": {
+          "brandAssets": {
+            "$ref": "#/components/schemas/BrandAssetUploadsDto"
+          },
+          "darkPalette": {
+            "$ref": "#/components/schemas/PaletteDto"
+          },
+          "layout": {
+            "$ref": "#/components/schemas/LayoutDto"
+          },
+          "lightPalette": {
+            "$ref": "#/components/schemas/PaletteDto"
+          },
+          "typography": {
+            "$ref": "#/components/schemas/TypographyDto"
+          }
+        },
+        "type": "object"
+      },
+      "ToggleUserStatusCommand": {
+        "properties": {
+          "activateUser": {
+            "type": "boolean"
+          },
+          "userId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "TokenResponse": {
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "accessTokenExpiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "refreshTokenExpiresAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "refreshTokenExpiresAt",
+          "accessTokenExpiresAt"
+        ],
+        "type": "object"
+      },
+      "TwoFactorEnrollmentResponse": {
+        "properties": {
+          "authenticatorUri": {
+            "type": "string"
+          },
+          "sharedKey": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sharedKey",
+          "authenticatorUri"
+        ],
+        "type": "object"
+      },
+      "TwoFactorOperationResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "type": "object"
+      },
+      "TypographyDto": {
+        "properties": {
+          "fontFamily": {
+            "type": "string"
+          },
+          "fontSizeBase": {
+            "format": "double",
+            "type": "number"
+          },
+          "headingFontFamily": {
+            "type": "string"
+          },
+          "lineHeightBase": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateGroupRequest": {
+        "properties": {
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "roleIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "isDefault",
+          "roleIds"
+        ],
+        "type": "object"
+      },
+      "UpdatePermissionsCommand": {
+        "properties": {
+          "permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "roleId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UpdateUserCommand": {
+        "properties": {
+          "deleteCurrentImage": {
+            "type": "boolean"
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "firstName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "image": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FileUploadRequest"
+              }
+            ]
+          },
+          "lastName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "phoneNumber": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "UpsertRoleCommand": {
+        "properties": {
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "UserDto": {
+        "properties": {
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "emailConfirmed": {
+            "type": "boolean"
+          },
+          "firstName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "imageUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "lastName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "phoneNumber": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "twoFactorEnabled": {
+            "type": "boolean"
+          },
+          "userName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "UserRoleDto": {
+        "properties": {
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "roleId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "roleName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "UserSessionDto": {
+        "properties": {
+          "browser": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "browserVersion": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "deviceType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ipAddress": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "isCurrentSession": {
+            "type": "boolean"
+          },
+          "lastActivityAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "operatingSystem": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "osVersion": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "userEmail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "userId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "userName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "VerifyEnrollTwoFactorCommand": {
+        "properties": {
+          "code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "type": "object"
+      },
+      "Visibility": {
+        "enum": [
+          "Public",
+          "Private"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "bearerFormat": "Json Web Token",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "contact": {
+      "email": "contact@example.com",
+      "name": "Boilerplate",
+      "url": "https://example.com/contact"
+    },
+    "description": "Modular, multitenant SaaS API.",
+    "license": {
+      "name": "MIT License",
+      "url": "https://opensource.org/licenses/MIT"
+    },
+    "title": "Boilerplate API",
+    "version": "v1"
+  },
+  "openapi": "3.1.1",
+  "paths": {
+    "/api/v1/audits": {
+      "get": {
+        "description": "Retrieve audit events with pagination and filters.",
+        "operationId": "GetAudits",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "PageNumber",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "PageSize",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "FromUtc",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ToUtc",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "TenantId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "UserId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "EventType",
+            "schema": {
+              "$ref": "#/components/schemas/AuditEventType"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ExcludeEventType",
+            "schema": {
+              "$ref": "#/components/schemas/AuditEventType"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Severity",
+            "schema": {
+              "$ref": "#/components/schemas/AuditSeverity"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Tags",
+            "schema": {
+              "$ref": "#/components/schemas/AuditTag"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Source",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "CorrelationId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "TraceId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Search",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfAuditSummaryDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "List and search audit events",
+        "tags": [
+          "Audits"
+        ]
+      }
+    },
+    "/api/v1/audits/by-correlation/{correlationId}": {
+      "get": {
+        "description": "Retrieve audit events associated with a given correlation id.",
+        "operationId": "GetAuditsByCorrelation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "correlationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fromUtc",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "toUtc",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AuditSummaryDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get audit events by correlation id",
+        "tags": [
+          "Audits"
+        ]
+      }
+    },
+    "/api/v1/audits/by-trace/{traceId}": {
+      "get": {
+        "description": "Retrieve audit events associated with a given trace id.",
+        "operationId": "GetAuditsByTrace",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "traceId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fromUtc",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "toUtc",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AuditSummaryDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get audit events by trace id",
+        "tags": [
+          "Audits"
+        ]
+      }
+    },
+    "/api/v1/audits/exceptions": {
+      "get": {
+        "description": "Retrieve audit events related to exceptions.",
+        "operationId": "GetExceptionAudits",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "Area",
+            "schema": {
+              "$ref": "#/components/schemas/ExceptionArea"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Severity",
+            "schema": {
+              "$ref": "#/components/schemas/AuditSeverity"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ExceptionType",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "RouteOrLocation",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "FromUtc",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ToUtc",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Skip",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Take",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AuditSummaryDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get exception audit events",
+        "tags": [
+          "Audits"
+        ]
+      }
+    },
+    "/api/v1/audits/security": {
+      "get": {
+        "description": "Retrieve security audit events such as login, logout, and permission denials.",
+        "operationId": "GetSecurityAudits",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "Action",
+            "schema": {
+              "$ref": "#/components/schemas/SecurityAction"
+            }
+          },
+          {
+            "in": "query",
+            "name": "UserId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "TenantId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "FromUtc",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ToUtc",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Skip",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Take",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AuditSummaryDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get security-related audit events",
+        "tags": [
+          "Audits"
+        ]
+      }
+    },
+    "/api/v1/audits/summary": {
+      "get": {
+        "description": "Retrieve aggregate counts of audit events by type, severity, source, and tenant.",
+        "operationId": "GetAuditSummary",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "FromUtc",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ToUtc",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "TenantId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditSummaryAggregateDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get audit summary",
+        "tags": [
+          "Audits"
+        ]
+      }
+    },
+    "/api/v1/audits/{id}": {
+      "get": {
+        "description": "Retrieve full details for a single audit event.",
+        "operationId": "GetAuditById",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditDetailDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get audit event by ID",
+        "tags": [
+          "Audits"
+        ]
+      }
+    },
+    "/api/v1/files/mine": {
+      "get": {
+        "operationId": "ListMyFiles",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FileAssetDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "List files uploaded by the current user",
+        "tags": [
+          "Files"
+        ]
+      }
+    },
+    "/api/v1/files/shared": {
+      "get": {
+        "operationId": "ListSharedFiles",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FileAssetDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "List Public files in this tenant (the 'Shared' view)",
+        "tags": [
+          "Files"
+        ]
+      }
+    },
+    "/api/v1/files/trash": {
+      "get": {
+        "operationId": "ListTrashedFiles",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "pageNumber",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfFileAssetDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "List soft-deleted files (admin/trash view)",
+        "tags": [
+          "Files"
+        ]
+      }
+    },
+    "/api/v1/files/upload-url": {
+      "post": {
+        "operationId": "RequestFileUploadUrl",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestUploadUrlCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresignedUploadResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Mint a presigned PUT URL for a file upload",
+        "tags": [
+          "Files"
+        ]
+      }
+    },
+    "/api/v1/files/{id}": {
+      "delete": {
+        "operationId": "DeleteFile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Soft-delete a file; bytes purged after retention window",
+        "tags": [
+          "Files"
+        ]
+      },
+      "get": {
+        "operationId": "GetFileMetadata",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileAssetDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get FileAsset metadata (plus a public URL if Visibility=Public)",
+        "tags": [
+          "Files"
+        ]
+      }
+    },
+    "/api/v1/files/{id}/finalize": {
+      "post": {
+        "operationId": "FinalizeFileUpload",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileAssetDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Finalize a file upload after the browser PUT completes",
+        "tags": [
+          "Files"
+        ]
+      }
+    },
+    "/api/v1/files/{id}/restore": {
+      "post": {
+        "operationId": "RestoreFile",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Restore a soft-deleted file from trash (admin)",
+        "tags": [
+          "Files"
+        ]
+      }
+    },
+    "/api/v1/files/{id}/url": {
+      "get": {
+        "description": "Default disposition is attachment (click-to-save). Pass ?inline=true to get an inline disposition for browser preview (PDF viewer, image render, etc.).",
+        "operationId": "GetFileDownloadUrl",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "inline",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresignedDownloadResponse"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Mint a short-lived presigned download URL",
+        "tags": [
+          "Files"
+        ]
+      }
+    },
+    "/api/v1/files/{id}/visibility": {
+      "patch": {
+        "description": "Authenticated upload permission gates the HTTP surface; per-file authorization is delegated to the OwnerType's IFileAccessPolicy (uploader-only by default).",
+        "operationId": "ChangeFileVisibility",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeVisibilityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileAssetDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Flip a file's visibility (Public ↔ Private)",
+        "tags": [
+          "Files"
+        ]
+      }
+    },
+    "/api/v1/identity/2fa/disable": {
+      "post": {
+        "description": "Turns off 2FA after confirming the current password. Also rotates the authenticator secret so a re-enroll starts fresh.",
+        "operationId": "DisableTwoFactor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisableTwoFactorCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorOperationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Disable TOTP for the current user",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/2fa/enroll": {
+      "post": {
+        "description": "Generates (or rotates) the current user's authenticator shared secret and returns it plus an otpauth:// URI for QR rendering. 2FA is NOT enabled until the caller confirms with /2fa/verify.",
+        "operationId": "EnrollTwoFactor",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorEnrollmentResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Begin TOTP enrollment",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/2fa/verify": {
+      "post": {
+        "description": "Verifies the 6-digit code from the authenticator app. On success, 2FA is enabled and subsequent logins must include a code.",
+        "operationId": "VerifyEnrollTwoFactor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyEnrollTwoFactorCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TwoFactorOperationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Confirm TOTP enrollment",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/change-password": {
+      "post": {
+        "description": "Change the current user's password.",
+        "operationId": "ChangePassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Change password",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/groups": {
+      "get": {
+        "description": "Retrieve all groups for the current tenant with optional search filter.",
+        "operationId": "ListGroups",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GroupDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "List all groups",
+        "tags": [
+          "Identity"
+        ]
+      },
+      "post": {
+        "description": "Create a new group with optional role assignments.",
+        "operationId": "CreateGroup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDto"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Create a new group",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/groups/{groupId}/members": {
+      "get": {
+        "description": "Retrieve all users that belong to a specific group.",
+        "operationId": "GetGroupMembers",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "groupId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GroupMemberDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get members of a group",
+        "tags": [
+          "Identity"
+        ]
+      },
+      "post": {
+        "description": "Add one or more users to a group. Returns count of added users and list of users already in the group.",
+        "operationId": "AddUsersToGroup",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "groupId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddUsersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddUsersToGroupResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Add users to a group",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/groups/{groupId}/members/{userId}": {
+      "delete": {
+        "description": "Remove a specific user from a group.",
+        "operationId": "RemoveUserFromGroup",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "groupId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Remove a user from a group",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/groups/{id}": {
+      "delete": {
+        "description": "Soft delete a group. System groups cannot be deleted.",
+        "operationId": "DeleteGroup",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Delete a group",
+        "tags": [
+          "Identity"
+        ]
+      },
+      "get": {
+        "description": "Retrieve a specific group by its ID including roles and member count.",
+        "operationId": "GetGroupById",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get group by ID",
+        "tags": [
+          "Identity"
+        ]
+      },
+      "put": {
+        "description": "Update a group's name, description, default status, and role assignments.",
+        "operationId": "UpdateGroup",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGroupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Update a group",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/impersonation/end": {
+      "post": {
+        "description": "Marks the grant behind the caller's acting token (same-tenant impersonation or an exchanged operator token) as ended, so that token is rejected on its next request. Returns no token: the actor's own session was never taken away, so the client simply drops the acting one. Callable by any authenticated session carrying act_sub.",
+        "operationId": "EndImpersonation",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndImpersonationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "End the current acting session",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/impersonation/grants": {
+      "get": {
+        "description": "Lists impersonation sessions scoped to what the caller can see. Tenant admins are limited to grants targeting their own tenant; root operators can filter by any tenant.",
+        "operationId": "GetImpersonationGrants",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "Status",
+            "schema": {
+              "$ref": "#/components/schemas/ImpersonationGrantStatus"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ImpersonatedTenantId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ActorUserId",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Take",
+            "schema": {
+              "default": 100,
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ImpersonationGrantDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "List impersonation grants",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/impersonation/grants/{id}/revoke": {
+      "post": {
+        "description": "Marks the grant as revoked. Subsequent requests carrying the impersonation token are rejected by the JWT validation hook immediately on the instance that handled the revoke, and within the local cache's expiration (up to 1 minute) on any other instance.",
+        "operationId": "RevokeImpersonationGrant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Body"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImpersonationGrantDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Revoke an impersonation grant",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/impersonation/start": {
+      "post": {
+        "description": "Issues a short-lived access token representing the target user. The token carries actor claims (act_sub, act_tenant) identifying the original caller. Platform operators (root tenant) may impersonate any user; tenant admins can only impersonate users within their own tenant. No refresh token is issued.",
+        "operationId": "StartImpersonation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartImpersonationCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImpersonationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Start user impersonation",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/operator/token-exchange": {
+      "post": {
+        "description": "ADR-0002. Root operators cross tenants by exchanging tokens, never by header. Returns a short-lived, access-only token whose `tenant` claim is the target tenant and whose subject is a real user of that tenant (targetUserId, else the tenant's admin), carrying act_sub/act_tenant for the operator. No refresh token, no session row, no cookie. The exchange is audited and revocable through the impersonation grant list (same jti revocation path). Requesting more than the configured maximum clamps the lifetime rather than failing.",
+        "operationId": "ExchangeOperatorToken",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExchangeOperatorTokenCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperatorTokenExchangeResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Exchange an operator token for a target tenant",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/permissions": {
+      "get": {
+        "description": "Retrieve permissions for the authenticated user. Requires authentication only — every signed-in user can read their own grants.",
+        "operationId": "GetCurrentUserPermissions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get current user permissions",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/permissions/catalog": {
+      "get": {
+        "description": "Returns every permission registered in the host, filtered to the caller's tenant context. Non-root tenants see the Admin set; the root tenant additionally sees the platform Root set.",
+        "operationId": "GetPermissionCatalog",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PermissionCatalogEntryDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get permission catalog",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/profile": {
+      "get": {
+        "description": "Retrieve the authenticated user's profile from the access token.",
+        "operationId": "GetCurrentUserProfile",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get current user profile",
+        "tags": [
+          "Identity"
+        ]
+      },
+      "put": {
+        "description": "Update profile details for the authenticated user. Any signed-in user may edit their own profile; no admin permission required.",
+        "operationId": "UpdateUserProfile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Update user profile",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/register": {
+      "post": {
+        "description": "Create a new user account.",
+        "operationId": "RegisterUser",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterUserCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterUserResponse"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Register user",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/roles": {
+      "get": {
+        "description": "Retrieve roles available for the current tenant. Pageable via PageNumber/PageSize; filterable via Search (case-insensitive substring against name + description).",
+        "operationId": "ListRoles",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "PageNumber",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "PageSize",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Search",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfRoleDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "List roles (paged)",
+        "tags": [
+          "Identity"
+        ]
+      },
+      "post": {
+        "description": "Create a new role or update an existing role's name and description.",
+        "operationId": "CreateOrUpdateRole",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertRoleCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Create or update role",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/roles/{id}": {
+      "delete": {
+        "description": "Remove an existing role by its unique identifier.",
+        "operationId": "DeleteRole",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Delete role by ID",
+        "tags": [
+          "Identity"
+        ]
+      },
+      "get": {
+        "description": "Retrieve details of a specific role by its unique identifier.",
+        "operationId": "GetRole",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get role by ID",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/sessions": {
+      "get": {
+        "description": "Returns paged sessions across the tenant, filterable by active state and a free-text search across user name, email, and IP address.",
+        "operationId": "GetTenantSessions",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "includeInactive",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageNumber",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfUserSessionDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "List all sessions in the current tenant (Admin)",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/sessions/me": {
+      "get": {
+        "description": "Retrieve all active sessions for the currently authenticated user.",
+        "operationId": "GetMySessions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserSessionDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get current user's sessions",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/sessions/revoke-all": {
+      "post": {
+        "description": "Revoke all sessions for the currently authenticated user except the current one.",
+        "operationId": "RevokeAllSessions",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RevokeAllSessionsCommand"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeSessionsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Revoke all sessions",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/sessions/{sessionId}": {
+      "delete": {
+        "description": "Revoke a specific session for the currently authenticated user.",
+        "operationId": "RevokeSession",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Revoke a session",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/users": {
+      "get": {
+        "description": "Retrieve a list of users for the current tenant.",
+        "operationId": "ListUsers",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "List users",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/users/search": {
+      "get": {
+        "description": "Search and filter users with server-side pagination, sorting, and filtering by status, email confirmation, and role.",
+        "operationId": "SearchUsers",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "PageNumber",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "PageSize",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Search",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "IsActive",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "EmailConfirmed",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "RoleId",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfUserDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Search users with pagination",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/users/{id}": {
+      "delete": {
+        "description": "Delete a user by unique identifier.",
+        "operationId": "DeleteUser",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Delete user",
+        "tags": [
+          "Identity"
+        ]
+      },
+      "get": {
+        "description": "Retrieve a user's profile details by unique user identifier.",
+        "operationId": "GetUser",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get user by ID",
+        "tags": [
+          "Identity"
+        ]
+      },
+      "patch": {
+        "description": "Activate or deactivate a user account.",
+        "operationId": "ToggleUserStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToggleUserStatusCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Toggle user status",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/users/{id}/confirm-email": {
+      "post": {
+        "description": "Marks another user's email address as confirmed without a confirmation token.",
+        "operationId": "AdminConfirmEmail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Confirm a user's email (admin)",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/users/{id}/resend-confirmation-email": {
+      "post": {
+        "description": "Re-sends the email-confirmation link to a user who has not confirmed their address yet.",
+        "operationId": "ResendConfirmationEmail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Resend a user's email confirmation (admin)",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/users/{id}/roles": {
+      "get": {
+        "description": "Retrieve the roles assigned to a specific user.",
+        "operationId": "GetUserRoles",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserRoleDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get user roles",
+        "tags": [
+          "Identity"
+        ]
+      },
+      "post": {
+        "description": "Assign one or more roles to a user.",
+        "operationId": "AssignUserRoles",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignUserRolesCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Assign roles to user",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/users/{userId}/groups": {
+      "get": {
+        "description": "Retrieve all groups that a specific user belongs to.",
+        "operationId": "GetUserGroups",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GroupDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get groups for a user",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/users/{userId}/sessions": {
+      "get": {
+        "description": "Retrieve all active sessions for a specific user. Requires admin permission.",
+        "operationId": "GetUserSessions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserSessionDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get user's sessions (Admin)",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/users/{userId}/sessions/revoke-all": {
+      "post": {
+        "description": "Revoke all sessions for a specific user. Requires admin permission.",
+        "operationId": "AdminRevokeAllSessions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AdminRevokeAllSessionsCommand"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeSessionsResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Revoke all user's sessions (Admin)",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/users/{userId}/sessions/{sessionId}": {
+      "delete": {
+        "description": "Revoke a specific session for a user. Requires admin permission.",
+        "operationId": "AdminRevokeSession",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "sessionId",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Revoke a user's session (Admin)",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/{id}/permissions": {
+      "get": {
+        "description": "Retrieve a role along with its assigned permissions.",
+        "operationId": "GetRolePermissions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get role permissions",
+        "tags": [
+          "Identity"
+        ]
+      },
+      "put": {
+        "description": "Replace the set of permissions assigned to a role.",
+        "operationId": "UpdateRolePermissions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePermissionsCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Update role permissions",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "operationId": "ListNotifications",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "unreadOnly",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/NotificationDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "List the caller's notifications (newest first)",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/read-all": {
+      "post": {
+        "operationId": "MarkAllNotificationsRead",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Mark every unread notification for the caller as read; returns the count updated",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/unread-count": {
+      "get": {
+        "operationId": "GetUnreadNotificationCount",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "format": "int32",
+                  "type": "integer"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Count of caller's unread notifications (bell badge)",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/{id}/read": {
+      "post": {
+        "operationId": "MarkNotificationRead",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Mark a single notification as read",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/v1/tenants": {
+      "get": {
+        "description": "Retrieve tenants for the current environment with pagination and optional sorting.",
+        "operationId": "ListTenants",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "PageNumber",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "PageSize",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Sort",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResponseOfTenantDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "List tenants",
+        "tags": [
+          "Tenants"
+        ]
+      },
+      "post": {
+        "description": "Create a new tenant.",
+        "operationId": "CreateTenant",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTenantCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateTenantCommandResponse"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Create tenant",
+        "tags": [
+          "Tenants"
+        ]
+      }
+    },
+    "/api/v1/tenants/me/status": {
+      "get": {
+        "description": "Returns plan, validity, and expiry/grace state for the authenticated tenant — used by the tenant dashboard to show plan info and expiry warnings.",
+        "operationId": "GetMyTenantStatus",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantStatusDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get the calling tenant's status",
+        "tags": [
+          "Tenants"
+        ]
+      }
+    },
+    "/api/v1/tenants/theme": {
+      "get": {
+        "description": "Retrieve the theme settings for the current tenant, including colors, typography, and brand assets.",
+        "operationId": "GetTenantTheme",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantThemeDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get current tenant theme",
+        "tags": [
+          "Tenants"
+        ]
+      },
+      "put": {
+        "description": "Update the theme settings for the current tenant: colors, typography, layout, and the brand assets. A brand asset is uploaded as bytes or removed with its delete flag — the asset URLs are response-only, so a client cannot point one at an object the server did not issue for that asset.",
+        "operationId": "UpdateTenantTheme",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TenantThemeUpdateDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Update current tenant theme",
+        "tags": [
+          "Tenants"
+        ]
+      }
+    },
+    "/api/v1/tenants/theme/reset": {
+      "post": {
+        "description": "Reset the theme settings for the current tenant to the default values.",
+        "operationId": "ResetTenantTheme",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Reset tenant theme to defaults",
+        "tags": [
+          "Tenants"
+        ]
+      }
+    },
+    "/api/v1/tenants/{id}/activation": {
+      "post": {
+        "description": "Activate or deactivate a tenant in a single endpoint.",
+        "operationId": "ChangeTenantActivation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeTenantActivationCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantLifecycleResultDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Change tenant activation state",
+        "tags": [
+          "Tenants"
+        ]
+      }
+    },
+    "/api/v1/tenants/{id}/adjust-validity": {
+      "post": {
+        "description": "Set a tenant's validity to an explicit date — for comps, support extensions, or immediate expiry.",
+        "operationId": "AdjustTenantValidity",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustTenantValidityCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdjustTenantValidityCommandResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Adjust tenant validity (operator override)",
+        "tags": [
+          "Tenants"
+        ]
+      }
+    },
+    "/api/v1/tenants/{id}/renew": {
+      "post": {
+        "description": "Extend a tenant's validity by the requested number of months (default term when omitted), stacking on any remaining time.",
+        "operationId": "RenewTenant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenewTenantCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenewTenantCommandResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Renew tenant validity",
+        "tags": [
+          "Tenants"
+        ]
+      }
+    },
+    "/api/v1/tenants/{id}/status": {
+      "get": {
+        "description": "Retrieve status information for a tenant, including activation, validity, and basic metadata.",
+        "operationId": "GetTenantStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantStatusDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get tenant status",
+        "tags": [
+          "Tenants"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenantId}/provisioning": {
+      "get": {
+        "description": "Get latest provisioning status for a tenant.",
+        "operationId": "GetTenantProvisioningStatus",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantProvisioningStatusDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Get tenant provisioning status",
+        "tags": [
+          "Tenants"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenantId}/provisioning/retry": {
+      "post": {
+        "description": "Retry the provisioning workflow for a tenant.",
+        "operationId": "RetryTenantProvisioning",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantProvisioningStatusDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Retry tenant provisioning",
+        "tags": [
+          "Tenants"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/auth/confirm-email": {
+      "get": {
+        "description": "Confirm a user's email address. The tenant is taken from the '{tenant}' route segment.",
+        "operationId": "ConfirmEmail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Confirm user email",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/auth/forgot-password": {
+      "post": {
+        "description": "Generate a password reset token and send it via email. The tenant is taken from the '{tenant}' route segment.",
+        "operationId": "RequestPasswordReset",
+        "parameters": [
+          {
+            "description": "The tenant identifier. The one place a caller may name a tenant (ADR-0002).",
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Request password reset",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/auth/logout": {
+      "post": {
+        "description": "Revokes the session behind the caller's access token ('sid' claim) or, failing that, the session the supplied refresh token belongs to, and clears the refresh cookie. Always returns 204 so it cannot be used to probe tokens.",
+        "operationId": "Logout",
+        "parameters": [
+          {
+            "description": "The tenant identifier. The one place a caller may name a tenant (ADR-0002).",
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EndSessionCommand"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "End the current session",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/auth/refresh": {
+      "post": {
+        "description": "Use a valid (possibly expired) access token together with a valid refresh token to obtain a new access token and a rotated refresh token. The tenant is taken from the '{tenant}' route segment. Browsers may omit the refresh token from the body and let the HttpOnly refresh cookie carry it.",
+        "operationId": "RefreshJwtTokens",
+        "parameters": [
+          {
+            "description": "The tenant identifier. The one place a caller may name a tenant (ADR-0002).",
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RefreshTokenCommand"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshTokenCommandResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Refresh JWT access and refresh tokens",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/auth/register": {
+      "post": {
+        "description": "Allow a user to self-register. Anonymous; the tenant is taken from the '{tenant}' route segment.",
+        "operationId": "SelfRegisterUser",
+        "parameters": [
+          {
+            "description": "The tenant identifier. The one place a caller may name a tenant (ADR-0002).",
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterUserCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterUserResponse"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Self register user",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/auth/reset-password": {
+      "post": {
+        "description": "Reset the user's password using the provided verification token. The tenant is taken from the '{tenant}' route segment.",
+        "operationId": "ResetPassword",
+        "parameters": [
+          {
+            "description": "The tenant identifier. The one place a caller may name a tenant (ADR-0002).",
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Reset password",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/auth/token": {
+      "post": {
+        "description": "Submit credentials to receive a JWT access token and a refresh token. The tenant is taken from the '{tenant}' route segment.",
+        "operationId": "IssueJwtTokens",
+        "parameters": [
+          {
+            "description": "The tenant identifier. The one place a caller may name a tenant (ADR-0002).",
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateTokenCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Issue JWT access and refresh tokens",
+        "tags": [
+          "Auth"
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Identity"
+    },
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Tenants"
+    },
+    {
+      "name": "Audits"
+    },
+    {
+      "name": "Files"
+    },
+    {
+      "name": "Notifications"
+    }
+  ]
+}

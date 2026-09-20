@@ -1,0 +1,17 @@
+# The console is an INDEPENDENT pnpm project, not a package of the repo-root
+# workspace: its container image is built from this directory as the Docker
+# context (deploy/dokploy, docker-compose.yml, backend.yml), so its manifest and
+# lockfile have to live here. This file exists to say so — without it pnpm walks
+# up, finds the root pnpm-workspace.yaml and installs the orchestrator's
+# dependencies instead of the console's.
+packages: []
+
+# pnpm blocks dependency build scripts unless they are allowed here, and a
+# blocked one makes `pnpm install` exit non-zero. esbuild's postinstall places
+# the platform binary Vite needs.
+allowBuilds:
+  esbuild: true
+
+minimumReleaseAgeExclude:
+  - '@types/node@26.6.2'
+  - eslint@10.11.0

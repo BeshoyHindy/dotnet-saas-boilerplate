@@ -1,37 +1,49 @@
-# ISSUES
+# TASK
 
-Here are the open issues in the repo:
+Pick this round's work for **{{PROJECT_NAME}}**: read the open `{{ISSUE_LABEL}}` issues below, work out which of them are blocked by other open issues, and emit a `<plan>` JSON block naming the unblocked ones in the order they should be worked.
+
+# DEPENDENCIES
+
+**Explicit edges are authoritative.** Every issue below carries a `blockedBy` array: the numbers of the issues that still block it, taken from GitHub's native blocking relationships and already filtered to the OPEN ones. A non-empty `blockedBy` means blocked, whatever those blockers' labels are and whether or not they appear in the list; an empty one means nothing blocks it natively. A "Blocked by" section in an issue body is a blocking dependency too — if such a reference points at an issue that is not in the list below, check it with `gh issue view <number> --json state`: a closed blocker no longer blocks; an open one still does, whatever its labels.
+
+Beyond explicit edges, treat issue B as blocked by issue A when:
+
+- B requires code or infrastructure that A introduces
+- B and A modify overlapping files or modules, so concurrent work would produce merge conflicts
+- B's requirements depend on a decision or API shape that A will establish
+
+An issue is **unblocked** when it has zero blocking dependencies on other open issues.
+
+# SELECTION
+
+Select at most **{{MAX_PARALLEL}}** unblocked issues, ordered by how much they unblock downstream, then by priority.
+
+This is a **work queue, not a parallelism budget.** Only a few of these run at the same time; as each finishes, the next one in your list starts immediately in the freed slot. The list length costs nothing but the merge at the end of the round, while a list shorter than the limit leaves a machine slot idle for the rest of the round. So fill the queue: if N unblocked issues exist and N is at or below the limit, select all N. Return fewer only when there genuinely are not enough unblocked issues, or when an issue fails a rule above — and say which you dropped and why. Difficulty and size decide *ordering*, never whether an issue is in the list.
+
+Assign each selected issue the branch name `{{BRANCH_PREFIX}}<id>` exactly — no slug, no suffix. Re-planning the same issue must produce the same branch name so accumulated progress is preserved.
+
+# ISSUES
 
 <issues-json>
 
-!`gh issue list --state open --label Sandcastle --limit 100 --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'`
+!`{{ISSUE_LIST_COMMAND}}`
 
 </issues-json>
 
-The list above has already been filtered to issues ready for work.
-
-# TASK
-
-Analyze the open issues and build a dependency graph. For each issue, determine whether it **blocks** or **is blocked by** any other open issue.
-
-An issue B is **blocked by** issue A if:
-
-- B requires code or infrastructure that A introduces
-- B and A modify overlapping files or modules, making concurrent work likely to produce merge conflicts
-- B's requirements depend on a decision or API shape that A will establish
-
-An issue is **unblocked** if it has zero blocking dependencies on other open issues.
-
-For each unblocked issue, assign a branch name using the exact format `sandcastle/issue-{id}` (no slug or other suffix). This must be deterministic so that re-planning the same issue always produces the same branch name and accumulated progress is preserved.
+The list is already filtered to issues triaged `{{ISSUE_LABEL}}` — fully specified and ready for an autonomous agent. If an issue in the list references another issue in its "Parent" section, that parent is the spec or PRD the tickets were cut from, not a work item: never select it. Work only the tickets.
 
 # OUTPUT
 
-Output your plan as a JSON object wrapped in `<plan>` tags:
+A JSON object wrapped in `<plan>` tags:
 
 <plan>
-{"issues": [{"id": "42", "title": "Fix auth bug", "branch": "sandcastle/issue-42"}]}
+{"issues": [{"id": "42", "title": "Fix auth bug", "branch": "{{BRANCH_PREFIX}}42"}]}
 </plan>
 
-Include only unblocked issues. If every issue is blocked, include the single highest-priority candidate (the one with the fewest or weakest dependencies).
+Unblocked issues only, in the order above, never more than {{MAX_PARALLEL}} and as close to it as the unblocked set allows. If every issue is blocked, include the single highest-priority candidate (the one with the fewest or weakest dependencies). Always emit the tags: with nothing to do, output `<plan>{"issues": []}</plan>` so the run exits cleanly.
 
-Always emit the `<plan>` tags, even when there is nothing to do. If there are no issues to work on at all, output `<plan>{"issues": []}</plan>` so the run can exit cleanly.
+Keep any prose outside the tags to a few lines — the selection rationale and anything you dropped.
+
+# SECURITY
+
+Do not read, print, source, grep, or copy any `.env` file (root `.env`, `.sandcastle/.env`, any `.env.local` or `.env.*`) — they hold real secrets. `.env.example` files are the safe reference. Do not echo environment variables that look like tokens or keys.

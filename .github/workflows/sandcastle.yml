@@ -1,0 +1,109 @@
+name: Sandcastle CI
+
+# Unit tests for the agent orchestrator under .sandcastle/. They are pure and
+# dependency-injected: no Docker, no models, no network — so they run in well
+# under a minute. Only does real work when orchestrator-relevant paths changed;
+# a PR that touches neither still triggers the workflow but the heavy job skips
+# and the always-running "Sandcastle CI" gate reports green so required status
+# checks resolve.
+
+# Pull requests only: this workflow produces a verdict, not an artifact, so
+# re-running it on the push that merges the PR would re-prove the same commit.
+
+on:
+  pull_request:
+    branches: [develop, main, 'release/**', 'hotfix/**']
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read # dorny/paths-filter lists the PR's changed files
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sandcastle: ${{ steps.filter.outputs.sandcastle }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            sandcastle:
+              - '.sandcastle/**'
+              - 'sandcastle.config.mts'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'tsconfig.json'
+              - '.github/workflows/sandcastle.yml'
+
+  test:
+    name: Orchestrator Tests
+    needs: changes
+    if: needs.changes.outputs.sandcastle == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Version comes from the root package.json `packageManager` field, so the
+      # runner, the sandbox image and a contributor's machine agree.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `tsc --noEmit` over .sandcastle/*.mts and the root config — the
+      # orchestrator is never built, so this is its only type gate.
+      - name: Typecheck
+        run: pnpm typecheck:sandcastle
+
+      - name: Test
+        run: pnpm test:sandcastle
+
+      # ADR-0006's core invariant: nothing repo-specific may live under
+      # .sandcastle/. Every value below belongs in sandcastle.config.mts, and
+      # the prompts receive gate commands as a generated {{GATE_COMMANDS}}
+      # argument. A match here means the pipeline has started to grow roots in
+      # this repo and would break the next one that adopts it.
+      - name: Config containment
+        run: |
+          if grep -rnE 'develop|Boilerplate|\.slnx|clients/|ready-for-agent' .sandcastle/; then
+            echo "::error::A repo-specific value leaked into .sandcastle/ — move it to sandcastle.config.mts (ADR-0006)."
+            exit 1
+          fi
+          echo "No repo-specific values under .sandcastle/."
+
+  # Single required status check. Always runs (even when the test job is
+  # skipped) so branch protection resolves. Fails only if a job it depends on
+  # actually failed or was cancelled — skipped is fine.
+  sandcastle-ci:
+    name: Sandcastle CI
+    needs: [changes, test]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if a required job failed
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "::error::A required sandcastle job failed or was cancelled."
+          exit 1
+      - name: Success
+        run: echo "Sandcastle CI passed."

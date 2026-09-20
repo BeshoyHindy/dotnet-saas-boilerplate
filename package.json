@@ -6,13 +6,19 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "sandcastle": "tsx --env-file-if-exists=.sandcastle/.env .sandcastle/main.mts",
-		"sandcastle:build-image": "sandcastle docker build-image"
+    "sandcastle:build-image": "sandcastle docker build-image",
+    "test:sandcastle": "node --import tsx --test .sandcastle/*.test.mts",
+    "typecheck:sandcastle": "tsc --noEmit"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "packageManager": "pnpm@12.3.4",
   "devDependencies": {
-    "@ai-hero/sandcastle": "^0.12.0"
+    "@ai-hero/sandcastle": "^0.12.0",
+    "@types/node": "^26.1.1",
+    "tsx": "^4.20.0",
+    "typescript": "^6.0.3"
   },
   "dependencies": {
     "zod": "^4.6.5"

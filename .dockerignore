@@ -1,0 +1,37 @@
+# Build context for src/Host/Dockerfile (api + migrator). The context is the
+# repository root; everything the .NET publish does not need is dropped here so
+# the daemon upload stays small and nothing secret can be layered in by accident.
+
+# .NET build artifacts
+**/bin
+**/obj
+**/.vs
+**/TestResults
+
+# Test projects — not needed in any runtime image, and dropping them is why the
+# Dockerfile restores per-project instead of restoring the solution.
+src/Tests/
+
+# Frontends — the console image builds from clients/<app> with its own context.
+clients/
+
+# Tooling, docs, deployment and template scaffolding
+.git
+.github
+.agents
+.sandcastle
+.devcontainer
+.template.config
+.idea
+.vscode
+deploy/
+docs/
+scripts/
+node_modules/
+*.md
+LICENSE
+
+# Never ship local environment files
+**/.env
+**/.env.*
+!**/.env.example

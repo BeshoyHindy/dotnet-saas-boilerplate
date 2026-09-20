@@ -1,0 +1,55 @@
+# Web security & request governance
+
+CORS, security headers, rate limiting, idempotency. `src/BuildingBlocks/Web/`.
+For auth/JWT/permissions see `modules/identity.md`; for the global exception handler see `api-conventions.md`.
+
+## CORS (`Web/Cors/`)
+
+Policy `AppCorsPolicy`. **No `AllowCredentials()` in either branch** (decided in #13): auth is a bearer header, no client sends cookies or `withCredentials`, and the credentialed SignalR negotiate that once justified it is gone. Don't add it back without a client that needs it — and then only on the explicit-origins branch.
+
+`CorsOptions.AllowAll=true` is **Development only**; `CorsOptionsValidator` fails the boot in every other environment. It uses `SetIsOriginAllowed(_ => true)` rather than `AllowAnyOrigin()` so the reflected origin is visible in traces. `UseHeroCors()` runs **before** `UseHttpsRedirection()` so OPTIONS preflight isn't 307-redirected.
+
+## Security headers (`Web/Security/`)
+
+`UseHeroSecurityHeaders()` sets `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, HSTS (HTTPS), and a CSP. `SecurityHeadersOptions.ExcludedPaths` defaults to `["/scalar","/openapi"]` (they manage their own scripts) — keep those excluded.
+
+The headers are written from a **`Response.OnStarting` callback**, not eagerly: `UseExceptionHandler` resets status, body *and* headers before re-running the handler, so eager writes vanish from every 5xx. Never "simplify" it back to a straight-line write — `SecurityHeadersTests.ThrowEndpoint_Should_StillEmitSecurityHeaders…` fails if you do.
+
+## Host filtering & the proxy (`Web/Security/ProxyOptions.cs`)
+
+`AllowedHosts` is an explicit semicolon-separated list; `*` is rejected in Production by `ProductionConfigurationGuard`. Behind Traefik set `ProxyOptions.Enabled` so `UseForwardedHeaders` runs **first** in the pipeline; it clears the loopback-only defaults, and `ProxyOptionsValidator` then **fails the boot** unless `KnownProxies`/`KnownNetworks` names the proxy or `TrustAnyProxy` is set explicitly (opt-in, only where the app is unreachable except through the proxy). Trusting any peer on a shared container network lets a neighbour spoof `X-Forwarded-For`, which partitions rate limits and lands in the audit trail.
+
+**`XForwardedHost` is never enabled.** Host filtering runs before the forwarded-headers middleware, so honouring it would let a caller rewrite `Request.Host` after the allow-list approved the real one. `ForwardedHeadersTests` locks this down.
+
+**Every emailed link is built from `OriginOptions.OriginUrl`, never from the request.** Password reset, registration and resend-confirmation all resolve the base URL through `MailLinkOrigin.Require` (the endpoints no longer touch `HttpContext` for it), and the resolver throws if no origin is configured. Password reset and resend do it in their command handlers; the registration mail is now sent from the registration event (#86), so its handler resolves the same configured origin on the dispatcher's cycle — which is exactly why nothing request-derived may be carried there instead. `RegisterUserCommandHandler` still requires an origin up front, so a sign-up is refused rather than creating an account no mail can reach. A mailed link is exactly where a swapped host turns into account takeover, so keep the request out of it. The registration mail points at the **client** route `{origin}/confirm-email?userId&code&tenant` — the page then calls `/api/v1/tenants/{tenant}/auth/confirm-email`; mailing the API route landed the recipient on a raw JSON body (#46).
+
+## Request limits (`Web/Limits/`)
+
+`RequestLimits` caps Kestrel's body (10 MiB), total headers and request line. Uploads go direct to object storage via presigned URLs, so the API never needs a large body — raise the cap only with a reason.
+
+## Health checks (`Web/Health/`)
+
+`/health/live` runs nothing, `/health/ready` runs only checks tagged `HealthTags.Ready`, `/health` runs everything. Tag a new check `Ready` only if the API cannot serve requests without it — every module DbContext check hits the same PostgreSQL server, so only the tenant catalog carries the tag.
+
+## Rate limiting (`Web/RateLimiting/`)
+
+Chained partitioned fixed-window limiter: **tenant → user → IP** (defaults 1000 / 200 / 300 per 60s) + a stricter named `"auth"` policy (10/60s). Health paths are unlimited. Rejection → 429 + ProblemDetails + `Retry-After`. `RateLimitingOptions.Enabled` is read **eagerly** — when false the middleware is skipped entirely (tests set it via env var before host build).
+
+## Idempotency (`Web/Idempotency/`)
+
+Opt-in per endpoint with **`.WithIdempotency()`**. Reads the `Idempotency-Key` header (max 128 chars; TTL from `IdempotencyOptions.DefaultTtl`, 24h); a replay returns the stored response with `Idempotency-Replayed: true`. Put it on POSTs that must be replay-safe (e.g. CreateTenant).
+
+The filter owns its entries and keeps them in `IDistributedCache` itself — HybridCache's framed L2 payload is unreadable to anything else, which is what made the first replay of every key a 500 against Redis (#82, see `caching.md`). The semantics worth knowing:
+
+- **What a key can replay.** The entry is bound to tenant (the Caching block's namespace — `TenantKey` when a tenant is resolved, which covers the authenticated routes and the anonymous `tenants/{tenant}/auth` ones alike; `GlobalKey` when there is no tenant at all) **+ subject (or an anonymous marker) + method + path**, all hashed into the key. Another tenant, another user, or the same key on another route gets its own entry and never sees yours.
+- **Same key, different payload → `422 Unprocessable Entity`** (the IETF Idempotency-Key draft's answer), not a replay of a response to a request nobody made. The fingerprint is the query string plus the bound payload arguments; a request that cannot be fingerprinted stores none and is replayed rather than refused, so a legitimate retry is never falsely rejected. A key longer than `MaxKeyLength` is a ProblemDetails `400`, like every other client error.
+- **No secret enters the fingerprint.** The digest lives in Redis for the entry's whole TTL, and an unsalted hash of a low-entropy secret is that secret for anyone willing to grind a candidate list — keying it would not help, because the Data Protection key ring is in the same Redis. Anything whose name reads as a secret (`SensitiveFieldNames` in `BuildingBlocks/Shared/Security/`, matched on properties and on handler parameters) and anything marked `[NotFingerprinted]` is dropped first. The cost is deliberate: a retry differing *only* in an excluded field replays instead of answering 422. Add a name to that one list — never a second copy. `IdempotentCommandSecretsTests` (Architecture.Tests) sweeps every command an idempotent endpoint binds against a *wider* probe than the production rule, so a new secret-shaped field has to be excluded or explained rather than silently hashed; it exists because `CreateTenantCommand` once bound a `ConnectionString` that was neither.
+- **The entry is stored before the body is written**, on `CancellationToken.None`. The handler has already committed its side effect by then; storing afterwards would leave no entry when the client hangs up mid-write, and the retry would run that side effect again.
+- **Only 2xx is stored.** A 4xx/5xx is the answer to that attempt; caching it would freeze a transient failure in place for the whole TTL.
+- **Response headers are stored by allow-list** — `Location`, `ETag`, `Content-Language`, plus the content type. `Set-Cookie` never reaches the cache, so no replay can hand one caller another's cookie. **Do not mark a token- or cookie-issuing endpoint idempotent**: for an anonymous caller the partition is the client-supplied key alone, so a guessed key would be handed that response body. None of the kit's two idempotent endpoints (register user, create tenant) issue tokens, and the anonymous auth routes that set the refresh cookie are deliberately not among them.
+- **An anonymous route is never marked idempotent.** For an anonymous caller the partition collapses to tenant + `anon` + method + path + the caller-supplied key alone, so anyone who presents another caller's key on that route is handed their stored response. `SelfRegisterUser` was the one place this held (#84): it is no longer idempotent, and a sequential retry did not need it — `UserRegistrationService` already refuses a duplicate email/username with 400 rather than creating a second user. This repo declares anonymity three ways — a route-group `.AllowAnonymous()` (e.g. `IdentityModule`'s `TenantRoute.AnonymousAuthGroup`), a handler `[AllowAnonymous]` attribute, and a chain call on the route itself — and only the last is visible in that route's own source text. `IdempotentEndpointAnonymityTests` (Integration.Tests) is the authority: it reads the running host's built endpoint metadata, where all three forms look identical. `AnonymousRoutesAreNeverIdempotentTests` (Architecture.Tests) is a fast, text-only early warning for the chain-call and attribute forms on a route's own chain; it cannot see route-group anonymity.
+- **A short-lived capability is never marked idempotent.** `RequestUploadUrl` used to be idempotent and answered with a presigned PUT URL valid for minutes, from an entry that lives 24h: a retry under the same key past that expiry got a dead link rather than a fresh one, and the presigned URL sat in the cache until the entry did (#85). It is no longer idempotent, and did not need to be — a repeated call is harmless without replay: it creates another pending `FileAsset` whose `UploadDeadline` passes and which `PurgeOrphanedFilesJob` deletes. The rule: a response that expires sooner than the replay entry's TTL must not be marked idempotent.
+- **Concurrent duplicates** are serialised by an in-process per-key lock, so two simultaneous requests on one instance run the handler once. `IDistributedCache` has no set-if-absent: **across instances that window is open** and both can execute, last write winning the entry. A Redis `SET NX` lease is the fix if that ever matters; it is not pretended to be closed today. The wait is bounded by `IdempotencyOptions.LockWaitTimeout` (5s; a non-positive value fails the boot) because the lock is held across the whole handler — a duplicate that waits out the bound runs anyway rather than parking a request thread for the handler's full duration.
+- **Nothing may wrap the filter.** It writes the response itself and returns `TypedResults.Empty`, so a filter added *before* `.WithIdempotency()` sees `Empty` where it expected the handler's result, with the bytes already gone. Put `.WithIdempotency()` first in the chain; `IdempotencyFilterOrderTests` (Architecture.Tests) fails the build otherwise.
+- **An unreadable entry is a miss, never a 500** — foreign bytes, malformed JSON or an unknown envelope version logs once at warning and re-runs the handler, overwriting the entry.
+

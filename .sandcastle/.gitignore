@@ -1,3 +1,5 @@
 .env
 logs/
 worktrees/
+pending-close.json
+pending-close.json.tmp

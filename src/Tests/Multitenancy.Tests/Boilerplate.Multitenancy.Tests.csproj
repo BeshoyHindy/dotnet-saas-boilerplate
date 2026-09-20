@@ -1,0 +1,37 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+    <AssemblyName>Boilerplate.Multitenancy.Tests</AssemblyName>
+    <RootNamespace>Boilerplate.Multitenancy.Tests</RootNamespace>
+		<TargetFramework>net10.0</TargetFramework>
+		<IsPackable>false</IsPackable>
+		<IsPublishable>false</IsPublishable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<NoWarn>$(NoWarn);S125;S3261;CA1707</NoWarn>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="coverlet.collector">
+		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		  <PrivateAssets>all</PrivateAssets>
+		</PackageReference>
+		<PackageReference Include="NetArchTest.Rules" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+		<PackageReference Include="Microsoft.Extensions.Caching.Hybrid" />
+		<PackageReference Include="Microsoft.Extensions.Configuration" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+		<PackageReference Include="Microsoft.NET.Test.Sdk" />
+		<PackageReference Include="xunit" />
+		<PackageReference Include="xunit.runner.visualstudio">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Shouldly" />
+		<PackageReference Include="AutoFixture" />
+		<PackageReference Include="NSubstitute" />
+	</ItemGroup>
+	<ItemGroup>
+	  <ProjectReference Include="..\..\BuildingBlocks\Caching\Boilerplate.BuildingBlocks.Caching.csproj" />
+	  <ProjectReference Include="..\..\Modules\Multitenancy\Modules.Multitenancy\Boilerplate.Modules.Multitenancy.csproj" />
+	  <ProjectReference Include="..\..\Modules\Multitenancy\Modules.Multitenancy.Contracts\Boilerplate.Modules.Multitenancy.Contracts.csproj" />
+	</ItemGroup>
+</Project>

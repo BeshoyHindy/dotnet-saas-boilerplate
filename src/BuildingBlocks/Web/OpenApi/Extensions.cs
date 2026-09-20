@@ -1,0 +1,103 @@
+﻿using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Microsoft.OpenApi;
+using Scalar.AspNetCore;
+
+namespace Boilerplate.BuildingBlocks.Web.OpenApi;
+
+public static class Extensions
+{
+    /// <summary>
+    /// Registers OpenAPI documents per API version. Each version gets a separate document
+    /// (e.g., /openapi/v1.json) with endpoints filtered to that version group.
+    /// To add a new version, add another entry to the <c>OpenApiOptions:Versions</c> array
+    /// or call <c>AddOpenApi("v2", ...)</c> after this method.
+    /// </summary>
+    public static IServiceCollection AddHeroOpenApi(this IServiceCollection services, IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        services
+            .AddOptions<OpenApiOptions>()
+            .Bind(configuration.GetSection(nameof(OpenApiOptions)))
+            .Validate(o => !string.IsNullOrWhiteSpace(o.Title), "OpenApi:Title is required.")
+            .Validate(o => !string.IsNullOrWhiteSpace(o.Description), "OpenApi:Description is required.")
+            .ValidateOnStart();
+
+        var appOptions = configuration.GetSection(nameof(OpenApiOptions)).Get<OpenApiOptions>();
+
+        // One OpenAPI document per API version. Asp.Versioning's GroupNameFormat "'v'VVV" groups
+        // endpoints as "v1", "v2", …; each AddOpenApi(groupName) includes only that group's endpoints.
+        var versions = appOptions?.Versions is { Length: > 0 } ? appOptions.Versions : ["v1"];
+        foreach (var version in versions)
+        {
+            services.AddOpenApi(version, options =>
+            {
+                options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+                options.AddDocumentTransformer((document, context, _) =>
+                {
+                    var provider = context.ApplicationServices;
+                    var openApi = provider.GetRequiredService<IOptions<OpenApiOptions>>().Value;
+
+                    document.Info = new OpenApiInfo
+                    {
+                        Title = openApi.Title,
+                        Version = version,
+                        Description = openApi.Description,
+                        Contact = openApi.Contact is null ? null : new OpenApiContact
+                        {
+                            Name = openApi.Contact.Name,
+                            Url = openApi.Contact.Url,
+                            Email = openApi.Contact.Email
+                        },
+                        License = openApi.License is null ? null : new OpenApiLicense
+                        {
+                            Name = openApi.License.Name,
+                            Url = openApi.License.Url
+                        }
+                    };
+                    return Task.CompletedTask;
+                });
+            });
+        }
+
+        return services;
+    }
+
+    public static void UseHeroOpenApi(
+        this WebApplication app,
+        string openApiPath = "/openapi/{documentName}.json")
+    {
+        ArgumentNullException.ThrowIfNull(app);
+
+        // Explicitly anonymous: the permission policy is also the fallback policy and fails closed,
+        // so the document and its viewer must state their intent like any other endpoint. This matches
+        // how they already behave (PathAwareAuthorizationHandler lets /openapi and /scalar through).
+        // Both are mapped only when OpenApiOptions:Enabled is true — off by default in production.
+        app.MapOpenApi(openApiPath)
+            .AllowAnonymous()
+            .ExemptFromTenantSweep(
+                "{documentName} selects an API version document, not a tenant resource. The document " +
+                "describes route shapes only — it is generated from endpoint metadata and reads no data.");
+
+        app.MapScalarApiReference(options =>
+        {
+            var configuration = app.Configuration;
+            options
+                .WithTitle(configuration["OpenApi:Title"] ?? "Boilerplate API")
+                .WithTheme(Scalar.AspNetCore.ScalarTheme.Alternate)
+                .EnableDarkMode()
+                .HideModels()
+                .WithOpenApiRoutePattern(openApiPath)
+                .AddPreferredSecuritySchemes("Bearer");
+        })
+        .AllowAnonymous()
+        .ExemptFromTenantSweep(
+            "{documentName?} selects which OpenAPI document the reference UI renders, not a tenant " +
+            "resource. The UI is static assets plus that document; it reads no tenant data.");
+    }
+}

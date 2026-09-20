@@ -1,0 +1,262 @@
+# Run the production container images locally, end to end.
+#
+#   bash scripts/local-env.sh          # once: writes .env with generated secrets
+#   docker compose up --build          # http://localhost:8080/health/ready
+#   docker compose down -v             # stop and delete the data volumes
+#
+# Non-secret settings (ports, URLs, database and bucket names) have local
+# defaults, so .env only has to carry the secrets. Those have NO default
+# on purpose: the containers run as Production, and ProductionConfigurationGuard
+# refuses to boot on a secret that looks like a template placeholder, so a
+# committed "local-dev-only" literal here would either be rejected or, worse,
+# quietly become a repo-public secret on someone's server. scripts/local-env.sh
+# generates them; compose names the missing variable if you skip it.
+#
+# Real deployments configure the same images through Dokploy environment
+# variables (ADR-0005), not this file.
+#
+#if (aspire)
+# Aspire (`dotnet run --project src/Host/Boilerplate.AppHost`) is the day-to-day
+# inner-loop orchestrator; this file exists to exercise the shipped images.
+#endif
+
+name: boilerplate
+
+services:
+  # ── Data plane ────────────────────────────────────────────────────
+  # PostgreSQL and Valkey stay compose-internal — nothing outside the network
+  # needs them, and not publishing them keeps this file from colliding with a
+  # Postgres you already run locally.
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-boilerplate}
+      POSTGRES_USER: ${POSTGRES_USER:-boilerplate}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run scripts/local-env.sh to generate .env}
+    volumes:
+      # postgres:18+ wants a single mount at /var/lib/postgresql and puts the
+      # cluster in a major-version subdirectory under it; mounting .../data
+      # instead is refused at startup.
+      - pg_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-boilerplate} -d ${POSTGRES_DB:-boilerplate}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Valkey (BSD-licensed Redis fork). No password: the port is compose-internal
+  # only, and a fake one here would just be a credential-shaped literal to leak.
+  valkey:
+    image: valkey/valkey:9.1.0-alpine
+    restart: unless-stopped
+    command: ["valkey-server", "--appendonly", "yes"]
+    volumes:
+      - valkey_data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "PING"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # quay.io, not docker.io: MinIO no longer publishes to Docker Hub.
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-boilerplate}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?run scripts/local-env.sh to generate .env}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # Published because the browser follows Storage__S3__PublicBaseUrl straight to
+    # the S3 API. Aspire binds the same two ports for its own persistent MinIO, so
+    # override MINIO_API_PORT / MINIO_CONSOLE_PORT if you run both stacks at once.
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+
+  # One-shot: create the bucket the Files module writes to. The app never
+  # auto-creates it, so without this the first upload fails with NoSuchBucket.
+  minio-init:
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    restart: "no"
+    depends_on:
+      minio: { condition: service_healthy }
+    environment:
+      MC_HOST_local: http://${MINIO_ROOT_USER:-boilerplate}:${MINIO_ROOT_PASSWORD:?run scripts/local-env.sh to generate .env}@minio:9000
+    entrypoint: ["mc"]
+    command: ["mb", "--ignore-existing", "local/${STORAGE_BUCKET:-boilerplate}"]
+
+  # One-shot: allow anonymous GET under `uploads/` — and nowhere else. Avatars
+  # and tenant branding are served as unsigned URLs (IStorageService.UploadAsync
+  # returns BuildPublicUrl), and a MinIO bucket is private by default, so they
+  # 403 in the browser without this. Files-module objects live under `tenants/`
+  # where public and private share a key space and visibility is a database
+  # column, so that prefix must stay closed.
+  minio-public-prefix:
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    restart: "no"
+    depends_on:
+      minio-init: { condition: service_completed_successfully }
+    environment:
+      MC_HOST_local: http://${MINIO_ROOT_USER:-boilerplate}:${MINIO_ROOT_PASSWORD:?run scripts/local-env.sh to generate .env}@minio:9000
+    entrypoint: ["mc"]
+    command: ["anonymous", "set", "download", "local/${STORAGE_BUCKET:-boilerplate}/uploads"]
+
+  # Mail catcher: every message the API sends is trapped here instead of being
+  # delivered. Web UI on http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:v1.31
+    restart: unless-stopped
+    environment:
+      MP_MAX_MESSAGES: "500"
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+
+  # ── Application ───────────────────────────────────────────────────
+  # One-shot migrator. Applies every pending migration under a Postgres advisory
+  # lock, seeds the root tenant + its admin user and the demo accounts, then
+  # exits. The API starts only once this completes, so it can never run against
+  # an unmigrated database.
+  migrator:
+    build:
+      context: .
+      dockerfile: src/Host/Dockerfile
+      target: migrator
+    image: boilerplate/migrator:local
+    restart: "no"
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      # Development, while every other service here runs as Production: `--demo` below is
+      # refused outright in a Production host, by design (it mints well-known accounts sharing
+      # one password). This stack exists to exercise the shipped images locally and wants demo
+      # accounts to sign in as; the deploy/dokploy stacks run the same image as Production and
+      # pass no --demo. Drop the --demo flag and this line together if you want neither.
+      DOTNET_ENVIRONMENT: Development
+      DatabaseOptions__Provider: POSTGRESQL
+      DatabaseOptions__ConnectionString: Host=postgres;Port=5432;Database=${POSTGRES_DB:-boilerplate};Username=${POSTGRES_USER:-boilerplate};Password=${POSTGRES_PASSWORD:?run scripts/local-env.sh to generate .env}
+      DatabaseOptions__MigrationsAssembly: Boilerplate.Migrations.PostgreSQL
+      Seed__DefaultAdminPassword: ${SEED_ADMIN_PASSWORD:?run scripts/local-env.sh to generate .env}
+      # The one password every demo account signs in with. Generated into .env like the rest;
+      # never a literal here, because this file is committed.
+      Seed__DemoPassword: ${SEED_DEMO_PASSWORD:?run scripts/local-env.sh to generate .env}
+      # No JwtOptions here on purpose: the migrator turns off EnableAuthentication, so it never
+      # needs a signing key it could not use anyway.
+    command: ["apply", "--seed", "--demo"]
+
+  api:
+    build:
+      context: .
+      dockerfile: src/Host/Dockerfile
+      target: api
+    image: boilerplate/api:local
+    restart: unless-stopped
+    depends_on:
+      postgres:   { condition: service_healthy }
+      valkey:     { condition: service_healthy }
+      minio:      { condition: service_healthy }
+      mailpit:    { condition: service_started }
+      minio-init: { condition: service_completed_successfully }
+      minio-public-prefix: { condition: service_completed_successfully }
+      migrator:   { condition: service_completed_successfully }
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      DatabaseOptions__Provider: POSTGRESQL
+      DatabaseOptions__ConnectionString: Host=postgres;Port=5432;Database=${POSTGRES_DB:-boilerplate};Username=${POSTGRES_USER:-boilerplate};Password=${POSTGRES_PASSWORD:?run scripts/local-env.sh to generate .env};Minimum Pool Size=5
+      DatabaseOptions__MigrationsAssembly: Boilerplate.Migrations.PostgreSQL
+      CachingOptions__Redis: valkey:6379
+      CachingOptions__EnableSsl: "false"
+      JwtOptions__SigningKey: ${JWT_SIGNING_KEY:?run scripts/local-env.sh to generate .env}
+      # Mailed links (password reset, email confirmation) go to a tenant's users, so the
+      # origin the API writes into them is the DASHBOARD's, never the operator console's.
+      OriginOptions__OriginUrl: ${APP_DASHBOARD_URL:-http://localhost:8081}
+      CorsOptions__AllowedOrigins__0: ${APP_DASHBOARD_URL:-http://localhost:8081}
+      CorsOptions__AllowedOrigins__1: ${APP_CONSOLE_URL:-http://localhost:8082}
+      AllowedHosts: ${ALLOWED_HOSTS:-localhost;127.0.0.1;api}
+      # Nothing fronts the API here — it is published straight onto a host port — so forwarded
+      # headers must not be honoured. appsettings.Production.json enables them for a Traefik
+      # deployment and trusts nobody by default, which is a hard failure until a proxy is named.
+      ProxyOptions__Enabled: "false"
+      Storage__Provider: s3
+      Storage__S3__ServiceUrl: http://minio:9000
+      Storage__S3__PublicBaseUrl: http://localhost:${MINIO_API_PORT:-9000}/${STORAGE_BUCKET:-boilerplate}
+      Storage__S3__Region: us-east-1
+      Storage__S3__Bucket: ${STORAGE_BUCKET:-boilerplate}
+      Storage__S3__AccessKey: ${MINIO_ROOT_USER:-boilerplate}
+      Storage__S3__SecretKey: ${MINIO_ROOT_PASSWORD:?run scripts/local-env.sh to generate .env}
+      Storage__S3__ForcePathStyle: "true"
+      MailOptions__UseSendGrid: "false"
+      MailOptions__From: no-reply@localhost
+      MailOptions__DisplayName: Boilerplate
+      MailOptions__Smtp__Host: mailpit
+      MailOptions__Smtp__Port: "1025"
+      # Mailpit speaks plain SMTP on the compose network and never advertises STARTTLS, which the
+      # default (StartTls) requires. A real relay keeps the default.
+      MailOptions__Smtp__SecureSocket: None
+      OpenTelemetryOptions__Exporter__Otlp__Endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    ports:
+      - "${APP_API_PORT:-8080}:8080"
+    # No container HEALTHCHECK: the runtime image is chiseled, so there is no
+    # shell or curl to run one with. Probe from the host instead:
+    #   curl -fsS http://localhost:8080/health/ready
+
+  #if (frontend)
+  # The two React clients (ADR-0008), each its own image served by nginx. Each proxies
+  # /api and /health to the API on the compose network, so a browser only ever talks to
+  # one origin — which is what lets the SameSite=Strict refresh cookie work without CORS
+  # credentials. APP_API_URL is therefore an INTERNAL address, not a browser one;
+  # `api` is in the API's AllowedHosts list because nginx forwards that Host.
+  #
+  # The dashboard: the app a tenant's own users sign in to.
+  dashboard:
+    build:
+      context: clients/dashboard
+    image: boilerplate/dashboard:local
+    restart: unless-stopped
+    depends_on:
+      api: { condition: service_started }
+    environment:
+      APP_API_URL: http://api:8080
+      # The browser fetches presigned URLs straight from MinIO, so the client's
+      # Content-Security-Policy has to name that origin.
+      APP_STORAGE_URL: http://localhost:${MINIO_API_PORT:-9000}
+      APP_DEFAULT_TENANT: ${APP_DEFAULT_TENANT:-root}
+    # 8080 in the container: the images run nginx as an unprivileged user, which
+    # cannot bind a privileged port.
+    ports:
+      - "${APP_DASHBOARD_PORT:-8081}:8080"
+
+  # The console: the operator tool. Same image shape, different app.
+  console:
+    build:
+      context: clients/console
+    image: boilerplate/console:local
+    restart: unless-stopped
+    depends_on:
+      api: { condition: service_started }
+    environment:
+      APP_API_URL: http://api:8080
+      APP_STORAGE_URL: http://localhost:${MINIO_API_PORT:-9000}
+      # Operators live in the root tenant; the console's sign-in form has no tenant field.
+      APP_DEFAULT_TENANT: ${APP_DEFAULT_TENANT:-root}
+      # Only so a tenant user who lands here can be pointed at the app that is theirs.
+      APP_DASHBOARD_URL: ${APP_DASHBOARD_URL:-http://localhost:8081}
+    ports:
+      - "${APP_CONSOLE_PORT:-8082}:8080"
+  #endif
+
+volumes:
+  pg_data:
+  valkey_data:
+  minio_data:

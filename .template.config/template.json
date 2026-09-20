@@ -1,0 +1,238 @@
+{
+    "$schema": "http://json.schemastore.org/template",
+    "author": "Boilerplate",
+    "classifications": [
+        "WebAPI",
+        "Modular Monolith",
+        "Vertical Slice",
+        "ASP.NET Core",
+        "Cloud",
+        "Web",
+        "React",
+        "Full Stack"
+    ],
+    "tags": {
+        "language": "C#",
+        "type": "solution"
+    },
+    "identity": "Boilerplate.Saas",
+    "name": "Modular .NET SaaS Starter",
+    "description": "A production-ready full-stack starter: modular .NET 10 monolith (VSA, CQRS, multitenancy, Identity, Aspire) + React client + Docker.",
+    "shortName": "saas",
+    "sourceName": "Boilerplate",
+    "preferNameDirectory": true,
+    "guids": [
+        "0f2b2a2e-3d3c-4f0d-9d5f-2c9a1a9d6b71",
+        "9fe5df9a-b9b2-4202-bdb4-d30b01b71d1a"
+    ],
+    "symbols": {
+        "aspire": {
+            "type": "parameter",
+            "datatype": "bool",
+            "description": "Include the .NET Aspire AppHost project for local orchestration.",
+            "defaultValue": "true"
+        },
+        "frontend": {
+            "type": "parameter",
+            "datatype": "bool",
+            "description": "Include BOTH React clients under clients/ — the dashboard (tenant app) and the console (operator tool) — and everything that serves them (their container images, client CI, Aspire client resources).",
+            "defaultValue": "true"
+        },
+        "sandcastle": {
+            "type": "parameter",
+            "datatype": "bool",
+            "description": "Include the Sandcastle agent pipeline (.sandcastle/, sandcastle.config.mts and the root pnpm project that exists only for it).",
+            "defaultValue": "true"
+        },
+        "skipRestore": {
+            "type": "parameter",
+            "datatype": "bool",
+            "description": "Skip dotnet restore after project creation.",
+            "defaultValue": "false"
+        },
+        "contactEmail": {
+            "type": "parameter",
+            "datatype": "string",
+            "description": "Contact email written into OpenAPI metadata.",
+            "defaultValue": "contact@example.com",
+            "replaces": "contact@example.com"
+        },
+        "contactUrl": {
+            "type": "parameter",
+            "datatype": "string",
+            "description": "Contact / company URL written into OpenAPI metadata.",
+            "defaultValue": "https://example.com/contact",
+            "replaces": "https://example.com/contact"
+        },
+        "mailFrom": {
+            "type": "parameter",
+            "datatype": "string",
+            "description": "Default 'from' address for outbound mail.",
+            "defaultValue": "noreply@example.com",
+            "replaces": "noreply@example.com"
+        },
+        "sendgridFrom": {
+            "type": "generated",
+            "generator": "constant",
+            "parameters": {
+                "value": "noreply@example.com"
+            },
+            "replaces": "sendgrid@example.com"
+        },
+        "lowerName": {
+            "type": "derived",
+            "valueSource": "name",
+            "valueTransform": "lc"
+        },
+        "kebabName": {
+            "type": "derived",
+            "valueSource": "lowerName",
+            "valueTransform": "dashNorm",
+            "replaces": "boilerplate"
+        }
+    },
+    "forms": {
+        "lc": {
+            "identifier": "lowerCaseInvariant"
+        },
+        "dashNorm": {
+            "identifier": "replace",
+            "pattern": "[^a-z0-9]+",
+            "replacement": "-"
+        }
+    },
+    "specialCustomOperations": {
+        "**/.env.example": {
+            "flagPrefix": "#",
+            "operations": [
+                {
+                    "type": "conditional",
+                    "configuration": {
+                        "if": ["#if"],
+                        "else": ["#else"],
+                        "elseif": ["#elseif"],
+                        "endif": ["#endif"],
+                        "trim": true,
+                        "wholeLine": true,
+                        "evaluator": "C++"
+                    }
+                }
+            ]
+        }
+    },
+    "sources": [
+        {
+            "source": "./",
+            "target": "./",
+            "exclude": [
+                "**/.DS_Store",
+                ".template.config/**",
+                ".git",
+                ".git/**",
+                ".gitmodules",
+                ".claude",
+                ".claude/**",
+                "**/.idea/**",
+                "**/.vs/**",
+                "**/.vscode/**",
+                "**/.history/**",
+                ".devcontainer/**",
+                "**/bin/**",
+                "**/obj/**",
+                "**/artifacts/**",
+                "**/publish/**",
+                "**/node_modules/**",
+                "**/dist/**",
+                "**/build/**",
+                "**/.turbo/**",
+                "**/.next/**",
+                "**/TestResults/**",
+                "**/test-results/**",
+                "clients/**/test-results/**",
+                "clients/**/.pnpm-store/**",
+                "**/*.tsbuildinfo",
+                "**/playwright-report/**",
+                "**/coverage/**",
+                "**/coverage-report/**",
+                "**/audit-dlq/**",
+                "**/[Ll]og/**",
+                "**/[Ll]ogs/**",
+                "**/*.log",
+                "**/*.binlog",
+                "**/*.user",
+                "**/*.filelist",
+                "**/*.nupkg",
+                "**/*.snupkg",
+                "**/*.lock.json",
+                "nupkgs/**",
+                "**/.env",
+                "**/.env.local",
+                "**/.env.*.local",
+                "LICENSE",
+                "README.md",
+                "GEMINI.md",
+                ".agents/skills/**",
+                ".agents/workflows/**",
+                "skills-lock.json",
+                "docs/adr/0001-*",
+                ".github/workflows/brand-gate.yml",
+                ".github/workflows/template-smoke.yml",
+                "scripts/brand-gate.sh",
+                "scripts/template-smoke.sh"
+            ],
+            "rename": {
+                "README-template.md": "README.md"
+            },
+            "modifiers": [
+                {
+                    "condition": "(!aspire)",
+                    "exclude": [
+                        "src/Host/Boilerplate.AppHost/**"
+                    ]
+                },
+                {
+                    "condition": "(!frontend)",
+                    "exclude": [
+                        "clients/**",
+                        ".github/workflows/frontend.yml",
+                        ".agents/rules/frontend/**",
+                        "scripts/export-openapi.sh",
+                        "docs/adr/0004-*",
+                        "docs/adr/0008-*"
+                    ]
+                },
+                {
+                    "condition": "(!sandcastle)",
+                    "exclude": [
+                        ".sandcastle/**",
+                        "sandcastle.config.mts",
+                        "package.json",
+                        "pnpm-workspace.yaml",
+                        "pnpm-lock.yaml",
+                        "tsconfig.json",
+                        ".github/workflows/sandcastle.yml",
+                        "docs/adr/0006-*"
+                    ]
+                }
+            ]
+        }
+    ],
+    "primaryOutputs": [
+        {
+            "path": "./src"
+        }
+    ],
+    "postActions": [
+        {
+            "condition": "(!skipRestore)",
+            "description": "Restore NuGet packages",
+            "manualInstructions": [
+                {
+                    "text": "Run 'dotnet restore'"
+                }
+            ],
+            "actionId": "210D431B-A78B-4D2F-B762-4ED3E3EA9025",
+            "continueOnError": false
+        }
+    ]
+}

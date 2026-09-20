@@ -1,0 +1,306 @@
+using Finbuckle.MultiTenant.Abstractions;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Shared.Constants;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Identity.Contracts.Services;
+using Boilerplate.Modules.Identity.Data;
+using Boilerplate.Modules.Identity.Domain;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using System.IdentityModel.Tokens.Jwt;
+using System.Net;
+using System.Security.Claims;
+
+namespace Boilerplate.Modules.Identity.Services;
+
+public sealed class IdentityService : IIdentityService
+{
+    private readonly UserManager<AppUser> _userManager;
+    private readonly ILogger<IdentityService> _logger;
+    private readonly IMultiTenantContextAccessor<AppTenantInfo>? _multiTenantContextAccessor;
+    private readonly IGroupRoleService _groupRoleService;
+    private readonly TimeProvider _timeProvider;
+    private readonly IdentityDbContext _dbContext;
+    private readonly int _gracePeriodDays;
+
+    public IdentityService(
+        UserManager<AppUser> userManager,
+        IMultiTenantContextAccessor<AppTenantInfo>? multiTenantContextAccessor,
+        ILogger<IdentityService> logger,
+        IGroupRoleService groupRoleService,
+        TimeProvider timeProvider,
+        IdentityDbContext dbContext,
+        IOptions<TenantGraceOptions> graceOptions)
+    {
+        ArgumentNullException.ThrowIfNull(graceOptions);
+        _userManager = userManager;
+        _multiTenantContextAccessor = multiTenantContextAccessor;
+        _logger = logger;
+        _groupRoleService = groupRoleService;
+        _timeProvider = timeProvider;
+        _dbContext = dbContext;
+        _gracePeriodDays = graceOptions.Value.GracePeriodDays;
+    }
+
+    public async Task<(string Subject, IEnumerable<Claim> Claims)?>
+        ValidateCredentialsAsync(string email, string password, string? twoFactorCode = null, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(email);
+        ArgumentNullException.ThrowIfNull(password);
+
+        var tenant = GetValidatedTenant();
+        var user = await FindAndValidateUserByCredentialsAsync(email, password);
+
+        ValidateUserStatus(user);
+        ValidateTenantStatus(tenant);
+
+        if (user.TwoFactorEnabled)
+        {
+            await VerifyTwoFactorOrThrowAsync(user, twoFactorCode);
+        }
+
+        var claims = await BuildUserClaimsAsync(user, tenant.Id, ct);
+        return (user.Id, claims);
+    }
+
+    private async Task VerifyTwoFactorOrThrowAsync(AppUser user, string? twoFactorCode)
+    {
+        if (string.IsNullOrWhiteSpace(twoFactorCode))
+        {
+            throw new CustomException(
+                "two_factor_required: An authenticator code is required to complete sign-in.",
+                errors: null,
+                HttpStatusCode.Unauthorized);
+        }
+
+        var valid = await _userManager.VerifyTwoFactorTokenAsync(
+            user,
+            _userManager.Options.Tokens.AuthenticatorTokenProvider,
+            twoFactorCode);
+
+        if (!valid)
+        {
+            _logger.LogWarning("Invalid two-factor code for user {UserId}", user.Id);
+            throw new UnauthorizedException("two_factor_invalid: The authenticator code is invalid or expired.");
+        }
+    }
+
+    public async Task<(string Subject, IEnumerable<Claim> Claims)?>
+        BuildClaimsForRefreshAsync(string userId, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(userId);
+
+        var tenant = GetValidatedTenant();
+
+        // No IgnoreQueryFilters on the token path (ADR-0002): the tenant filter is the isolation.
+        var user = await _userManager.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+        if (user is null)
+        {
+            return null;
+        }
+
+        ValidateUserStatus(user);
+        ValidateTenantStatus(tenant);
+
+        var claims = await BuildUserClaimsAsync(user, tenant.Id, ct);
+        return (user.Id, claims);
+    }
+
+    public async Task<(string Subject, IEnumerable<Claim> Claims)?>
+        BuildClaimsForUserAsync(string userId, string tenantId, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(userId);
+        ArgumentNullException.ThrowIfNull(tenantId);
+
+        // IgnoreQueryFilters bypasses Finbuckle's tenant filter so root-tenant callers can
+        // resolve users in other tenants during impersonation.
+        var user = await _userManager.Users
+            .IgnoreQueryFilters()
+            .Where(u => u.Id == userId && EF.Property<string>(u, "TenantId") == tenantId)
+            .FirstOrDefaultAsync(ct);
+
+        if (user is null)
+        {
+            return null;
+        }
+
+        ValidateUserStatus(user);
+
+        var claims = CreateBasicClaims(user, tenantId);
+
+        var userRoleIds = await _dbContext.UserRoles
+            .IgnoreQueryFilters()
+            .Where(ur => ur.UserId == userId)
+            .Select(ur => ur.RoleId)
+            .ToListAsync(ct);
+
+        if (userRoleIds.Count > 0)
+        {
+            var roleNames = await _dbContext.Roles
+                .IgnoreQueryFilters()
+                .Where(r => userRoleIds.Contains(r.Id) && EF.Property<string>(r, "TenantId") == tenantId)
+                .Select(r => r.Name!)
+                .ToListAsync(ct);
+
+            claims.AddRange(roleNames.Select(r => new Claim(ClaimTypes.Role, r)));
+        }
+
+        return (user.Id, claims);
+    }
+
+    public async Task<TenantUserLookup?> FindTenantUserAsync(
+        string tenantId,
+        string? userId = null,
+        string? email = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(tenantId);
+
+        if (string.IsNullOrWhiteSpace(userId) && string.IsNullOrWhiteSpace(email))
+        {
+            throw new ArgumentException("Either userId or email must be supplied.", nameof(userId));
+        }
+
+        // Same rationale as BuildClaimsForUserAsync: the caller is a root operator resolving a user
+        // in ANOTHER tenant, so Finbuckle's filter is bypassed and the tenant is pinned explicitly.
+        var normalizedEmail = email is null ? null : _userManager.NormalizeEmail(email);
+
+        return await _userManager.Users
+            .IgnoreQueryFilters()
+            .Where(u => EF.Property<string>(u, "TenantId") == tenantId
+                && (userId != null ? u.Id == userId : u.NormalizedEmail == normalizedEmail))
+            .Select(u => new TenantUserLookup(u.Id, u.UserName, u.Email, u.IsActive, u.EmailConfirmed))
+            .FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
+    }
+
+    private AppTenantInfo GetValidatedTenant()
+    {
+        var tenant = _multiTenantContextAccessor!.MultiTenantContext.TenantInfo
+            ?? throw new UnauthorizedException();
+
+        if (string.IsNullOrWhiteSpace(tenant.Id))
+        {
+            throw new UnauthorizedException();
+        }
+
+        return tenant;
+    }
+
+    private async Task<AppUser> FindAndValidateUserByCredentialsAsync(string email, string password)
+    {
+        var user = await _userManager.FindByEmailAsync(email.Trim().Normalize());
+        if (user is null)
+        {
+            // Generic 401 — never confirm or deny account existence from this path.
+            throw new UnauthorizedException();
+        }
+
+        // Lockout check runs BEFORE password check so an attacker can't tell a locked
+        // account from a wrong-password one on every request.
+        if (_userManager.SupportsUserLockout && await _userManager.IsLockedOutAsync(user))
+        {
+            _logger.LogWarning("Login attempted for locked account {UserId}", user.Id);
+            throw new CustomException(
+                "Account is temporarily locked due to too many failed login attempts. Try again later.",
+                errors: null,
+                HttpStatusCode.Locked);
+        }
+
+        if (!await _userManager.CheckPasswordAsync(user, password))
+        {
+            if (_userManager.SupportsUserLockout)
+            {
+                await _userManager.AccessFailedAsync(user);
+                if (await _userManager.IsLockedOutAsync(user))
+                {
+                    _logger.LogWarning(
+                        "Account {UserId} locked out after exceeding failed login threshold.",
+                        user.Id);
+                }
+            }
+            throw new UnauthorizedException();
+        }
+
+        // Successful authentication resets the failed-attempt counter.
+        if (_userManager.SupportsUserLockout && await _userManager.GetAccessFailedCountAsync(user) > 0)
+        {
+            await _userManager.ResetAccessFailedCountAsync(user);
+        }
+
+        return user;
+    }
+
+    private static void ValidateUserStatus(AppUser user)
+    {
+        if (!user.IsActive)
+        {
+            throw new UnauthorizedException("user is deactivated");
+        }
+
+        if (!user.EmailConfirmed)
+        {
+            throw new UnauthorizedException("email not confirmed");
+        }
+    }
+
+    private void ValidateTenantStatus(AppTenantInfo tenant)
+    {
+        if (tenant.Id == MultitenancyConstants.Root.Id)
+        {
+            return;
+        }
+
+        if (!tenant.IsActive)
+        {
+            throw new UnauthorizedException($"tenant {tenant.Id} is deactivated");
+        }
+
+        // Honor the tenant-validity grace period: a lapsed tenant can still authenticate until
+        // ValidUpto + grace (matching the request-time guard in MultitenancyModule).
+        if (_timeProvider.GetUtcNow().UtcDateTime > tenant.ValidUpto.AddDays(_gracePeriodDays))
+        {
+            throw new UnauthorizedException($"tenant {tenant.Id} validity has expired");
+        }
+    }
+
+    private async Task<List<Claim>> BuildUserClaimsAsync(AppUser user, string tenantId, CancellationToken ct)
+    {
+        var claims = CreateBasicClaims(user, tenantId);
+        await AddRoleClaimsAsync(claims, user, ct);
+        return claims;
+    }
+
+    private static List<Claim> CreateBasicClaims(AppUser user, string tenantId)
+    {
+        var fullName = $"{user.FirstName} {user.LastName}".Trim();
+        return
+        [
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            // RFC 7519 short-form sub/name/email emitted alongside legacy ClaimTypes.* so JWT consumers read them per spec.
+            // `name` is published explicitly because the default outbound map turns ClaimTypes.Name into `unique_name`, not `name`.
+            new(JwtRegisteredClaimNames.Sub, user.Id),
+            new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
+            new(JwtRegisteredClaimNames.Name, fullName.Length > 0 ? fullName : (user.Email ?? string.Empty)),
+            new(ClaimTypes.NameIdentifier, user.Id),
+            new(ClaimTypes.Email, user.Email!),
+            new(ClaimTypes.Name, user.FirstName ?? string.Empty),
+            new(ClaimTypes.MobilePhone, user.PhoneNumber ?? string.Empty),
+            new(ClaimConstants.Fullname, fullName),
+            new(ClaimTypes.Surname, user.LastName ?? string.Empty),
+            new(ClaimConstants.Tenant, tenantId),
+            new(ClaimConstants.ImageUrl, user.ImageUrl?.ToString() ?? string.Empty)
+        ];
+    }
+
+    private async Task AddRoleClaimsAsync(List<Claim> claims, AppUser user, CancellationToken ct)
+    {
+        var directRoles = await _userManager.GetRolesAsync(user);
+        var groupRoles = await _groupRoleService.GetUserGroupRolesAsync(user.Id, ct);
+
+        var allRoles = directRoles.Union(groupRoles).Distinct();
+        claims.AddRange(allRoles.Select(r => new Claim(ClaimTypes.Role, r)));
+    }
+}

@@ -1,0 +1,35 @@
+# Security Policy
+
+## Supported versions
+
+This is a starter kit. Only the current `main` branch receives security fixes. Forks, downstream projects, and tagged releases are owned by their maintainers — pull fixes in on your own cadence.
+
+## Reporting a vulnerability
+
+**Do not open a public issue.** Use GitHub's private vulnerability reporting on this repository
+(Security → Report a vulnerability).
+
+Please include:
+
+- Affected component (module, file, endpoint)
+- Reproduction steps and any required configuration
+- Impact (what an attacker can achieve)
+- Proof-of-concept if you have one
+
+## What to expect
+
+- Acknowledgement within 72 hours.
+- Triage decision within 7 days.
+- Coordinated disclosure window of ~90 days from triage, longer for changes that need careful migration paths.
+
+Fixes ship as a patched commit on `main` plus a GitHub Security Advisory. Reporters are credited with permission.
+
+## Scope
+
+In scope: `src/` (BuildingBlocks, Modules, Host), the default `appsettings.*.json`, and anything this repository ships under `clients/`.
+
+Out of scope: third-party NuGet/npm packages (report upstream) and issues in downstream forks (contact that fork's maintainer).
+
+## Production hardening
+
+This kit ships with development-friendly defaults. Before deploying a fork, rotate JWT signing keys and seeded passwords, lock CORS, keep the `Permissions.Hangfire.View` operator permission on the root tenant's Admin role only, and persist DataProtection keys to a shared store for multi-instance hosting.

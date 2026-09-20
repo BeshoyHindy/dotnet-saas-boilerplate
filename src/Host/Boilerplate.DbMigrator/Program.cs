@@ -1,0 +1,359 @@
+﻿using System.Globalization;
+using System.Reflection;
+using Boilerplate.BuildingBlocks.Eventing;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Web;
+using Boilerplate.BuildingBlocks.Web.Modules;
+using Boilerplate.Modules.Auditing;
+using Boilerplate.Modules.Identity;
+using Boilerplate.Modules.Identity.Contracts.v1.Tokens.TokenGeneration;
+using Boilerplate.Modules.Identity.Features.v1.Tokens.TokenGeneration;
+using Boilerplate.Modules.Multitenancy;
+using Boilerplate.Modules.Multitenancy.Contracts;
+using Boilerplate.Modules.Multitenancy.Contracts.v1.GetTenantStatus;
+using Boilerplate.Modules.Multitenancy.Data;
+using Boilerplate.Modules.Multitenancy.Features.v1.GetTenantStatus;
+using Boilerplate.DbMigrator;
+using Boilerplate.DbMigrator.DemoSeed;
+using Finbuckle.MultiTenant.Abstractions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+// Boilerplate DbMigrator — one-shot console that migrates every DB to head, optionally seeds, then exits 0/1.
+// Runs as a deployment step (not at API startup) so it can use an elevated-DDL connection string. Verbs: see MigratorCommand.HelpText.
+
+var cli = MigratorCommand.Parse(args);
+if (cli.Help)
+{
+    await Console.Out.WriteLineAsync(MigratorCommand.HelpText).ConfigureAwait(false);
+    return 0;
+}
+var builder = Host.CreateApplicationBuilder(args);
+
+// Disable build-time DI validation: auto-on in Development, it walks ALL descriptors incl. handlers this
+// reduced-graph process never invokes (e.g. Identity→IMailService) and throws — false positive.
+builder.ConfigureContainer(new DefaultServiceProviderFactory(
+    new ServiceProviderOptions { ValidateOnBuild = false, ValidateScopes = false }));
+
+// Under dotnet run the cwd is the project folder but appsettings.json is copied to the output dir,
+// so load it from AppContext.BaseDirectory for IdentityModule's JwtOptions to validate.
+builder.Configuration.AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"), optional: true);
+builder.Configuration.AddJsonFile(Path.Combine(AppContext.BaseDirectory, $"appsettings.{builder.Environment.EnvironmentName}.json"), optional: true);
+
+// Re-add environment variables and command line args so they maintain priority over the manually added JSON files.
+builder.Configuration.AddEnvironmentVariables();
+builder.Configuration.AddCommandLine(args);
+
+// Fail-fast with one clear line if DatabaseOptions__ConnectionString is unset, rather than letting
+// host-build-time option validation throw a stack trace.
+if (string.IsNullOrWhiteSpace(builder.Configuration["DatabaseOptions:ConnectionString"]))
+{
+    await Console.Error.WriteLineAsync(
+        "[migrator] FAILED: DatabaseOptions:ConnectionString is empty — refusing to run against an unconfigured target. "
+        + "Set DatabaseOptions__ConnectionString to an elevated-DDL connection string before invoking the migrator.")
+        .ConfigureAwait(false);
+    return 1;
+}
+
+// Demo seeding is refused outright in Production and needs a password; ask both questions here,
+// before a single migration runs, so a misconfigured --demo costs nothing but an exit code.
+// The seeder asks them again (and checks the password against the policy) once the host is up.
+if (cli.Demo)
+{
+    try
+    {
+        DemoSeedGuard.EnsureEnvironmentAllowsDemoSeeding(builder.Environment);
+        _ = DemoSeedGuard.RequireConfiguredPassword(builder.Configuration);
+    }
+    catch (InvalidOperationException ex)
+    {
+        await Console.Error.WriteLineAsync($"[migrator] FAILED: {ex.Message}").ConfigureAwait(false);
+        return 1;
+    }
+}
+
+// Mirror the API's mediator registration so module handlers wire correctly —
+// some module DbInitializers depend on services that mediator pipelines build.
+builder.Services.AddMediator(o =>
+{
+    o.ServiceLifetime = ServiceLifetime.Scoped;
+    o.Assemblies =
+    [
+        typeof(GenerateTokenCommand),
+        typeof(GenerateTokenCommandHandler),
+        typeof(GetTenantStatusQuery),
+        typeof(GetTenantStatusQueryHandler),
+        typeof(Boilerplate.Modules.Auditing.Contracts.AuditEnvelope),
+        typeof(Boilerplate.Modules.Auditing.Persistence.AuditDbContext),
+        typeof(Boilerplate.Modules.Files.Contracts.v1.Commands.RequestUploadUrlCommand),
+        typeof(Boilerplate.Modules.Files.FilesModule),
+        typeof(Boilerplate.Modules.Notifications.Contracts.v1.Commands.MarkNotificationReadCommand),
+        typeof(Boilerplate.Modules.Notifications.NotificationsModule),
+    ];
+});
+
+var moduleAssemblies = new Assembly[]
+{
+    typeof(IdentityModule).Assembly,
+    typeof(MultitenancyModule).Assembly,
+    typeof(AuditingModule).Assembly,
+    typeof(Boilerplate.Modules.Files.FilesModule).Assembly,
+    typeof(Boilerplate.Modules.Notifications.NotificationsModule).Assembly,
+};
+
+// Disable runtime-only concerns; persistence + multitenancy stay on so DbInitializers resolve. Caching
+// stays on because some modules' ctor wiring touches IDistributedCache (in-memory fallback if no Redis).
+builder.AddHeroPlatform(o =>
+{
+    o.EnableOpenTelemetry = false;
+    o.EnableCors = false;
+    o.EnableOpenApi = false;
+    o.EnableJobs = false;
+    o.EnableMailing = false;
+    o.EnableIdempotency = false;
+    o.EnableCaching = true;
+    // No HTTP surface and no tokens are ever minted here, so IdentityModule skips JWT bearer auth.
+    // That is what keeps the migrator free of a signing key: it needs no secret it cannot use.
+    o.EnableAuthentication = false;
+});
+
+// Registers EventingDbContext + its IDbInitializer, so the schema pass below creates the framework
+// outbox/inbox schema alongside every module's (issue #1349).
+builder.Services.AddEventingCore(builder.Configuration);
+
+builder.AddModules(moduleAssemblies);
+
+// TenantProvisioningService needs IJobService, but Hangfire's is gated behind EnableJobs (off here).
+// Provide a throwing no-op so the DI graph resolves; the migration code paths don't enqueue jobs.
+builder.Services.AddSingleton<Boilerplate.BuildingBlocks.Jobs.Services.IJobService, NoOpJobService>();
+
+// Strip every BackgroundService (+ TenantStoreInitializerHostedService) before StartAsync: left running they
+// poll/write tables BEFORE Step 1/2 create them (42P01). StartupValidator + Serilog flush IHostedServices stay.
+foreach (var descriptor in builder.Services
+    .Where(d => d.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)
+        && (typeof(Microsoft.Extensions.Hosting.BackgroundService).IsAssignableFrom(d.ImplementationType)
+            || d.ImplementationType?.Name == "TenantStoreInitializerHostedService"))
+    .ToList())
+{
+    builder.Services.Remove(descriptor);
+}
+
+using var host = builder.Build();
+var logger = host.Services.GetRequiredService<ILogger<MigratorCommand>>();
+
+// Start the host so logging providers / option validators initialise.
+await host.StartAsync().ConfigureAwait(false);
+
+try
+{
+    // ── Step 0 — wait for the database to come up ────────────────────────
+    // Postgres may still be initialising on cold-start; exp. backoff (≤2 min), then TimeoutException + exit 1.
+    var connectionString = host.Services.GetRequiredService<IConfiguration>()["DatabaseOptions:ConnectionString"]
+        ?? throw new InvalidOperationException("DatabaseOptions:ConnectionString is not configured.");
+    await Console.Out.WriteLineAsync("[migrator] waiting for postgres…").ConfigureAwait(false);
+    await PostgresMigratorLock.WaitForDatabaseAsync(connectionString, logger, CancellationToken.None)
+        .ConfigureAwait(false);
+    await Console.Out.WriteLineAsync("[migrator] postgres ready").ConfigureAwait(false);
+
+    // Log the connected role + database so a misconfigured low-priv connection string surfaces now,
+    // not as "permission denied for schema public" during MigrateAsync.
+    await LogConnectionIdentityAsync(connectionString).ConfigureAwait(false);
+
+    // ── Step 0b — acquire the advisory lock ──────────────────────────────
+    // Session-level lock: concurrent runs block here; auto-releases on connection close (no orphan on crash).
+    await Console.Out.WriteLineAsync("[migrator] acquiring advisory lock…").ConfigureAwait(false);
+    await using var migratorLock = await PostgresMigratorLock
+        .AcquireAsync(connectionString, logger, CancellationToken.None)
+        .ConfigureAwait(false);
+    await Console.Out.WriteLineAsync("[migrator] advisory lock acquired").ConfigureAwait(false);
+
+    // ── Step 1 — tenant catalog ───────────────────────────────────────────
+    // Always applied first: the schema and seed passes below read every tenant out of this database.
+    using (var scope = host.Services.CreateScope())
+    {
+        var tenantDb = scope.ServiceProvider.GetRequiredService<TenantDbContext>();
+        var pending = (await tenantDb.Database.GetPendingMigrationsAsync(CancellationToken.None)
+            .ConfigureAwait(false)).ToList();
+
+        if (cli.Command == "list-pending")
+        {
+            await Console.Out.WriteLineAsync(string.Create(
+                CultureInfo.InvariantCulture,
+                $"[tenant-catalog] {pending.Count} pending migration(s)"))
+                .ConfigureAwait(false);
+            foreach (var name in pending)
+            {
+                await Console.Out.WriteLineAsync($"  · {name}").ConfigureAwait(false);
+            }
+        }
+        else if (pending.Count > 0)
+        {
+            await Console.Out.WriteLineAsync(string.Create(
+                CultureInfo.InvariantCulture,
+                $"[tenant-catalog] applying {pending.Count} migration(s)…"))
+                .ConfigureAwait(false);
+            await tenantDb.Database.MigrateAsync(CancellationToken.None).ConfigureAwait(false);
+            await Console.Out.WriteLineAsync("[tenant-catalog] done").ConfigureAwait(false);
+        }
+        else
+        {
+            await Console.Out.WriteLineAsync("[tenant-catalog] already at head").ConfigureAwait(false);
+        }
+
+        // Seed the root tenant the first time the catalog comes up so the passes
+        // below have at least one tenant to enter.
+        var seeded = await tenantDb.TenantInfo
+            .FindAsync([MultitenancyConstants.Root.Id], CancellationToken.None)
+            .ConfigureAwait(false);
+        if (seeded is null && cli.Command != "list-pending")
+        {
+            var rootTenant = new AppTenantInfo(
+                MultitenancyConstants.Root.Id,
+                MultitenancyConstants.Root.Id,
+                MultitenancyConstants.Root.Name)
+            {
+                AdminEmail = MultitenancyConstants.Root.EmailAddress,
+                IsActive = true,
+                Issuer = MultitenancyConstants.Root.Issuer,
+            };
+            rootTenant.SetValidity(TimeProvider.System.GetUtcNow().UtcDateTime.AddYears(1));
+            await tenantDb.TenantInfo.AddAsync(rootTenant, CancellationToken.None).ConfigureAwait(false);
+            await tenantDb.SaveChangesAsync(CancellationToken.None).ConfigureAwait(false);
+            await Console.Out.WriteLineAsync("[tenant-catalog] seeded root tenant").ConfigureAwait(false);
+        }
+    }
+
+    // ── Step 2 — the shared module schema, then per-tenant seeds ─────────
+    // Every tenant lives in the one shared database (#75), so schema is migrated ONCE, not once per
+    // tenant. Seeding is the part that is genuinely per tenant — tenant-scoped roles, groups and the
+    // tenant admin — so that pass still walks the catalog, and --tenant scopes it.
+    if (!cli.CatalogOnly)
+    {
+        var tenantStore = host.Services.GetRequiredService<IMultiTenantStore<AppTenantInfo>>();
+        var tenantService = host.Services.GetRequiredService<ITenantService>();
+
+        var allTenants = (await tenantStore.GetAllAsync().ConfigureAwait(false)).ToList();
+        var rootTenant = allTenants.FirstOrDefault(t =>
+            string.Equals(t.Id, MultitenancyConstants.Root.Id, StringComparison.OrdinalIgnoreCase));
+
+        // 2a — schema, once. Run inside the root tenant's scope because a module's DbContext is
+        // tenant-filtered and needs an ambient tenant to be constructed at all.
+        if (cli.Command == "list-pending")
+        {
+            using var pendingScope = host.Services.CreateScope();
+            foreach (var (name, pendingNames) in await ModuleSchema
+                .GetPendingAsync(pendingScope.ServiceProvider, moduleAssemblies, CancellationToken.None)
+                .ConfigureAwait(false))
+            {
+                await Console.Out.WriteLineAsync(string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"[{name}] {pendingNames.Count} pending migration(s)"))
+                    .ConfigureAwait(false);
+                foreach (var migration in pendingNames)
+                {
+                    await Console.Out.WriteLineAsync($"  · {migration}").ConfigureAwait(false);
+                }
+            }
+        }
+        else if (cli.Command != "seed")
+        {
+            if (rootTenant is null)
+            {
+                await Console.Out.WriteLineAsync(
+                    "[migrator] the root tenant is missing from the catalog; cannot migrate the module schema")
+                    .ConfigureAwait(false);
+            }
+            else
+            {
+                await Console.Out.WriteLineAsync("[module-schema] migrating…").ConfigureAwait(false);
+                await tenantService.MigrateTenantAsync(rootTenant, CancellationToken.None).ConfigureAwait(false);
+                await Console.Out.WriteLineAsync("[module-schema] done").ConfigureAwait(false);
+            }
+        }
+
+        // 2b — seeds, per tenant.
+        if (cli.Command == "seed" || (cli.Command != "list-pending" && cli.SeedAfter))
+        {
+            var tenants = string.IsNullOrEmpty(cli.Tenant)
+                ? allTenants
+                : allTenants.Where(t => string.Equals(t.Id, cli.Tenant, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            if (tenants.Count == 0)
+            {
+                await Console.Out.WriteLineAsync($"[migrator] no tenants matched {cli.Tenant ?? "(all)"}")
+                    .ConfigureAwait(false);
+            }
+
+            foreach (var tenant in tenants)
+            {
+                await Console.Out.WriteLineAsync($"[{tenant.Id}] seeding…").ConfigureAwait(false);
+                await tenantService.SeedTenantAsync(tenant, CancellationToken.None).ConfigureAwait(false);
+            }
+        }
+    }
+
+    // ── Step 3 — (optional) demo accounts ────────────────────────────────
+    // Development affordance only: creates the acme/globex tenants and the people inside them, so
+    // a fresh stack has something to sign in as. Runs last, after every existing tenant is at head.
+    if (cli.Demo && cli.Command != "list-pending")
+    {
+        await Console.Out.WriteLineAsync("[migrator] seeding demo accounts…").ConfigureAwait(false);
+        var demoSeeder = new DemoSeeder(host.Services, host.Services.GetRequiredService<ILogger<DemoSeeder>>());
+        await demoSeeder.RunAsync(CancellationToken.None).ConfigureAwait(false);
+        await Console.Out.WriteLineAsync("[migrator] demo accounts ready").ConfigureAwait(false);
+    }
+
+    await Console.Out.WriteLineAsync("[migrator] finished successfully.").ConfigureAwait(false);
+    return 0;
+}
+#pragma warning disable CA1031 // Top-level Main intentionally catches every exception to convert any failure into exit code 1.
+catch (Exception ex)
+#pragma warning restore CA1031
+{
+    logger.LogError(ex, "DbMigrator failed");
+    await Console.Error.WriteLineAsync($"[migrator] FAILED: {ex.GetType().Name}: {ex.Message}")
+        .ConfigureAwait(false);
+    if (ex.StackTrace is { } stack)
+    {
+        await Console.Error.WriteLineAsync(stack).ConfigureAwait(false);
+    }
+    return 1;
+}
+finally
+{
+    // Flush logging buffers + run host shutdown so the operator (and any
+    // CI log collector) sees the final lines before the process exits.
+    await host.StopAsync().ConfigureAwait(false);
+}
+
+static async Task LogConnectionIdentityAsync(string connectionString)
+{
+    // Best-effort identity probe — never fail the migrator over a logging step.
+    try
+    {
+        await using var conn = new Npgsql.NpgsqlConnection(connectionString);
+        await conn.OpenAsync().ConfigureAwait(false);
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT current_user, current_database()";
+        await using var reader = await cmd.ExecuteReaderAsync().ConfigureAwait(false);
+        if (await reader.ReadAsync().ConfigureAwait(false))
+        {
+            var role = reader.GetString(0);
+            var db = reader.GetString(1);
+            await Console.Out.WriteLineAsync(string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"[migrator] connected as role={role} database={db}")).ConfigureAwait(false);
+        }
+    }
+#pragma warning disable CA1031 // Logging-only path: any exception swallowed and reported, never fatal.
+    catch (Exception ex)
+#pragma warning restore CA1031
+    {
+        await Console.Out.WriteLineAsync($"[migrator] WARN: could not log connection identity: {ex.Message}")
+            .ConfigureAwait(false);
+    }
+}

@@ -1,0 +1,49 @@
+name: CodeQL Analysis
+
+# Static analysis of the C# sources: a full `dotnet build` per run, so it is
+# rationed. It runs on PRs that touch src/**, and weekly on the default branch —
+# which is also what keeps the branch's alert set current and picks up newly
+# published queries without a commit. Deliberately NOT on every push: the merge
+# commit carries the code the PR run already analysed.
+
+on:
+  pull_request:
+    branches: [develop, main, 'release/**', 'hotfix/**']
+    paths:
+      - 'src/**'
+      - '.github/workflows/codeql.yml'
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (csharp)
+    # A Dependabot bump changes package versions, not the code CodeQL reasons
+    # about, and the weekly run on the default branch covers what it landed.
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      security-events: write # upload the SARIF results
+      actions: read # the analyze step reads the run's own metadata
+    steps:
+      - uses: actions/checkout@v7
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      # Not -warnaserror: backend.yml owns that gate, and CodeQL must still be
+      # able to analyse a build that only warns.
+      - run: dotnet build src/Boilerplate.slnx -c Release
+      - uses: github/codeql-action/analyze@v3

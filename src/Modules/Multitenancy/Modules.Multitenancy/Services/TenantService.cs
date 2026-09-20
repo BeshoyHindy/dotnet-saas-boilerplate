@@ -1,0 +1,256 @@
+using Finbuckle.MultiTenant.Abstractions;
+using Finbuckle.MultiTenant.Stores;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
+using Boilerplate.Modules.Multitenancy.Contracts;
+using Boilerplate.Modules.Multitenancy.Contracts.Dtos;
+using Boilerplate.Modules.Multitenancy.Contracts.v1.GetTenants;
+using Boilerplate.Modules.Multitenancy.Data;
+using Boilerplate.Modules.Multitenancy.Features.v1.GetTenants;
+using Boilerplate.Modules.Multitenancy.Provisioning;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace Boilerplate.Modules.Multitenancy.Services;
+
+public sealed class TenantService : ITenantService
+{
+    private readonly IMultiTenantStore<AppTenantInfo> _tenantStore;
+    private readonly ITenantScope _tenantScope;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly TenantDbContext _dbContext;
+    private readonly ITenantProvisioningService _provisioningService;
+    private readonly TimeProvider _timeProvider;
+    private readonly TenantValidityOptions _validityOptions;
+    private readonly ILogger<TenantService> _logger;
+
+    public TenantService(
+        IMultiTenantStore<AppTenantInfo> tenantStore,
+        ITenantScope tenantScope,
+        IServiceProvider serviceProvider,
+        TenantDbContext dbContext,
+        ITenantProvisioningService provisioningService,
+        TimeProvider timeProvider,
+        IOptions<TenantValidityOptions> validityOptions,
+        ILogger<TenantService> logger)
+    {
+        ArgumentNullException.ThrowIfNull(validityOptions);
+        _tenantStore = tenantStore;
+        _tenantScope = tenantScope;
+        _serviceProvider = serviceProvider;
+        _dbContext = dbContext;
+        _provisioningService = provisioningService;
+        _timeProvider = timeProvider;
+        _validityOptions = validityOptions.Value;
+        _logger = logger;
+    }
+
+    public async Task<string> ActivateAsync(string id, CancellationToken cancellationToken)
+    {
+        var tenant = await GetTenantInfoAsync(id, cancellationToken).ConfigureAwait(false);
+
+        if (tenant.IsActive)
+        {
+            throw new CustomException($"tenant {id} is already activated");
+        }
+
+        await _provisioningService.EnsureCanActivateAsync(id, cancellationToken).ConfigureAwait(false);
+
+        tenant.Activate();
+
+        await _tenantStore.UpdateAsync(tenant).ConfigureAwait(false);
+        await RefreshTenantCacheAsync(tenant).ConfigureAwait(false);
+
+        return $"tenant {id} is now activated";
+    }
+
+    public async Task<string> CreateAsync(string id,
+        string name,
+        string adminEmail, string? issuer, DateTime validUpto, CancellationToken cancellationToken)
+    {
+        AppTenantInfo tenant = new(id, id, name)
+        {
+            AdminEmail = adminEmail,
+            IsActive = true,
+            Issuer = issuer,
+            // Set ValidUpto directly rather than through SetValidity(), which forbids moving the
+            // date backward and would reject a term computed from an earlier 'now'.
+            ValidUpto = DateTime.SpecifyKind(validUpto, DateTimeKind.Utc),
+        };
+        await _tenantStore.AddAsync(tenant).ConfigureAwait(false);
+        await RefreshTenantCacheAsync(tenant).ConfigureAwait(false);
+
+        return tenant.Id;
+    }
+
+    public async Task MigrateTenantAsync(AppTenantInfo tenant, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tenant);
+
+        await _tenantScope.RunAsync(
+            tenant.Id!,
+            async (services, ct) =>
+            {
+                foreach (var initializer in services.GetServices<IDbInitializer>())
+                {
+                    await initializer.MigrateAsync(ct).ConfigureAwait(false);
+                }
+            },
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task SeedTenantAsync(AppTenantInfo tenant, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(tenant);
+
+        await _tenantScope.RunAsync(
+            tenant.Id!,
+            async (services, ct) =>
+            {
+                foreach (var initializer in services.GetServices<IDbInitializer>())
+                {
+                    await initializer.SeedAsync(ct).ConfigureAwait(false);
+                }
+            },
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<string> DeactivateAsync(string id, CancellationToken cancellationToken = default)
+    {
+        var tenant = await GetTenantInfoAsync(id, cancellationToken).ConfigureAwait(false);
+        if (!tenant.IsActive)
+        {
+            throw new CustomException($"tenant {id} is already deactivated");
+        }
+
+        int tenantCount = (await _tenantStore.GetAllAsync().ConfigureAwait(false)).Count(t => t.IsActive);
+        if (tenantCount <= 1)
+        {
+            throw new CustomException("At least one active tenant is required.");
+        }
+
+        if (tenant.Id.Equals(MultitenancyConstants.Root.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new CustomException("The root tenant cannot be deactivated.");
+        }
+
+        tenant.Deactivate();
+        await _tenantStore.UpdateAsync(tenant).ConfigureAwait(false);
+        await RefreshTenantCacheAsync(tenant).ConfigureAwait(false);
+        return $"tenant {id} is now deactivated";
+    }
+
+    public async Task<bool> ExistsWithIdAsync(string id, CancellationToken cancellationToken = default) =>
+        await _tenantStore.GetAsync(id).ConfigureAwait(false) is not null;
+
+    public async Task<bool> ExistsWithNameAsync(string name, CancellationToken cancellationToken = default) =>
+        (await _tenantStore.GetAllAsync().ConfigureAwait(false)).Any(t => t.Name == name);
+
+    public async Task<PagedResponse<TenantDto>> GetAllAsync(GetTenantsQuery query, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        IQueryable<AppTenantInfo> tenants = _dbContext.TenantInfo;
+        var specification = new GetTenantsSpecification(query);
+        IQueryable<TenantDto> projected = tenants.ApplySpecification(specification);
+
+        return await projected
+            .ToPagedResponseAsync(query, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<TenantStatusDto> GetStatusAsync(string id, CancellationToken cancellationToken = default)
+    {
+        var tenant = await GetTenantInfoAsync(id, cancellationToken).ConfigureAwait(false);
+
+        var graceEnds = tenant.ValidUpto.AddDays(_validityOptions.GracePeriodDays);
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+        string expiryState;
+        if (now <= tenant.ValidUpto)
+        {
+            expiryState = "Active";
+        }
+        else if (now <= graceEnds)
+        {
+            expiryState = "InGrace";
+        }
+        else
+        {
+            expiryState = "Expired";
+        }
+
+        return new TenantStatusDto
+        {
+            Id = tenant.Id!,
+            Name = tenant.Name!,
+            IsActive = tenant.IsActive,
+            ValidUpto = tenant.ValidUpto,
+            AdminEmail = tenant.AdminEmail!,
+            Issuer = tenant.Issuer,
+            ExpiryState = expiryState,
+            GraceEndsUtc = graceEnds
+        };
+    }
+
+    public async Task<(DateTime PeriodStartUtc, DateTime ValidUpto)> RenewAsync(
+        string id, int months, CancellationToken cancellationToken = default)
+    {
+        var tenant = await GetTenantInfoAsync(id, cancellationToken).ConfigureAwait(false);
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
+
+        // Stack remaining time: renew from ValidUpto if still in the future, otherwise from now.
+        var periodStart = DateTime.SpecifyKind(tenant.ValidUpto > now ? tenant.ValidUpto : now, DateTimeKind.Utc);
+        var newValidUpto = DateTime.SpecifyKind(periodStart.AddMonths(months), DateTimeKind.Utc);
+
+        tenant.SetValidity(newValidUpto);
+
+        await _tenantStore.UpdateAsync(tenant).ConfigureAwait(false);
+        await RefreshTenantCacheAsync(tenant).ConfigureAwait(false);
+
+        return (periodStart, newValidUpto);
+    }
+
+    public async Task<DateTime> AdjustValidityAsync(string id, DateTime validUpto, CancellationToken cancellationToken = default)
+    {
+        var tenant = await GetTenantInfoAsync(id, cancellationToken).ConfigureAwait(false);
+
+        // Set directly rather than via SetValidity: this operator override is allowed to move the date
+        // backward (e.g. immediate expiry / correcting a mistake), which SetValidity forbids.
+        var normalized = DateTime.SpecifyKind(validUpto, DateTimeKind.Utc);
+        var previous = tenant.ValidUpto;
+        tenant.ValidUpto = normalized;
+
+        await _tenantStore.UpdateAsync(tenant).ConfigureAwait(false);
+        await RefreshTenantCacheAsync(tenant).ConfigureAwait(false);
+
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation(
+                "[Multitenancy] operator adjusted tenant {TenantId} validity from {Previous:o} to {ValidUpto:o}",
+                id, previous, normalized);
+        }
+
+        return normalized;
+    }
+
+    private async Task<AppTenantInfo> GetTenantInfoAsync(string id, CancellationToken cancellationToken = default) =>
+        await _tenantStore.GetAsync(id).ConfigureAwait(false)
+            ?? throw new NotFoundException($"{typeof(AppTenantInfo).Name} {id} Not Found.");
+
+    // Finbuckle resolves via the distributed-cache store first (60-min TTL) while the injected store only
+    // writes EF, so push the new state into the cache store too — otherwise flips lag until cache expiry.
+    private async Task RefreshTenantCacheAsync(AppTenantInfo tenant)
+    {
+        var cacheStore = _serviceProvider
+            .GetServices<IMultiTenantStore<AppTenantInfo>>()
+            .FirstOrDefault(s => s.GetType() == typeof(DistributedCacheStore<AppTenantInfo>));
+        if (cacheStore is not null)
+        {
+            await cacheStore.UpdateAsync(tenant).ConfigureAwait(false);
+        }
+    }
+}

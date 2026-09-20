@@ -1,0 +1,21 @@
+@baseUrl = https://localhost:7030
+@tenant = root
+
+### Issue JWT token
+POST {{baseUrl}}/api/v1/tenants/{{tenant}}/auth/token
+Content-Type: application/json
+
+{
+  "email": "admin@root.com",
+  "password": "Password123!"
+}
+
+### Refresh JWT token
+# Anonymous, so the tenant rides in the route (ADR-0002): the access token may be expired.
+POST {{baseUrl}}/api/v1/tenants/{{tenant}}/auth/refresh
+Content-Type: application/json
+
+{
+  "token": "{{access_token}}",
+  "refreshToken": "{{refresh_token}}"
+}

@@ -1,0 +1,46 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<RootNamespace>Boilerplate.Api</RootNamespace>
+		<AssemblyName>Boilerplate.Api</AssemblyName>
+		<IsPackable>false</IsPackable>
+
+		<!-- Development secrets (JWT signing key, SMTP, seed admin password) live in the local
+		     user-secrets store, never in appsettings.Development.json. Bootstrap them with
+		     `bash scripts/dev-secrets.sh`. -->
+		<UserSecretsId>0f2b2a2e-3d3c-4f0d-9d5f-2c9a1a9d6b71</UserSecretsId>
+
+		<!-- No Container* properties: the image is the `api` target of src/Host/Dockerfile
+		     (chiseled, non-root, port 8080), built by CI with Buildx (ADR-0005). The SDK's
+		     PublishContainer target is not used, and leaving its settings here would be a
+		     second, silently divergent definition of the same image. -->
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+		<PackageReference Include="Mediator.Abstractions" />
+		<PackageReference Include="Mediator.SourceGenerator">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\BuildingBlocks\Web\Boilerplate.BuildingBlocks.Web.csproj" />
+    <ProjectReference Include="..\..\Modules\Auditing\Modules.Auditing.Contracts\Boilerplate.Modules.Auditing.Contracts.csproj" />
+    <ProjectReference Include="..\..\Modules\Auditing\Modules.Auditing\Boilerplate.Modules.Auditing.csproj" />
+    <ProjectReference Include="..\..\Modules\Identity\Modules.Identity\Boilerplate.Modules.Identity.csproj" />
+    <ProjectReference Include="..\..\Modules\Multitenancy\Modules.Multitenancy\Boilerplate.Modules.Multitenancy.csproj" />
+    <ProjectReference Include="..\Boilerplate.Migrations.PostgreSQL\Boilerplate.Migrations.PostgreSQL.csproj" />
+    <ProjectReference Include="..\..\Modules\Files\Modules.Files\Boilerplate.Modules.Files.csproj" />
+    <ProjectReference Include="..\..\Modules\Files\Modules.Files.Contracts\Boilerplate.Modules.Files.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="wwwroot\uploads\" />
+  </ItemGroup>
+
+</Project>
