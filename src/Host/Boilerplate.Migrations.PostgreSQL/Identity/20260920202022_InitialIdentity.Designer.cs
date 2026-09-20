@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Boilerplate.Migrations.PostgreSQL.Identity
 {
     [DbContext(typeof(IdentityDbContext))]
-    [Migration("20260919084834_InitialIdentity")]
+    [Migration("20260920202022_InitialIdentity")]
     partial class InitialIdentity
     {
         /// <inheritdoc />
@@ -174,7 +174,8 @@ namespace Boilerplate.Migrations.PostgreSQL.Identity
 
                     b.HasKey("Id");
 
-                    b.HasIndex("NormalizedEmail")
+                    b.HasIndex("NormalizedEmail", "TenantId")
+                        .IsUnique()
                         .HasDatabaseName("EmailIndex");
 
                     b.HasIndex("NormalizedUserName", "TenantId")

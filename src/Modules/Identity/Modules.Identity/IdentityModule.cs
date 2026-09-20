@@ -107,6 +107,9 @@ public class IdentityModule : IModule
 
         // User services - focused single-responsibility services
         services.AddTransient<IUserRegistrationService, UserRegistrationService>();
+        // One definition of the "confirm your e-mail" message, shared by the registration event
+        // handler and the resend endpoint so the two links cannot drift apart (#86).
+        services.AddTransient<ConfirmationMailBuilder>();
         services.AddTransient<IUserProfileService, UserProfileService>();
         services.AddTransient<IUserStatusService, UserStatusService>();
         services.AddTransient<IUserRoleService, UserRoleService>();

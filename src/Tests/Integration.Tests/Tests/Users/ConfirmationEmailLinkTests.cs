@@ -25,6 +25,9 @@ public sealed class ConfirmationEmailLinkTests
     /// <summary>Matches <c>OriginOptions:OriginUrl</c> in <see cref="AppWebApplicationFactory"/>.</summary>
     private const string ConfiguredOrigin = "http://localhost";
 
+    /// <summary>Subject of the mail that carries the link — not the welcome that shares its event.</summary>
+    private const string ConfirmationSubject = "Confirm Your Email Address";
+
     private readonly AppWebApplicationFactory _factory;
 
     public ConfirmationEmailLinkTests(AppWebApplicationFactory factory)
@@ -45,7 +48,8 @@ public sealed class ConfirmationEmailLinkTests
         var unique = Guid.NewGuid().ToString("N")[..8];
         var email = $"confirm-link-{unique}@example.com";
 
-        // Act — self-register; the confirmation mail is enqueued on the "email" Hangfire queue.
+        // Act — self-register; the confirmation mail hangs off the registration event (#86), so it is
+        // published with the user row and delivered on a dispatch cycle rather than inside the request.
         var response = await client.PostAsJsonAsync($"{TestConstants.RootAuthBasePath}/register", new
         {
             firstName = "Confirm",
@@ -57,6 +61,9 @@ public sealed class ConfirmationEmailLinkTests
         });
         response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
         var registered = await response.DeserializeAsync<RegisterResult>();
+
+        // The hosted dispatcher is off in this host, so the drain is what stands in for its cycle.
+        await OutboxDrain.DrainAsync(_factory.Services);
 
         var confirmationMail = await WaitForMailAsync(mail, email);
         var link = ExtractConfirmationLink(confirmationMail);
@@ -99,11 +106,16 @@ public sealed class ConfirmationEmailLinkTests
 
     private static async Task<MailRequest> WaitForMailAsync(NoOpMailService mail, string to)
     {
-        // The mail is dispatched by the in-memory Hangfire server, so it lands a beat after the response.
+        // The handler runs on the dispatcher's scope, so the mail lands a beat after the drain.
+        // Match the SUBJECT as well as the recipient: the same event also sends that address a
+        // welcome mail, and taking whichever arrived first would make this test assert about the
+        // wrong message — a welcome with no link in it fails later, and confusingly.
         var deadline = DateTime.UtcNow.AddSeconds(30);
         while (DateTime.UtcNow < deadline)
         {
-            var match = mail.Sent.FirstOrDefault(m => m.To.Contains(to));
+            var match = mail.Sent.FirstOrDefault(m =>
+                m.To.Contains(to) &&
+                string.Equals(m.Subject, ConfirmationSubject, StringComparison.Ordinal));
             if (match is not null)
             {
                 return match;

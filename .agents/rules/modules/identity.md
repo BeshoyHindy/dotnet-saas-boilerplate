@@ -17,6 +17,47 @@ Auth (JWT + ASP.NET Identity), users, roles, permissions, sessions, impersonatio
 
 `ChangePassword`/`Update`/`Delete` etc. flow facade → service → EF/UserManager. `CancellationToken` is `= default` on these interfaces and propagated into EF sinks (note: `UserManager`/`RoleManager` have no CT overloads, so private helpers that only call them don't take one).
 
+## Registration is one transaction (#86)
+
+`UserRegistrationService.RegisterAsync` wraps the whole sign-up in a single
+`IdentityDbContext` transaction: the user row, the `Basic` role, the tenant's default groups,
+`RecordRegistered` and the `UserRegisteredIntegrationEvent` outbox row commit together or not at all.
+`UserManager` writes through that same scoped context, and the outbox joins the ambient transaction
+through the shared scope connection (`eventing.md` §Atomicity) — so one `BeginTransaction` covers
+every write. It was four independent commits, and a failure after the first left a user with no
+role, no groups and no event, which every retry was then refused on as a duplicate. **Don't add a
+step to registration outside that transaction.**
+
+**The confirmation mail is sent from the event, not inline** — `UserRegisteredConfirmationMailHandler`
+reacts to `UserRegisteredIntegrationEvent`, skipping a user whose e-mail is already confirmed (which
+is how external-auth sign-ups are excluded). A mail queued mid-registration could announce a sign-up
+that then rolled back; hanging it off the event means no row, no event, no mail, and the outbox's
+retries mean a committed sign-up cannot lose it. A rare duplicate is acceptable — the link is the
+same one. The `origin` the link is built on is configuration (`MailLinkOrigin`), resolvable in the
+dispatcher, so nothing request-derived rides on the event; `RegisterAsync` therefore takes no
+`origin` at all. The resend endpoint still queues its copy on the `email` job queue — it has a
+committed user by definition. Both build the message through `ConfirmationMailBuilder`, so the two
+links cannot drift apart. **A test asserting the registration mail must drain the outbox first**
+(`OutboxDrain.DrainAsync`).
+
+`AppUser.RecordRegistered` stays inside that transaction, and its handler (`UserRegisteredHandler`)
+**logs only** — like every other Identity domain-event handler. It used to publish
+`UserRegisteredIntegrationEvent` as well, which meant two events per sign-up, two welcome mails and
+(once the mail moved) two confirmation mails. The service publishes that event itself so the row
+sits inside the transaction; a publish from a domain-event handler runs inside
+`DomainEventsInterceptor`, which logs and swallows handler failures, so a failed write there would
+leave a committed user nobody was ever told about. **Don't reinstate a publish in that handler.**
+
+**E-mail uniqueness is an index, not a query.** `EmailIndex` is `(NormalizedEmail, TenantId)` UNIQUE,
+mirroring how Finbuckle widens `UserNameIndex` — so an address is free again in every other tenant,
+and NULL e-mails stay allowed (Postgres treats NULLs as distinct). Identity's `RequireUniqueEmail`
+check runs before the insert and two concurrent sign-ups both passed it. A `23505` on **those two
+named indexes** is mapped by `RegistrationConflict` to the same 400 the pre-insert check gives
+("Unable to register the user." plus the taken-email/username reason); any other unique violation is
+rethrown and stays a 500, because answering "that e-mail is taken" to a collision somewhere else
+would be a lie that also hides the bug. `GetOrCreateFromPrincipalAsync` instead re-finds the winner
+by e-mail and returns it, because a lost race there is still a valid login.
+
 ## Avatars: the client never names one (#83)
 
 `AppUser.ImageUrl` holds **only a URL this server issued for this user**. `PUT /identity/profile` takes the bytes (`image`) or the removal flag (`deleteCurrentImage`) and writes the column from what `IStorageService.UploadAsync<AppUser>(…, owner: user.Id, …)` returns; the old `PUT /identity/profile/image`, which accepted any string up to 2048 characters, is **gone**, and so is `IUserProfileService.SetImageUrlAsync`. Don't add either back — a column a client can name is a column that can name another user's avatar.

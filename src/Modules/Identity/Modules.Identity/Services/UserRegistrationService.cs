@@ -1,9 +1,7 @@
 using Finbuckle.MultiTenant.Abstractions;
-using Boilerplate.BuildingBlocks.Core.Common;
 using Boilerplate.BuildingBlocks.Core.Exceptions;
-using Boilerplate.BuildingBlocks.Eventing.Outbox;
+using Boilerplate.BuildingBlocks.Eventing.Abstractions;
 using Boilerplate.BuildingBlocks.Jobs.Services;
-using Boilerplate.BuildingBlocks.Mailing;
 using Boilerplate.BuildingBlocks.Mailing.Services;
 using Boilerplate.BuildingBlocks.Shared.Constants;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
@@ -14,7 +12,6 @@ using Boilerplate.Modules.Identity.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
-using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Net;
 using System.Security.Claims;
@@ -27,9 +24,17 @@ internal sealed class UserRegistrationService(
     IdentityDbContext db,
     IJobService jobService,
     IMailService mailService,
+    ConfirmationMailBuilder confirmationMailBuilder,
     IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor,
-    IOutboxStore outboxStore) : IUserRegistrationService
+    IOutboxWriter outbox) : IUserRegistrationService
 {
+    /// <summary>
+    /// The one message a caller who lost a registration race is told, whatever they lost it to.
+    /// Identical to what the pre-insert duplicate check produces, so a race is indistinguishable
+    /// from a sequential duplicate — which is what it is.
+    /// </summary>
+    private const string RegistrationFailedMessage = "Unable to register the user.";
+
     public async Task<string> GetOrCreateFromPrincipalAsync(ClaimsPrincipal principal, CancellationToken cancellationToken = default)
     {
         EnsureValidTenant();
@@ -43,11 +48,29 @@ internal sealed class UserRegistrationService(
             return existingUser.Id;
         }
 
-        var user = await CreateUserFromPrincipalAsync(principal, email);
-        await AssignDefaultRoleAndGroupsAsync(user, "ExternalAuth", cancellationToken);
-        await PublishUserRegisteredAsync(user, "Identity.ExternalAuth", cancellationToken);
+        try
+        {
+            return await InTransactionAsync(async ct =>
+            {
+                var user = await CreateUserFromPrincipalAsync(principal, email);
+                await AssignDefaultRoleAndGroupsAsync(user, "ExternalAuth", ct);
+                await PublishUserRegisteredAsync(user, "Identity.ExternalAuth", ct);
 
-        return user.Id;
+                return user.Id;
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateException ex) when (RegistrationConflict.IsDuplicateUser(ex))
+        {
+            // Two sign-ins with the same external identity raced and the other one won. The user this
+            // call was asked to get-or-create now exists, which is the answer the caller wanted: find
+            // it and hand it back rather than failing a login that has nothing wrong with it. The
+            // change tracker was already cleared on the way out of the transaction.
+            var winner = await userManager.FindByEmailAsync(email);
+            return winner?.Id ?? throw new CustomException(
+                "Failed to create user from external principal.",
+                errors: null,
+                HttpStatusCode.BadRequest);
+        }
     }
 
     public async Task<string> RegisterAsync(
@@ -58,17 +81,36 @@ internal sealed class UserRegistrationService(
         string password,
         string confirmPassword,
         string phoneNumber,
-        string origin,
         CancellationToken cancellationToken)
     {
+        EnsureValidTenant();
         ValidatePasswordMatch(password, confirmPassword);
 
-        var user = await CreateUserWithPasswordAsync(firstName, lastName, email, userName, password, phoneNumber);
-        await AssignDefaultRoleAndGroupsAsync(user, "System", cancellationToken);
-        await SendConfirmationEmailAsync(user, origin, cancellationToken);
-        await PublishUserRegisteredAsync(user, "Identity", cancellationToken);
+        // The confirmation mail is NOT sent here. It hangs off UserRegisteredIntegrationEvent
+        // (UserRegisteredConfirmationMailHandler), whose outbox row commits with the rows below —
+        // so a registration that rolls back cannot have mailed a link to an account that does not
+        // exist, and one that commits cannot lose the mail.
+        try
+        {
+            return await InTransactionAsync(async ct =>
+            {
+                var user = await CreateUserWithPasswordAsync(firstName, lastName, email, userName, password, phoneNumber);
+                await AssignDefaultRoleAndGroupsAsync(user, "System", ct);
+                await PublishUserRegisteredAsync(user, "Identity", ct);
 
-        return user.Id;
+                return user.Id;
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateException ex) when (RegistrationConflict.IsDuplicateUser(ex))
+        {
+            // A concurrent registration got there first. Identity's pre-insert duplicate check lost
+            // the race to the index, so say what that check would have said: this is the caller's
+            // duplicate (400), not a server fault (500).
+            throw new CustomException(
+                RegistrationFailedMessage,
+                [RegistrationConflict.DuplicateReasonFor(ex, email, userName)],
+                HttpStatusCode.BadRequest);
+        }
     }
 
     public async Task<string> ConfirmEmailAsync(string userId, string code, string tenant, CancellationToken cancellationToken)
@@ -152,6 +194,57 @@ internal sealed class UserRegistrationService(
         return result.Succeeded
             ? string.Format(CultureInfo.InvariantCulture, "Phone number {0} confirmed successfully.", user.PhoneNumber)
             : throw new CustomException(string.Format(CultureInfo.InvariantCulture, "An error occurred while confirming phone number {0}", user.PhoneNumber));
+    }
+
+    /// <summary>
+    /// Runs the whole of a registration in one database transaction: the user row, the role, the
+    /// default groups and the outbox row either all exist or none of them do (#86). Before this,
+    /// each was its own commit, and a failure after the first left a user with no role, no groups
+    /// and no event — a row every retry was then refused on, with no way for the caller to recover.
+    ///
+    /// <para><see cref="UserManager{T}"/> writes through this same scoped <see cref="IdentityDbContext"/>,
+    /// and the outbox joins the ambient transaction through the shared scope connection
+    /// (<c>.agents/rules/eventing.md</c> §Atomicity), so one <c>BeginTransaction</c> here covers
+    /// every write registration makes.</para>
+    ///
+    /// <para>The body runs through the provider's execution strategy. Postgres is configured without
+    /// retry-on-failure today, so it executes exactly once; wrapping it anyway is what keeps
+    /// enabling retries a configuration change rather than a crash (a user-initiated transaction
+    /// under a retrying strategy throws). The change tracker is cleared at the top of each attempt
+    /// so a retry starts from committed state instead of the failed attempt's leftovers, and again
+    /// on the way out of a failed one — the rows were rolled back, so a context still tracking them
+    /// would re-insert them on the next save anything in this scope makes.</para>
+    /// </summary>
+    private async Task<string> InTransactionAsync(
+        Func<CancellationToken, Task<string>> register,
+        CancellationToken cancellationToken)
+    {
+        return await db.Database.CreateExecutionStrategy().ExecuteAsync(
+            cancellationToken,
+            async (ct) =>
+            {
+                db.ChangeTracker.Clear();
+
+                try
+                {
+                    // Disposal rolls back anything not committed, which is the whole point: every exit
+                    // that is not the commit below leaves the database as it found it.
+                    await using var transaction = await db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+
+                    var userId = await register(ct).ConfigureAwait(false);
+
+                    await transaction.CommitAsync(ct).ConfigureAwait(false);
+                    return userId;
+                }
+                catch
+                {
+                    // One place for every failed exit — the caller that maps a duplicate to 400, the
+                    // caller that re-finds the winner, and the failure nobody catches all leave the
+                    // scoped context as clean as the database.
+                    db.ChangeTracker.Clear();
+                    throw;
+                }
+            }).ConfigureAwait(false);
     }
 
     private void EnsureValidTenant()
@@ -265,7 +358,7 @@ internal sealed class UserRegistrationService(
             // reasons so the caller sees *why* registration failed, not a bare 500.
             var errors = result.Errors.Select(error => error.Description).ToList();
             throw new CustomException(
-                "Unable to register the user.",
+                RegistrationFailedMessage,
                 errors,
                 HttpStatusCode.BadRequest);
         }
@@ -296,20 +389,18 @@ internal sealed class UserRegistrationService(
         }
     }
 
+    /// <summary>
+    /// The resend path only. A first registration's confirmation mail is sent from the event
+    /// (<c>UserRegisteredConfirmationMailHandler</c>) so it cannot outlive a rolled-back sign-up;
+    /// a resend has a committed user by definition, so queueing it keeps the request short.
+    /// </summary>
     private async Task SendConfirmationEmailAsync(AppUser user, string origin, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(user.Email))
+        var mailRequest = await confirmationMailBuilder.BuildAsync(user, origin).ConfigureAwait(false);
+        if (mailRequest is null)
         {
             return;
         }
-
-        string emailVerificationUri = await GetEmailVerificationUriAsync(user, origin);
-        string emailBody = BuildConfirmationEmailHtml(user.FirstName ?? user.UserName ?? "User", emailVerificationUri);
-
-        var mailRequest = new MailRequest(
-            new Collection<string> { user.Email },
-            "Confirm Your Email Address",
-            emailBody);
 
         jobService.Enqueue("email", () => mailService.SendAsync(mailRequest, cancellationToken));
     }
@@ -335,96 +426,6 @@ internal sealed class UserRegistrationService(
             FirstName: user.FirstName ?? string.Empty,
             LastName: user.LastName ?? string.Empty);
 
-        await outboxStore.AddAsync(integrationEvent, cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task<string> GetEmailVerificationUriAsync(AppUser user, string origin)
-    {
-        EnsureValidTenant();
-
-        string code = await userManager.GenerateEmailConfirmationTokenAsync(user);
-        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-
-        // Mail the *client* route, not the API route: a recipient clicking an API link lands on a raw
-        // JSON body. The page reads userId/code/tenant from the query and calls the tenant-routed
-        // endpoint itself. Built exactly like the reset-password link in UserPasswordService — the
-        // configured origin with any trailing slash trimmed (Uri.ToString() adds one for a host-only
-        // URL, which would produce "//confirm-email" and miss the client route) and QueryHelpers doing
-        // the URL-encoding. The tenant rides in the query because the client route has no path segment
-        // for it; it is a page parameter, never an input to tenant resolution (ADR-0002).
-        var confirmEmailUri = QueryHelpers.AddQueryString(
-            $"{origin.TrimEnd('/')}/confirm-email",
-            new Dictionary<string, string?>
-            {
-                [QueryStringKeys.UserId] = user.Id,
-                [QueryStringKeys.Code] = code,
-                ["tenant"] = multiTenantContextAccessor?.MultiTenantContext?.TenantInfo?.Id,
-            });
-
-        return confirmEmailUri;
-    }
-
-    private static string BuildConfirmationEmailHtml(string userName, string confirmationUrl)
-    {
-        return $"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Confirm Your Email</title>
-            </head>
-            <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc;">
-                <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                    <tr>
-                        <td align="center" style="padding: 40px 0;">
-                            <table role="presentation" style="width: 100%; max-width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-                                <tr>
-                                    <td style="padding: 40px 40px 30px 40px; text-align: center; background-color: #2563eb; border-radius: 8px 8px 0 0;">
-                                        <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">Confirm Your Email Address</h1>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 40px;">
-                                        <p style="margin: 0 0 20px 0; color: #334155; font-size: 16px; line-height: 1.6;">
-                                            Hi {System.Net.WebUtility.HtmlEncode(userName)},
-                                        </p>
-                                        <p style="margin: 0 0 20px 0; color: #334155; font-size: 16px; line-height: 1.6;">
-                                            Thank you for registering! Please confirm your email address by clicking the button below:
-                                        </p>
-                                        <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                                            <tr>
-                                                <td align="center" style="padding: 30px 0;">
-                                                    <a href="{System.Net.WebUtility.HtmlEncode(confirmationUrl)}" style="display: inline-block; padding: 14px 32px; background-color: #2563eb; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 6px;">
-                                                        Confirm Email Address
-                                                    </a>
-                                                </td>
-                                            </tr>
-                                        </table>
-                                        <p style="margin: 0 0 20px 0; color: #64748b; font-size: 14px; line-height: 1.6;">
-                                            If the button doesn't work, copy and paste this link into your browser:
-                                        </p>
-                                        <p style="margin: 0 0 20px 0; color: #2563eb; font-size: 14px; line-height: 1.6; word-break: break-all;">
-                                            {System.Net.WebUtility.HtmlEncode(confirmationUrl)}
-                                        </p>
-                                        <p style="margin: 30px 0 0 0; color: #64748b; font-size: 14px; line-height: 1.6;">
-                                            If you didn't create an account, you can safely ignore this email.
-                                        </p>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 20px 40px; background-color: #f1f5f9; border-radius: 0 0 8px 8px; text-align: center;">
-                                        <p style="margin: 0; color: #94a3b8; font-size: 12px;">
-                                            This is an automated message. Please do not reply to this email.
-                                        </p>
-                                    </td>
-                                </tr>
-                            </table>
-                        </td>
-                    </tr>
-                </table>
-            </body>
-            </html>
-            """;
+        await outbox.AddAsync(integrationEvent, cancellationToken).ConfigureAwait(false);
     }
 }

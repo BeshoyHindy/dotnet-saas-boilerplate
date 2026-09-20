@@ -59,7 +59,6 @@ public sealed class RegisterUserCommandHandlerTests
             command.Password,
             command.ConfirmPassword,
             command.PhoneNumber!,
-            ConfiguredOrigin,
             Arg.Any<CancellationToken>())
             .Returns(expectedUserId);
 
@@ -82,7 +81,7 @@ public sealed class RegisterUserCommandHandlerTests
         command.UserName = "janesmith";
 
         var userId = _fixture.Create<string>();
-        _userService.RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _userService.RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(userId);
 
         // Act
@@ -97,7 +96,6 @@ public sealed class RegisterUserCommandHandlerTests
             command.Password,
             command.ConfirmPassword,
             command.PhoneNumber!,
-            ConfiguredOrigin,
             Arg.Any<CancellationToken>());
     }
 
@@ -109,7 +107,7 @@ public sealed class RegisterUserCommandHandlerTests
         command.PhoneNumber = null;
 
         var userId = _fixture.Create<string>();
-        _userService.RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _userService.RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(userId);
 
         // Act
@@ -124,16 +122,18 @@ public sealed class RegisterUserCommandHandlerTests
             command.Password,
             command.ConfirmPassword,
             string.Empty, // Should convert null to empty string
-            ConfiguredOrigin,
             Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Handle_Should_UseTheConfiguredOrigin_For_TheConfirmationLink()
+    public async Task Handle_Should_Register_When_AnOriginIsConfigured()
     {
         // Arrange — the mailed link's base URL is configuration, not anything the caller controls.
+        // It no longer travels into registration: the confirmation mail is built by the handler of
+        // the registration event (#86), which resolves the same configured origin. What is left here
+        // is the precondition — an origin exists, so the sign-up may proceed.
         var command = ValidCommand();
-        _userService.RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _userService.RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(_fixture.Create<string>());
 
         // Act
@@ -143,7 +143,6 @@ public sealed class RegisterUserCommandHandlerTests
         await _userService.Received(1).RegisterAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
             Arg.Any<string>(), Arg.Any<string>(),
-            Arg.Is<string>(origin => origin == ConfiguredOrigin),
             Arg.Any<CancellationToken>());
     }
 
@@ -158,7 +157,7 @@ public sealed class RegisterUserCommandHandlerTests
         var command = ValidCommand();
 
         var expectedExceptionMessage = "Email already exists";
-        _userService.RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _userService.RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new InvalidOperationException(expectedExceptionMessage));
 
         // Act & Assert
@@ -180,7 +179,7 @@ public sealed class RegisterUserCommandHandlerTests
 
         await _userService.DidNotReceive().RegisterAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
-            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     #endregion
@@ -208,7 +207,7 @@ public sealed class RegisterUserCommandHandlerTests
         using var cts = new CancellationTokenSource();
         var cancellationToken = cts.Token;
 
-        _userService.RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), cancellationToken)
+        _userService.RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), cancellationToken)
             .Returns(userId);
 
         // Act
@@ -223,7 +222,6 @@ public sealed class RegisterUserCommandHandlerTests
             command.Password,
             command.ConfirmPassword,
             command.PhoneNumber!,
-            ConfiguredOrigin,
             cancellationToken);
     }
 
@@ -243,7 +241,7 @@ public sealed class RegisterUserCommandHandlerTests
         command.PhoneNumber = "";
 
         var userId = _fixture.Create<string>();
-        _userService.RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _userService.RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(userId);
 
         // Act
@@ -251,7 +249,7 @@ public sealed class RegisterUserCommandHandlerTests
 
         // Assert
         result.UserId.ShouldBe(userId);
-        await _userService.Received(1).RegisterAsync("", "", "test@example.com", "testuser", "Password123!", "Password123!", "", ConfiguredOrigin, Arg.Any<CancellationToken>());
+        await _userService.Received(1).RegisterAsync("", "", "test@example.com", "testuser", "Password123!", "Password123!", "", Arg.Any<CancellationToken>());
     }
 
     #endregion
