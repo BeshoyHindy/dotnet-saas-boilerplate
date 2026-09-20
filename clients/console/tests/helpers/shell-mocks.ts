@@ -60,7 +60,6 @@ export async function installShellMocks(page: Page): Promise<void> {
     name: "Acme Corp",
     isActive: true,
     validUpto: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-    hasConnectionString: false,
     adminEmail: "admin@acme.com",
     issuer: null,
     expiryState: "Active",

@@ -1140,26 +1140,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/tenants/migrations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get per-tenant migration status
-         * @description Retrieve migration status for each tenant, including pending migrations and provider information.
-         */
-        get: operations["GetTenantMigrations"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/tenants/theme": {
         parameters: {
             query?: never;
@@ -1587,7 +1567,6 @@ export interface components {
         CreateTenantCommand: {
             adminEmail: string;
             adminPassword: string;
-            connectionString: null | string;
             id: string;
             issuer: null | string;
             name: string;
@@ -1940,7 +1919,6 @@ export interface components {
         };
         TenantDto: {
             adminEmail: string;
-            connectionString: null | string;
             id: string;
             isActive: boolean;
             issuer: null | string;
@@ -1951,18 +1929,6 @@ export interface components {
         TenantLifecycleResultDto: {
             isActive: boolean;
             message: string;
-            tenantId: string;
-            /** Format: date-time */
-            validUpto: null | string;
-        };
-        TenantMigrationStatusDto: {
-            error: null | string;
-            hasPendingMigrations: boolean;
-            isActive: boolean;
-            lastAppliedMigration: null | string;
-            name: string;
-            pendingMigrations: string[];
-            provider: null | string;
             tenantId: string;
             /** Format: date-time */
             validUpto: null | string;
@@ -1995,7 +1961,6 @@ export interface components {
             expiryState: string;
             /** Format: date-time */
             graceEndsUtc: string;
-            hasConnectionString: boolean;
             id: string;
             isActive: boolean;
             issuer: null | string;
@@ -4659,40 +4624,6 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    GetTenantMigrations: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TenantMigrationStatusDto"][];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden */
-            403: {
                 headers: {
                     [name: string]: unknown;
                 };
