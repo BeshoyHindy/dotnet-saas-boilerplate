@@ -318,7 +318,3 @@ Stated plainly, because each is a deliberate trade rather than an oversight.
   which would serve files from `wwwroot` with no signing; overriding that needs an explicit
   `Storage:AllowLocalProviderInProduction=true`. Not a limit so much as a door that is locked from
   the inside — don't unlock it to get a deployment green.
-- **Per-tenant databases** (a dedicated connection string per tenant) are supported and tested today:
-  the migrator, the tenant sweeps and the outbox dispatcher all follow the tenant's connection.
-  Whether they *stay* supported is an open decision — the machinery is not free, and a tenant with a
-  dedicated database cannot yet be entered by tenant exchange.

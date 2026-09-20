@@ -54,7 +54,7 @@ table, and renames surfacing as drop+add (data loss). Adjust the model or hand-e
 
 ## Step 4 — apply
 
-Preferred (the canonical path — migrates the tenant catalog then each tenant's per-module schema):
+Preferred (the canonical path — migrates the tenant catalog, then the shared module schema once, then seeds per tenant):
 
 ```bash
 dotnet run --project src/Host/Boilerplate.DbMigrator -- apply
@@ -66,7 +66,7 @@ dotnet run --project src/Host/Boilerplate.DbMigrator -- list-pending   # to prev
 ## Notes
 
 - A **new module** also needs a `{X}/` folder in the Migrations project and the runtime project referenced from it — see `add-module`.
-- `dotnet ef` against a `BaseDbContext` works because the 4-arg ctor is satisfied by the startup host's DI.
+- `dotnet ef` against a `BaseDbContext` works because its `(accessor, options)` ctor is satisfied by the startup host's DI. It reads `DatabaseOptions:ConnectionString`, so set it (user-secrets or `DatabaseOptions__ConnectionString`) or design-time discovery fails before it finds a context.
 
 ## Checklist
 

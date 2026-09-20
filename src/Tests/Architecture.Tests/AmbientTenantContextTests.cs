@@ -9,9 +9,9 @@ namespace Architecture.Tests;
 ///
 /// The pattern this bans is "create a DI scope, then set <c>IMultiTenantContextSetter</c> on it",
 /// which was hand-rolled in eight places and is wrong in all of them: a <c>MultiTenantDbContext</c>
-/// captures its <c>TenantInfo</c> — and with it the tenant's connection string — at construction, so
-/// a context resolved from a scope created before the tenant is installed reads the default
-/// database through a null tenant filter. <c>AmbientTenantContext</c> is the only writer;
+/// captures its <c>TenantInfo</c> — and with it the tenant filter — at construction, so a context
+/// resolved from a scope created before the tenant is installed reads every tenant's rows through a
+/// null tenant filter. <c>AmbientTenantContext</c> is the only writer;
 /// <c>ITenantScope</c> is how everything else enters a tenant, and it gets the order right by
 /// construction.
 ///

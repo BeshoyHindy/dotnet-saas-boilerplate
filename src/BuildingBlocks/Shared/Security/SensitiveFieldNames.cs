@@ -35,9 +35,10 @@ public static class SensitiveFieldNames
         "credential",
 
         // A connection string carries the credentials it connects with, so it is one. It is also the
-        // field the first version of this list missed, on a command an idempotent endpoint binds
-        // (CreateTenantCommand.ConnectionString). "connection" on its own would be too broad —
-        // ConnectionId and ConnectionCount are not secrets.
+        // field the first version of this list missed. No command the kit ships binds one today
+        // (#75 cut per-tenant databases), and the rule stays for the consumer who adds one.
+        // "connection" on its own would be too broad — ConnectionId and ConnectionCount are not
+        // secrets.
         "connectionstring",
     ];
 

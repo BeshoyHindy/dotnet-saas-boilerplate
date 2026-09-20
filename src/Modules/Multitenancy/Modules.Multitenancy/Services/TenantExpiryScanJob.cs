@@ -117,9 +117,9 @@ public sealed class TenantExpiryScanJob
         _db.TenantExpiryNotices.Add(TenantExpiryNotice.Record(tenant.Id, noticeType, validUpto, now));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        // The outbox writer comes from the tenant's own scope: EventingDbContext captures the
-        // tenant's connection string at construction, so a writer resolved outside it would file the
-        // row in the scheduler's database, where this tenant's dispatcher never looks.
+        // The outbox writer comes from the tenant's own scope: it stamps the ambient tenant onto the
+        // row, so a writer resolved outside it would file the notice with no tenant, and dispatch
+        // would throw for an event that is not IGlobalIntegrationEvent.
         var outbox = tenantServices.GetRequiredService<IOutboxWriter>();
         await outbox.AddAsync(BuildEvent(noticeType, tenant, validUpto, graceEnds, now), ct).ConfigureAwait(false);
         return true;

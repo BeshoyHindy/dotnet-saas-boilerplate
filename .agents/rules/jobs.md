@@ -16,7 +16,7 @@ Queues: `default`, `email` (5 workers, 30s poll). Storage is `Hangfire.PostgreSq
 
 ## Every job is tenant-bound or `[SystemJob]` (ADR-0002)
 
-`AppJobFilter` stamps the **ambient** tenant's Id onto the job at enqueue — the ambient context, never `HttpContext`, so enqueuing from a hosted service or an event handler works the same as from a request. `AppJobActivator` loads the full tenant record through `ITenantScope.GetTenantAsync` (cache-first, same as the HTTP path) and opens the tenant **before** the job's DI scope, so a tenant with a dedicated connection string gets its own database. Only the Id travels: the record is never serialized into job storage.
+`AppJobFilter` stamps the **ambient** tenant's Id onto the job at enqueue — the ambient context, never `HttpContext`, so enqueuing from a hosted service or an event handler works the same as from a request. `AppJobActivator` loads the full tenant record through `ITenantScope.GetTenantAsync` (cache-first, same as the HTTP path) and opens the tenant **before** the job's DI scope, so an unknown or deactivated tenant fails the job closed and every tenant-filtered `DbContext` in the scope is built under the right tenant. Only the Id travels: the record is never serialized into job storage.
 
 There is no third, silent option:
 
@@ -32,7 +32,7 @@ Mark the job class (or the method Hangfire invokes) `[SystemJob]` only when the 
 
 ## Touching tenant data from a system job — `ITenantScope`
 
-`ITenantScope` (`BuildingBlocks/Shared/Multitenancy/`) is the only way to enter a tenant outside a request. It loads the full `AppTenantInfo` from the store, installs it, and *then* creates the DI scope — that order is the whole point, because a `MultiTenantDbContext` captures its `TenantInfo`, and the tenant's connection string with it, at construction.
+`ITenantScope` (`BuildingBlocks/Shared/Multitenancy/`) is the only way to enter a tenant outside a request. It loads the full `AppTenantInfo` from the store, installs it, and *then* creates the DI scope — that order is the whole point, because a `MultiTenantDbContext` captures its `TenantInfo`, and the tenant query filter with it, at construction.
 
 ```csharp
 await tenantScope.RunAsync(tenantId, async (services, ct) =>

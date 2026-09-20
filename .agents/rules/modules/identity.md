@@ -64,7 +64,7 @@ Clearing localStorage alone is **not** a logout: the SPA cannot delete an HttpOn
 - `POST /identity/impersonation/start` — **same tenant only**. A cross-tenant caller (root included) gets 403 pointing at the exchange.
 - `POST /identity/operator/token-exchange` — **root only** (`SystemPermissions.Platform.CrossTenantImpersonate`, the catalog's "Cross-Tenant Impersonate"), plus a root-tenant check in the handler. The subject is a real user of the target tenant (`targetUserId`, else the tenant record's `AdminEmail`), so the normal permission pipeline applies unchanged. Reason required; unknown tenant 404, deactivated tenant 403, unknown user 404, deactivated user 409. No refresh token, no session row, no cookie.
 
-Neither accepts a caller that already carries `act_sub` (no nesting). The audit row lands in the **ambient** tenant — the caller's own — so an operator finds their crossings in root. `BuildClaimsForUserAsync`/`FindTenantUserAsync` read the target user with `IgnoreQueryFilters` from the ambient database, so a tenant with a dedicated connection string cannot be entered until the tenant-scope helper lands.
+Neither accepts a caller that already carries `act_sub` (no nesting). The audit row lands in the **ambient** tenant — the caller's own — so an operator finds their crossings in root. `BuildClaimsForUserAsync`/`FindTenantUserAsync` read the target user with `IgnoreQueryFilters` from the ambient database.
 
 `RevokeImpersonationGrant` takes effect immediately on the instance that handled the revoke, and within the `ImpersonationGrantService` local cache's expiration (up to 1 minute, see `Services/ImpersonationGrantService.cs`) on any other instance — not the flat "~1 second" the endpoint used to claim.
 

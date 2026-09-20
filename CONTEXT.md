@@ -11,6 +11,8 @@ live in `docs/adr/`.
 **Tenant**:
 One customer of the product, and the isolation boundary every row, cache key, storage key, job and
 event belongs to. A request names its tenant only through the signed `tenant` claim (ADR-0002).
+Every tenant lives in the one shared database; isolation is the `TenantId` column and the default-on
+query filter.
 _Avoid_: organisation, account, workspace, company, customer (a customer is a commercial relation,
 not a boundary).
 

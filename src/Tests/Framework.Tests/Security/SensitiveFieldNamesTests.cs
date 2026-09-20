@@ -26,7 +26,7 @@ public sealed class SensitiveFieldNamesTests
     [InlineData("access_token")]
     [InlineData("credential")]
     [InlineData("awsCredentials")]
-    // A connection string is a credential, and it is the one CreateTenantCommand binds.
+    // A connection string is a credential. No shipped command binds one, and a consumer's does.
     [InlineData("connectionString")]
     [InlineData("ConnectionString")]
     [InlineData("tenantConnectionStringOverride")]
