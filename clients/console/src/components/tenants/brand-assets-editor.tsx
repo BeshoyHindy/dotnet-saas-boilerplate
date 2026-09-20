@@ -16,6 +16,11 @@ type DraftAssets = TenantThemeDraft["brandAssets"];
  * **A URL cannot be typed in here, and the API would not take one (#83).** What is shown is the URL
  * the server issued; removing an asset is a flag, so the object deleted is always the one this slot
  * uploaded rather than whatever address happened to be sitting in the column.
+ *
+ * A removal also blanks that slot's `…Url` **on the draft**, so the preview empties as soon as the
+ * user clicks Remove instead of lingering until the save round-trips. That is a local edit to the
+ * editor's copy of the read model; `updateTenantTheme` sends the write model, which has no URL field
+ * to put it in.
  */
 export function BrandAssetsEditor({
   assets,
@@ -39,19 +44,19 @@ export function BrandAssetsEditor({
           label="Logo"
           value={assets.logoUrl ?? ""}
           onUpload={(logo) => onChange({ logo, deleteLogo: false })}
-          onRemove={() => onChange({ logo: null, deleteLogo: true })}
+          onRemove={() => onChange({ logoUrl: null, logo: null, deleteLogo: true })}
         />
         <AssetRow
           label="Logo (dark mode)"
           value={assets.logoDarkUrl ?? ""}
           onUpload={(logoDark) => onChange({ logoDark, deleteLogoDark: false })}
-          onRemove={() => onChange({ logoDark: null, deleteLogoDark: true })}
+          onRemove={() => onChange({ logoDarkUrl: null, logoDark: null, deleteLogoDark: true })}
         />
         <AssetRow
           label="Favicon"
           value={assets.faviconUrl ?? ""}
           onUpload={(favicon) => onChange({ favicon, deleteFavicon: false })}
-          onRemove={() => onChange({ favicon: null, deleteFavicon: true })}
+          onRemove={() => onChange({ faviconUrl: null, favicon: null, deleteFavicon: true })}
         />
       </div>
     </div>
