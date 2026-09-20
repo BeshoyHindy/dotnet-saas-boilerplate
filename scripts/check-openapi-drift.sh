@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# OpenAPI drift gate, both sides (issue #15, ADR-0004). The checked-in contract,
-# clients/openapi/v1.json, must be reproducible from the API and the console's
-# generated types must be reproducible from the contract — this is the single
+# OpenAPI drift gate, both sides (issue #15, ADR-0008). The checked-in contract,
+# clients/openapi/v1.json, must be reproducible from the API, and EVERY client's
+# generated types must be reproducible from that one contract — this is the single
 # place both CI jobs and a developer ask either question.
 #
 #   bash scripts/check-openapi-drift.sh backend   # re-export the document from the API
-#   bash scripts/check-openapi-drift.sh frontend  # regenerate the console's types
+#   bash scripts/check-openapi-drift.sh frontend  # regenerate both clients' types
 #
 # `git status --porcelain`, not `git diff --exit-code`: a regeneration that
 # DELETES a file or leaves an untracked one is drift too, and diff --exit-code
@@ -23,9 +23,14 @@ case "$MODE" in
     FIX="bash scripts/export-openapi.sh"
     ;;
   frontend)
-    (cd clients/console && pnpm generate:api)
-    PATHS=(clients/openapi/ clients/console/src/api/schema.d.ts)
-    FIX="pnpm generate:api (in clients/console)"
+    # Both clients generate from the same checked-in document, so both are asked.
+    # A client whose schema.d.ts is stale is drift even if the other one is current.
+    PATHS=(clients/openapi/)
+    for client in dashboard console; do
+      (cd "clients/${client}" && pnpm generate:api)
+      PATHS+=("clients/${client}/src/api/schema.d.ts")
+    done
+    FIX="pnpm generate:api (in clients/dashboard and clients/console)"
     ;;
   *)
     echo "usage: check-openapi-drift.sh {backend|frontend}" >&2

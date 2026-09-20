@@ -55,17 +55,12 @@ const SettingsLayout = lazyNamed(
 );
 const ProfileSettings = lazyNamed(() => import("@/pages/settings/profile"), "ProfileSettings");
 const SecuritySettings = lazyNamed(() => import("@/pages/settings/security"), "SecuritySettings");
-const BrandingSettings = lazyNamed(
-  () => import("@/pages/settings/branding"),
-  "BrandingSettings",
-);
 const AppearanceSettings = lazyNamed(
   () => import("@/pages/settings/appearance"),
   "AppearanceSettings",
 );
 const HealthPage = lazyNamed(() => import("@/pages/health"), "HealthPage");
 const AuditsPage = lazyNamed(() => import("@/pages/audits"), "AuditsPage");
-const TrashPage = lazyNamed(() => import("@/pages/system/trash"), "TrashPage");
 const SessionsPage = lazyNamed(() => import("@/pages/system/sessions"), "SessionsPage");
 const UsersPage = lazyNamed(() => import("@/pages/identity/users"), "UsersPage");
 const UserDetailPage = lazyNamed(
@@ -82,7 +77,6 @@ const GroupDetailPage = lazyNamed(
   () => import("@/pages/identity/group-detail"),
   "GroupDetailPage",
 );
-const MyFilesPage = lazyNamed(() => import("@/pages/files/my-files"), "MyFilesPage");
 // Operator surfaces. Same app, same shell — permissions decide who sees them (ADR-0004).
 const TenantsListPage = lazyNamed(() => import("@/pages/tenants/list"), "TenantsListPage");
 const TenantDetailPage = lazyNamed(() => import("@/pages/tenants/detail"), "TenantDetailPage");
@@ -167,9 +161,7 @@ export const router = createBrowserRouter([
           { index: true, element: withSuspense(<OverviewPage />) },
           { path: "system/health", element: withSuspense(<HealthPage />) },
           { path: "system/audits", element: withSuspense(<AuditsPage />) },
-          { path: "system/trash", element: withSuspense(<TrashPage />) },
           { path: "system/sessions", element: withSuspense(<SessionsPage />) },
-          { path: "files", element: withSuspense(<MyFilesPage />) },
           { path: "identity", element: <Navigate to="/identity/users" replace /> },
           { path: "identity/users", element: withSuspense(<UsersPage />) },
           { path: "identity/users/:userId", element: withSuspense(<UserDetailPage />) },
@@ -214,7 +206,6 @@ export const router = createBrowserRouter([
               { path: "profile", element: withSuspense(<ProfileSettings />) },
               { path: "security", element: withSuspense(<SecuritySettings />) },
               { path: "appearance", element: withSuspense(<AppearanceSettings />) },
-              { path: "branding", element: withSuspense(<BrandingSettings />) },
             ],
           },
         ],

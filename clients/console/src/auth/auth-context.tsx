@@ -292,7 +292,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // The acting token is a separate credential and must not outlive the session that
     // minted it, even in memory — endSessionLocally() is the one place that drops it
-    // alongside the token store and the query cache (see .agents/rules/frontend/console.md).
+    // alongside the token store and the query cache (see .agents/rules/frontend/console.md,
+    // "The acting token"; the clear-site rule itself is in clients.md).
     endSessionLocally();
   }, []);
 

@@ -1,7 +1,7 @@
 # Boilerplate
 
 A production-ready starter for multi-tenant SaaS: a modular .NET 10 monolith (vertical slices,
-CQRS via a source-generated mediator, EF Core 10 on PostgreSQL) plus one React 19 console, wired
+CQRS via a source-generated mediator, EF Core 10 on PostgreSQL) plus two React 19 clients, wired
 for local orchestration with .NET Aspire.
 
 `Boilerplate` is the placeholder root name. A new product renames it in one command
@@ -27,7 +27,7 @@ install route, so there is no package version to keep in step with the source.
 
 | Option | Default | Drops when `false` |
 |---|---|---|
-| `--frontend` | `true` | `clients/**`, the console container in `docker-compose.yml` and `deploy/dokploy/app.compose.yml`, the Aspire client resources, `frontend.yml` |
+| `--frontend` | `true` | `clients/**` (BOTH clients — dashboard and console), their containers in `docker-compose.yml` and `deploy/dokploy/app.compose.yml`, the Aspire client resources, `frontend.yml` |
 | `--aspire` | `true` | `src/Host/Boilerplate.AppHost` and its solution folder |
 | `--sandcastle` | `true` | `.sandcastle/`, `sandcastle.config.mts`, the root pnpm project that exists only for them, `sandcastle.yml` |
 
@@ -58,8 +58,9 @@ Run the whole thing locally — scaffold, build, test, brand-grep — with
   Valkey), eventing (outbox/inbox), jobs (Hangfire), storage (S3/MinIO), mailing.
 - **Hosts**: `Boilerplate.Api` (composition root), `Boilerplate.DbMigrator` (one-shot migrate/seed —
   the API never migrates at startup), `Boilerplate.AppHost` (Aspire orchestrator).
-- **Client**: `clients/console` — one React 19 app for tenant users and root operators (ADR-0004), +
-  Vite + TypeScript, TanStack Query, React Router, Radix + Tailwind.
+- **Clients**: two React 19 apps (ADR-0008) — `clients/dashboard`, what a tenant's users sign in to,
+  and `clients/console`, the operator tool. Vite + TypeScript, TanStack Query, React Router,
+  Radix + Tailwind; each an independent pnpm project generating its types from the one contract.
 - **Deploy**: one multi-target image definition (`src/Host/Dockerfile`, targets `api` and
   `migrator`), a root `docker-compose.yml` that runs those images locally, and Dokploy
   (`deploy/dokploy`).
@@ -85,14 +86,15 @@ connection strings, S3 and SMTP credentials, the seeded admin password — comes
 parameters, environment variables or that same store, never from `appsettings*.json`.
 
 The Aspire dashboard is at <https://localhost:15888>; the API and its Scalar reference at
-<https://localhost:7030/scalar>; the console at <http://localhost:5173>. MinIO and Mailpit get host
+<https://localhost:7030/scalar>; the dashboard at <http://localhost:5173> and the console at
+<http://localhost:5174>. MinIO and Mailpit get host
 ports allocated by Aspire — open them from the dashboard's resource list rather than a remembered
 port. Aspire starts PostgreSQL, Valkey, MinIO and Mailpit, runs the migrator to completion, then the
-API, then the console.
+API, then both clients.
 
 **Container host ports are not pinned**, so a second checkout or worktree can run its own AppHost
 while yours is up: MinIO and Mailpit take whatever host port is free. (The API's `7030`/`5030`, the
-dashboard's `15888` and the client's `5173` *are* fixed — they are part of the documented
+Aspire dashboard's `15888` and the clients' `5173`/`5174` *are* fixed — they are part of the documented
 developer contract, and unlike a container they fail loudly and immediately when taken.) If you see
 `minio-init` looping on `waiting for minio...`, you are on an older revision where 9000/9001 were
 pinned; the fix is in `AppHost.cs`.
@@ -126,12 +128,12 @@ what to do with the seeder when you start a real product.
 
 ```bash
 bash scripts/local-env.sh                  # once — writes .env with generated secrets
-docker compose up --build                  # API :8080, console :8081, Mailpit inbox :8025
+docker compose up --build                  # API :8080, dashboard :8081, console :8082, Mailpit :8025
 curl -fsS http://localhost:8080/health/ready
 docker compose down -v
 ```
 
-This builds and runs the same `api`, `migrator` and console images a deployment uses, against
+This builds and runs the same `api`, `migrator` and client images a deployment uses, against
 PostgreSQL, Valkey, MinIO and a Mailpit mail catcher. The containers run as **Production**, so the
 same fail-fast guards apply as on a server: no placeholder secrets, no `AllowedHosts: *`. That is
 why the secrets have no default in `docker-compose.yml` and `scripts/local-env.sh` generates them
@@ -149,15 +151,15 @@ HTTPS deployment.
 | `Production configuration is not usable: Missing required configuration 'AllowedHosts'` | The API refuses to answer for any Host header in Production. List the hostnames it serves, semicolon-separated; `*` is rejected. |
 | `Production configuration is not usable: … still holds a template placeholder` | A secret carries a sample value such as `changeme` or `dev-only`. Regenerate with `bash scripts/local-env.sh --force`. |
 | `ProxyOptions: Enabled is true but nothing is trusted` | Production enables forwarded headers for a Traefik deployment and deliberately trusts no one by default. This compose file publishes the API directly, so it sets `ProxyOptions__Enabled=false`; behind a real proxy, name the proxy's network instead. |
-| Console shows a CORS error | `APP_CONSOLE_URL` does not match the origin the browser actually uses; it is the API's CORS allow-list entry. |
+| A client shows a CORS error | `APP_DASHBOARD_URL` / `APP_CONSOLE_URL` does not match the origin the browser actually uses; they are the API's CORS allow-list entries. |
 | `migrator` retries Postgres for 2 minutes then fails | Usually a `POSTGRES_PASSWORD` change against an existing `pg_data` volume. `docker compose down -v` (destructive) and start over. |
 
 ## Test
 
 ```bash
 dotnet test src/Boilerplate.slnx          # unit + architecture + Testcontainers integration
-cd clients/console && pnpm test           # Vitest units
-cd clients/console && pnpm test:e2e       # Playwright smoke suite
+cd clients/dashboard && pnpm test         # Vitest units (same in clients/console)
+cd clients/dashboard && pnpm exec playwright test --workers=1   # Playwright smoke suite
 ```
 
 ## Repository layout
@@ -168,7 +170,8 @@ cd clients/console && pnpm test:e2e       # Playwright smoke suite
 | `src/Modules/{Name}/` | Bounded contexts (runtime project + `.Contracts`) |
 | `src/Host/` | API, AppHost, DbMigrator, Migrations |
 | `src/Tests/` | Unit, architecture (NetArchTest) and integration (Testcontainers) tests |
-| `clients/console` | The React console; `clients/openapi/v1.json` is the contract it generates from |
+| `clients/dashboard` | The tenant app (React) |
+| `clients/console` | The operator tool (React); `clients/openapi/v1.json` is the contract both generate from |
 | `docker-compose.yml` | Runs the production images locally, with `.env.example` |
 | `deploy/dokploy/` | Dokploy compose stacks, env contract and deploy script |
 | `docs/adr/` | Architecture decision records |

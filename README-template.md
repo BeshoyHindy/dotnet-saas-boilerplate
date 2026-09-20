@@ -10,7 +10,7 @@ the shared code lives in `src/BuildingBlocks` and is yours to change.
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 <!--#if (frontend) -->
-- [Node.js 20+](https://nodejs.org) — for the console
+- [Node.js 20+](https://nodejs.org) — for the two React clients
 <!--#endif -->
 - [Docker](https://www.docker.com/) — Postgres, Redis, MinIO
 
@@ -25,7 +25,7 @@ dotnet run --project src/Host/Boilerplate.AppHost
 
 <!--#if (frontend) -->
 Aspire starts Postgres, Redis, and MinIO, runs database migrations, then launches the API
-**and the React console**.
+**and both React clients**.
 <!--#else -->
 Aspire starts Postgres, Redis, and MinIO, runs database migrations, then launches the API.
 <!--#endif -->
@@ -35,7 +35,8 @@ Aspire starts Postgres, Redis, and MinIO, runs database migrations, then launche
 | Aspire dashboard | https://localhost:15888 |
 | API + Scalar docs | https://localhost:7030/scalar |
 <!--#if (frontend) -->
-| Console | http://localhost:5173 |
+| Dashboard (tenant app) | http://localhost:5173 |
+| Console (operators) | http://localhost:5174 |
 <!--#endif -->
 
 <!--#endif -->
@@ -49,10 +50,11 @@ dotnet run --project src/Host/Boilerplate.Api      # needs external Postgres + R
 ### Frontend only (against a running API)
 
 ```bash
-cd clients/console && pnpm install && pnpm dev      # → http://localhost:5173
+cd clients/dashboard && pnpm install && pnpm dev     # → http://localhost:5173
+cd clients/console   && pnpm install && pnpm dev     # → http://localhost:5174
 ```
 
-The console reads its API URL at runtime from `public/config.json` — no rebuild to repoint. The dev
+Each client reads its API URL at runtime from `public/config.json` — no rebuild to repoint. The dev
 server proxies `/api` to the API, so the browser only ever talks to one origin; keep it that way, or
 the `HttpOnly` refresh cookie can never be sent.
 Types come from the checked-in `clients/openapi/v1.json`; regenerate it with
@@ -76,8 +78,9 @@ src/
   Tests/               Unit, integration (Testcontainers), and architecture tests
 <!--#if (frontend) -->
 clients/
-  console/             The React 19 + Vite + Tailwind console (pnpm)
-  openapi/v1.json      The checked-in API contract the console types from
+  dashboard/           The tenant app: React 19 + Vite + Tailwind (pnpm)
+  console/             The operator tool, same stack (pnpm)
+  openapi/v1.json      The checked-in API contract BOTH clients type from
 <!--#endif -->
 docker-compose.yml     Runs the production images locally (+ .env.example)
 deploy/
@@ -107,8 +110,9 @@ This project shipped with sensible defaults. Before production:
 - [ ] **Secrets** — the values `scripts/local-env.sh` writes into `.env` are local-only
       throwaways. Generate fresh ones for anything deployed, and never commit `.env`.
 <!--#if (frontend) -->
-- [ ] **Branding** — the console renders a plain text wordmark; swap it (and add a logo under
-      `clients/console/public/`) in `clients/console/src/components/**` for your own identity.
+- [ ] **Branding** — both clients render a plain text wordmark; swap it (and add a logo under
+      `clients/<app>/public/`) in `clients/<app>/src/components/**` for your own identity. They
+      share a design language, so a token change usually belongs in both.
 <!--#endif -->
 - [ ] **Mail** — configure SMTP / SendGrid under `MailOptions` in
       `src/Host/Boilerplate.Api/appsettings.json`.
@@ -128,7 +132,7 @@ This project shipped with sensible defaults. Before production:
 ```bash
 bash scripts/local-env.sh         # once — writes .env with generated secrets
 <!--#if (frontend) -->
-docker compose up --build         # API :8080, console :8081, Mailpit inbox :8025
+docker compose up --build         # API :8080, dashboard :8081, console :8082, Mailpit :8025
 <!--#else -->
 docker compose up --build         # API :8080, Mailpit inbox :8025
 <!--#endif -->
@@ -136,7 +140,7 @@ curl -fsS http://localhost:8080/health/ready
 ```
 
 <!--#if (frontend) -->
-This runs the same `api` / `migrator` / console images a deployment uses, against PostgreSQL,
+This runs the same `api` / `migrator` / client images a deployment uses, against PostgreSQL,
 Valkey, MinIO and a Mailpit mail catcher.
 <!--#else -->
 This runs the same `api` / `migrator` images a deployment uses, against PostgreSQL, Valkey,
@@ -147,7 +151,8 @@ The containers run as Production, so placeholder secrets and
 Everything else has a local default; see `.env.example`.
 
 <!--#if (frontend) -->
-Sign in to the console as `admin@root.com` using the `SEED_ADMIN_PASSWORD` from `.env`, then
+Sign in as `admin@root.com` using the `SEED_ADMIN_PASSWORD` from `.env` — the seeded root admin is
+an operator, so the console is the app to try it in — then
 rotate it from Settings → Security.
 <!--#else -->
 The seeded root admin is `admin@root.com` with the `SEED_ADMIN_PASSWORD` from `.env`. Rotate it
@@ -166,7 +171,8 @@ after the first sign-in.
 ```bash
 dotnet test src/Boilerplate.slnx       # integration tests require Docker
 <!--#if (frontend) -->
-cd clients/console && pnpm test:e2e    # Playwright, route-mocked
+cd clients/dashboard && pnpm exec playwright test --workers=1   # Playwright, route-mocked
+cd clients/console   && pnpm exec playwright test --workers=1   # same, for the operator tool
 <!--#endif -->
 <!--#if (sandcastle) -->
 pnpm install && pnpm test:sandcastle   # the agent orchestrator's own suite

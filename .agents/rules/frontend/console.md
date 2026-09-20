@@ -1,83 +1,58 @@
-# Frontend — the console (`clients/console`)
+# Frontend — the console (`clients/console`), the OPERATOR tool
 
-There is ONE client (ADR-0004): the console, at `clients/console`. It serves tenant users and root
-operators alike — operator screens (tenants, impersonation) sit in the same app behind permissions.
-Read this for any React work.
+Read [`clients.md`](clients.md) first: everything about the API client, runtime env, data
+fetching, routing, the design system and testing is shared with the dashboard and is not
+repeated here. This file is only what is TRUE OF THE CONSOLE AND NOT OF THE DASHBOARD.
 
-Stack: React 19 · Vite 7 · TypeScript · TanStack Query v5 · React Router 7 · Radix UI · Tailwind v4 ·
-class-variance-authority (shadcn-style). Path alias `@` → `src` (`vite.config.ts`).
+The console is the tool a root operator signs in to (ADR-0008). Dev port **5174**, package
+`@boilerplate/console`, image `boilerplate-console`, localStorage prefix `boilerplate.console.*`.
 
-## API client (`src/lib/api-client.ts`, `src/api/*`) — generated, never hand-written
+## What it has that the dashboard does not
 
-- **No hand-written API types.** `clients/openapi/v1.json` is the contract (exported from the API by
-  `bash scripts/export-openapi.sh`); `pnpm generate:api` turns it into `src/api/schema.d.ts`. Every DTO
-  is `Schemas["Name"]` — i.e. `components["schemas"]["Name"]`. Both sides are drift-gated in CI.
-- One client: `api` in `src/lib/api-client.ts`, an `openapi-fetch` client typed by `paths`. Call it as
-  `unwrap(await api.GET("/api/v1/identity/users/{id}", { params: { path: { id } } }))`; `unwrapVoid`
-  for 204s. `src/api/{feature}.ts` stays a thin, named wrapper per endpoint. No axios, no `apiFetch`.
-- `unwrap` throws `ApiRequestError(status, message, problem)` on a non-OK response, parsing RFC 9457
-  `application/problem+json` off `error`.
-- Auth header `Authorization: Bearer <access>` is added by the client's own `fetch`, and it
-  single-flights a refresh-and-retry on 401. **Except while acting** (`acting-store`): that token is
-  access-only with no refresh cookie, so a 401 drops the acting session instead — it never spends the
-  operator's refresh cookie on a credential nothing can renew. Opt a call out of the acting token with
-  `headers: AS_OPERATOR`; the client strips that sentinel header before the request leaves.
-- **No tenant header.** The server reads the tenant from the token's `tenant` claim (ADR-0002). The
-  only place a tenant is named is the anonymous auth URLs, via `authPath(tenant, segment)`, and the
-  tenant there must be the tenant **Id** from the claim — the refresh cookie's `Path` names it.
-- **The refresh token is never in JavaScript.** It is an `HttpOnly; SameSite=Strict` cookie; the store
-  keeps only the access token. That works because the console is served from the API's origin (nginx
-  proxies `/api`, and so does the Vite dev server) — do not "fix" a CORS error by pointing the client
-  at another origin.
-- Query keys are PascalCase where the endpoint's are (`PageNumber`, `PageSize`, `Search`); the
-  generated types tell you which.
+- **The tenant registry** — `src/pages/tenants/{list,detail}.tsx`, `src/api/tenants.ts`,
+  `src/components/tenants/*`: create, renew, adjust validity, activate/deactivate, and edit a
+  tenant's branding while acting inside it.
+- **The impersonation list** — `src/pages/impersonation/list.tsx`, `src/api/impersonation-grants.ts`:
+  the live acting grants and how to revoke one.
+- **The acting layer** — below.
+- **Identity, audits, health and sessions with an operator's reach**: the same screens the dashboard
+  has, kept here because an operator needs them *while acting inside a tenant*. Audits here are the
+  cross-tenant view.
 
-## Env (`src/env.ts`) — runtime, not build-time
+## What it deliberately does NOT have
 
-`loadRuntimeConfig()` fetches `/config.json` once at boot (awaited in `main.tsx` before React mounts); `env` is a getter that throws if read too early. One built image promotes across environments — the container entrypoint renders `config.json`, the nginx site and the CSP from `APP_*` variables. The only `VITE_*` var, `VITE_API_BASE_URL`, configures the **Vite dev proxy target only**; the runtime `apiBase` is `""` (same origin) in every environment.
+Tenant self-service, which belongs to the app a tenant's users actually use: **My Files**,
+**Trash**, and **Settings → Branding** for one's own tenant. Do not add them back; a tenant's
+branding is edited from `tenants/detail` while acting, which is the operator's path to it.
 
-## Data fetching (TanStack Query v5)
+## Operators only (`src/auth/operator-gate.tsx`)
 
-- Shared `queryClient` (`src/lib/query-client.ts`): `staleTime: 30_000`, `refetchOnWindowFocus:false`, no retry on 401/403 else `failureCount < 2`.
-- **Query keys are inline literal arrays**, hierarchical, params object last: `["users", {pageNumber, searchTerm}]`, `["user", id]`, `["user", id, "roles"]`. No central key factory.
-- `useQuery`/`useMutation` live inline in page components. Invalidate in `onSuccess`: `queryClient.invalidateQueries({ queryKey: ["users"] })`. Pagination: `placeholderData: keepPreviousData`.
+`ProtectedRoute` renders `NotAnOperatorView` — "this console is for platform operators" — for any
+signed-in user who holds neither `Permissions.Tenants.View` nor
+`Permissions.Platform.Users.Impersonate`. A tenant user's credentials are perfectly valid, so the
+sign-in succeeds; the honest answer is "wrong app", not a shell of 403ing panels. It waits for
+`permissionsHydrated` so a warm reload never flashes it at a real operator, and it stays satisfied
+while acting because permissions are hydrated `AS_OPERATOR` (below). `env.dashboardUrl`
+(`APP_DASHBOARD_URL`, optional) turns the screen's "Go to the app" into a link.
 
-### ⚠️ The `mutate(arg)` race-safe pattern (golden rule #9)
+The gate is a **permission** check, not a tenant-name check: "root" is a seeded identifier, not a
+security boundary, and the server gates the same endpoints on the same permission strings.
 
-`useMutation` reads its options at execute time, so values produced at call time (e.g. a fresh
-`crypto.randomUUID()` client id) must ride **through `mutate(arg)`** and be read from the `variables`
-argument of `onMutate`/`onSuccess`/`onError` — never from component state the callbacks close over,
-or two rapid calls collide.
+## Sign-in
 
-```ts
-mutation.mutate({ text, clientId: crypto.randomUUID() });
-// onMutate: ({ clientId }) => insert optimistic `temp:${clientId}`
-// onSuccess: (real, { clientId }) => swap temp → real
-// onError:   (_e, { clientId }) => rollback
-```
+Operators live in the root tenant, so the console's login form has **no tenant field** — it always
+signs in to `env.defaultTenant` (`APP_DEFAULT_TENANT`, default `root`). Do not port the dashboard's
+tenant resolver here: there is nothing to resolve, and an operator who needs another tenant enters
+it from the registry instead.
 
-## Routing (`routes.tsx`, `App.tsx`)
+With `env.demoMode` on (`APP_DEMO_MODE`), the page offers one affordance — "Use the demo operator
+account" — which **prefills the email only** (`APP_DEMO_OPERATOR_EMAIL`, default `admin@root.com`).
+It never signs in: that account's password is `Seed__DefaultAdminPassword`, not the demo tenants'
+shared secret, so this app has nothing to sign in with and must not pretend otherwise.
 
-- `createBrowserRouter`, flat config. Pages are **named exports** loaded via a `lazyNamed(importer, name)` helper (adapts named → `React.lazy`'s default contract). No default exports.
-- Nesting: public auth routes → `<ProtectedRoute/>` → `<AppShell/>` → page children. `errorElement: <RouteError/>`.
-- Provider tree: `ThemeProvider > QueryClientProvider > AuthProvider > … > RouterProvider` + `sonner` `<Toaster/>`.
+## The acting token (`src/auth/acting-store.ts`, `src/api/operator.ts`, ADR-0002 + issue #9)
 
-## Auth (`src/auth/`)
-
-`token-store.ts` (localStorage + pub/sub), `jwt.ts` (`decodeJwt`), `AuthProvider`/`useAuth()`, `ProtectedRoute`, `RouteGuard`.
-Login is `POST /api/v1/tenants/{tenant}/auth/token` — the tenant is a path segment, the one place a caller may name one. No `X-Client-App` header: the SuperAdmin/dashboard app boundary it fed has no meaning with one console. localStorage keys are `boilerplate.console.*` and hold the access token, the tenant Id and the permission set — never a refresh token.
-
-**Permissions are not in the JWT** (it carries role names). `AuthProvider` fetches them from
-`GET /api/v1/identity/permissions` on every subject change, always `AS_OPERATOR` (while acting the
-endpoint answers for the subject, and caching a stranger's grants would regate your own chrome), and exposes
-`permissionsHydrated` so gated UI does not flash. Gate a *route* with
-`<RouteGuard perms={[IdentityPermissions.Users.View]}>` using the constants in `src/lib/permissions.ts`
-— which holds only what routes gate on; the role editor reads the server's catalog endpoint. Gate a
-*nav item* with `perm`/`anyPerm` in `src/components/layout/nav-data.ts`. Mirror the permission the
-server endpoint enforces, never a broader one.
-
-**Acting as someone else** (`src/auth/acting-store.ts`, ADR-0002 + issue #9). Two ways in, one way
-out, one in-memory credential:
+Two ways in, one way out, one in-memory credential:
 
 - `useAuth().enterTenant({ tenantId, reason, … })` — the operator token exchange,
   `POST /identity/operator/token-exchange`, root only (`SystemPermissions.Platform.CrossTenantImpersonate`).
@@ -98,59 +73,32 @@ Nothing outside the transport ever touches the acting **bearer token**: `AuthCon
 `ActingSessionView` (`ActingSession` minus `accessToken`) — metadata only, for banners and query keys.
 The real credential is read straight off `acting-store` inside `src/lib/api-client.ts`.
 
-**One clear-site rule.** Every "this session is over" path — logout, a dead refresh
-(`refreshAccessToken`'s non-OK branch), a token-gone 401 (`authFetch`'s `!accessToken` branch), boot's
-failed silent refresh — MUST call `endSessionLocally()` (`src/lib/query-client.ts`), never clear
-`tokenStore`/`actingStore` by hand. It clears the acting session, the token store and the query cache
-together, so a forced sign-out can never hand the next person who signs in on that tab a stranger's
-acting token or their cached data. `login()` additionally clears `actingStore` up front (before issuing
-the new token) for the same reason — it does not call `endSessionLocally()` itself since it is
-establishing a session, not ending one. An acting session dropped **involuntarily** (revoked/expired,
-`acting-store`'s `drop()`) still calls `queryClient.clear()`, not `invalidateQueries()`: stale data must
-not be able to render before a refetch replaces it.
+### `AS_OPERATOR` — the console-only sentinel
 
-`api-client.ts`'s `authFetch` also captures the acting identity (jti, or null under `AS_OPERATOR`) once
-per call, before the first send. If it no longer matches `acting-store` by the time a retry (post-refresh)
-would go out, the retry is skipped and a synthetic 401 is returned instead of sending with whatever
-credential — acting or operator's own — took over in between.
+`api-client.ts` exports `AS_OPERATOR_HEADER = "X-Console-As-Operator"` and `AS_OPERATOR`. Adding that
+header to a call means "send this with the OPERATOR's own token, not the acting one"; `authFetch`
+strips it before the request leaves, so it never reaches the wire. Needed by the two exchange
+endpoints (an acting token carries `act_sub` and the server refuses to exchange it again — no
+nesting) and by anything that must stay attributed to the operator, such as "my permissions".
 
-## Design system (Tailwind v4, shadcn-style)
+**This sentinel does not exist in the dashboard** and must not be copied there: that app has one
+credential, so there is nothing to opt out of.
 
-- **`cn()` is at `src/lib/cn.ts`** (`twMerge(clsx(...))`) — not `lib/utils.ts`. `components.json`: `style:new-york`, `baseColor:slate`, `cssVariables:true`, `iconLibrary:lucide`.
-- UI primitives in `src/components/ui/` are cva-based: `cva(base, { variants, defaultVariants })` + Radix `Slot`/`asChild` + `cn(buttonVariants({...}))`. Layout primitives live in `src/components/list/`, re-exported from `index.ts`.
-- **Tailwind v4 is CSS-first — there is NO `tailwind.config`.** Configured via the `@tailwindcss/vite` plugin and one entrypoint `src/styles/globals.css` (imported in `main.tsx`). Tokens: `:root` oklch primitives → semantic vars → an `@theme inline { --color-*: var(--…) }` block exposing them as utilities. `@custom-variant dark (&:is(.dark *))`.
-- Add a new token in `globals.css` (primitive → semantic → `@theme inline`), then use the utility. Don't hard-code colors in components.
+### While acting, a 401 is not a session problem
 
-### Design language
+The acting token is access-only with no refresh cookie, so a 401 on it **drops the acting session**
+instead of spending the operator's refresh cookie on a credential nothing can renew. `authFetch` also
+captures the acting identity (jti, or null under `AS_OPERATOR`) once per call, before the first send;
+if it no longer matches `acting-store` by the time a retry (post-refresh) would go out, the retry is
+skipped and a synthetic 401 is returned rather than sending with whatever credential took over in
+between.
 
-Chroma-0 neutrals (`--neutral-*: oklch(L 0 0)` — untinted), a rose default brand with swappable
-`.accent-{rose,indigo,violet,sky,emerald,amber}` classes, saffron secondary, Figtree/Outfit/JetBrains
-Mono. The operator screens were re-toned to these tokens when they came over from the admin app —
-there is no second palette any more.
+`AuthProvider` fetches permissions always `AS_OPERATOR` (while acting the endpoint answers for the
+subject, and caching a stranger's grants would regate your own chrome — and lock you out of the
+operator gate above).
 
-## Testing — Vitest units + a SMALL Playwright smoke suite
-
-- `pnpm test` runs Vitest (jsdom) over `src/**/*.test.ts`, next to the code. Pure logic belongs here:
-  the API client's error mapping, the token store, audit humanisation. Prefer adding one of these.
-- `pnpm test:e2e` runs the Playwright **smoke** suite — sign-in, user CRUD, operator enters a tenant.
-  It is deliberately small (ADR-0004); do not grow a page-per-spec suite back into it.
-- `playwright.config.ts`: `testDir: ./tests`, chromium, auto-boots `pnpm dev`, no real backend.
-- **JWT seeding:** `seedAuthedSession(page, TEST_USER)` builds a fake JWT and `addInitScript`-writes `boilerplate.console.*` to localStorage before React boots (server isn't called, so signature is junk).
-- **Route mocking:** `mockJsonResponse(page, urlGlob, body)` / `mockProblemDetails(...)`. `installShellMocks(page)` stubs every call `AppShell` fires. Playwright matches most-recently-registered first → broad shell mocks in `beforeEach`, page-specific mocks after (they win).
-- `beforeEach`: `seedAuthedSession(page, TEST_USER)` → `installShellMocks(page)`.
-
-## Add a page/feature
-
-0. Contract first: if the endpoint is new, `bash scripts/export-openapi.sh` then `pnpm generate:api`
-   and commit both artifacts. Nothing below can be typed until the contract knows about it.
-1. API: extend `src/api/{feature}.ts` — `Schemas[...]` aliases + one `api.VERB(...)` wrapper each.
-2. Page: `src/pages/{area}/{name}.tsx`, **named** export. `useQuery` with hierarchical key; `useMutation` invalidating in `onSuccess`, passing per-call data via `mutate(arg)`.
-3. Route: add `const X = lazyNamed(() => import("@/pages/area/name"), "XPage")` and a child route under `AppShell`.
-4. Test: a Vitest unit beside the code for its logic. Only touch the smoke suite if the page is one
-   of the three journeys it covers.
-
-Forms: hand-rolled controlled inputs are the norm; `react-hook-form` + `zod` came over with the
-operator screens and is the right tool for a long, validated form (see
-`src/components/tenants/create-tenant-dialog.tsx`). Wrap every route element in `withSuspense(...)`.
-Long lists use `@tanstack/react-virtual`. Keep neutrals at chroma 0 and add tokens in
-`src/styles/globals.css` (primitive → semantic → `@theme inline`), never hard-coded colours.
+`endSessionLocally()` clears the acting session alongside the token store and the query cache;
+`login()` additionally clears `actingStore` up front (before issuing the new token), since it is
+establishing a session rather than ending one. An acting session dropped **involuntarily**
+(revoked/expired, `acting-store`'s `drop()`) still calls `queryClient.clear()`, not
+`invalidateQueries()`: stale data must not be able to render before a refetch replaces it.

@@ -1,6 +1,5 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
-  Brush,
   ChevronRight,
   Palette,
   Settings as SettingsIcon,
@@ -33,7 +32,6 @@ const TABS: Tab[] = [
   // Tenant-wide branding (palette + logos served on sign-in), distinct from the
   // per-user Appearance prefs above. Gated on the same permission the /theme
   // endpoints enforce server-side.
-  { to: "/settings/branding", label: "Branding", hint: "Tenant colours and logos", icon: Brush, perm: "Permissions.Tenants.UpdateTheme" },
 ];
 
 const pad2 = (n: number) => n.toString().padStart(2, "0");

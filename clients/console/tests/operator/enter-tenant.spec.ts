@@ -4,9 +4,9 @@ import { seedAuthedSession } from "../helpers/auth-seed";
 import { installShellMocks, OPERATOR_PERMISSIONS, paged } from "../helpers/shell-mocks";
 
 /**
- * Operator enters a tenant — the third smoke journey (ADR-0004).
+ * Operator enters a tenant — the console's smoke journey (ADR-0008).
  *
- * One console serves tenant users and root operators, so this exercises the whole seam:
+ * This is what the console exists for, so it exercises the whole seam:
  * the permission-gated /tenants route resolves for an operator, the tenant page offers
  * "Enter tenant", and confirming exchanges the operator's token for a short-lived one
  * that names the target tenant (ADR-0002, issue #9).
@@ -75,7 +75,7 @@ test.describe("operator enters a tenant", () => {
   test.beforeEach(async ({ page }) => {
     await seedAuthedSession(page, OPERATOR);
     await installShellMocks(page);
-    // The shell mocks grant nothing; an operator holds the tenant + exchange set.
+    // Spelled out here too: this spec is about what the operator grant unlocks.
     await mockJsonResponse(page, "**/api/v1/identity/permissions", [...OPERATOR_PERMISSIONS]);
     // A RegExp, not a glob: the query string is what distinguishes the registry
     // listing from the per-tenant routes mocked below.
@@ -182,14 +182,21 @@ test.describe("operator enters a tenant", () => {
     await expect(page.getByTestId("acting-banner")).toHaveCount(0);
   });
 
-  test("a tenant user without the operator permissions is refused the registry", async ({
-    page,
-  }) => {
+  test("a tenant user is told this tool is not theirs, on every route", async ({ page }) => {
+    // Valid session, no operator grant: the sign-in worked, so the honest answer is
+    // "wrong app", not a 403 panel inside a shell that cannot load (ADR-0008).
     await mockJsonResponse(page, "**/api/v1/identity/permissions", []);
 
     await page.goto("/tenants");
-
-    await expect(page.getByText(/don’t have|do not have|forbidden|access/i).first()).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /console is for platform operators/i }),
+    ).toBeVisible();
     await expect(page.getByRole("heading", { name: "Registry", level: 1 })).toHaveCount(0);
+
+    // Not just the operator routes — the whole app is behind the same gate.
+    await page.goto("/settings/profile");
+    await expect(
+      page.getByRole("heading", { name: /console is for platform operators/i }),
+    ).toBeVisible();
   });
 });
