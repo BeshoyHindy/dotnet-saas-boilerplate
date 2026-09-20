@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using Boilerplate.BuildingBlocks.Caching;
+using Boilerplate.BuildingBlocks.Shared.Security;
 using Boilerplate.BuildingBlocks.Web.Idempotency;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -111,7 +112,8 @@ public sealed class IdempotencyEndpointFilterTests
     }
 
     private static (ServiceProvider Provider, FixedTenantAccessor Tenant, RecordingDistributedCache L2) BuildServices(
-        TimeSpan? ttl = null)
+        TimeSpan? ttl = null,
+        TimeSpan? lockWait = null)
     {
         var services = new ServiceCollection();
         var config = new ConfigurationBuilder().Build();
@@ -128,6 +130,10 @@ public sealed class IdempotencyEndpointFilterTests
         {
             services.Configure<IdempotencyOptions>(o => o.DefaultTtl = ttl.Value);
         }
+        if (lockWait is not null)
+        {
+            services.Configure<IdempotencyOptions>(o => o.LockWaitTimeout = lockWait.Value);
+        }
         services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
 
@@ -141,7 +147,44 @@ public sealed class IdempotencyEndpointFilterTests
 
     private sealed record Payload(string Name);
 
+    /// <summary>A payload whose second field reads as a secret by name alone.</summary>
+    private sealed record Signup(string Name, string Password);
+
+    /// <summary>A payload whose second field does not read as a secret and says so at the property.</summary>
+    private sealed record Enrolment(string Name, [property: NotFingerprinted] string Voucher);
+
     private sealed record Created(int Id);
+
+    /// <summary>A response body that has gone away, the way a client that hung up mid-write has.</summary>
+    private sealed class HungUpStream : Stream
+    {
+        public override bool CanRead => false;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => true;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush() { }
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new IOException("the client hung up");
+
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
+            throw new IOException("the client hung up");
+    }
 
     private sealed record Invocation(int StatusCode, string Body, IHeaderDictionary Headers)
     {
@@ -159,7 +202,8 @@ public sealed class IdempotencyEndpointFilterTests
         ClaimsPrincipal? user = null,
         object? payload = null,
         string path = "/things",
-        EndpointFilterDelegate? handler = null)
+        EndpointFilterDelegate? handler = null,
+        Stream? responseBody = null)
     {
         var httpContext = new DefaultHttpContext { RequestServices = provider };
         httpContext.Request.Method = HttpMethods.Post;
@@ -170,7 +214,7 @@ public sealed class IdempotencyEndpointFilterTests
         }
 
         var body = new MemoryStream();
-        httpContext.Response.Body = body;
+        httpContext.Response.Body = responseBody ?? body;
         if (user is not null)
         {
             httpContext.User = user;
@@ -557,6 +601,148 @@ public sealed class IdempotencyEndpointFilterTests
             entry.ShouldNotBeNull();
             entry.V.ShouldBe(CachedIdempotentResponse.CurrentVersion);
             entry.StatusCode.ShouldBe(StatusCodes.Status201Created);
+        }
+    }
+
+    [Fact]
+    public async Task A_Field_That_Reads_As_A_Secret_Should_Not_Enter_TheFingerprint()
+    {
+        // The fingerprint lives in Redis for the entry's whole TTL, and an unsalted digest of a
+        // password is a password for anyone willing to grind a candidate list. The cost is stated
+        // where it is paid: a retry differing *only* in the password replays instead of answering 422.
+        var (provider, tenant, l2) = BuildServices();
+        await using (provider)
+        {
+            tenant.TenantId = "alpha";
+            var counter = new Counter();
+
+            await InvokeAsync(provider, "req-1", counter, payload: new Signup("ada", "Sup3rStr0ng!"));
+            var retry = await InvokeAsync(provider, "req-1", counter, payload: new Signup("ada", "something-else"));
+
+            retry.Replayed.ShouldBeTrue();
+            counter.Executions.ShouldBe(1);
+
+            var stored = Encoding.UTF8.GetString(new MemoryDistributedCacheProbe(l2).Read(IdempotencyKeyIn(l2)));
+            stored.ShouldNotContain("Sup3rStr0ng!");
+        }
+    }
+
+    [Fact]
+    public async Task A_NonSecret_Field_Should_Still_Be_Fingerprinted()
+    {
+        // The control for the test above: dropping the password must not amount to dropping the
+        // fingerprint, or key reuse with a genuinely different request would quietly replay.
+        var (provider, tenant, _) = BuildServices();
+        await using (provider)
+        {
+            tenant.TenantId = "alpha";
+            var counter = new Counter();
+
+            await InvokeAsync(provider, "req-1", counter, payload: new Signup("ada", "Sup3rStr0ng!"));
+            var other = await InvokeAsync(provider, "req-1", counter, payload: new Signup("grace", "Sup3rStr0ng!"));
+
+            other.StatusCode.ShouldBe(StatusCodes.Status422UnprocessableEntity);
+        }
+    }
+
+    [Fact]
+    public async Task A_NotFingerprinted_Field_Should_Not_Enter_TheFingerprint()
+    {
+        // The explicit half, for a field whose name does not give it away.
+        var (provider, tenant, _) = BuildServices();
+        await using (provider)
+        {
+            tenant.TenantId = "alpha";
+            var counter = new Counter();
+
+            await InvokeAsync(provider, "req-1", counter, payload: new Enrolment("ada", "first"));
+            var retry = await InvokeAsync(provider, "req-1", counter, payload: new Enrolment("ada", "second"));
+
+            retry.Replayed.ShouldBeTrue();
+            counter.Executions.ShouldBe(1);
+        }
+    }
+
+    [Fact]
+    public async Task OverLong_Key_Should_Answer_ProblemDetails()
+    {
+        // Every other client error the API answers is a ProblemDetails; a bare string body here would
+        // be the one 400 a client has to special-case.
+        var (provider, tenant, _) = BuildServices();
+        await using (provider)
+        {
+            tenant.TenantId = "alpha";
+
+            var result = await InvokeAsync(provider, new string('k', 129), new Counter());
+
+            result.StatusCode.ShouldBe(StatusCodes.Status400BadRequest);
+            result.Body.ShouldContain("\"title\":\"Invalid idempotency key\"");
+            result.Body.ShouldContain("128");
+        }
+    }
+
+    [Fact]
+    public async Task Entry_Should_Be_Stored_Before_TheBody_Reaches_TheClient()
+    {
+        // The handler has committed its side effect by the time the response is written. Storing
+        // after the write would leave no entry when the client hangs up mid-write, and the retry
+        // would run that side effect a second time — the one thing the key is there to prevent.
+        var (provider, tenant, l2) = BuildServices();
+        await using (provider)
+        {
+            tenant.TenantId = "alpha";
+            var counter = new Counter();
+
+            await Should.ThrowAsync<IOException>(
+                () => InvokeAsync(provider, "req-1", counter, responseBody: new HungUpStream()));
+
+            counter.Executions.ShouldBe(1);
+            l2.WrittenKeys.ShouldHaveSingleItem("the entry must already be in the cache when the write fails.");
+
+            var retry = await InvokeAsync(provider, "req-1", counter);
+            retry.Replayed.ShouldBeTrue();
+            counter.Executions.ShouldBe(1);
+        }
+    }
+
+    [Fact]
+    public async Task A_Duplicate_Should_Stop_Waiting_After_TheLock_Timeout_And_Run_Anyway()
+    {
+        // The lock is held across the whole handler, so an unbounded wait would park every duplicate
+        // of one slow request for as long as it takes, a request thread apiece. Timing out widens the
+        // same "the handler may run twice" window that is already open across instances.
+        var (provider, tenant, _) = BuildServices(lockWait: TimeSpan.FromMilliseconds(50));
+        await using (provider)
+        {
+            tenant.TenantId = "alpha";
+            var counter = new Counter();
+            var entered = new TaskCompletionSource();
+            var release = new TaskCompletionSource();
+            var runs = 0;
+
+            EndpointFilterDelegate slow = async ctx =>
+            {
+                Interlocked.Increment(ref runs);
+                entered.TrySetResult();
+                await release.Task;
+                return TypedResults.Created("/things/1", new Created(1));
+            };
+
+            EndpointFilterDelegate prompt = ctx =>
+            {
+                Interlocked.Increment(ref runs);
+                return ValueTask.FromResult<object?>(TypedResults.Created("/things/2", new Created(2)));
+            };
+
+            var first = InvokeAsync(provider, "req-1", counter, handler: slow);
+            await entered.Task;
+            var second = await InvokeAsync(provider, "req-1", counter, handler: prompt);
+
+            second.Replayed.ShouldBeFalse("the waiter gave up on the lock and ran the handler itself.");
+            runs.ShouldBe(2);
+
+            release.SetResult();
+            await first;
         }
     }
 

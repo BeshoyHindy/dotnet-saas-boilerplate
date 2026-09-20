@@ -1,9 +1,12 @@
 using System.IO.Pipelines;
+using System.Reflection;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using Boilerplate.BuildingBlocks.Caching;
+using Boilerplate.BuildingBlocks.Shared.Security;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Distributed;
@@ -50,12 +53,47 @@ namespace Boilerplate.BuildingBlocks.Web.Idempotency;
 /// <c>422 Unprocessable Entity</c> rather than replaying a response to a request nobody made.
 /// </para>
 /// <para>
+/// <b>Secrets never enter the fingerprint.</b> The bound arguments are hashed <i>after</i> every
+/// property that reads as a secret is dropped — by name (<see cref="SensitiveFieldNames"/>) and by
+/// <see cref="NotFingerprintedAttribute"/>. An unsalted digest of a password in Redis is a password
+/// in Redis for anyone willing to grind a candidate list, and keying the hash would not help: the
+/// Data Protection keys are persisted in the same Redis. The cost is stated where it is paid — a
+/// retry that differs <i>only</i> in an excluded field replays instead of answering 422.
+/// </para>
+/// <para>
 /// <b>Do not put this on a token-issuing endpoint.</b> For an anonymous caller the partition is the
 /// client-supplied key alone (there is no subject to bind to), so a caller who guesses another's key
 /// would be handed that response. None of the kit's idempotent endpoints issue tokens, and the
 /// anonymous <c>tenants/{tenant}/auth/*</c> routes that set a refresh cookie are deliberately not
 /// marked idempotent. Response headers are stored by allow-list anyway, so <c>Set-Cookie</c> never
 /// reaches the cache.
+/// </para>
+/// <para>
+/// <b>Ask the same question of a short-lived capability.</b> <c>RequestUploadUrl</c> is idempotent
+/// and its response is a presigned PUT URL valid for minutes, stored in an entry that lives for 24h:
+/// a retry under the same key past that expiry is handed a dead link rather than a fresh one, and
+/// the signed URL sits in the cache until the entry does. That is the caller's own URL either way —
+/// the partition is tenant + subject — so it is a usability cost, not a leak. An endpoint that minted
+/// a capability usable by somebody else would be the leak, and must not be marked idempotent.
+/// </para>
+/// <para>
+/// <b>Nothing may wrap it.</b> The filter writes the response itself and returns
+/// <see cref="TypedResults.Empty"/>, so any endpoint filter added <i>before</i> it on the same route
+/// wraps it, sees <c>Empty</c> where it expected the handler's result, and runs its post-<c>next</c>
+/// code after the bytes have already gone out. <c>.WithIdempotency()</c> must therefore be the first
+/// endpoint filter in the chain (filters run outermost-first in the order they are added);
+/// <c>IdempotencyFilterOrderTests</c> in Architecture.Tests fails the build if another one precedes
+/// it. A filter added <i>after</i> it is fine — it sits between this filter and the handler, and its
+/// result and headers are captured normally.
+/// </para>
+/// <para>
+/// <b>There is deliberately no <c>MaxCachedBodyBytes</c>.</b> Every idempotent endpoint in the kit
+/// answers with a small created-resource DTO, and Kestrel already caps the <i>request</i> at 10 MiB,
+/// so a cap here would be a knob with no setting to find. What would force one: marking an endpoint
+/// idempotent whose success body is unbounded — a list, an export, anything streamed. At that point
+/// add the cap and skip the store (not the response) when the buffer exceeds it, because this filter
+/// buffers the whole body in memory before it writes, and a large body would be held twice, once in
+/// the buffer and once in the entry.
 /// </para>
 /// </remarks>
 public sealed class IdempotencyEndpointFilter : IEndpointFilter
@@ -64,6 +102,17 @@ public sealed class IdempotencyEndpointFilter : IEndpointFilter
     private const string AnonymousSubject = "anon";
 
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+    /// <summary>
+    /// The serializer the <i>fingerprint</i> uses: the entry format's shape minus every property that
+    /// reads as a secret. The exclusion lives in the contract resolver rather than at the call site
+    /// so it reaches nested objects too — a password one level down is still a password in Redis.
+    /// </summary>
+    private static readonly JsonSerializerOptions FingerprintJson = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { DropSensitiveProperties } },
+    };
 
     /// <summary>
     /// The only response headers that are stored and replayed. An allow-list, not a deny-list: the
@@ -95,13 +144,18 @@ public sealed class IdempotencyEndpointFilter : IEndpointFilter
 
         if (idempotencyKey.Length > options.MaxKeyLength)
         {
-            return TypedResults.BadRequest($"Idempotency key exceeds maximum length of {options.MaxKeyLength}.");
+            // ProblemDetails, like every other client error the API answers: a bare string body here
+            // would be the one 400 a client has to special-case.
+            return TypedResults.Problem(
+                detail: $"Idempotency key exceeds the maximum length of {options.MaxKeyLength} characters.",
+                statusCode: StatusCodes.Status400BadRequest,
+                title: "Invalid idempotency key");
         }
 
         var cache = httpContext.RequestServices.GetRequiredService<IDistributedCache>();
         var logger = httpContext.RequestServices.GetRequiredService<ILogger<IdempotencyEndpointFilter>>();
         var cacheKey = CacheKey(httpContext, idempotencyKey);
-        var fingerprint = RequestFingerprint(context);
+        var fingerprint = RequestFingerprint(context, logger);
 
         var replay = await TryReplayAsync(cache, cacheKey, fingerprint, httpContext, logger, idempotencyKey, logUnreadable: true)
             .ConfigureAwait(false);
@@ -112,14 +166,26 @@ public sealed class IdempotencyEndpointFilter : IEndpointFilter
 
         // Two duplicates arriving together must not both run the handler. The probe above is the
         // cheap path; this is the one that is allowed to wait, and it re-probes because the request
-        // it waited for has just written the entry.
-        using var handle = await InFlight.AcquireAsync(cacheKey, httpContext.RequestAborted).ConfigureAwait(false);
-
-        replay = await TryReplayAsync(cache, cacheKey, fingerprint, httpContext, logger, idempotencyKey, logUnreadable: false)
+        // it waited for has just written the entry. The wait is bounded: the lock is held across the
+        // whole handler, so an unbounded one would queue every duplicate of a slow request behind it.
+        using var handle = await InFlight.TryAcquireAsync(cacheKey, options.LockWaitTimeout, httpContext.RequestAborted)
             .ConfigureAwait(false);
-        if (replay is not null)
+
+        if (handle is null)
         {
-            return replay;
+            logger.LogWarning(
+                "Timed out after {Timeout} waiting for an in-flight request with idempotency key {KeyHash}; running the handler without the lock.",
+                options.LockWaitTimeout,
+                HashKey(idempotencyKey));
+        }
+        else
+        {
+            replay = await TryReplayAsync(cache, cacheKey, fingerprint, httpContext, logger, idempotencyKey, logUnreadable: false)
+                .ConfigureAwait(false);
+            if (replay is not null)
+            {
+                return replay;
+            }
         }
 
         var result = await next(context).ConfigureAwait(false);
@@ -127,11 +193,18 @@ public sealed class IdempotencyEndpointFilter : IEndpointFilter
 
         // Only a success is replayable. A 4xx/5xx is the server's answer to *this* attempt — caching
         // it would make a transient failure permanent for the lifetime of the key.
+        //
+        // Stored *before* the body reaches the client, and not on the request's token. The handler has
+        // already committed its side effect by now; if the client hangs up while the response is being
+        // written, storing afterwards would leave no entry, and the retry would run the side effect a
+        // second time — the one thing the key is there to prevent.
         if (captured.StatusCode is >= StatusCodes.Status200OK and < StatusCodes.Status300MultipleChoices)
         {
-            await StoreAsync(cache, cacheKey, captured, fingerprint, options, httpContext, logger, idempotencyKey)
+            await StoreAsync(cache, cacheKey, captured, fingerprint, options, logger, idempotencyKey)
                 .ConfigureAwait(false);
         }
+
+        await FlushAsync(httpContext, captured.Body).ConfigureAwait(false);
 
         // The response is already written; returning the captured result again would duplicate it.
         return TypedResults.Empty;
@@ -235,7 +308,8 @@ public sealed class IdempotencyEndpointFilter : IEndpointFilter
 
     /// <summary>
     /// Runs the endpoint's result against a buffered body so the bytes the client receives are the
-    /// bytes that get cached, then writes them through.
+    /// bytes that get cached. The caller stores the entry and only then flushes, so a client that
+    /// disconnects mid-write still leaves a replayable entry behind.
     /// </summary>
     /// <remarks>
     /// Executing the result here rather than handing it back is what makes the replay honest. The
@@ -260,11 +334,6 @@ public sealed class IdempotencyEndpointFilter : IEndpointFilter
         }
 
         var body = buffer.ToArray();
-        if (body.Length > 0)
-        {
-            await originalBody.WriteAsync(body, httpContext.RequestAborted).ConfigureAwait(false);
-        }
-
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var name in ReplayableResponseHeaders)
         {
@@ -275,6 +344,19 @@ public sealed class IdempotencyEndpointFilter : IEndpointFilter
         }
 
         return new CapturedResponse(response.StatusCode, response.ContentType, body, headers);
+    }
+
+    /// <summary>
+    /// Writes the captured bytes to the real response body. Runs last, after the entry is stored:
+    /// this is the call that can fail on a client disconnect, and by then there is nothing left to
+    /// lose.
+    /// </summary>
+    private static async Task FlushAsync(HttpContext httpContext, byte[] body)
+    {
+        if (body.Length > 0)
+        {
+            await httpContext.Response.Body.WriteAsync(body, httpContext.RequestAborted).ConfigureAwait(false);
+        }
     }
 
     /// <summary>
@@ -301,7 +383,6 @@ public sealed class IdempotencyEndpointFilter : IEndpointFilter
         CapturedResponse captured,
         string? fingerprint,
         IdempotencyOptions options,
-        HttpContext httpContext,
         ILogger logger,
         string idempotencyKey)
     {
@@ -319,7 +400,10 @@ public sealed class IdempotencyEndpointFilter : IEndpointFilter
             var payload = JsonSerializer.SerializeToUtf8Bytes(entry, JsonOpts);
             var entryOptions = new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = options.DefaultTtl };
 
-            await cache.SetAsync(cacheKey, payload, entryOptions, httpContext.RequestAborted).ConfigureAwait(false);
+            // CancellationToken.None on purpose: the request's token is already cancelled when the
+            // client hangs up, and that is exactly the case where the entry matters most. The write
+            // is a small SET against the cache, not something worth keeping a cancelled request alive.
+            await cache.SetAsync(cacheKey, payload, entryOptions, CancellationToken.None).ConfigureAwait(false);
         }
         // Best-effort caching: idempotency replay is a convenience, not a correctness requirement.
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -330,40 +414,80 @@ public sealed class IdempotencyEndpointFilter : IEndpointFilter
 
     /// <summary>
     /// A hash of the request payload: query string plus every bound argument that is data rather
-    /// than plumbing. <see langword="null"/> when the payload cannot be serialized, in which case the
-    /// entry carries no fingerprint and reuse of the key is replayed rather than refused — a miss on
-    /// a client bug, never a false 422 on a legitimate retry.
+    /// than plumbing, minus everything that reads as a secret. <see langword="null"/> when the payload
+    /// cannot be serialized, in which case the entry carries no fingerprint and reuse of the key is
+    /// replayed rather than refused — a miss on a client bug, never a false 422 on a legitimate retry.
     /// </summary>
     /// <remarks>
     /// The raw body is not available here: an endpoint filter runs after model binding, by which
     /// point the body stream has been consumed and is not rewindable unless something called
-    /// <c>EnableBuffering</c> first. The bound arguments are the same data, already materialised.
+    /// <c>EnableBuffering</c> first. The bound arguments are the same data, already materialised —
+    /// which is also what makes dropping the secret ones possible at all, since a raw body could only
+    /// be hashed whole.
     /// </remarks>
-    private static string? RequestFingerprint(EndpointFilterInvocationContext context)
+    private static string? RequestFingerprint(EndpointFilterInvocationContext context, ILogger logger)
     {
         var httpContext = context.HttpContext;
+
+        // Parameter names, for the endpoint that binds a bare value rather than a DTO: Arguments is
+        // positional against the handler's signature, so index i is parameter i. Metadata is absent
+        // outside a mapped endpoint, and then only the property-level exclusion applies.
+        var parameters = httpContext.GetEndpoint()?.Metadata.GetMetadata<MethodInfo>()?.GetParameters();
+
         try
         {
             using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
             hash.AppendData(Encoding.UTF8.GetBytes(httpContext.Request.QueryString.Value ?? string.Empty));
 
-            foreach (var argument in context.Arguments.Where(a => IsRequestPayload(a, httpContext.RequestServices)))
+            for (var i = 0; i < context.Arguments.Count; i++)
             {
-                hash.AppendData(JsonSerializer.SerializeToUtf8Bytes(argument, argument!.GetType(), JsonOpts));
+                var argument = context.Arguments[i];
+                if (!IsRequestPayload(argument, httpContext.RequestServices) || IsSensitiveParameter(parameters, i))
+                {
+                    continue;
+                }
+
+                hash.AppendData(JsonSerializer.SerializeToUtf8Bytes(argument, argument!.GetType(), FingerprintJson));
             }
 
             return Convert.ToHexString(hash.GetHashAndReset());
         }
-        catch (NotSupportedException)
+        // A parameter type System.Text.Json refuses to serialize. No fingerprint, no conflict check.
+        catch (Exception ex) when (ex is NotSupportedException or JsonException)
         {
-            // A parameter type System.Text.Json refuses to serialize. No fingerprint, no conflict check.
-            return null;
-        }
-        catch (JsonException)
-        {
+            logger.LogDebug(ex, "Could not fingerprint the request; this key's entry will be replayed rather than checked.");
             return null;
         }
     }
+
+    /// <summary>
+    /// Drops every property that reads as a secret from the fingerprint's view of a type — by name
+    /// (<see cref="SensitiveFieldNames"/>) and by <see cref="NotFingerprintedAttribute"/>. The name
+    /// seen here is the serialized one, so it is the camelCase name the list is written against.
+    /// </summary>
+    private static void DropSensitiveProperties(JsonTypeInfo typeInfo)
+    {
+        for (var i = typeInfo.Properties.Count - 1; i >= 0; i--)
+        {
+            var property = typeInfo.Properties[i];
+            if (SensitiveFieldNames.IsSensitive(property.Name)
+                || property.AttributeProvider?.IsDefined(typeof(NotFingerprintedAttribute), inherit: true) == true)
+            {
+                typeInfo.Properties.RemoveAt(i);
+            }
+        }
+    }
+
+    /// <summary>
+    /// True for a handler parameter whose own name reads as a secret, or that is marked
+    /// <see cref="NotFingerprintedAttribute"/> — the case <see cref="DropSensitiveProperties"/>
+    /// cannot see, because a bare <c>string code</c> has no property to drop.
+    /// </summary>
+    private static bool IsSensitiveParameter(ParameterInfo[]? parameters, int index) =>
+        parameters is not null
+        && index < parameters.Length
+        && (SensitiveFieldNames.IsSensitive(parameters[index].Name)
+            || parameters[index].IsDefined(typeof(NotFingerprintedAttribute), inherit: true));
 
     /// <summary>
     /// True for an argument that is part of what the caller asked for, false for the plumbing the

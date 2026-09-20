@@ -18,15 +18,35 @@ namespace Boilerplate.BuildingBlocks.Web.Idempotency;
 /// million distinct keys does not keep a million semaphores. Stripe-hashing would be simpler but
 /// would let one slow handler block an unrelated request that happened to collide on a stripe.
 /// </para>
+/// <para>
+/// <b>The wait is bounded, and a timeout is not an error.</b> The lock is held across the whole
+/// handler, so an unbounded wait would queue every duplicate of one slow request behind it and tie up
+/// a request thread apiece for as long as the handler takes — a slow handler plus a retrying client
+/// is then a self-inflicted outage. On timeout the caller runs anyway: the multi-instance window
+/// above already means "the handler may run twice", so widening it for a few requests costs nothing
+/// the design was not already paying, and a request that answers late is strictly better than one
+/// that never answers.
+/// </para>
 /// </remarks>
 internal sealed class KeyedAsyncLock
 {
     private readonly Dictionary<string, Entry> _entries = new(StringComparer.Ordinal);
 
     /// <summary>
-    /// Waits for exclusive use of <paramref name="key"/>. Dispose the returned handle to release it.
+    /// The number of keys currently held or waited on. Zero on a quiet process; a test asserts it
+    /// returns to zero so a timed-out waiter cannot leak an entry.
     /// </summary>
-    public async ValueTask<IDisposable> AcquireAsync(string key, CancellationToken cancellationToken)
+    public int TrackedKeys
+    {
+        get { lock (_entries) { return _entries.Count; } }
+    }
+
+    /// <summary>
+    /// Waits up to <paramref name="timeout"/> for exclusive use of <paramref name="key"/>. Dispose the
+    /// returned handle to release it; <see langword="null"/> means the wait timed out and the caller
+    /// should proceed <i>without</i> the lock.
+    /// </summary>
+    public async ValueTask<IDisposable?> TryAcquireAsync(string key, TimeSpan timeout, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(key);
 
@@ -43,14 +63,23 @@ internal sealed class KeyedAsyncLock
             entry = existing;
         }
 
+        bool acquired;
         try
         {
-            await entry.Semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+            acquired = await entry.Semaphore.WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
             Release(key, entry, held: false);
             throw;
+        }
+
+        if (!acquired)
+        {
+            // Drop the reference the same way a cancellation does, or the entry outlives every
+            // waiter and the dictionary grows one semaphore per timed-out key.
+            Release(key, entry, held: false);
+            return null;
         }
 
         return new Handle(this, key, entry);
