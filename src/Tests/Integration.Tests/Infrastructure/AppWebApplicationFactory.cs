@@ -231,6 +231,11 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
                 JwtBearerDefaults.AuthenticationScheme,
                 options => options.RequireHttpsMetadata = false);
 
+            // Fault-injection seam for the provisioning failure/retry suites. Appended to the
+            // IDbInitializer enumerable ITenantService.MigrateTenantAsync iterates, so an armed
+            // tenant fails the real Migrations step; every other tenant sees a no-op.
+            services.AddScoped<IDbInitializer, FaultInjectingDbInitializer>();
+
             // Probe handler for the tenant-context tests: registered here so it is dispatched by the
             // real bus, through the real IEventTenantScope, with a real inbox — the whole point is
             // that nothing in that path is substituted.
