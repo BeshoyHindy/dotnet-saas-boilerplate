@@ -20,6 +20,21 @@ internal static class OutboxDrain
 {
     private const int MaxPasses = 10;
 
+    /// <summary>
+    /// Runs <b>exactly one</b> dispatch pass — one <c>ClaimBatchAsync</c>, one publish loop.
+    ///
+    /// For the test that has to prove a single pass delivers rows belonging to <i>different</i>
+    /// tenants. <see cref="DrainAsync"/> cannot prove it: a dispatcher narrowed to one tenant per
+    /// pass would have the rest picked up by the next pass, and the assertion would still hold.
+    /// Call <see cref="DrainAsync"/> first to clear the shared suite's backlog, publish, then call
+    /// this.
+    /// </summary>
+    public static async Task DispatchOnceAsync(IServiceProvider services)
+    {
+        using var scope = services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<OutboxDispatcher>().DispatchAsync();
+    }
+
     public static async Task DrainAsync(IServiceProvider services)
     {
         for (int pass = 0; pass < MaxPasses; pass++)

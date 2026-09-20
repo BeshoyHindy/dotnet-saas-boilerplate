@@ -61,8 +61,8 @@ public sealed partial class InMemoryEventBus : IEventBus
 
         // The tenant scope owns both the ambient tenant and the DI scope, so the tenant is installed
         // BEFORE any handler — or the DbContext it holds — is constructed. A context built first
-        // captures a null tenant and the default connection string, which is what broke background
-        // dispatch.
+        // captures a null tenant, and every tenant-filtered read in the handler is then unscoped,
+        // which is what broke background dispatch.
         await _tenantScope.DispatchAsync(
             @event.TenantId,
             async (provider, token) =>

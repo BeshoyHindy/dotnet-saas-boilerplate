@@ -63,12 +63,65 @@ public sealed class EventTenantIsolationTests
         AssertIsolated(TenantProbeHandler.Observations[marker], tenantA, adminA, adminB);
     }
 
-    private static void AssertIsolated(TenantObservation observation, string tenantA, string adminA, string adminB)
+    /// <summary>
+    /// One dispatch pass delivers rows belonging to <b>different</b> tenants, each handler running
+    /// under its own row's tenant.
+    ///
+    /// This is the shape the per-tenant-database cut (#75) left behind: the dispatcher used to run
+    /// one pass per drain target, and now runs one pass, full stop, because outbox rows are
+    /// <c>IGlobalEntity</c> with an explicit <c>TenantId</c> and there is one database. The failure
+    /// it guards against is a claim narrowed to a single tenant — every other tenant's events
+    /// strand, and the looping <see cref="OutboxDrain.DrainAsync"/> every other test uses would hide
+    /// it by picking the rest up on the next pass. Hence <see cref="OutboxDrain.DispatchOnceAsync"/>,
+    /// and hence the pre-drain: the backlog the shared suite database carries must not be what fills
+    /// the batch.
+    /// </summary>
+    [Fact]
+    public async Task One_Outbox_Pass_Should_Deliver_Rows_For_Two_Different_Tenants()
     {
-        observation.TenantId.ShouldBe(tenantA, "the handler must run under the event's tenant");
-        observation.VisibleUserEmails.ShouldContain(adminA);
+        var (tenantA, adminA) = await _tenants.CreateProvisionedTenantAsync("onepassa");
+        var (tenantB, adminB) = await _tenants.CreateProvisionedTenantAsync("onepassb");
+
+        // Clear anything earlier tests left queued, so the single pass below is claiming our two
+        // rows and not someone else's backlog.
+        await OutboxDrain.DrainAsync(_factory.Services);
+
+        var markerA = Guid.CreateVersion7();
+        var markerB = Guid.CreateVersion7();
+
+        var tenantScope = _factory.Services.GetRequiredService<ITenantScope>();
+        await tenantScope.RunAsync(tenantA, async (services, ct) =>
+            await services.GetRequiredService<IOutboxWriter>().AddAsync(NewEvent(markerA, tenantA), ct));
+        await tenantScope.RunAsync(tenantB, async (services, ct) =>
+            await services.GetRequiredService<IOutboxWriter>().AddAsync(NewEvent(markerB, tenantB), ct));
+
+        // Exactly one pass — one ClaimBatchAsync, one publish loop.
+        await OutboxDrain.DispatchOnceAsync(_factory.Services);
+
+        TenantProbeHandler.Observations.ShouldContainKey(
+            markerA, "one pass must deliver tenant A's row");
+        TenantProbeHandler.Observations.ShouldContainKey(
+            markerB, "one pass must deliver tenant B's row too — not on a later pass, this one");
+
+        AssertIsolated(TenantProbeHandler.Observations[markerA], tenantA, adminA, adminB);
+        AssertIsolated(TenantProbeHandler.Observations[markerB], tenantB, adminB, adminA);
+    }
+
+    /// <summary>
+    /// The handler ran under <paramref name="expectedTenantId"/> and could read that tenant's rows
+    /// and no other tenant's.
+    /// </summary>
+    private static void AssertIsolated(
+        TenantObservation observation,
+        string expectedTenantId,
+        string ownAdminEmail,
+        string otherTenantAdminEmail)
+    {
+        observation.TenantId.ShouldBe(expectedTenantId, "the handler must run under the event's tenant");
+        observation.VisibleUserEmails.ShouldContain(ownAdminEmail);
         observation.VisibleUserEmails.ShouldNotContain(
-            adminB, "a handler running as tenant A must not be able to read tenant B's rows");
+            otherTenantAdminEmail,
+            $"a handler running as {expectedTenantId} must not be able to read another tenant's rows");
     }
 
     private static TenantProbeIntegrationEvent NewEvent(Guid marker, string tenantId) => new(
