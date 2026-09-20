@@ -8,7 +8,11 @@ namespace Boilerplate.Modules.Identity.Contracts.Services;
 public interface IUserRegistrationService
 {
     /// <summary>
-    /// Registers a new user with password.
+    /// Registers a new user with password, as one transaction: the user, the <c>Basic</c> role, the
+    /// tenant's default groups and the registration event either all exist or none of them do.
+    /// The confirmation mail is sent from that event, so it cannot announce a sign-up that rolled
+    /// back — and takes no <c>origin</c>: the link's base URL is configuration, resolved where the
+    /// mail is built.
     /// </summary>
     Task<string> RegisterAsync(
         string firstName,
@@ -18,7 +22,6 @@ public interface IUserRegistrationService
         string password,
         string confirmPassword,
         string phoneNumber,
-        string origin,
         CancellationToken cancellationToken);
 
     /// <summary>

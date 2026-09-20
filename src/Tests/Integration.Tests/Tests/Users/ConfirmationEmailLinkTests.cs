@@ -45,7 +45,8 @@ public sealed class ConfirmationEmailLinkTests
         var unique = Guid.NewGuid().ToString("N")[..8];
         var email = $"confirm-link-{unique}@example.com";
 
-        // Act — self-register; the confirmation mail is enqueued on the "email" Hangfire queue.
+        // Act — self-register; the confirmation mail hangs off the registration event (#86), so it is
+        // published with the user row and delivered on a dispatch cycle rather than inside the request.
         var response = await client.PostAsJsonAsync($"{TestConstants.RootAuthBasePath}/register", new
         {
             firstName = "Confirm",
@@ -57,6 +58,9 @@ public sealed class ConfirmationEmailLinkTests
         });
         response.StatusCode.ShouldBe(HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
         var registered = await response.DeserializeAsync<RegisterResult>();
+
+        // The hosted dispatcher is off in this host, so the drain is what stands in for its cycle.
+        await OutboxDrain.DrainAsync(_factory.Services);
 
         var confirmationMail = await WaitForMailAsync(mail, email);
         var link = ExtractConfirmationLink(confirmationMail);
@@ -99,7 +103,7 @@ public sealed class ConfirmationEmailLinkTests
 
     private static async Task<MailRequest> WaitForMailAsync(NoOpMailService mail, string to)
     {
-        // The mail is dispatched by the in-memory Hangfire server, so it lands a beat after the response.
+        // The handler runs on the dispatcher's scope, so the mail lands a beat after the drain.
         var deadline = DateTime.UtcNow.AddSeconds(30);
         while (DateTime.UtcNow < deadline)
         {
