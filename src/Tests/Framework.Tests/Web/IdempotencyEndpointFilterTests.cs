@@ -60,6 +60,12 @@ public sealed class IdempotencyEndpointFilterTests
         private readonly List<string> _reads = [];
         private readonly Dictionary<string, DistributedCacheEntryOptions> _writes = new(StringComparer.Ordinal);
 
+        /// <summary>Redis is down, or the key is unreachable: every read throws.</summary>
+        public bool FailReads { get; set; }
+
+        /// <summary>…and every write. Set independently, because the two are separate code paths.</summary>
+        public bool FailWrites { get; set; }
+
         public IReadOnlyList<string> Reads
         {
             get { lock (_reads) { return [.. _reads]; } }
@@ -81,25 +87,41 @@ public sealed class IdempotencyEndpointFilterTests
         public byte[]? Get(string key)
         {
             lock (_reads) { _reads.Add(key); }
+            Refuse(FailReads);
             return _inner.Get(key);
         }
 
         public Task<byte[]?> GetAsync(string key, CancellationToken token = default)
         {
             lock (_reads) { _reads.Add(key); }
+            Refuse(FailReads);
             return _inner.GetAsync(key, token);
         }
 
         public void Set(string key, byte[] value, DistributedCacheEntryOptions options)
         {
+            Refuse(FailWrites);
             lock (_reads) { _writes[key] = options; }
             _inner.Set(key, value, options);
         }
 
         public Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options, CancellationToken token = default)
         {
+            Refuse(FailWrites);
             lock (_reads) { _writes[key] = options; }
             return _inner.SetAsync(key, value, options, token);
+        }
+
+        /// <summary>
+        /// The shape a real outage takes through StackExchange.Redis: a connection exception out of
+        /// the call, not a null return.
+        /// </summary>
+        private static void Refuse(bool failing)
+        {
+            if (failing)
+            {
+                throw new InvalidOperationException("the cache is unreachable");
+            }
         }
 
         public void Refresh(string key) => _inner.Refresh(key);
@@ -152,6 +174,9 @@ public sealed class IdempotencyEndpointFilterTests
 
     /// <summary>A payload whose second field does not read as a secret and says so at the property.</summary>
     private sealed record Enrolment(string Name, [property: NotFingerprinted] string Voucher);
+
+    /// <summary>The shape of CreateTenantCommand's credential-bearing pair, caught by name alone.</summary>
+    private sealed record Provisioning(string Name, string ConnectionString);
 
     private sealed record Created(int Id);
 
@@ -743,6 +768,96 @@ public sealed class IdempotencyEndpointFilterTests
 
             release.SetResult();
             await first;
+        }
+    }
+
+    [Fact]
+    public async Task A_ConnectionString_Should_Not_Enter_TheFingerprint()
+    {
+        // The field that got through the first time: a per-tenant database connection string, on a
+        // command CreateTenant binds, hashed into an entry that lives 24h. Covered by name here so a
+        // consumer's own command is safe without marking anything.
+        var (provider, tenant, l2) = BuildServices();
+        await using (provider)
+        {
+            tenant.TenantId = "alpha";
+            var counter = new Counter();
+
+            await InvokeAsync(provider, "req-1", counter,
+                payload: new Provisioning("acme", "Host=db;Username=sa;Password=hunter2"));
+            var retry = await InvokeAsync(provider, "req-1", counter,
+                payload: new Provisioning("acme", "Host=db;Username=sa;Password=other"));
+
+            retry.Replayed.ShouldBeTrue();
+            counter.Executions.ShouldBe(1);
+
+            var stored = Encoding.UTF8.GetString(new MemoryDistributedCacheProbe(l2).Read(IdempotencyKeyIn(l2)));
+            stored.ShouldNotContain("hunter2");
+        }
+    }
+
+    [Fact]
+    public async Task A_Cache_That_Throws_On_Read_Should_Not_Fail_TheRequest()
+    {
+        // Idempotency is a convenience; the handler is the truth. An outage on the probe must cost a
+        // duplicate execution at worst, never the caller's request.
+        var (provider, tenant, l2) = BuildServices();
+        await using (provider)
+        {
+            tenant.TenantId = "alpha";
+            var counter = new Counter();
+            l2.FailReads = true;
+
+            var result = await InvokeAsync(provider, "req-1", counter);
+
+            result.StatusCode.ShouldBe(StatusCodes.Status201Created);
+            counter.Executions.ShouldBe(1, "the handler runs when the entry cannot be read.");
+            result.Replayed.ShouldBeFalse();
+        }
+    }
+
+    [Fact]
+    public async Task A_Cache_That_Throws_On_Write_Should_Not_Fail_TheRequest()
+    {
+        var (provider, tenant, l2) = BuildServices();
+        await using (provider)
+        {
+            tenant.TenantId = "alpha";
+            var counter = new Counter();
+            l2.FailWrites = true;
+
+            var result = await InvokeAsync(provider, "req-1", counter);
+
+            result.StatusCode.ShouldBe(StatusCodes.Status201Created);
+            result.Body.ShouldBe("""{"id":1}""", "the caller still gets the response the handler produced.");
+            l2.WrittenKeys.ShouldBeEmpty();
+        }
+    }
+
+    [Fact]
+    public async Task An_Outage_Should_Cost_A_Replay_And_Nothing_More()
+    {
+        // The whole failure story in one run: while the cache is down every duplicate executes, and
+        // once it is back the next one is stored and the one after that replays again.
+        var (provider, tenant, l2) = BuildServices();
+        await using (provider)
+        {
+            tenant.TenantId = "alpha";
+            var counter = new Counter();
+
+            l2.FailReads = true;
+            l2.FailWrites = true;
+            await InvokeAsync(provider, "req-1", counter);
+            await InvokeAsync(provider, "req-1", counter);
+            counter.Executions.ShouldBe(2, "no entry can be written, so nothing can be replayed.");
+
+            l2.FailReads = false;
+            l2.FailWrites = false;
+            await InvokeAsync(provider, "req-1", counter);
+            var afterRecovery = await InvokeAsync(provider, "req-1", counter);
+
+            counter.Executions.ShouldBe(3);
+            afterRecovery.Replayed.ShouldBeTrue("the cache is back; replay resumes with no intervention.");
         }
     }
 

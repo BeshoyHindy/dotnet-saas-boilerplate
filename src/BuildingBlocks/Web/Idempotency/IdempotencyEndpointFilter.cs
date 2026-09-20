@@ -72,9 +72,9 @@ namespace Boilerplate.BuildingBlocks.Web.Idempotency;
 /// <b>Ask the same question of a short-lived capability.</b> <c>RequestUploadUrl</c> is idempotent
 /// and its response is a presigned PUT URL valid for minutes, stored in an entry that lives for 24h:
 /// a retry under the same key past that expiry is handed a dead link rather than a fresh one, and
-/// the signed URL sits in the cache until the entry does. That is the caller's own URL either way —
-/// the partition is tenant + subject — so it is a usability cost, not a leak. An endpoint that minted
-/// a capability usable by somebody else would be the leak, and must not be marked idempotent.
+/// the presigned URL sits in the cache until the entry does. It stays a private file URL either
+/// way — the partition is tenant + subject — so it is a usability cost, not a leak. An endpoint that
+/// minted a capability usable by somebody else would be the leak, and must not be marked idempotent.
 /// </para>
 /// <para>
 /// <b>Nothing may wrap it.</b> The filter writes the response itself and returns
