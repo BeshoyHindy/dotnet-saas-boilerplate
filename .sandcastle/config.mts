@@ -21,14 +21,14 @@ export type PhaseName =
   | "healer";
 
 export interface PhaseModel {
-  /** A model id the agent CLI understands, e.g. `claude-opus-5`. */
+  /** A model id the agent CLI understands, e.g. `claude-opus-5-5`. */
   readonly model: string;
   /**
-   * Reasoning effort. Unset means the CLI default (high) — the level for
-   * long-horizon agentic work with the spec given up front, which is what
-   * every phase here is.
+   * Reasoning effort. REQUIRED: each model has its own default (Opus 5.5
+   * defaults to `medium`, the others to `high`), so an unset effort would
+   * silently differ per model. Name the level explicitly per phase instead.
    */
-  readonly effort?: "low" | "medium" | "high";
+  readonly effort: "low" | "medium" | "high" | "xhigh" | "max";
 }
 
 export interface GateConfig {

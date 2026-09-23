@@ -36,15 +36,19 @@ const issueListQuery = (fields: string): string =>
 // at a call site. Every phase runs on Claude Code, which is baked into
 // `.sandcastle/Dockerfile` and authenticates with CLAUDE_CODE_OAUTH_TOKEN /
 // ANTHROPIC_API_KEY. A "[1m]" suffix is the Claude Code 1M-context model
-// selector. It is NOT free: once a session's context passes 200K tokens every
-// request is billed at the long-context premium, so a role only gets "[1m]"
-// when it genuinely reads that much (a reviewer over a big diff, a planner
-// over the whole backlog).
+// selector, but it is not what bounds the window in practice: across 461 past
+// runs, plain-id implementers passed 200K in 62% of sessions (peak 610K) and
+// never compacted. So no role uses the suffix, and context size is a cost
+// driver to watch rather than something the id caps.
+//
+// Where the spend goes, measured over those runs: implementer ~75%, reviewer
+// ~20%, merger, planner and healer ~4% together. Cost tracks turns × context
+// (cached context re-read every turn is ~64% of it), not output tokens.
 const CLAUDE = {
-  fable51: "claude-fable-5-1", // most capable; 200K + auto-compaction
-  fable51Long: "claude-fable-5-1[1m]", // same model, 1M context
-  opus5: "claude-opus-5", // strong all-rounder; 200K + auto-compaction
-  opus5Long: "claude-opus-5[1m]", // same model, 1M context
+  fable51: "claude-fable-5-1", // most capable; $10/$50 per MTok
+  fable51Long: "claude-fable-5-1[1m]", // same model, explicit 1M selector
+  opus55: "claude-opus-5-5", // strong all-rounder; $4/$20, 20% under Opus 5
+  opus55Long: "claude-opus-5-5[1m]", // same model, explicit 1M selector
   sonnet5: "claude-sonnet-5", // best speed/intelligence balance
 } as const;
 
@@ -165,30 +169,32 @@ export default defineConfig({
     healAttempts: 0,
   },
 
-  // Which model each phase runs on, and at what reasoning effort. An unset
-  // effort is the CLI default (high) — the level for long-horizon agentic work
-  // with the spec given up front, which is what every phase here is. Don't
-  // reach for `effort: "low"` on the implementer: low effort means fewer,
-  // terser tool calls, the wrong shape for an autonomous run. There is no turn
-  // or budget cap, so cost is controlled by the choices here and by the
-  // edit-tool rule in implement-prompt.md.
+  // Which model each phase runs on, and at what reasoning effort. Effort is
+  // set explicitly per phase because each model's own default differs (Opus
+  // 5.5 defaults to `medium`, the others to `high`), and an unset value would
+  // silently pick up whichever default that phase's model happens to have.
+  // Don't reach for `effort: "low"` on the implementer: low effort means
+  // fewer, terser tool calls, the wrong shape for an autonomous run. There is
+  // no turn or budget cap, so cost is controlled by the choices here and by
+  // the edit-tool rule in implement-prompt.md.
   models: {
-    // Dependency reasoning across the whole open backlog.
-    planner: { model: CLAUDE.opus5Long },
-    // Long-horizon agentic coding, the bulk of the work. Opus at 200K with
-    // auto-compaction is half Fable's per-token price; the pipeline's quality
-    // comes from the tickets' precision, the reviewer and the merge gate, not
-    // from the implementer's model. Switch to `CLAUDE.fable51Long` when usage
-    // is not the constraint: it reaches a commit in about half the turns.
-    implementer: { model: CLAUDE.opus5 },
-    // The quality net: one pass over the diff, and the layer that actually
-    // catches defects. 1M context so a big diff fits.
-    reviewer: { model: CLAUDE.fable51Long },
-    // Conflict resolution plus a full gate run.
-    merger: { model: CLAUDE.opus5Long },
-    // Hard debugging of a red merged HEAD on the host — the most capable
-    // model; a handful of failing tests and one seam fit easily.
-    healer: { model: CLAUDE.fable51Long },
+    planner: { model: CLAUDE.sonnet5, effort: "medium" },
+    // TDD on the ticket, gates, integration tests it cannot run here. The bulk
+    // of the spend (its cost scales with turns); it runs at `high` because it
+    // writes the code everything downstream builds on.
+    implementer: { model: CLAUDE.opus55, effort: "high" },
+    // The quality net: walks every acceptance criterion against the diff
+    // (inlined into its prompt, up to 302K seen, so it keeps the full window).
+    // Fable 5.1, the most capable model, at `medium` to spend less of its
+    // scarce usage.
+    reviewer: { model: CLAUDE.fable51, effort: "medium" },
+    // `git merge` per branch; most are conflict-free because the planner keeps
+    // overlapping work apart. A bad resolution is caught by its own scoped
+    // gates and again by the host's post-merge gate, so the cheaper model fits.
+    merger: { model: CLAUDE.sonnet5, effort: "xhigh" },
+    // Phase 4: reproduce and root-cause a red merged HEAD on the host. Rare,
+    // so cost barely matters; Opus 5.5 keeps Fable usage for the reviewer.
+    healer: { model: CLAUDE.opus55, effort: "medium" },
   },
 
   sandbox: {
