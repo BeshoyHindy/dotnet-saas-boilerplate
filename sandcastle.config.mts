@@ -38,8 +38,9 @@ const issueListQuery = (fields: string): string =>
 // ANTHROPIC_API_KEY. A "[1m]" suffix is the Claude Code 1M-context model
 // selector, but it is not what bounds the window in practice: across 461 past
 // runs, plain-id implementers passed 200K in 62% of sessions (peak 610K) and
-// never compacted. So no role uses the suffix, and context size is a cost
-// driver to watch rather than something the id caps.
+// never compacted. The reviewer still takes the explicit selector: its diff is
+// inlined into the prompt (up to 302K seen), and compacting it would drop the
+// acceptance criteria it checks. Context size is a usage driver to watch.
 //
 // Where the spend goes, measured over those runs: implementer ~75%, reviewer
 // ~20%, merger, planner and healer ~4% together. Cost tracks turns × context
@@ -187,7 +188,7 @@ export default defineConfig({
     // (inlined into its prompt, up to 302K seen, so it keeps the full window).
     // Fable 5.1, the most capable model, at `medium` to spend less of its
     // scarce usage.
-    reviewer: { model: CLAUDE.fable51, effort: "medium" },
+    reviewer: { model: CLAUDE.fable51Long, effort: "medium" },
     // `git merge` per branch; most are conflict-free because the planner keeps
     // overlapping work apart. A bad resolution is caught by its own scoped
     // gates and again by the host's post-merge gate, so the cheaper model fits.
