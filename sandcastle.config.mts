@@ -179,7 +179,8 @@ export default defineConfig({
   // no turn or budget cap, so cost is controlled by the choices here and by
   // the edit-tool rule in implement-prompt.md. Override any of these per
   // machine or per run with SANDCASTLE_<PHASE>_MODEL / SANDCASTLE_<PHASE>_EFFORT
-  // in .sandcastle/.env (see .env.example), no edit here needed.
+  // in .sandcastle/.env (see .env.example), no edit here needed. Keep the
+  // pre-filled defaults in .sandcastle/.env.example in step with these.
   models: {
     planner: { model: CLAUDE.sonnet5, effort: "medium" },
     // TDD on the ticket, gates, integration tests it cannot run here. The bulk
