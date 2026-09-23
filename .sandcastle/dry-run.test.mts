@@ -46,11 +46,11 @@ const config: SandcastleConfig = {
     healAttempts: 0,
   },
   models: {
-    planner: { model: "model-planner" },
-    implementer: { model: "model-impl" },
+    planner: { model: "model-planner", effort: "medium" },
+    implementer: { model: "model-impl", effort: "high" },
     reviewer: { model: "model-review", effort: "high" },
-    merger: { model: "model-merge" },
-    healer: { model: "model-heal" },
+    merger: { model: "model-merge", effort: "xhigh" },
+    healer: { model: "model-heal", effort: "xhigh" },
   },
   sandbox: {
     cacheRoot: "~/.sandcastle-cache",

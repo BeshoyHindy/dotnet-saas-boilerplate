@@ -177,11 +177,11 @@ test("defineConfig returns the config unchanged", () => {
     gates: [gate()],
     limits,
     models: {
-      planner: { model: "m" },
-      implementer: { model: "m" },
-      reviewer: { model: "m" },
-      merger: { model: "m" },
-      healer: { model: "m" },
+      planner: { model: "m", effort: "medium" },
+      implementer: { model: "m", effort: "high" },
+      reviewer: { model: "m", effort: "medium" },
+      merger: { model: "m", effort: "xhigh" },
+      healer: { model: "m", effort: "xhigh" },
     },
     sandbox: {
       cacheRoot: "~/.cache",

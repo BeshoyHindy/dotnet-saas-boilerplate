@@ -218,10 +218,7 @@ export function renderDryRun(
   ];
 
   for (const [phase, model] of Object.entries(config.models)) {
-    lines.push(
-      `  ${phase.padEnd(20)} ${model.model}` +
-        (model.effort === undefined ? "" : ` (effort: ${model.effort})`),
-    );
+    lines.push(`  ${phase.padEnd(20)} ${model.model} (effort: ${model.effort})`);
   }
 
   lines.push("", "Post-merge gates, in order");

@@ -183,7 +183,7 @@ const agentFor = (
 ) => {
   if (model.startsWith("claude-")) {
     return sandcastle.claudeCode(model, {
-      ...(effort ? { effort: effort as ClaudeCodeOptions["effort"] } : {}),
+      effort: effort as ClaudeCodeOptions["effort"],
       ...extras,
     });
   }
