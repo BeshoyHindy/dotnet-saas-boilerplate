@@ -9,8 +9,11 @@ import {
   issueBranch,
   joinGateCommands,
   resolveLimits,
+  resolveModels,
   type GateConfig,
   type LimitsConfig,
+  type PhaseModel,
+  type PhaseName,
   type SandcastleConfig,
 } from "./config.mts";
 
@@ -31,6 +34,14 @@ const limits: LimitsConfig = {
   plannerQueueDepth: 10,
   idleTimeoutSeconds: 3900,
   healAttempts: 0,
+};
+
+const models: Readonly<Record<PhaseName, PhaseModel>> = {
+  planner: { model: "model-plan", effort: "medium" },
+  implementer: { model: "model-impl", effort: "high" },
+  reviewer: { model: "model-review", effort: "high" },
+  merger: { model: "model-merge", effort: "xhigh" },
+  healer: { model: "model-heal", effort: "xhigh" },
 };
 
 // --- gate command rendering ------------------------------------------------
@@ -154,6 +165,96 @@ test("the planner queue is clamped up to the concurrency cap, never below it", (
   );
   // A queue already deeper than the cap is left alone.
   assert.equal(resolveLimits(limits, { MAX_CONCURRENT_AGENTS: "2" }).plannerQueueDepth, 10);
+});
+
+// --- models ----------------------------------------------------------------
+
+test("resolveModels keeps the configured models when nothing is overridden", () => {
+  const resolved = resolveModels(models, {});
+
+  for (const [phase, configured] of Object.entries(models)) {
+    assert.deepEqual(resolved[phase as PhaseName], { ...configured, overridden: [] });
+  }
+});
+
+test("resolveModels treats a blank override as unset", () => {
+  const resolved = resolveModels(models, {
+    SANDCASTLE_PLANNER_MODEL: "   ",
+    SANDCASTLE_PLANNER_EFFORT: "",
+  });
+
+  assert.deepEqual(resolved.planner, { ...models.planner, overridden: [] });
+});
+
+test("SANDCASTLE_<PHASE>_MODEL overrides that phase's model", () => {
+  const resolved = resolveModels(models, { SANDCASTLE_IMPLEMENTER_MODEL: " claude-test-model " });
+
+  assert.equal(resolved.implementer.model, "claude-test-model");
+  assert.equal(resolved.implementer.effort, "high");
+  assert.deepEqual(resolved.implementer.overridden, ["model"]);
+});
+
+test("SANDCASTLE_<PHASE>_EFFORT overrides that phase's effort", () => {
+  const resolved = resolveModels(models, { SANDCASTLE_HEALER_EFFORT: "low" });
+
+  assert.equal(resolved.healer.model, "model-heal");
+  assert.equal(resolved.healer.effort, "low");
+  assert.deepEqual(resolved.healer.overridden, ["effort"]);
+});
+
+test("the [1m] context selector is accepted as part of a model id", () => {
+  const resolved = resolveModels(models, { SANDCASTLE_REVIEWER_MODEL: "claude-test-model[1m]" });
+  assert.equal(resolved.reviewer.model, "claude-test-model[1m]");
+});
+
+test("the overridden list names every field that came from the environment", () => {
+  const resolved = resolveModels(models, {
+    SANDCASTLE_MERGER_MODEL: "claude-test-model",
+    SANDCASTLE_MERGER_EFFORT: "max",
+  });
+
+  assert.deepEqual(resolved.merger, {
+    model: "claude-test-model",
+    effort: "max",
+    overridden: ["model", "effort"],
+  });
+});
+
+test("one phase's override leaves every other phase on its configured model", () => {
+  const resolved = resolveModels(models, {
+    SANDCASTLE_REVIEWER_MODEL: "claude-test-model",
+    SANDCASTLE_REVIEWER_EFFORT: "low",
+  });
+
+  for (const phase of ["planner", "implementer", "merger", "healer"] as const) {
+    assert.deepEqual(resolved[phase], { ...models[phase], overridden: [] });
+  }
+});
+
+// A typo that quietly restored the config default would run a whole round on
+// the wrong model or effort, with nothing on screen saying so.
+test("a malformed effort throws, naming the variable and the allowed levels", () => {
+  assert.throws(
+    () => resolveModels(models, { SANDCASTLE_REVIEWER_EFFORT: "extreme" }),
+    /SANDCASTLE_REVIEWER_EFFORT must be one of low, medium, high, xhigh, max/,
+  );
+  // Exact match only: the level reaches the agent CLI verbatim, so it is
+  // checked verbatim — no case folding.
+  assert.throws(
+    () => resolveModels(models, { SANDCASTLE_REVIEWER_EFFORT: "HIGH" }),
+    /SANDCASTLE_REVIEWER_EFFORT/,
+  );
+});
+
+test("a model the agent CLI cannot route throws instead of falling back", () => {
+  assert.throws(
+    () => resolveModels(models, { SANDCASTLE_PLANNER_MODEL: "gpt-test-model" }),
+    /SANDCASTLE_PLANNER_MODEL must be a Claude model id starting with "claude-"/,
+  );
+  assert.throws(
+    () => resolveModels(models, { SANDCASTLE_PLANNER_MODEL: "claude-test model" }),
+    /SANDCASTLE_PLANNER_MODEL.*no whitespace/,
+  );
 });
 
 // --- branches --------------------------------------------------------------

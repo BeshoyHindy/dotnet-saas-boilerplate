@@ -59,6 +59,7 @@ import {
   gateNames,
   joinGateCommands,
   resolveLimits,
+  resolveModels,
   type PhaseModel,
 } from "./config.mts";
 import { branchTip, gitIn, restoreValidatedBranch } from "./branch-guard.mts";
@@ -99,10 +100,12 @@ import {
 // Resolved configuration
 // ---------------------------------------------------------------------------
 
-// Environment overrides (MAX_CONCURRENT_AGENTS, SANDCASTLE_HEAL_ATTEMPTS) are
+// Environment overrides (MAX_CONCURRENT_AGENTS, SANDCASTLE_HEAL_ATTEMPTS, and
+// the per-phase SANDCASTLE_<PHASE>_MODEL / SANDCASTLE_<PHASE>_EFFORT) are
 // applied here and nowhere else; a malformed one THROWS rather than silently
-// restoring a default that may not fit this machine.
+// restoring a default that may not fit this machine or this run.
 const limits = resolveLimits(config.limits, process.env);
+const models = resolveModels(config.models, process.env);
 // The one channel by which a prompt learns a gate command — see config.mts.
 const GATE_COMMANDS = formatGateCommands(config.gates);
 
@@ -121,7 +124,12 @@ if (isDryRun(process.argv.slice(2), process.env)) {
       stdio: ["ignore", "pipe", "pipe"],
     });
   console.log(
-    renderDryRun(config, limits, listAgentIssues(config.issues.listArgs, exec)),
+    renderDryRun(
+      config,
+      limits,
+      models,
+      listAgentIssues(config.issues.listArgs, exec),
+    ),
   );
   process.exit(0);
 }
@@ -450,7 +458,7 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
     // One iteration is enough: the planner just needs to read and reason,
     // not write code. (Structured output requires maxIterations: 1.)
     maxIterations: 1,
-    agent: agentFor(config.models.planner),
+    agent: agentFor(models.planner),
     promptFile: config.prompts.plan,
     promptArgs: {
       PROJECT_NAME: config.project.name,
@@ -513,7 +521,7 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
               name: "implementer",
               maxIterations: 100,
               idleTimeoutSeconds: limits.idleTimeoutSeconds,
-              agent: agentFor(config.models.implementer),
+              agent: agentFor(models.implementer),
               promptFile: config.prompts.implement,
               promptArgs: {
                 TASK_ID: issue.id,
@@ -532,7 +540,7 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
               // and observe the gate result.
               maxIterations: 3,
               idleTimeoutSeconds: limits.idleTimeoutSeconds,
-              agent: agentFor(config.models.reviewer),
+              agent: agentFor(models.reviewer),
               promptFile: config.prompts.review,
               promptArgs: {
                 TASK_ID: issue.id,
@@ -668,7 +676,7 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
       // gates still running AND never reaches its final report.
       maxIterations: 2,
       idleTimeoutSeconds: limits.idleTimeoutSeconds,
-      agent: agentFor(config.models.merger),
+      agent: agentFor(models.merger),
       promptFile: config.prompts.merge,
       promptArgs: {
         // A markdown list of branch names, one per line.
@@ -837,7 +845,7 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
           // suite, then finish and report.
           maxIterations: 3,
           idleTimeoutSeconds: limits.idleTimeoutSeconds,
-          agent: agentFor(config.models.healer, { permissionMode: "bypassPermissions" }),
+          agent: agentFor(models.healer, { permissionMode: "bypassPermissions" }),
           promptFile: config.prompts.heal,
           promptArgs: {
             ATTEMPT: String(attempt),

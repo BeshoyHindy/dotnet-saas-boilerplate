@@ -177,7 +177,9 @@ export default defineConfig({
   // Don't reach for `effort: "low"` on the implementer: low effort means
   // fewer, terser tool calls, the wrong shape for an autonomous run. There is
   // no turn or budget cap, so cost is controlled by the choices here and by
-  // the edit-tool rule in implement-prompt.md.
+  // the edit-tool rule in implement-prompt.md. Override any of these per
+  // machine or per run with SANDCASTLE_<PHASE>_MODEL / SANDCASTLE_<PHASE>_EFFORT
+  // in .sandcastle/.env (see .env.example), no edit here needed.
   models: {
     planner: { model: CLAUDE.sonnet5, effort: "medium" },
     // TDD on the ticket, gates, integration tests it cannot run here. The bulk
