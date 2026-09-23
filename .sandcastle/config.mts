@@ -12,13 +12,25 @@
 
 import type { LogParserName } from "./log-parsers.mts";
 
-/** The agent phases, in the order a round runs them. */
-export type PhaseName =
-  | "planner"
-  | "implementer"
-  | "reviewer"
-  | "merger"
-  | "healer";
+/**
+ * The agent phases, in the order a round runs them. A runtime list, so code
+ * that must visit every phase (the environment overrides) iterates it and a
+ * new phase cannot be missed.
+ */
+export const PHASE_NAMES = [
+  "planner",
+  "implementer",
+  "reviewer",
+  "merger",
+  "healer",
+] as const;
+
+export type PhaseName = (typeof PHASE_NAMES)[number];
+
+/** The reasoning-effort levels the agent CLI accepts, lowest first. */
+export const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const;
+
+export type EffortLevel = (typeof EFFORT_LEVELS)[number];
 
 export interface PhaseModel {
   /** A model id the agent CLI understands, e.g. `claude-opus-5-5`. */
@@ -28,7 +40,7 @@ export interface PhaseModel {
    * defaults to `medium`, the others to `high`), so an unset effort would
    * silently differ per model. Name the level explicitly per phase instead.
    */
-  readonly effort: "low" | "medium" | "high" | "xhigh" | "max";
+  readonly effort: EffortLevel;
 }
 
 export interface GateConfig {
@@ -145,6 +157,10 @@ export interface SandcastleConfig {
   /** Run in order on the merged HEAD; the first failure stops the rest. */
   readonly gates: readonly GateConfig[];
   readonly limits: LimitsConfig;
+  /**
+   * Which model each phase runs on, and at what effort. Overridden per machine
+   * or per run by `SANDCASTLE_<PHASE>_MODEL` / `SANDCASTLE_<PHASE>_EFFORT`.
+   */
   readonly models: Readonly<Record<PhaseName, PhaseModel>>;
   readonly sandbox: SandboxConfig;
   readonly prompts: PromptsConfig;
@@ -248,6 +264,73 @@ export function resolveLimits(
     healAttempts,
     plannerQueueDepth: Math.max(limits.plannerQueueDepth, maxConcurrentAgents),
   };
+}
+
+export interface ResolvedPhaseModel extends PhaseModel {
+  /** Which fields came from the environment rather than the config. */
+  readonly overridden: readonly ("model" | "effort")[];
+}
+
+export type ResolvedModels = Readonly<Record<PhaseName, ResolvedPhaseModel>>;
+
+/**
+ * Apply the per-machine / per-run environment overrides to the configured
+ * models: `SANDCASTLE_<PHASE>_MODEL` and `SANDCASTLE_<PHASE>_EFFORT`, with the
+ * phase upper-cased (`SANDCASTLE_REVIEWER_EFFORT`). Trying a new model is then
+ * an `.env` edit, never a code edit.
+ *
+ * THROWS on a malformed override rather than silently falling back: a typo in
+ * `SANDCASTLE_IMPLEMENTER_MODEL` that quietly restored the config default would
+ * run a whole round on the wrong model or effort, and nothing on screen would
+ * say so.
+ */
+export function resolveModels(
+  models: Readonly<Record<PhaseName, PhaseModel>>,
+  env: Readonly<Record<string, string | undefined>>,
+): ResolvedModels {
+  const read = (name: string): string | undefined => {
+    const raw = env[name]?.trim();
+    return raw === undefined || raw === "" ? undefined : raw;
+  };
+
+  const resolved = {} as Record<PhaseName, ResolvedPhaseModel>;
+  for (const phase of PHASE_NAMES) {
+    const prefix = `SANDCASTLE_${phase.toUpperCase()}`;
+    const overridden: ("model" | "effort")[] = [];
+
+    const modelName = `${prefix}_MODEL`;
+    const model = read(modelName);
+    if (model !== undefined) {
+      // Claude Code is the only provider `agentFor` in main.mts routes to.
+      if (/\s/.test(model) || !model.startsWith("claude-")) {
+        throw new Error(
+          `${modelName} must be a Claude model id starting with "claude-" and ` +
+            `containing no whitespace (Claude Code is the only agent provider ` +
+            `configured), got ${JSON.stringify(model)}`,
+        );
+      }
+      overridden.push("model");
+    }
+
+    const effortName = `${prefix}_EFFORT`;
+    const effort = read(effortName);
+    if (effort !== undefined) {
+      if (!(EFFORT_LEVELS as readonly string[]).includes(effort)) {
+        throw new Error(
+          `${effortName} must be one of ${EFFORT_LEVELS.join(", ")}, got ` +
+            JSON.stringify(effort),
+        );
+      }
+      overridden.push("effort");
+    }
+
+    resolved[phase] = {
+      model: model ?? models[phase].model,
+      effort: (effort as EffortLevel | undefined) ?? models[phase].effort,
+      overridden,
+    };
+  }
+  return resolved;
 }
 
 /** The branch an issue is worked on. Re-planning an issue must reproduce it exactly. */

@@ -13,7 +13,9 @@
 import {
   formatGateCommands,
   gateCommand,
+  PHASE_NAMES,
   type ResolvedLimits,
+  type ResolvedModels,
   type SandcastleConfig,
 } from "./config.mts";
 
@@ -196,6 +198,7 @@ export function listAgentIssues(
 export function renderDryRun(
   config: SandcastleConfig,
   limits: ResolvedLimits,
+  models: ResolvedModels,
   query: IssueQuery,
 ): string {
   const lines: string[] = [
@@ -217,8 +220,15 @@ export function renderDryRun(
     "Models",
   ];
 
-  for (const [phase, model] of Object.entries(config.models)) {
-    lines.push(`  ${phase.padEnd(20)} ${model.model} (effort: ${model.effort})`);
+  // The RESOLVED models, so an `.env` override is visible before a round runs
+  // on it; the marker says which fields did not come from the config file.
+  for (const phase of PHASE_NAMES) {
+    const model = models[phase];
+    const marker =
+      model.overridden.length === 0 ? "" : `  [.env: ${model.overridden.join(", ")}]`;
+    lines.push(
+      `  ${phase.padEnd(20)} ${model.model} (effort: ${model.effort})${marker}`,
+    );
   }
 
   lines.push("", "Post-merge gates, in order");

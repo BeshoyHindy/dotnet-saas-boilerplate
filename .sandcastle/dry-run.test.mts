@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { resolveLimits, type SandcastleConfig } from "./config.mts";
+import { resolveLimits, resolveModels, type SandcastleConfig } from "./config.mts";
 import {
   isDryRun,
   listAgentIssues,
@@ -69,6 +69,7 @@ const config: SandcastleConfig = {
 };
 
 const limits = resolveLimits(config.limits, {});
+const models = resolveModels(config.models, {});
 
 // --- isDryRun --------------------------------------------------------------
 
@@ -218,7 +219,7 @@ test("a GraphQL error envelope is reported, not read as an empty backlog", () =>
 // --- renderDryRun ----------------------------------------------------------
 
 test("the report names the resolved config, not the defaults in the code", () => {
-  const report = renderDryRun(config, limits, { ok: true, issues: [] });
+  const report = renderDryRun(config, limits, models, { ok: true, issues: [] });
 
   assert.match(report, /Sandcastle dry run — Acme/);
   assert.match(report, /integration branch\s+trunk/);
@@ -230,19 +231,19 @@ test("the report names the resolved config, not the defaults in the code", () =>
 });
 
 test("the report states plainly that nothing was acquired", () => {
-  const report = renderDryRun(config, limits, { ok: true, issues: [] });
+  const report = renderDryRun(config, limits, models, { ok: true, issues: [] });
   assert.match(report, /no sandbox, no model session, no sentinel port/);
 });
 
 test("healing off is called out, and a raised attempt count is not", () => {
-  assert.match(renderDryRun(config, limits, { ok: true, issues: [] }), /healing is OFF/);
+  assert.match(renderDryRun(config, limits, models, { ok: true, issues: [] }), /healing is OFF/);
   const healing = resolveLimits(config.limits, { SANDCASTLE_HEAL_ATTEMPTS: "2" });
-  assert.doesNotMatch(renderDryRun(config, healing, { ok: true, issues: [] }), /healing is OFF/);
-  assert.match(renderDryRun(config, healing, { ok: true, issues: [] }), /healing attempts\s+2/);
+  assert.doesNotMatch(renderDryRun(config, healing, models, { ok: true, issues: [] }), /healing is OFF/);
+  assert.match(renderDryRun(config, healing, models, { ok: true, issues: [] }), /healing attempts\s+2/);
 });
 
 test("the report shows each gate's real command, timeout and parser", () => {
-  const report = renderDryRun(config, limits, { ok: true, issues: [] });
+  const report = renderDryRun(config, limits, models, { ok: true, issues: [] });
 
   assert.match(report, /\[build\] dotnet build src\/Acme\.sln -warnaserror/);
   assert.match(report, /timeout 15 min · parser dotnetBuild/);
@@ -251,7 +252,7 @@ test("the report shows each gate's real command, timeout and parser", () => {
 });
 
 test("the report shows the generated gate commands exactly as the prompts get them", () => {
-  const report = renderDryRun(config, limits, { ok: true, issues: [] });
+  const report = renderDryRun(config, limits, models, { ok: true, issues: [] });
 
   assert.match(report, /\{\{GATE_COMMANDS\}\} as the prompts will receive it/);
   assert.match(report, /- \*\*build\*\*/);
@@ -259,7 +260,7 @@ test("the report shows the generated gate commands exactly as the prompts get th
 });
 
 test("the report lists the open issues and the branch each would get", () => {
-  const report = renderDryRun(config, limits, {
+  const report = renderDryRun(config, limits, models, {
     ok: true,
     issues: [
       { number: 4, title: "Port the pipeline", blockedBy: [] },
@@ -273,7 +274,7 @@ test("the report lists the open issues and the branch each would get", () => {
 });
 
 test("the report marks each issue blocked or unblocked and names the blockers", () => {
-  const report = renderDryRun(config, limits, {
+  const report = renderDryRun(config, limits, models, {
     ok: true,
     issues: [
       { number: 4, title: "Port the pipeline", blockedBy: [] },
@@ -287,12 +288,12 @@ test("the report marks each issue blocked or unblocked and names the blockers", 
 });
 
 test("no open issues is spelt out as such", () => {
-  const report = renderDryRun(config, limits, { ok: true, issues: [] });
+  const report = renderDryRun(config, limits, models, { ok: true, issues: [] });
   assert.match(report, /\(none — a real run would plan nothing and exit\)/);
 });
 
 test("a failed listing is loud in the report and blames nothing on the backlog", () => {
-  const report = renderDryRun(config, limits, { ok: false, error: "gh: not authenticated" });
+  const report = renderDryRun(config, limits, models, { ok: false, error: "gh: not authenticated" });
 
   assert.match(report, /COULD NOT LIST THEM: gh: not authenticated/);
   assert.match(report, /A real run's planner would fail the same way/);
@@ -300,6 +301,26 @@ test("a failed listing is loud in the report and blames nothing on the backlog",
 });
 
 test("a repo with no gates is told its merged HEAD would go unverified", () => {
-  const report = renderDryRun({ ...config, gates: [] }, limits, { ok: true, issues: [] });
+  const report = renderDryRun({ ...config, gates: [] }, limits, models, { ok: true, issues: [] });
   assert.match(report, /none configured — the merged HEAD would never be verified/);
+});
+
+// An `.env` override changes what a round runs on; the dry run is where a human
+// sees that before committing a night of agent time to it.
+test("the report marks each model field that came from the environment", () => {
+  const overridden = resolveModels(config.models, {
+    SANDCASTLE_REVIEWER_EFFORT: "max",
+    SANDCASTLE_MERGER_MODEL: "claude-other",
+    SANDCASTLE_MERGER_EFFORT: "low",
+  });
+  const report = renderDryRun(config, limits, overridden, { ok: true, issues: [] });
+
+  assert.match(report, /reviewer\s+model-review \(effort: max\)  \[\.env: effort\]/);
+  assert.match(report, /merger\s+claude-other \(effort: low\)  \[\.env: model, effort\]/);
+  assert.match(report, /planner\s+model-planner \(effort: medium\)$/m);
+});
+
+test("no marker is shown when nothing is overridden", () => {
+  const report = renderDryRun(config, limits, models, { ok: true, issues: [] });
+  assert.doesNotMatch(report, /\[\.env:/);
 });
