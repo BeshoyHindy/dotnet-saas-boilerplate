@@ -89,12 +89,18 @@ data_images="$(printf '%s\n' "$data_text" | grep -E '^[[:space:]]*image:' | sed 
 assert_true "data stack declares images" test -n "$data_images"
 while IFS= read -r image; do
   [ -n "$image" ] || continue
-  # An explicit tag, and never a floating one: the data plane must come back
-  # byte-identical after a host reboot.
-  assert_match "data image is pinned — $image" "$image" '^[a-z0-9./-]+:[A-Za-z0-9._-]+$'
+  # An explicit tag or a digest, and never a floating one: the data plane must
+  # come back byte-identical after a host reboot. A digest is the only pin an
+  # image published solely as :latest (Chainguard's MinIO) can have.
+  assert_match "data image is pinned — $image" "$image" \
+    '^[a-z0-9./-]+(:[A-Za-z0-9._-]+|@sha256:[0-9a-f]{64})$'
   refute_match "data image is not :latest — $image" "$image" ':latest$'
 done <<< "$data_images"
 refute_match "data stack interpolates no image tag" "$data_images" '\$\{'
+# Docker Hub and then quay.io both stopped serving MinIO anonymously; a MinIO
+# image from either would leave the whole object store undeployable.
+refute_match "no MinIO image comes from quay.io" "$data_images" 'quay\.io'
+refute_match "no MinIO image comes from Docker Hub" "$data_images" '^minio/'
 
 # ── Migrator gates the API ───────────────────────────────────────────
 api_block="$(service_block "$APP" api)"
@@ -141,6 +147,24 @@ refute_match "the grant never reaches the tenants/ prefix" "$data_text" 'downloa
 assert_match "the grant runs after the bucket exists" "$public_block" \
   'condition:[[:space:]]*service_completed_successfully'
 assert_match "the grant is one-shot" "$public_block" '^[[:space:]]*restart:[[:space:]]*"no"'
+
+# ── The MinIO volume belongs to the image's non-root user ────────────
+# The Chainguard image runs as uid 65532; the images before it ran as root, so
+# the production minio_data is root-owned and the server refuses to start on it.
+# A root one-shot chowns the volume in place before MinIO starts. Renaming the
+# volume instead would strand every upload, so the chain is pinned here.
+minio_block="$(service_block "$DATA" minio)"
+owner_block="$(service_block "$DATA" minio-volume-owner)"
+assert_true "minio-volume-owner is a service in the data stack" test -n "$owner_block"
+assert_match "minio depends_on minio-volume-owner" "$minio_block" '^[[:space:]]*minio-volume-owner:[[:space:]]*$'
+assert_match "minio waits for the volume owner to complete successfully" "$minio_block" \
+  'condition:[[:space:]]*service_completed_successfully'
+assert_match "the volume owner runs as root" "$owner_block" '^[[:space:]]*user:[[:space:]]*"0:0"'
+assert_match "the volume owner hands /data to uid 65532" "$owner_block" \
+  'command:.*"-R".*"65532:65532".*"/data"'
+assert_match "the volume owner mounts the MinIO volume" "$owner_block" '^[[:space:]]*-[[:space:]]*minio_data:/data'
+assert_match "the volume owner is one-shot" "$owner_block" '^[[:space:]]*restart:[[:space:]]*"no"'
+assert_match "minio still mounts the same volume" "$minio_block" '^[[:space:]]*-[[:space:]]*minio_data:/data'
 
 # ── The shared external network ──────────────────────────────────────
 for f in "$DATA" "$APP"; do
