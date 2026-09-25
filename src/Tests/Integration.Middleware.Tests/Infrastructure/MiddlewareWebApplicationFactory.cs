@@ -43,7 +43,7 @@ namespace Integration.Middleware.Tests.Infrastructure;
 /// </summary>
 public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private const string MinioImage = "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z";
+    private const string MinioImage = "cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1";
     private const string MinioAccessKey = "minioadmin";
     private const string MinioSecretKey = "minioadmin";
     private const string MinioBucket = "boilerplate-middleware-test-uploads";
@@ -57,8 +57,10 @@ public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Prog
         .WithCleanUp(true)
         .Build();
 
-    // MinIO no longer publishes to Docker Hub, so `minio/minio:*` fails to pull on any machine
-    // without a cached layer. Pull from quay.io, pinned to the same release as docker-compose.yml.
+    // Docker Hub stopped carrying MinIO, then quay.io withdrew anonymous pulls, so MinIO's own
+    // images fail to pull on any machine without a cached layer. Chainguard's image publishes only
+    // :latest, so it is pinned by the same digest as the AppHost and both compose stacks. It runs as
+    // uid 65532, which is fine here: no volume is mounted, and the image's own /data is writable.
     private readonly MinioContainer _minio = new MinioBuilder(MinioImage)
         .WithUsername(MinioAccessKey)
         .WithPassword(MinioSecretKey)

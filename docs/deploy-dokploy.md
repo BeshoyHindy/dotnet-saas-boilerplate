@@ -228,9 +228,11 @@ routing and the migrator gate would silently stop working.
 
 Paste the `[data]` and `[both]` variables into **Environment**, then **Deploy**.
 Watch the deployment log until it settles; `postgres`, `valkey` and `minio`
-should be running, and `minio-init` and `minio-public-prefix` should each have
-exited 0 — the first creating the bucket, the second opening anonymous reads on
-the `uploads/` prefix that avatars and tenant branding are served from.
+should be running, and `minio-volume-owner`, `minio-init` and
+`minio-public-prefix` should each have exited 0 — the first handing the MinIO
+volume to the image's non-root user (uid 65532), the second creating the
+bucket, the third opening anonymous reads on the `uploads/` prefix that avatars
+and tenant branding are served from.
 
 Deploy this stack again only when a data-service image version changes. That is
 the whole point of the split: an application redeploy can never recreate,
@@ -492,6 +494,7 @@ usable until it expires.
 | Password-reset links point at a container IP | Traefik is not passing the original `Host`. `passhostheader=true` must stay on the API's load-balancer labels — `X-Forwarded-Host` is deliberately never honoured, so that label is the only path for the real host. |
 | Uploads fail with a signature error | `STORAGE_DOMAIN` differs between the two stacks, or `Storage__S3__ServiceUrl` was pointed at an internal alias. The signature covers the host. |
 | `NoSuchBucket` on first upload | The data stack's `minio-init` did not run, or `STORAGE_BUCKET` differs between the two stacks. |
+| `minio` exits with `Unable to write to the backend` | `minio-volume-owner` did not complete, so the volume is still owned by root (the MinIO images before Chainguard's ran as root; this one runs as uid 65532). Read its log and redeploy the data stack; it is idempotent. Never rename the volume to get past this — that strands every upload. |
 | Avatars and tenant logos 403 | `minio-public-prefix` did not run. Redeploy the data stack; it is idempotent. Buckets are private by default and those URLs are unsigned. |
 | Traces and metrics never arrive | `OTEL_EXPORTER_ENABLED` is not `true`. The endpoint alone does nothing — Production ships the exporter disabled. |
 | `migrator` retries PostgreSQL and then fails | The data stack is not up, or `POSTGRES_PASSWORD` was changed against an existing volume. |

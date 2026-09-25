@@ -69,8 +69,27 @@ var minioPassword = builder.AddParameter(
     secret: true,
     persist: true);
 
-// quay.io, not the implicit docker.io: MinIO no longer publishes to Docker Hub.
-//
+// Chainguard's MinIO image, pinned by digest. Docker Hub stopped carrying MinIO first, then quay.io
+// withdrew anonymous pulls too (401 even for :latest), which left `minio` never created and
+// `minio-init` — and through it the API and both clients — waiting forever. Chainguard's free tier
+// publishes only :latest, so the digest is the only reproducible pin — and every MinIO site in the
+// repository (both compose stacks, both integration factories) carries the same one, which
+// Architecture.Tests pins. The image also ships `mc` and a shell, so this one pin serves the server,
+// the bucket bootstrap and the volume-owner one-shot below.
+const string MinioImage = "cgr.dev/chainguard/minio";
+const string MinioImageDigest = "bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1";
+
+// This image runs as uid 65532, not root. The images it replaced ran as root, so a volume they wrote
+// is root-owned and the server dies on it with "Unable to write to the backend". Rather than bump the
+// volume name (and strand everyone's dev uploads), this one-shot hands the volume to 65532 before
+// the server starts. Old objects stay readable, and on a volume that is already right it is a no-op.
+var minioVolumeOwner = builder.AddContainer("minio-volume-owner", MinioImage)
+    .WithImageSHA256(MinioImageDigest)
+    .WithEntrypoint("/bin/sh")
+    .WithArgs("-c", "chown -R 65532:65532 /data")
+    .WithContainerRuntimeArgs("--user", "0")
+    .WithVolume($"{appPrefix}-minio-data", "/data");
+
 // NO FIXED HOST PORTS. The container listens on its own 9000/9001, but the host side is left to
 // Aspire to allocate. Pinning them made a second AppHost instance (another checkout or worktree)
 // unrunnable in the worst possible way: the persistent MinIO container of the first instance still
@@ -78,7 +97,8 @@ var minioPassword = builder.AddParameter(
 // `minio-init` then loops on "waiting for minio..." forever — which, through `WaitForCompletion`,
 // hangs the API and every client behind it with no error anywhere. Everything that needs the real
 // address takes it from the endpoint below, so nothing here knows a port number.
-var minio = builder.AddContainer("minio", "quay.io/minio/minio", "RELEASE.2025-09-07T16-13-09Z")
+var minio = builder.AddContainer("minio", MinioImage)
+    .WithImageSHA256(MinioImageDigest)
     .WithArgs("server", "/data", "--console-address", ":9001")
     .WithHttpEndpoint(targetPort: 9000, name: "api")
     .WithHttpEndpoint(targetPort: 9001, name: "console")
@@ -86,11 +106,12 @@ var minio = builder.AddContainer("minio", "quay.io/minio/minio", "RELEASE.2025-0
     .WithEnvironment("MINIO_ROOT_PASSWORD", minioPassword)
     .WithEnvironment("MINIO_API_CORS_ALLOW_ORIGIN", ClientOrigins)
     .WithVolume($"{appPrefix}-minio-data", "/data")
-    .WithLifetime(ContainerLifetime.Persistent);
+    .WithLifetime(ContainerLifetime.Persistent)
+    .WaitForCompletion(minioVolumeOwner);
 
 var minioApiEndpoint = minio.GetEndpoint("api");
 
-// Init container: bucket bootstrap (create + public-read). Script normalized to LF so /bin/sh in minio/mc doesn't choke on Windows CRLF.
+// Init container: bucket bootstrap (create + public-read). Script normalized to LF so the image's /bin/sh doesn't choke on Windows CRLF.
 // The endpoint arrives as $MC_URL: Aspire resolves an endpoint reference injected into a *container*
 // to the container-network form (http://minio:9000), so this keeps working whatever the host port is.
 var minioInitScript = ($$"""
@@ -102,7 +123,8 @@ mc mb --ignore-existing local/{{MinioBucket}};
 mc anonymous set download local/{{MinioBucket}};
 """).ReplaceLineEndings("\n");
 
-var minioInit = builder.AddContainer("minio-init", "quay.io/minio/mc", "RELEASE.2025-08-13T08-35-41Z")
+var minioInit = builder.AddContainer("minio-init", MinioImage)
+    .WithImageSHA256(MinioImageDigest)
     .WithEntrypoint("/bin/sh")
     .WithArgs("-c", minioInitScript)
     .WithEnvironment("MC_URL", minioApiEndpoint)

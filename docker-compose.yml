@@ -59,10 +59,29 @@ services:
       timeout: 3s
       retries: 20
 
-  # quay.io, not docker.io: MinIO no longer publishes to Docker Hub.
+  # MinIO's own images are gone: Docker Hub stopped carrying them, then quay.io
+  # withdrew anonymous pulls. Chainguard's free tier publishes only :latest, so
+  # every MinIO service here pins its image by digest. It ships `mc` and a
+  # shell too, so the one image serves the server and every one-shot below.
+  #
+  # One-shot: hand the volume to the image's non-root user (uid 65532). The
+  # MinIO images this replaced ran as root, so a volume they wrote is root-owned
+  # and the server refuses it ("Unable to write to the backend"). Chowning in
+  # place keeps existing data; on a volume that is already right it is a no-op.
+  minio-volume-owner:
+    image: cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1
+    restart: "no"
+    user: "0:0"
+    entrypoint: ["chown"]
+    command: ["-R", "65532:65532", "/data"]
+    volumes:
+      - minio_data:/data
+
   minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    image: cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1
     restart: unless-stopped
+    depends_on:
+      minio-volume-owner: { condition: service_completed_successfully }
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-boilerplate}
@@ -84,7 +103,7 @@ services:
   # One-shot: create the bucket the Files module writes to. The app never
   # auto-creates it, so without this the first upload fails with NoSuchBucket.
   minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    image: cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1
     restart: "no"
     depends_on:
       minio: { condition: service_healthy }
@@ -100,7 +119,7 @@ services:
   # where public and private share a key space and visibility is a database
   # column, so that prefix must stay closed.
   minio-public-prefix:
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    image: cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1
     restart: "no"
     depends_on:
       minio-init: { condition: service_completed_successfully }

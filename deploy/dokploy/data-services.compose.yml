@@ -1,6 +1,7 @@
 # Dokploy stack 1 of 2 — the data plane (ADR-0005).
 #
-# PostgreSQL, Valkey and MinIO, plus a one-shot bucket creator. Kept in its own
+# PostgreSQL, Valkey and MinIO, plus the MinIO one-shots (volume owner, bucket
+# creator, public-prefix grant). Kept in its own
 # Dokploy Compose service so that redeploying the application (app.compose.yml)
 # can never recreate, restart or wipe the database: the two stacks are separate
 # docker compose projects with separate lifecycles and separate volumes.
@@ -62,8 +63,31 @@ services:
         aliases:
           - ${STACK_NAME}-valkey
 
+  # ── One-shot: hand the MinIO volume to the image's non-root user ────
+  # The MinIO images this stack used to run (Docker Hub, then quay.io) ran as
+  # root, so an existing minio_data is root-owned — and the Chainguard image
+  # below runs as uid 65532, which dies on that volume with "Unable to write to
+  # the backend". This chowns it in place before the server starts: every
+  # uploaded object stays where it is and stays readable, and on a volume that
+  # is already right it is a no-op, so it is safe on every redeploy. Do NOT
+  # "fix" this by renaming the volume: that strands every upload in production.
+  minio-volume-owner:
+    image: cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1
+    restart: "no"
+    user: "0:0"
+    entrypoint: ["chown"]
+    command: ["-R", "65532:65532", "/data"]
+    volumes:
+      - minio_data:/data
+    networks:
+      - dokploy-network
+
   # ── MinIO (S3-compatible object storage) ────────────────────────────
-  # quay.io, not docker.io: MinIO no longer publishes to Docker Hub.
+  # MinIO's own images are gone: Docker Hub stopped carrying them, then quay.io
+  # withdrew anonymous pulls. Chainguard's free tier publishes only :latest, so
+  # the image is pinned by digest — the data plane must come back byte-identical
+  # after a host reboot. It ships `mc` and a shell too, so every MinIO one-shot
+  # here uses the same pin.
   #
   # Routed through Traefik on STORAGE_DOMAIN because the API signs presigned
   # upload/download URLs against Storage__S3__ServiceUrl and hands them to the
@@ -71,8 +95,11 @@ services:
   # to be the host the browser resolves. app.compose.yml therefore points
   # ServiceUrl at https://${STORAGE_DOMAIN}, not at the internal alias.
   minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    image: cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1
     restart: unless-stopped
+    depends_on:
+      minio-volume-owner:
+        condition: service_completed_successfully
     command: ["server", "/data", "--console-address", ":9001"]
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
@@ -124,7 +151,7 @@ services:
   # fails with NoSuchBucket. Idempotent (--ignore-existing), so it is safe on
   # every redeploy.
   minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    image: cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1
     restart: "no"
     depends_on:
       minio:
@@ -157,11 +184,12 @@ services:
   # ones provisioned after the stack was deployed. Narrowing it to a single
   # tenant would 403 every other tenant's branding.
   #
-  # A separate one-shot rather than `mb && anonymous set` in one: the mc image is
-  # not guaranteed to ship a shell, and `entrypoint: ["mc"]` keeps both steps
-  # shell-free. Both are idempotent.
+  # A separate one-shot rather than `mb && anonymous set` in one: the image does
+  # ship a shell, but `entrypoint: ["mc"]` keeps both steps shell-free, so a
+  # future image without one cannot break them and there is no quoting to get
+  # wrong. Both are idempotent.
   minio-public-prefix:
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    image: cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1
     restart: "no"
     depends_on:
       minio-init:
