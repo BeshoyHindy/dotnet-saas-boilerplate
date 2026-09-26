@@ -7,7 +7,6 @@ using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace Integration.Tests.Tests.Storage;
@@ -63,7 +62,7 @@ public sealed class StorageTenantIsolationTests : IAsyncLifetime
     {
         // Arrange — tenant B uploads a file the normal way, and we read the key its row holds.
         using var clientB = await ClientForAsync(_tenantB, _tenantBAdmin);
-        var fileId = await UploadAndFinalizeAsync(clientB, "b-secret.pdf", "application/pdf", RandomBytes(512));
+        var fileId = await UploadAndFinalizeAsync(clientB, "b-secret.pdf", "application/pdf", UploadPayloads.Pdf(512));
         var key = await StorageKeyOfAsync(_tenantB, fileId);
 
         key.ShouldStartWith($"tenants/{_tenantB}/");
@@ -123,8 +122,8 @@ public sealed class StorageTenantIsolationTests : IAsyncLifetime
         using var clientA = await ClientForAsync(_tenantA, _tenantAAdmin);
         using var clientB = await ClientForAsync(_tenantB, _tenantBAdmin);
 
-        var a = await UploadAndFinalizeAsync(clientA, "same-name.pdf", "application/pdf", RandomBytes(64));
-        var b = await UploadAndFinalizeAsync(clientB, "same-name.pdf", "application/pdf", RandomBytes(64));
+        var a = await UploadAndFinalizeAsync(clientA, "same-name.pdf", "application/pdf", UploadPayloads.Pdf(64));
+        var b = await UploadAndFinalizeAsync(clientB, "same-name.pdf", "application/pdf", UploadPayloads.Pdf(64));
 
         var keyA = await StorageKeyOfAsync(_tenantA, a);
         var keyB = await StorageKeyOfAsync(_tenantB, b);
@@ -200,7 +199,7 @@ public sealed class StorageTenantIsolationTests : IAsyncLifetime
         // composed key, finalize HEADs it, the download URL serves the same bytes, and the purge
         // job — which enters each tenant through ITenantScope — removes the object.
         using var clientB = await ClientForAsync(_tenantB, _tenantBAdmin);
-        var bytes = RandomBytes(1024);
+        var bytes = UploadPayloads.Pdf(1024);
         var fileId = await UploadAndFinalizeAsync(clientB, "round-trip.pdf", "application/pdf", bytes);
         var key = await StorageKeyOfAsync(_tenantB, fileId);
 
@@ -357,13 +356,6 @@ public sealed class StorageTenantIsolationTests : IAsyncLifetime
             defaultElevation = 1,
         },
     };
-
-    private static byte[] RandomBytes(int size)
-    {
-        byte[] bytes = new byte[size];
-        RandomNumberGenerator.Fill(bytes);
-        return bytes;
-    }
 
     private static async Task<Guid> UploadAndFinalizeAsync(
         HttpClient client, string fileName, string contentType, byte[] bytes)

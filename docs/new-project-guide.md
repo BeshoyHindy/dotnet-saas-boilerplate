@@ -309,6 +309,13 @@ Stated plainly, because each is a deliberate trade rather than an oversight.
 - **A public file URL outlives a visibility change.** Public Files assets are presigned per read
   (default 5 minutes, clamped 1–15), so flipping Public → Private stops issuance at once, but a link
   already handed out works until its signature expires. Hard revocation means deleting the object.
+- **Nothing scans uploads for malware.** `IFileScanner` ships as `NoOpFileScanner`, which reports
+  every file clean. What finalize does check is that the bytes are the declared type: their
+  signature must match the extension and content type, and no shipped category accepts SVG or HTML
+  (a category opts in with `AllowScriptCapableTypes`). That is not malware scanning. A product that
+  needs it registers its own `IFileScanner` (ClamAV, a cloud scanning service) after the Files
+  module, and the last registration wins; finalize calls it, and an `Infected` result leaves the
+  file `Quarantined` instead of `Available`.
 - **Three React Compiler lint rules sit at `warn`** in both clients (`set-state-in-effect`,
   `static-components`, `refs`). Each needs a real design change, not a mechanical fix; they are left
   visible rather than disabled, and no `eslint-disable` comment exists in `src/`.
