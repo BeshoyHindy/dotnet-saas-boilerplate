@@ -133,7 +133,7 @@ public sealed class LogoutTests
         using var client = _factory.CreateClient();
         var request = new HttpRequestMessage(
             HttpMethod.Post, $"{TestConstants.AuthBasePath(TestConstants.RootTenantId)}/refresh");
-        request.Headers.Add("Cookie", $"refresh_token={TestConstants.RootTenantId}.dead-token");
+        request.Headers.Add("Cookie", $"__Secure-refresh_token={TestConstants.RootTenantId}.dead-token");
         request.Content = JsonContent.Create(new { });
 
         using var response = await client.SendAsync(request);
@@ -166,7 +166,7 @@ public sealed class LogoutTests
 
     private static string? RefreshCookieHeader(HttpResponseMessage response) =>
         response.Headers.TryGetValues("Set-Cookie", out var values)
-            ? values.FirstOrDefault(v => v.StartsWith("refresh_token=", StringComparison.Ordinal))
+            ? values.FirstOrDefault(v => v.StartsWith("__Secure-refresh_token=", StringComparison.Ordinal))
             : null;
 
     /// <summary>
@@ -176,7 +176,7 @@ public sealed class LogoutTests
     private static bool ClearsRefreshCookie(HttpResponseMessage response, string tenant)
     {
         var cookie = RefreshCookieHeader(response);
-        if (cookie is null || !cookie.StartsWith("refresh_token=;", StringComparison.Ordinal))
+        if (cookie is null || !cookie.StartsWith("__Secure-refresh_token=;", StringComparison.Ordinal))
         {
             return false;
         }
@@ -202,7 +202,7 @@ public sealed class LogoutTests
 
         if (refreshCookie is not null)
         {
-            request.Headers.Add("Cookie", $"refresh_token={refreshCookie}");
+            request.Headers.Add("Cookie", $"__Secure-refresh_token={refreshCookie}");
         }
 
         request.Content = JsonContent.Create(body ?? new { });
@@ -221,7 +221,7 @@ public sealed class LogoutTests
     {
         using var client = _factory.CreateClient();
         var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.AuthBasePath(tenant)}/refresh");
-        request.Headers.Add("Cookie", $"refresh_token={refreshToken}");
+        request.Headers.Add("Cookie", $"__Secure-refresh_token={refreshToken}");
         request.Content = JsonContent.Create(new { });
         return await client.SendAsync(request);
     }

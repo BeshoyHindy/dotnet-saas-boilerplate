@@ -61,7 +61,10 @@ public class ConfigureJwtBearerOptions : IConfigureNamedOptions<JwtBearerOptions
             ValidAudience = _options.Audience,
             ValidateAudience = true,
             RoleClaimType = ClaimTypes.Role,
-            ClockSkew = TimeSpan.FromMinutes(2)
+            ClockSkew = TimeSpan.FromMinutes(2),
+            // V9.1.2: pin the allow-listed algorithm to what TokenService actually signs with,
+            // rather than trusting whatever Microsoft.IdentityModel accepts for the key type.
+            ValidAlgorithms = [SecurityAlgorithms.HmacSha256]
         };
         // Capture the validation failure reason so OnChallenge can include it (in Development).
         // Without this we get a body of `{"error":"Unauthorized"}` with no clue why JwtBearer rejected.

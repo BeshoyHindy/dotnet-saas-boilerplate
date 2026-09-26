@@ -22,7 +22,7 @@ namespace Boilerplate.Modules.Identity;
 /// </summary>
 internal static partial class RefreshTokenCookie
 {
-    public const string Name = "refresh_token";
+    public const string Name = "__Secure-refresh_token";
 
     /// <summary>
     /// The refresh path for a tenant, matching <see cref="TenantRoute.AnonymousAuthGroup"/> with the
