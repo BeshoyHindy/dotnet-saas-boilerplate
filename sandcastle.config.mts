@@ -168,6 +168,17 @@ export default defineConfig({
     // SANDCASTLE_HEAL_ATTEMPTS=2 (each attempt costs one healer session plus a
     // full gate re-run).
     healAttempts: 0,
+
+    // USAGE-LIMIT WAIT, ON BY DEFAULT. When a phase fails and a probe of its
+    // model gets no answer (a spent subscription, or an outage), the phase
+    // waits and re-runs instead of ending the run. One wait per model, shared
+    // by every phase on it. The budget is per phase call, counted from its
+    // first limit hit, and comfortably longer than one five-hour usage window;
+    // past it, the phase's original error ends the run as before. 0 hours
+    // turns the wait off. Per-run overrides: SANDCASTLE_USAGE_POLL_MINUTES and
+    // SANDCASTLE_USAGE_MAX_WAIT_HOURS in .sandcastle/.env.
+    usagePollMinutes: 5,
+    usageMaxWaitHours: 6,
   },
 
   // Which model each phase runs on, and at what reasoning effort. Effort is
@@ -200,6 +211,12 @@ export default defineConfig({
     // so cost barely matters; Opus 5.5 keeps Fable usage for the reviewer.
     healer: { model: CLAUDE.opus55, effort: "medium" },
   },
+
+  // The startup self-check probes this model once to learn whether the host
+  // `claude` CLI can probe at all; if it cannot, the usage-limit wait is
+  // switched off for the run. Any model the account reaches will do, so a
+  // cheap one. A failed phase mid-run probes its OWN model instead.
+  usageProbeModel: CLAUDE.sonnet5,
 
   sandbox: {
     // Shared host-side caches, bind-mounted into every sandbox so restores and

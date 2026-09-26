@@ -34,6 +34,16 @@ Older history, subjects only:
 
 </recent-history>
 
+Uncommitted changes already in this worktree:
+
+<uncommitted-work>
+
+!`git status --short`
+
+</uncommitted-work>
+
+If that list is empty, start from the issue. If it is not, an earlier attempt at this issue was cut off (the run waited out a usage limit and started you again in the same sandbox), and those changes are its unfinished work. Do not start over and do not discard them: read them with `git diff` and `git diff --staged`, keep what is sound, fix what is not, and finish the issue from there. Its commits, if any, are already in the history above.
+
 # ENVIRONMENT
 
 This sandbox has **warm shared caches** mounted for the package managers this repo uses (`~/.nuget/packages`, with `NUGET_PACKAGES` preset; `~/.npm`; `~/.pnpm-store` and `~/.cache/pnpm`; `~/.cache/ms-playwright` for browsers). Restores and installs should be fast — if a restore or install downloads the world, something is wrong. A *permission* error on one of these cache paths is an infrastructure bug, not your code: apply `mkdir -p /tmp/dnhome && export HOME=/tmp/dnhome`, note it in the commit body, and move on rather than debugging it.

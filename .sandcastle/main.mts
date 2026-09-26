@@ -21,6 +21,11 @@
 // The outer loop repeats up to `limits.maxIterations` times so that newly
 // unblocked issues are picked up after each round of merges.
 //
+// Every phase runs through the usage-limit wait (usage-limit.mts): a phase that
+// fails while a probe of its model gets no answer waits for the model and
+// re-runs, instead of ending the run. On by default; see `limits` in the root
+// config.
+//
 // Every phase runs in a git worktree (merge-to-head or an explicit branch) —
 // NEVER the host working directory — so untracked/gitignored files such as
 // .env and .sandcastle/.env physically do not exist inside any sandbox.
@@ -38,19 +43,20 @@ import * as sandcastle from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
 import { noSandbox } from "@ai-hero/sandcastle/sandboxes/no-sandbox";
 import { z } from "zod";
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import {
   closeSync,
   existsSync,
   fsyncSync,
   mkdirSync,
+  mkdtempSync,
   openSync,
   readFileSync,
   renameSync,
   rmSync,
   writeSync,
 } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
 
 import config from "../sandcastle.config.mts";
@@ -95,15 +101,23 @@ import {
   mergerDirtScanErrorBlock,
   preserveMergerDirt,
 } from "./merger-dirt.mts";
+import {
+  checkUsageProbe,
+  classifyProbeOutput,
+  createUsageWait,
+  probeArgs,
+  type ProbeOutcome,
+} from "./usage-limit.mts";
 
 // ---------------------------------------------------------------------------
 // Resolved configuration
 // ---------------------------------------------------------------------------
 
-// Environment overrides (MAX_CONCURRENT_AGENTS, SANDCASTLE_HEAL_ATTEMPTS, and
-// the per-phase SANDCASTLE_<PHASE>_MODEL / SANDCASTLE_<PHASE>_EFFORT) are
-// applied here and nowhere else; a malformed one THROWS rather than silently
-// restoring a default that may not fit this machine or this run.
+// Environment overrides (MAX_CONCURRENT_AGENTS, SANDCASTLE_HEAL_ATTEMPTS,
+// SANDCASTLE_USAGE_POLL_MINUTES, SANDCASTLE_USAGE_MAX_WAIT_HOURS, and the
+// per-phase SANDCASTLE_<PHASE>_MODEL / SANDCASTLE_<PHASE>_EFFORT) are applied
+// here and nowhere else; a malformed one THROWS rather than silently restoring
+// a default that may not fit this machine or this run.
 const limits = resolveLimits(config.limits, process.env);
 const models = resolveModels(config.models, process.env);
 // The one channel by which a prompt learns a gate command — see config.mts.
@@ -424,6 +438,67 @@ function reconcilePendingCloses(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Usage-limit wait (rules + rationale: usage-limit.mts)
+// ---------------------------------------------------------------------------
+//
+// Every agent phase runs through `usage.run(label, model, fn)`: when it fails
+// and a probe of its model gets no answer, it waits for the model and re-runs
+// instead of ending the run.
+
+// A probe that has not answered in this long is not answering.
+const PROBE_TIMEOUT_MS = 2 * 60_000;
+
+// One real `claude -p` call on the HOST, with the host's own credentials (the
+// ones the `sandcastle` script loads from .sandcastle/.env). Run from an empty
+// temporary directory so no repository instructions load, with stdin closed so
+// print mode never waits for more prompt. Never throws: a CLI that cannot be
+// started is simply a probe that did not answer.
+const probeModel = (model: string): Promise<ProbeOutcome> =>
+  new Promise((resolve) => {
+    const dir = mkdtempSync(join(tmpdir(), "sandcastle-probe-"));
+    const child = execFile(
+      "claude",
+      probeArgs(model),
+      {
+        cwd: dir,
+        encoding: "utf8",
+        timeout: PROBE_TIMEOUT_MS,
+        maxBuffer: 16 * 1024 * 1024,
+      },
+      (error, stdout, stderr) => {
+        rmSync(dir, { recursive: true, force: true });
+        const failure =
+          error === null
+            ? undefined
+            : `${error.message}${stderr.trim() === "" ? "" : `: ${stderr.trim()}`}`;
+        resolve(classifyProbeOutput(stdout, failure));
+      },
+    );
+    child.stdin?.end();
+  });
+
+const usageMaxWaitMs = limits.usageMaxWaitHours * 60 * 60_000;
+
+// Fail safe: if the host CLI cannot probe, the wait is off for this run and a
+// failed phase ends it exactly as it would without the wait. A quota already
+// spent at startup keeps it on — see checkUsageProbe.
+const usageWaitOn = await checkUsageProbe({
+  probe: probeModel,
+  model: config.usageProbeModel,
+  maxWaitMs: usageMaxWaitMs,
+  log: (line) => console.log(line),
+});
+
+const usage = createUsageWait({
+  probe: probeModel,
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  now: () => Date.now(),
+  log: (line) => console.warn(line),
+  pollMs: limits.usagePollMinutes * 60_000,
+  maxWaitMs: usageWaitOn ? usageMaxWaitMs : 0,
+});
+
+// ---------------------------------------------------------------------------
 // Main loop
 // ---------------------------------------------------------------------------
 
@@ -451,7 +526,8 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
   // worktree of tracked files only, never the host working dir, so .env stays
   // out.
   // -------------------------------------------------------------------------
-  const plan = await sandcastle.run({
+  // Every phase below runs through the usage-limit wait (see above).
+  const plan = await usage.run("planner", models.planner.model, () => sandcastle.run({
     sandbox: makeSandbox(),
     branchStrategy: { type: "merge-to-head" },
     name: "planner",
@@ -475,7 +551,7 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
     // StructuredOutputError if the tag is missing, the JSON is malformed, or
     // validation fails — which aborts the loop.
     output: sandcastle.Output.object({ tag: "plan", schema: planSchema }),
-  });
+  }));
 
   const issues = plan.output.issues;
 
@@ -516,8 +592,11 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
         // implementer's commits are already on the branch and must still be
         // merged, so its error must not reject this pipeline.
         outcome = await runIssuePipeline({
+          // Re-run by the usage-limit wait in the SAME sandbox, so a cut-off
+          // attempt's uncommitted work is still there for the next one to
+          // continue (implement-prompt.md shows it).
           runImplementer: () =>
-            sandbox.run({
+            usage.run(`${issue.id} implementer`, models.implementer.model, () => sandbox.run({
               name: "implementer",
               maxIterations: 100,
               idleTimeoutSeconds: limits.idleTimeoutSeconds,
@@ -530,9 +609,9 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
                 PROJECT_NAME: config.project.name,
                 GATE_COMMANDS,
               },
-            }),
+            })),
           runReviewer: () =>
-            sandbox.run({
+            usage.run(`${issue.id} reviewer`, models.reviewer.model, () => sandbox.run({
               name: "reviewer",
               // 3, not 1: with a single iteration the reviewer is cut off
               // mid-gates and its uncommitted refactors are discarded when the
@@ -548,7 +627,7 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
                 BRANCH: issue.branch,
                 GATE_COMMANDS,
               },
-            }),
+            })),
           captureValidated: () => branchTip(hostGit, issue.branch),
           onReviewFailure: (error) => {
             console.error(
@@ -668,7 +747,7 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
   })));
 
   try {
-    await sandcastle.run({
+    await usage.run("merger", models.merger.model, () => sandcastle.run({
       sandbox: makeSandbox(),
       branchStrategy: { type: "merge-to-head" },
       name: "merger",
@@ -685,7 +764,7 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
         ISSUES: completedIssues.map((i) => `- ${i.id}: ${i.title}`).join("\n"),
         GATE_COMMANDS,
       },
-    });
+    }));
   } catch (error) {
     // Two distinct failures surface here and must not be conflated:
     //   1. SyncError — the temp branch could not be merged back onto HEAD.
@@ -837,7 +916,7 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
         // `claude -p` on the host otherwise denies every edit and command.
         // That trust decision is exactly why healing is OFF by default.
         // -------------------------------------------------------------------
-        await sandcastle.run({
+        await usage.run(`healer-${attempt}`, models.healer.model, () => sandcastle.run({
           sandbox: noSandbox({ env: { ...config.sandbox.hostEnv } }),
           branchStrategy: { type: "merge-to-head" },
           name: `healer-${attempt}`,
@@ -857,7 +936,7 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
             FAILURES: failures.join("\n\n"),
             ISSUES: completedIssues.map((i) => `- ${i.id}: ${i.title}`).join("\n"),
           },
-        });
+        }));
         // Same fail-closed guard as after the merger: an uncommitted healer
         // worktree means HEAD differs from what the healer validated.
         const healerDirt = preserveMergerDirt(process.cwd());

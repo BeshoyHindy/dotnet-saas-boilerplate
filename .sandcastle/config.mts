@@ -111,6 +111,18 @@ export interface LimitsConfig {
    * per run by `SANDCASTLE_HEAL_ATTEMPTS`.
    */
   readonly healAttempts: number;
+  /**
+   * How often, in minutes, a model that stopped answering is probed while a
+   * phase waits out a usage limit (see usage-limit.mts). Overridden per run by
+   * `SANDCASTLE_USAGE_POLL_MINUTES`.
+   */
+  readonly usagePollMinutes: number;
+  /**
+   * How long, in hours, one phase call may wait for its model to answer again,
+   * counted from its first limit hit. 0 turns the wait off. Overridden per run
+   * by `SANDCASTLE_USAGE_MAX_WAIT_HOURS`.
+   */
+  readonly usageMaxWaitHours: number;
 }
 
 export interface CacheMount {
@@ -162,6 +174,12 @@ export interface SandcastleConfig {
    * or per run by `SANDCASTLE_<PHASE>_MODEL` / `SANDCASTLE_<PHASE>_EFFORT`.
    */
   readonly models: Readonly<Record<PhaseName, PhaseModel>>;
+  /**
+   * The model the startup self-check probes to learn whether the host CLI can
+   * probe at all (see usage-limit.mts). Any model the account can reach will
+   * do, so pick a cheap one. Mid-run, a failed phase probes its OWN model.
+   */
+  readonly usageProbeModel: string;
   readonly sandbox: SandboxConfig;
   readonly prompts: PromptsConfig;
 }
@@ -257,11 +275,24 @@ export function resolveLimits(
     limits.healAttempts,
     0,
   );
+  const usagePollMinutes = readInt(
+    "SANDCASTLE_USAGE_POLL_MINUTES",
+    limits.usagePollMinutes,
+    1,
+  );
+  // 0 is legal: it is how the wait is turned off.
+  const usageMaxWaitHours = readInt(
+    "SANDCASTLE_USAGE_MAX_WAIT_HOURS",
+    limits.usageMaxWaitHours,
+    0,
+  );
 
   return {
     ...limits,
     maxConcurrentAgents,
     healAttempts,
+    usagePollMinutes,
+    usageMaxWaitHours,
     plannerQueueDepth: Math.max(limits.plannerQueueDepth, maxConcurrentAgents),
   };
 }
