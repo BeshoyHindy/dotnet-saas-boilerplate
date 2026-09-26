@@ -90,6 +90,16 @@ namespace Boilerplate.BuildingBlocks.Web.Idempotency;
 /// response that expires sooner than the replay entry's TTL must not be marked idempotent.
 /// </para>
 /// <para>
+/// <b>A committed handler runs to completion even if the client is already gone.</b> Before
+/// <c>next(context)</c> the bound <see cref="CancellationToken"/> argument and
+/// <see cref="HttpContext.RequestAborted"/> are swapped for a token that never fires, so a disconnect
+/// between the handler's commit and the capture cannot cancel either one (#104, upstream
+/// <c>bf86648</c> part c). A half-finished side effect with no stored entry is the worse outcome: the
+/// retry the client is bound to send would run it again. The real token comes back only for the final
+/// write in <see cref="FlushAsync"/> — that one is allowed to fail, because by then the entry already
+/// exists.
+/// </para>
+/// <para>
 /// <b>Nothing may wrap it.</b> The filter writes the response itself and returns
 /// <see cref="TypedResults.Empty"/>, so any endpoint filter added <i>before</i> it on the same route
 /// wraps it, sees <c>Empty</c> where it expected the handler's result, and runs its post-<c>next</c>
@@ -201,20 +211,50 @@ public sealed class IdempotencyEndpointFilter : IEndpointFilter
             }
         }
 
-        var result = await next(context).ConfigureAwait(false);
-        var captured = await CaptureAsync(result, httpContext).ConfigureAwait(false);
-
-        // Only a success is replayable. A 4xx/5xx is the server's answer to *this* attempt — caching
-        // it would make a transient failure permanent for the lifetime of the key.
-        //
-        // Stored *before* the body reaches the client, and not on the request's token. The handler has
-        // already committed its side effect by now; if the client hangs up while the response is being
-        // written, storing afterwards would leave no entry, and the retry would run the side effect a
-        // second time — the one thing the key is there to prevent.
-        if (captured.StatusCode is >= StatusCodes.Status200OK and < StatusCodes.Status300MultipleChoices)
+        // A client that hangs up between here and the capture below must not undo a handler that has
+        // already committed its side effect (issue #104, upstream bf86648 part c). Two places would
+        // otherwise see that abort: the bound CancellationToken argument the handler itself may read
+        // again after committing (an outbox dispatch, a follow-up query), and RequestAborted, which the
+        // executed IResult's own body-writing reads too — a cancelled write there does not throw so
+        // much as silently write nothing, caching an empty 2xx for the entry's whole TTL. Swapping both
+        // for a token that never fires lets the handler and the capture run to completion regardless;
+        // restored before the final flush below, because that write really is talking to the client,
+        // and by then the entry is already safely stored either way.
+        var callerAborted = httpContext.RequestAborted;
+        httpContext.RequestAborted = CancellationToken.None;
+        for (var i = 0; i < context.Arguments.Count; i++)
         {
-            await StoreAsync(cache, cacheKey, captured, fingerprint, options, logger, idempotencyKey)
-                .ConfigureAwait(false);
+            if (context.Arguments[i] is CancellationToken)
+            {
+                context.Arguments[i] = CancellationToken.None;
+            }
+        }
+
+        CapturedResponse captured;
+        try
+        {
+            var result = await next(context).ConfigureAwait(false);
+            captured = await CaptureAsync(result, httpContext).ConfigureAwait(false);
+
+            // Only a success is replayable. A 4xx/5xx is the server's answer to *this* attempt —
+            // caching it would make a transient failure permanent for the lifetime of the key.
+            //
+            // Stored *before* the body reaches the client, and not on the request's token. The handler
+            // has already committed its side effect by now; if the client hangs up while the response
+            // is being written, storing afterwards would leave no entry, and the retry would run the
+            // side effect a second time — the one thing the key is there to prevent.
+            if (captured.StatusCode is >= StatusCodes.Status200OK and < StatusCodes.Status300MultipleChoices)
+            {
+                await StoreAsync(cache, cacheKey, captured, fingerprint, options, logger, idempotencyKey)
+                    .ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            // Restored even when the handler or the capture throws — a handler exception still has to
+            // reach the global exception handler and every downstream middleware on the real token, not
+            // one that can never fire.
+            httpContext.RequestAborted = callerAborted;
         }
 
         await FlushAsync(httpContext, captured.Body).ConfigureAwait(false);
