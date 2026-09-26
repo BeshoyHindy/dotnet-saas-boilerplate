@@ -14,9 +14,8 @@ name: Secret Scan
 # later one — `dir` would miss it, but it would still land in history on merge.
 #
 # Full history is not scanned here: an old, already-rotated leak is a rotation
-# job, not something every PR should fail on. `.gitleaksignore` ignores the
-# upstream-import commit's known non-secrets by fingerprint, so `gitleaks git .`
-# stays clean for a local full-history audit.
+# job, not something every PR should fail on; a `.gitleaksignore` of reviewed
+# fingerprints keeps a local `gitleaks git .` full-history audit clean.
 
 on:
   pull_request:
