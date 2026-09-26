@@ -33,6 +33,9 @@ public sealed class AuditingSaveChangesInterceptor : SaveChangesInterceptor
 
         var entries = ctx.ChangeTracker.Entries()
             .Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+            // IAuditExempt opts an entity out of the audit trail entirely — not merely masked, never
+            // captured — for a row whose existence or shape is not audit's business.
+            .Where(e => e.Entity is not IAuditExempt)
             .ToArray();
 
         if (entries.Length == 0) return result;

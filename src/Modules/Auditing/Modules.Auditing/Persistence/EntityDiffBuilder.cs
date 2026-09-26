@@ -1,3 +1,4 @@
+using Boilerplate.BuildingBlocks.Shared.Security;
 using Boilerplate.Modules.Auditing.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -116,13 +117,26 @@ internal static class EntityDiffBuilder
             return null;
         }
 
+        // The one canonical list (BuildingBlocks/Shared/Security) — no second copy of "what reads as
+        // a secret" here. A matching value is masked, not merely flagged: AuditRecords is readable by
+        // anyone holding AuditTrails.View in the tenant, and a hash or stamp in clear text there is
+        // exactly what #103 closes. Null stays null — there is nothing to mask.
+        var isSensitive = SensitiveFieldNames.IsSensitive(property.Metadata.Name);
+        if (isSensitive)
+        {
+            oldVal = Mask(oldVal);
+            newVal = Mask(newVal);
+        }
+
         return new PropertyChange(
             Name: property.Metadata.Name,
             DataType: ToSimpleTypeName(property.Metadata.ClrType),
             OldValue: oldVal,
             NewValue: newVal,
-            IsSensitive: IsSensitive(property.Metadata.Name));
+            IsSensitive: isSensitive);
     }
+
+    private static object? Mask(object? value) => value is null ? null : "****";
 
     private static (object? OldValue, object? NewValue, bool IsModified) GetPropertyValues(
         EntityState state,
@@ -172,11 +186,6 @@ internal static class EntityDiffBuilder
         var curr = prop.CurrentValue as bool? ?? false;
         return !orig && curr;
     }
-
-    private static bool IsSensitive(string propertyName) =>
-        propertyName.Contains("password", StringComparison.OrdinalIgnoreCase) ||
-        propertyName.Contains("secret", StringComparison.OrdinalIgnoreCase) ||
-        propertyName.Contains("token", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsScalar(Type t)
     {
