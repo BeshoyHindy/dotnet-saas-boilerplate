@@ -1,4 +1,5 @@
 using System.Globalization;
+using Boilerplate.Modules.Identity.Contracts.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -42,17 +43,21 @@ internal static class DemoSeedGuard
 
     /// <summary>
     /// Reads <c>Seed:DemoPassword</c> and checks it against the host's own Identity password
-    /// policy, so a password the seeder would accept and <c>UserManager</c> would then reject
-    /// fails here — with the reason — instead of half-way through the tenant loop.
+    /// policy and common-password list, so a password the seeder would accept and
+    /// <c>UserManager</c> would then reject fails here — with the reason — instead of half-way
+    /// through the tenant loop.
     /// </summary>
     /// <exception cref="InvalidOperationException">The password is missing or unusable.</exception>
-    public static string ResolveDemoPassword(IConfiguration configuration, PasswordOptions policy)
+    public static string ResolveDemoPassword(
+        IConfiguration configuration,
+        PasswordOptions policy,
+        ICommonPasswordList commonPasswords)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
         var password = RequireConfiguredPassword(configuration);
 
-        var failures = Validate(password, policy);
+        var failures = Validate(password, policy, commonPasswords);
         if (failures.Count > 0)
         {
             throw new InvalidOperationException(
@@ -86,13 +91,18 @@ internal static class DemoSeedGuard
     }
 
     /// <summary>
-    /// Every way <paramref name="candidate"/> fails <paramref name="policy"/>, phrased for an
-    /// operator. Empty means usable. Mirrors ASP.NET Core's <c>PasswordValidator</c>, which
-    /// cannot be used directly here because it needs a tenant-scoped <c>UserManager</c>.
+    /// Every way <paramref name="candidate"/> fails <paramref name="policy"/> or is on
+    /// <paramref name="commonPasswords"/>, phrased for an operator. Empty means usable. Mirrors
+    /// ASP.NET Core's <c>PasswordValidator</c> and Identity's common-password validator, which
+    /// cannot be used directly here because they need a tenant-scoped <c>UserManager</c>.
     /// </summary>
-    public static IReadOnlyList<string> Validate(string? candidate, PasswordOptions policy)
+    public static IReadOnlyList<string> Validate(
+        string? candidate,
+        PasswordOptions policy,
+        ICommonPasswordList commonPasswords)
     {
         ArgumentNullException.ThrowIfNull(policy);
+        ArgumentNullException.ThrowIfNull(commonPasswords);
 
         var failures = new List<string>();
         var password = candidate ?? string.Empty;
@@ -129,6 +139,11 @@ internal static class DemoSeedGuard
             failures.Add(string.Create(
                 CultureInfo.InvariantCulture,
                 $"It must use at least {policy.RequiredUniqueChars} distinct characters."));
+        }
+
+        if (commonPasswords.Contains(password))
+        {
+            failures.Add("It is on the common-password list.");
         }
 
         return failures;

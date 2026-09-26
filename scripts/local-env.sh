@@ -25,8 +25,9 @@ rand() {
   LC_ALL=C openssl rand -base64 "$1" | LC_ALL=C tr -dc 'A-Za-z0-9' | cut -c "1-$2"
 }
 
-# The seeded admin password must satisfy the Identity policy: 10+ characters with an upper, a
-# lower and a digit. The suffix guarantees all three regardless of what the random core drew.
+# The seeded admin password must satisfy the Identity policy: 10+ characters and not on the
+# bundled common-password list, which the random core clears. The suffix dates from the old
+# composition rules (upper, lower, digit — dropped for ASVS V6.2.5) and is harmless.
 SEED_ADMIN_PASSWORD="$(rand 24 20)Aa1"
 
 # Same policy, same trick: the single password every demo account (acme, globex) signs in with.

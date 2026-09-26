@@ -71,6 +71,24 @@ name (bounded, `MaxUserNameAttempts`), and the fallback name always carries its 
 (`UniqueUserNameFor`; the old `$"{name}_{guid}"[..20]` truncated the randomness off for any name ≥20
 characters and handed two different people the same fallback).
 
+## Password policy (ASVS 5.0 L1, #127)
+
+Length and a common-password list, and **no composition rules** (V6.2.5 — `RequireDigit`,
+`RequireLowercase`, `RequireUppercase` and `RequireNonAlphanumeric` are all `false`; don't turn them
+back on). The floor is `PasswordPolicy.MinimumLength` (10) in `Identity.Contracts`, which
+`IdentityModuleConstants.PasswordLength` reads. `CommonPasswordValidator` is registered on the
+Identity builder, so every `UserManager` path that sets a password runs it — registration, reset,
+change, and the tenant admin seed, which now goes through `CreateAsync(user, password)` rather than
+hashing by hand. It checks the embedded `Passwords/common-passwords.txt` (source, licence and how it
+was derived: `CommonPasswordList.cs`) case-insensitively, never calls out, and answers with the one
+generic `PasswordPolicy.CommonPasswordMessage`. **If you lower the length floor, regenerate the list
+at the new floor.**
+
+A password taken before `UserManager` sees it repeats the policy through the contract
+(`PasswordPolicy`, `ICommonPasswordList`): `CreateTenantCommandValidator` does, because the tenant
+admin is only created later by the provisioning seed, where a refusal is a Failed provisioning rather
+than a 400; `DemoSeedGuard` does for the demo password.
+
 ## Avatars: the client never names one (#83)
 
 `AppUser.ImageUrl` holds **only a URL this server issued for this user**. `PUT /identity/profile` takes the bytes (`image`) or the removal flag (`deleteCurrentImage`) and writes the column from what `IStorageService.UploadAsync<AppUser>(…, owner: user.Id, …)` returns; the old `PUT /identity/profile/image`, which accepted any string up to 2048 characters, is **gone**, and so is `IUserProfileService.SetImageUrlAsync`. Don't add either back — a column a client can name is a column that can name another user's avatar.

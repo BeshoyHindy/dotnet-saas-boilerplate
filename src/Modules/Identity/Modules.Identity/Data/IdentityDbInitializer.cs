@@ -209,11 +209,13 @@ internal sealed class IdentityDbInitializer(
                 logger.LogInformation("Seeding Default Admin User for '{TenantId}' Tenant.", multiTenantContextAccessor.MultiTenantContext.TenantInfo?.Id);
             }
             var initialPassword = ResolveInitialAdminPassword(multiTenantContextAccessor.MultiTenantContext.TenantInfo!.Id!);
-            var password = new PasswordHasher<AppUser>();
-            adminUser.PasswordHash = password.HashPassword(adminUser, initialPassword);
+            // Through UserManager's password overload, so the tenant admin passes the same password
+            // validators (length, common-password list) as every other user. It used to hash the
+            // password by hand, which skipped them. CreateTenantCommandValidator refuses the same
+            // passwords up front, so an operator hears it as a 400 rather than a Failed provisioning.
             // MUST check IdentityResult: a silent failure (password-policy reject, transient DB error)
             // would mark provisioning "Completed" with no admin user; throwing makes it a retryable Failed.
-            var createResult = await userManager.CreateAsync(adminUser);
+            var createResult = await userManager.CreateAsync(adminUser, initialPassword);
             if (!createResult.Succeeded)
             {
                 throw new InvalidOperationException(

@@ -1,3 +1,4 @@
+using Boilerplate.Modules.Identity.Contracts;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 
@@ -99,6 +100,48 @@ public sealed class TenantCreationTests
         });
 
         response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task CreateTenant_Should_Return400NamingTheRealMinimum_When_AdminPasswordIsNineCharacters()
+    {
+        using var client = await _auth.CreateRootAdminClientAsync();
+        var uniqueId = Guid.NewGuid().ToString("N")[..8];
+
+        var response = await client.PostAsJsonAsync(TestConstants.TenantsBasePath, new
+        {
+            id = $"tpw-short-{uniqueId}",
+            name = $"Short Admin Password {uniqueId}",
+            adminEmail = $"tpwshort-{uniqueId}@tenant.com",
+            adminPassword = "Abcdef12!",
+            issuer = "tpwshort.issuer"
+        });
+
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest, body);
+        body.ShouldContain($"at least {PasswordPolicy.MinimumLength} characters");
+    }
+
+    [Fact]
+    public async Task CreateTenant_Should_Return400_When_AdminPasswordIsCommon()
+    {
+        // Refused on the request: the admin is created later by the provisioning seed step, where a
+        // policy failure could only surface as a Failed provisioning.
+        using var client = await _auth.CreateRootAdminClientAsync();
+        var uniqueId = Guid.NewGuid().ToString("N")[..8];
+
+        var response = await client.PostAsJsonAsync(TestConstants.TenantsBasePath, new
+        {
+            id = $"tpw-common-{uniqueId}",
+            name = $"Common Admin Password {uniqueId}",
+            adminEmail = $"tpwcommon-{uniqueId}@tenant.com",
+            adminPassword = "password123",
+            issuer = "tpwcommon.issuer"
+        });
+
+        var body = await response.Content.ReadAsStringAsync();
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest, body);
+        body.ShouldContain(PasswordPolicy.CommonPasswordMessage);
     }
 
     [Fact]
