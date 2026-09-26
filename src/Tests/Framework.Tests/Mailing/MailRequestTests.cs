@@ -20,12 +20,13 @@ public sealed class MailRequestTests
         // Act
         var request = new MailRequest(
             to, "subject", "body", "from@x.com", "Sender",
-            "reply@x.com", "Reply", bcc, cc, attachments, headers);
+            "reply@x.com", "Reply", bcc, cc, attachments, headers, "plain body");
 
         // Assert
         request.To.ShouldBe(to);
         request.Subject.ShouldBe("subject");
         request.Body.ShouldBe("body");
+        request.TextBody.ShouldBe("plain body");
         request.From.ShouldBe("from@x.com");
         request.DisplayName.ShouldBe("Sender");
         request.ReplyTo.ShouldBe("reply@x.com");
@@ -48,6 +49,7 @@ public sealed class MailRequestTests
 
         // Assert — nullable collections default to empty (never null).
         request.Body.ShouldBeNull();
+        request.TextBody.ShouldBeNull();
         request.From.ShouldBeNull();
         request.Cc.ShouldNotBeNull();
         request.Cc.ShouldBeEmpty();
@@ -57,6 +59,22 @@ public sealed class MailRequestTests
         request.AttachmentData.ShouldBeEmpty();
         request.Headers.ShouldNotBeNull();
         request.Headers.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Ctor_Should_RoundTripTextBody_When_SerialisedWithNewtonsoft()
+    {
+        // A queued mail (the reset mail, the confirmation resend) reaches the sender through Hangfire,
+        // which serialises the MailRequest with Newtonsoft.Json and rebuilds it through the constructor
+        // by matching parameter names to properties. A TextBody that did not survive that trip would
+        // quietly drop the text part of every queued mail.
+        var request = new MailRequest(new Collection<string> { "a@x.com" }, "subject", "<p>html</p>", textBody: "plain");
+
+        var copy = Newtonsoft.Json.JsonConvert.DeserializeObject<MailRequest>(
+            Newtonsoft.Json.JsonConvert.SerializeObject(request))!;
+
+        copy.Body.ShouldBe("<p>html</p>");
+        copy.TextBody.ShouldBe("plain");
     }
 
     #endregion

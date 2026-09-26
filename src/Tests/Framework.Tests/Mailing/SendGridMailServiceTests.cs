@@ -37,6 +37,45 @@ public sealed class SendGridMailServiceTests
     private static MailRequest ValidRequest() =>
         new(to: ["dest@x.com"], subject: "hi", body: "body");
 
+    private static SendGridMessage SentMessage(ISendGridClient client) =>
+        (SendGridMessage)client.ReceivedCalls().Single().GetArguments()[0]!;
+
+    [Fact]
+    public async Task SendAsync_Should_MapEachBody_ToItsOwnPart()
+    {
+        // Arrange — Body and TextBody are separate parts. Sending Body as both shipped raw markup to
+        // text-only clients.
+        var client = ClientReturning(HttpStatusCode.Accepted);
+        var service = BuildService(client);
+        var request = new MailRequest(to: ["dest@x.com"], subject: "hi", body: "<p>rich</p>", textBody: "plain");
+
+        // Act
+        await service.SendAsync(request, CancellationToken.None);
+
+        // Assert — CreateSingleEmail folds both bodies into Contents, so assert on the parts.
+        var sent = SentMessage(client);
+        sent.Contents.Single(c => c.Type == "text/html").Value.ShouldBe("<p>rich</p>");
+        sent.Contents.Single(c => c.Type == "text/plain").Value.ShouldBe("plain");
+    }
+
+    [Fact]
+    public async Task SendAsync_Should_KeepAPlainTextPart_When_OnlyTheBodyIsSupplied()
+    {
+        // Arrange — CreateSingleEmail drops the text/plain part for a null string, so without the
+        // fallback a caller that passes only Body would silently go from two parts to HTML-only.
+        var client = ClientReturning(HttpStatusCode.Accepted);
+        var service = BuildService(client);
+        var request = new MailRequest(to: ["dest@x.com"], subject: "hi", body: "just text");
+
+        // Act
+        await service.SendAsync(request, CancellationToken.None);
+
+        // Assert
+        var sent = SentMessage(client);
+        sent.Contents.Single(c => c.Type == "text/plain").Value.ShouldBe("just text");
+        sent.Contents.Single(c => c.Type == "text/html").Value.ShouldBe("just text");
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.TooManyRequests)]        // 429 — rate limited
     [InlineData(HttpStatusCode.InternalServerError)]    // 500 — SendGrid-side
