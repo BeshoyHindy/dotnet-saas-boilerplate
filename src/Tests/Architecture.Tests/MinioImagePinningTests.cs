@@ -30,7 +30,9 @@ public sealed class MinioImagePinningTests
 
     // Forward slashes on purpose: Path.Combine accepts them on every OS, and they read like the
     // paths the failure messages name.
+//#if (aspire)
     private const string AppHostPath = "src/Host/Boilerplate.AppHost/AppHost.cs";
+//#endif
     private const string LocalComposePath = "docker-compose.yml";
     private const string DokployComposePath = "deploy/dokploy/data-services.compose.yml";
     private const string IntegrationFactoryPath = "src/Tests/Integration.Tests/Infrastructure/AppWebApplicationFactory.cs";
@@ -39,6 +41,8 @@ public sealed class MinioImagePinningTests
 
     #region Happy Path
 
+    // The AppHost is dropped from a scaffold made with --aspire false, and its checks with it.
+//#if (aspire)
     [Fact]
     public void AppHost_Should_PinEveryMinioContainerToTheChainguardDigest_When_DeclaringMinio()
     {
@@ -64,6 +68,7 @@ public sealed class MinioImagePinningTests
         CountOf(appHost, ".WithVolume($\"{appPrefix}-minio-data\", \"/data\")")
             .ShouldBe(2, "the volume owner must chown the very volume the server mounts, not a new one");
     }
+//#endif
 
     [Theory]
     [InlineData(LocalComposePath)]
@@ -102,7 +107,16 @@ public sealed class MinioImagePinningTests
     [Fact]
     public void MinioSites_Should_NotReferenceWithdrawnRegistries_When_DockerHubAndQuayNoLongerServeMinio()
     {
-        string[] sites = [AppHostPath, LocalComposePath, DokployComposePath, IntegrationFactoryPath, MiddlewareFactoryPath];
+        string[] sites =
+        [
+//#if (aspire)
+            AppHostPath,
+//#endif
+            LocalComposePath,
+            DokployComposePath,
+            IntegrationFactoryPath,
+            MiddlewareFactoryPath,
+        ];
 
         foreach (string site in sites)
         {
