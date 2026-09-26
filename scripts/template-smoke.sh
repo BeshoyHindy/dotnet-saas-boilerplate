@@ -129,6 +129,7 @@ exists "SECURITY.md"
 # Repo-only files the product must not inherit.
 not_exists ".git"
 not_exists "LICENSE"
+not_exists ".gitleaksignore"
 not_exists ".template.config"
 not_exists ".agents/skills"
 not_exists ".agents/workflows"
