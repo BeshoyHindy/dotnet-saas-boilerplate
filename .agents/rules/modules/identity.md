@@ -107,9 +107,14 @@ Login `POST /api/v1/tenants/{tenant}/auth/token` (no client-app header: the oper
 
 Clearing localStorage alone is **not** a logout: the SPA cannot delete an HttpOnly cookie and `/auth/refresh` accepts that cookie on its own. Note the cookie's `Path` is the refresh route, so a browser does not send it to `/logout` — identification comes from the `sid` claim or the body token, while the deletion works regardless (a `Set-Cookie` may name any `Path`).
 
-### `sid` is issued, not enforced
+### `sid` is enforced per request (#118)
 
-`sid` names the session row, but **nothing validates it per request** — there is no session lookup in the auth pipeline, by design (it would put a database read on every call). So revoking a session stops *refresh* immediately and stops API access only once the current access token expires (`JwtOptions.AccessTokenMinutes`, default 30). Revocation is eventually consistent for API access, and that window is the deliberate price of stateless JWT validation. Shorten `AccessTokenMinutes` if an application needs a tighter bound; don't add a per-request `sid` check without deciding how to pay for it.
+The JwtBearer `OnTokenValidated` hook (`Authorization/Jwt/ConfigureJwtBearerOptions.cs`) checks every non-acting token's `sid` against `UserSession` in the token's tenant and fails authentication — **401** — when the session is revoked, expired or unknown. Revoking a session therefore ends API access on the next request, not when the access token expires. On an `AllowAnonymous` route (logout) a dead token simply leaves the caller anonymous.
+
+- **The lookup is cached, not a database read per request.** `SessionLiveness` (singleton, `Services/SessionLiveness.cs`) caches each answer — live or dead — for `SessionLiveness.CacheDuration` (30 s) in a private, size-bounded `MemoryCache` keyed by (tenant, session). A miss enters the token's tenant through `ITenantScope.RunAsync` and reads with the tenant filter on — **no `IgnoreQueryFilters()`**. It is not `HybridCache`: the hook runs before tenant resolution, so the tenant-scoped cache has no tenant, and a session is not global data.
+- **Revocation is immediate on the instance that revoked, and within 30 s everywhere else.** Every revoke path in `SessionService` calls `SessionLiveness.MarkRevoked` *after* `SaveChangesAsync`; the marker cannot be overwritten by a lookup that was already in flight. Other replicas refuse the session once their cached answer lapses. **A new revoke path must mark the session too**, or it only takes effect at that bound.
+- **A token with no `sid` is refused**, explicitly. Login and refresh always mint one; the only issuer that omits it is `IImpersonationTokenIssuer`, whose acting tokens (`act_sub` present) skip the session check and are governed by their grant instead (below).
+- The tenant's *activation* is not checked here — the deactivated-tenant guard still answers 403 after resolution. A `SecurityStamp` change still kills a session only at its next refresh, not per request.
 
 ## Acting as someone else (impersonation + operator token exchange)
 

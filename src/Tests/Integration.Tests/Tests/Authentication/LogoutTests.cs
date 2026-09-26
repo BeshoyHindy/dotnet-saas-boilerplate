@@ -46,8 +46,17 @@ public sealed class LogoutTests
         using var cookieRefresh = await RefreshWithCookieAsync(TestConstants.RootTenantId, token.RefreshToken);
         cookieRefresh.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
 
-        // And the row itself is revoked, so it no longer shows as an active session.
-        (await ActiveSessionCountAsync(token.AccessToken)).ShouldBe(0);
+        // The access token dies with its session on the very next request (#118)...
+        using (var bearer = _factory.CreateClient())
+        {
+            bearer.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);
+            using var afterLogout = await bearer.GetAsync($"{TestConstants.IdentityBasePath}/sessions/me");
+            afterLogout.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        }
+
+        // ...and the row itself is revoked: signing in again shows only the new session as active.
+        var fresh = await _auth.GetTokenAsync(user.Email, user.Password);
+        (await ActiveSessionCountAsync(fresh.AccessToken)).ShouldBe(1);
     }
 
     [Fact]

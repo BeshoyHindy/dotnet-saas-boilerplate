@@ -302,10 +302,11 @@ Scaffold with `--sandcastle false` if you don't want any of this.
 
 Stated plainly, because each is a deliberate trade rather than an oversight.
 
-- **`sid` is issued but not validated per request.** Revoking a session stops *refresh* immediately
-  and stops API access only when the current access token expires (default 30 minutes). A per-request
-  session lookup would put a database read on every call. Shorten the access-token lifetime if you
-  need a tighter bound.
+- **Session revocation reaches other API replicas within 30 seconds.** Every request checks its
+  token's session, so a revoked session is refused on its next request by the instance that revoked
+  it. Each instance caches the answer for 30 seconds (`SessionLiveness.CacheDuration`) to keep the
+  check off the database, and there is no cross-instance invalidation — so on a multi-replica
+  deployment another replica may keep accepting the token for up to that long.
 - **A public file URL outlives a visibility change.** Public Files assets are presigned per read
   (default 5 minutes, clamped 1–15), so flipping Public → Private stops issuance at once, but a link
   already handed out works until its signature expires. Hard revocation means deleting the object.

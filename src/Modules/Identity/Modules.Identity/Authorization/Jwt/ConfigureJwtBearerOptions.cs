@@ -1,6 +1,8 @@
 ﻿using Boilerplate.BuildingBlocks.Core.Exceptions;
 using Boilerplate.BuildingBlocks.Shared.Constants;
+using Boilerplate.BuildingBlocks.Shared.Identity.Claims;
 using Boilerplate.Modules.Identity.Contracts.Services;
+using Boilerplate.Modules.Identity.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -151,16 +153,22 @@ public class ConfigureJwtBearerOptions : IConfigureNamedOptions<JwtBearerOptions
                 }
                 return Task.CompletedTask;
             },
-            // Server-side teeth behind /impersonation/revoke: for an impersonation token, reject if its
-            // grant is revoked/ended — otherwise revocation wouldn't stop tokens already in flight.
+            // Server-side teeth behind revocation: a token is refused on its next request once what it
+            // was minted from is gone — its session (sid) for a signed-in user, its grant (jti) for an
+            // acting token. Without this, revoking either would only bite when the token expired.
             OnTokenValidated = async context =>
             {
                 var actSub = context.Principal?.FindFirstValue(ClaimConstants.ActorSubject);
                 if (string.IsNullOrEmpty(actSub))
                 {
-                    // Not an impersonation token — zero cost for normal sessions.
+                    // Not an acting token: it was minted at login or refresh, and its session decides.
+                    await RejectUnlessSessionIsLiveAsync(context, FailureKey).ConfigureAwait(false);
                     return;
                 }
+
+                // An acting token (impersonation or tenant exchange) is access-only and has no session
+                // row — ImpersonationTokenIssuer mints it without a sid. Its grant, keyed by jti, is
+                // its revocation record, so the grant check below is its whole liveness check.
 
                 var jti = context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Jti);
                 if (string.IsNullOrEmpty(jti))
@@ -189,6 +197,56 @@ public class ConfigureJwtBearerOptions : IConfigureNamedOptions<JwtBearerOptions
             },
             OnForbidden = _ => throw new ForbiddenException(),
         };
+    }
+
+    /// <summary>
+    /// Fails authentication (→ 401) unless the session named by the token's <c>sid</c> is live in the
+    /// token's tenant. See <see cref="SessionLiveness"/> for the cache and the cross-instance bound.
+    /// </summary>
+    /// <remarks>
+    /// A token with no <c>sid</c> — or one that is not a session id — is refused outright, not waved
+    /// through. Login and refresh always mint one, and the only issuer that legitimately omits it (the
+    /// acting-token issuer) is handled by the grant branch before this runs. Anything else without a
+    /// <c>sid</c> names no session, so nothing could ever revoke it.
+    /// </remarks>
+    private static async Task RejectUnlessSessionIsLiveAsync(TokenValidatedContext context, string failureKey)
+    {
+        var principal = context.Principal;
+
+        // The JWT handler's default inbound map rewrites `sid` to ClaimTypes.Sid; read both spellings.
+        var sid = principal?.FindFirstValue(JwtRegisteredClaimNames.Sid)
+            ?? principal?.FindFirstValue(ClaimTypes.Sid);
+        if (!Guid.TryParse(sid, out var sessionId))
+        {
+            Reject(context, failureKey, "Access token names no session (sid)");
+            return;
+        }
+
+        var tenantId = principal?.GetTenant();
+        if (string.IsNullOrWhiteSpace(tenantId))
+        {
+            // The tenant guard would refuse this request too; without a tenant there is no session
+            // table to look in.
+            Reject(context, failureKey, "Access token names no tenant");
+            return;
+        }
+
+        var live = await context.HttpContext.RequestServices
+            .GetRequiredService<SessionLiveness>()
+            .IsLiveAsync(tenantId, sessionId, context.HttpContext.RequestAborted)
+            .ConfigureAwait(false);
+
+        if (!live)
+        {
+            Reject(context, failureKey, "Session revoked, expired or unknown");
+        }
+    }
+
+    private static void Reject(TokenValidatedContext context, string failureKey, string reason)
+    {
+        // Stashed for OnChallenge, which surfaces it in Development like the other failure reasons.
+        context.HttpContext.Items[failureKey] = reason;
+        context.Fail(reason);
     }
 
     // Strip control chars so attacker-controlled request data can't forge log lines
