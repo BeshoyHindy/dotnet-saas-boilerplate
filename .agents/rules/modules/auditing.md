@@ -22,8 +22,8 @@ Append-only audit trail (entity changes, security events, exceptions, HTTP activ
         (SELECT jsonb_agg(
                   CASE WHEN elem->>'name' = ANY (ARRAY['PasswordHash', 'SecurityStamp', 'RefreshTokenHash'])
                        THEN elem
-                            || jsonb_build_object('newValue', '****')
                             || (CASE WHEN elem ? 'oldValue' THEN jsonb_build_object('oldValue', '****') ELSE '{}'::jsonb END)
+                            || (CASE WHEN elem ? 'newValue' THEN jsonb_build_object('newValue', '****') ELSE '{}'::jsonb END)
                        ELSE elem
                   END)
          FROM jsonb_array_elements("PayloadJson" -> 'changes') elem))

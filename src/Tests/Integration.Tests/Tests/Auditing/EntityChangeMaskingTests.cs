@@ -34,7 +34,7 @@ public sealed class EntityChangeMaskingTests
         var email = $"maskaudit_{Guid.NewGuid():N}@test.com";
         const string oldPassword = TestConstants.DefaultPassword;
         const string newPassword = "NewPa$$word123!";
-        var (userId, oldPasswordHash) = await CreateActiveUserAsync(email, oldPassword);
+        var (userId, oldPasswordHash, oldSecurityStamp) = await CreateActiveUserAsync(email, oldPassword);
 
         using var client = await _auth.CreateAuthenticatedClientAsync(email, oldPassword, TestConstants.RootTenantId);
         using var adminClient = await _auth.CreateRootAdminClientAsync();
@@ -54,20 +54,19 @@ public sealed class EntityChangeMaskingTests
         passwordHashChange.GetProperty("oldValue").GetString().ShouldBe("****");
         passwordHashChange.GetProperty("newValue").GetString().ShouldBe("****");
 
-        var securityStampChange = changes.SingleOrDefault(
-            c => c.GetProperty("name").GetString() == "SecurityStamp");
-        if (securityStampChange.ValueKind != JsonValueKind.Undefined)
-        {
-            securityStampChange.GetProperty("newValue").GetString().ShouldBe("****");
-        }
+        var securityStampChange = changes.Single(c => c.GetProperty("name").GetString() == "SecurityStamp");
+        securityStampChange.GetProperty("oldValue").GetString().ShouldBe("****");
+        securityStampChange.GetProperty("newValue").GetString().ShouldBe("****");
 
-        // The masked payload never carries the actual hash, whichever property it landed on.
+        // The masked payload never carries the actual hash or stamp, whichever property they land on.
         payload.GetRawText().ShouldNotContain(oldPasswordHash, Case.Insensitive);
+        payload.GetRawText().ShouldNotContain(oldSecurityStamp, Case.Insensitive);
     }
 
     #region Helpers
 
-    private async Task<(string UserId, string PasswordHash)> CreateActiveUserAsync(string email, string password)
+    private async Task<(string UserId, string PasswordHash, string SecurityStamp)> CreateActiveUserAsync(
+        string email, string password)
     {
         using var scope = _factory.Services.CreateScope();
         var tenant = await scope.ServiceProvider
@@ -88,7 +87,7 @@ public sealed class EntityChangeMaskingTests
         var result = await userManager.CreateAsync(user, password);
         result.Succeeded.ShouldBeTrue(string.Join("; ", result.Errors.Select(e => e.Description)));
 
-        return (user.Id, user.PasswordHash!);
+        return (user.Id, user.PasswordHash!, user.SecurityStamp!);
     }
 
     /// <summary>
@@ -111,13 +110,17 @@ public sealed class EntityChangeMaskingTests
                     continue;
                 }
 
-                // The user's row is touched by more than one write in this flow (e.g. a login resets
-                // AccessFailedCount before the password itself changes), so match on the one carrying
-                // the property this test cares about rather than the first AppUser/{userId} row seen.
+                // The user's row is touched by more than one write in this flow — the insert in
+                // CreateActiveUserAsync (Operation: Insert) and a login resetting AccessFailedCount
+                // both match on entityName/key alone, and either can win the race with the async audit
+                // worker. Only the change-password Update carries a PasswordHash change with a real
+                // (masked) oldValue, so match on that explicitly rather than the first row seen.
                 if (detail.Payload.TryGetProperty("entityName", out var entityName)
                     && entityName.GetString() == "AppUser"
                     && detail.Payload.TryGetProperty("key", out var key)
                     && key.GetString() == $"Id:{userId}"
+                    && detail.Payload.TryGetProperty("operation", out var operation)
+                    && operation.GetString() == "Update"
                     && detail.Payload.TryGetProperty("changes", out var changes)
                     && changes.EnumerateArray().Any(c => c.GetProperty("name").GetString() == "PasswordHash"))
                 {
