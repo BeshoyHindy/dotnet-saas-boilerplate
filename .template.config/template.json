@@ -170,6 +170,7 @@
                 "**/.env.*.local",
                 "LICENSE",
                 "README.md",
+                ".gitleaksignore",
                 "GEMINI.md",
                 ".agents/skills/**",
                 ".agents/workflows/**",

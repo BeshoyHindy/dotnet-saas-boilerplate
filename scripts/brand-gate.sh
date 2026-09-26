@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Brand gate (ADR-0001): the upstream MIT copyright line in LICENSE is the only
-# permitted upstream reference. Fails on any case-insensitive hit of the upstream
-# brand tokens in tracked file CONTENTS or tracked file PATHS.
+# Brand gate (ADR-0001): the upstream MIT copyright line in LICENSE and the
+# README credit line are the only permitted upstream references. Fails on any
+# case-insensitive hit of the upstream brand tokens in tracked file CONTENTS or
+# tracked file PATHS.
 #
 # Exclusions, and why:
 #   LICENSE           - the MIT copyright line is legally required (ADR-0001).
@@ -10,6 +11,10 @@
 #                       contain "fsh" by chance (e.g. "...2BFshejCYXni..."); only
 #                       lockfile lines carrying such a digest are skipped, so
 #                       package names and URLs in lockfiles are still checked.
+#   .gitleaksignore   - its fingerprints necessarily name upstream's historical
+#                       file paths (issue #88).
+#   README credit line - only that exact line is permitted; any other mention
+#                       in README still fails.
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
@@ -18,12 +23,15 @@ PATTERN='fsh|fullstackhero|pantryk|mukesh|codewithmukesh'
 SELF='scripts/brand-gate.sh'
 # Lockfile lines whose only possible match is inside a content-address digest.
 DIGEST_LINE='^([^:]*/)?(package-lock\.json|pnpm-lock\.yaml):[0-9]+:.*(integrity|sha512-|sha384-|sha256-|sha1-)'
+# The one permitted upstream mention in README (see "Exclusions" above).
+CREDIT_LINE='^README\.md:[0-9]+:Derived from \[fullstackhero/dotnet-starter-kit\]\(https://github\.com/fullstackhero/dotnet-starter-kit\) \(MIT\), trimmed to a brand-free template with stricter tenancy and a Dokploy deploy path\.$'
 
 status=0
 
 content_hits=$(
-  git grep -nIiE "$PATTERN" -- . ":(exclude)LICENSE" ":(exclude)$SELF" \
+  git grep -nIiE "$PATTERN" -- . ":(exclude)LICENSE" ":(exclude)$SELF" ":(exclude).gitleaksignore" \
     | grep -vE "$DIGEST_LINE" \
+    | grep -vE "$CREDIT_LINE" \
     || true
 )
 

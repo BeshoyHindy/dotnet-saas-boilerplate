@@ -4,6 +4,8 @@ A production-ready starter for multi-tenant SaaS: a modular .NET 10 monolith (ve
 CQRS via a source-generated mediator, EF Core 10 on PostgreSQL) plus two React 19 clients, wired
 for local orchestration with .NET Aspire.
 
+Derived from [fullstackhero/dotnet-starter-kit](https://github.com/fullstackhero/dotnet-starter-kit) (MIT), trimmed to a brand-free template with stricter tenancy and a Dokploy deploy path.
+
 `Boilerplate` is the placeholder root name. A new product renames it in one command
 (`dotnet new saas -n Acme`) — see [`docs/adr/0001-placeholder-namespace-and-dotnet-new-rename.md`](docs/adr/0001-placeholder-namespace-and-dotnet-new-rename.md).
 
