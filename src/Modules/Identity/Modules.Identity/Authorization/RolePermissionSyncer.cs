@@ -13,9 +13,11 @@ using Microsoft.Extensions.Logging;
 namespace Boilerplate.Modules.Identity.Authorization;
 
 /// <summary>
-/// Adds missing permission claims to the built-in roles (<see cref="RoleConstants.Admin"/>,
-/// <see cref="RoleConstants.Basic"/>) for the current Finbuckle tenant context. Idempotent —
-/// only inserts claims that don't already exist, so it can run on every startup safely.
+/// Adds missing permission claims to, and removes stale ones from, the built-in roles
+/// (<see cref="RoleConstants.Admin"/>, <see cref="RoleConstants.Basic"/>) for the current Finbuckle
+/// tenant context, and prunes every other (tenant-created) role down to permissions that still exist
+/// in <see cref="IPermissionRegistry.All"/>. Idempotent — a claim that already matches its target is
+/// left untouched, so it can run on every startup safely.
 /// </summary>
 public sealed class RolePermissionSyncer(
     IdentityDbContext context,
@@ -31,27 +33,50 @@ public sealed class RolePermissionSyncer(
         var tenantId = tenantAccessor.MultiTenantContext.TenantInfo?.Id;
         bool isRoot = tenantId == MultitenancyConstants.Root.Id;
 
-        int basicAdded = await SyncRoleAsync(RoleConstants.Basic, permissionRegistry.Basic, cancellationToken).ConfigureAwait(false);
+        int changed = await SyncRoleAsync(RoleConstants.Basic, permissionRegistry.Basic, addMissing: true, cancellationToken).ConfigureAwait(false);
 
         // Admin gets all non-root permissions; the root tenant's Admin additionally gets Root permissions.
         var adminPermissions = isRoot
             ? permissionRegistry.Admin.Concat(permissionRegistry.Root).Distinct().ToList()
             : permissionRegistry.Admin.ToList();
-        int adminAdded = await SyncRoleAsync(RoleConstants.Admin, adminPermissions, cancellationToken).ConfigureAwait(false);
+        changed += await SyncRoleAsync(RoleConstants.Admin, adminPermissions, addMissing: true, cancellationToken).ConfigureAwait(false);
 
-        // If we wrote anything, drop the per-user permission cache so already-logged-in
+        // Every other role is one a tenant created for itself (RoleService.CreateOrUpdateRoleAsync).
+        // Its permission set is the tenant's own choice, so we never add to it — we only drop claims
+        // that no longer name a real permission, e.g. one whose module was removed from the registry.
+        var customRoles = await roleManager.Roles
+            .Where(r => r.Name != RoleConstants.Admin && r.Name != RoleConstants.Basic)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        foreach (var customRole in customRoles)
+        {
+            if (customRole.Name is null)
+            {
+                continue;
+            }
+
+            changed += await SyncRoleAsync(customRole.Name, permissionRegistry.All, addMissing: false, cancellationToken).ConfigureAwait(false);
+        }
+
+        // If we changed anything, drop the per-user permission cache so already-logged-in
         // sessions see the new perms on their next request rather than waiting for TTL.
         // The tag is scoped to the ambient tenant by the cache, so this evicts only the tenant whose
         // claims we just changed. That is the right blast radius: the syncer is invoked once per
-        // tenant under ITenantScope.RunAsync (RolePermissionSyncHostedService), so every tenant that
-        // gained claims gets its own eviction, and a tenant that gained none keeps its warm entries.
-        if (basicAdded + adminAdded > 0)
+        // tenant under ITenantScope.RunAsync (RolePermissionSyncHostedService), so every tenant whose
+        // claims changed gets its own eviction, and a tenant that changed none keeps its warm entries.
+        if (changed > 0)
         {
             await cache.RemoveByTagAsync(CacheKeys.Tags.Permissions, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private async Task<int> SyncRoleAsync(string roleName, IReadOnlyList<AppPermission> targetPermissions, CancellationToken cancellationToken)
+    /// <summary>
+    /// Diffs <paramref name="roleName"/>'s permission claims against <paramref name="targetPermissions"/>:
+    /// removes any claim whose value isn't in the target set, and — when <paramref name="addMissing"/> is
+    /// true — adds every target permission the role doesn't already have. Returns the number of claims
+    /// added plus removed.
+    /// </summary>
+    private async Task<int> SyncRoleAsync(string roleName, IReadOnlyList<AppPermission> targetPermissions, bool addMissing, CancellationToken cancellationToken)
     {
         var role = await roleManager.Roles
             .SingleOrDefaultAsync(r => r.Name == roleName, cancellationToken)
@@ -64,40 +89,58 @@ public sealed class RolePermissionSyncer(
 
         var existing = await context.RoleClaims
             .Where(rc => rc.RoleId == role.Id && rc.ClaimType == ClaimConstants.Permission)
-            .Select(rc => rc.ClaimValue!)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
-        var existingSet = existing.ToHashSet(StringComparer.Ordinal);
+        var targetNames = targetPermissions.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
 
-        var toAdd = targetPermissions
-            .Where(p => !existingSet.Contains(p.Name))
-            .Select(p => new AppRoleClaim
-            {
-                RoleId = role.Id,
-                ClaimType = ClaimConstants.Permission,
-                ClaimValue = p.Name,
-                CreatedBy = "RolePermissionSyncer",
-                CreatedOn = timeProvider.GetUtcNow(),
-            })
+        var toRemove = existing
+            .Where(rc => rc.ClaimValue is null || !targetNames.Contains(rc.ClaimValue))
             .ToList();
 
-        if (toAdd.Count == 0)
+        var toAdd = new List<AppRoleClaim>();
+        if (addMissing)
+        {
+            var existingSet = existing.Select(rc => rc.ClaimValue!).ToHashSet(StringComparer.Ordinal);
+            toAdd = targetPermissions
+                .Where(p => !existingSet.Contains(p.Name))
+                .Select(p => new AppRoleClaim
+                {
+                    RoleId = role.Id,
+                    ClaimType = ClaimConstants.Permission,
+                    ClaimValue = p.Name,
+                    CreatedBy = "RolePermissionSyncer",
+                    CreatedOn = timeProvider.GetUtcNow(),
+                })
+                .ToList();
+        }
+
+        if (toAdd.Count == 0 && toRemove.Count == 0)
         {
             return 0;
         }
 
-        await context.RoleClaims.AddRangeAsync(toAdd, cancellationToken).ConfigureAwait(false);
+        if (toRemove.Count > 0)
+        {
+            context.RoleClaims.RemoveRange(toRemove);
+        }
+
+        if (toAdd.Count > 0)
+        {
+            await context.RoleClaims.AddRangeAsync(toAdd, cancellationToken).ConfigureAwait(false);
+        }
+
         await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         if (logger.IsEnabled(LogLevel.Information))
         {
             logger.LogInformation(
-                "Synced {Count} new permission claim(s) to '{Role}' for tenant '{Tenant}'",
-                toAdd.Count,
+                "Synced '{Role}' for tenant '{Tenant}': added {Added} permission claim(s), removed {Removed} stale one(s)",
                 roleName,
-                tenantAccessor.MultiTenantContext.TenantInfo?.Id);
+                tenantAccessor.MultiTenantContext.TenantInfo?.Id,
+                toAdd.Count,
+                toRemove.Count);
         }
 
-        return toAdd.Count;
+        return toAdd.Count + toRemove.Count;
     }
 }

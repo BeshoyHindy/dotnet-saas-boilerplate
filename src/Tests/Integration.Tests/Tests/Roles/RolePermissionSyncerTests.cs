@@ -84,6 +84,70 @@ public sealed class RolePermissionSyncerTests
         after.Count.ShouldBe(before.Count, "Syncer must not duplicate existing permission claims.");
     }
 
+    [Fact]
+    public async Task SyncAsync_Should_Remove_Stale_Permission_Claim_From_Admin_Role_And_Keep_Other_Grants()
+    {
+        var rootTenant = await GetRootTenantAsync();
+        const string removedPermission = "Permissions.Removed.View";
+
+        // 1. Grant a permission name that no longer exists in the registry. Simulates
+        //    "a permission that used to be registered, then a later release dropped it."
+        await AddClaimAsync(rootTenant, "Admin", removedPermission);
+
+        var beforeSync = await GetClaimsAsync(rootTenant, "Admin");
+        beforeSync.ShouldContain(removedPermission, "Pre-condition: the stale claim must be present before the sync.");
+        var otherGrantsBeforeSync = beforeSync.Where(p => p != removedPermission).ToHashSet(StringComparer.Ordinal);
+
+        // 2. Run the syncer through the production scope/tenant pattern.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()
+                .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(rootTenant);
+
+            var syncer = scope.ServiceProvider.GetRequiredService<RolePermissionSyncer>();
+            await syncer.SyncAsync(CancellationToken.None);
+        }
+
+        // 3. The stale claim is gone; every other grant survived untouched.
+        var afterSync = await GetClaimsAsync(rootTenant, "Admin");
+        afterSync.ShouldNotContain(removedPermission, "Syncer must remove a permission claim no longer in the registry.");
+        otherGrantsBeforeSync.ShouldBeSubsetOf(afterSync, "Syncer must not touch a role's still-valid grants while removing a stale one.");
+    }
+
+    [Fact]
+    public async Task SyncAsync_Should_Prune_Stale_Permission_From_Custom_Role_Without_Adding_Others()
+    {
+        var rootTenant = await GetRootTenantAsync();
+        const string customRoleName = "SyncerTestCustomRole";
+        const string realPermission = "Permissions.Users.View";
+        const string removedPermission = "Permissions.Removed.View";
+
+        var roleId = await CreateCustomRoleAsync(rootTenant, customRoleName, [realPermission, removedPermission]);
+        try
+        {
+            var beforeSync = await GetClaimsAsync(rootTenant, customRoleName);
+            beforeSync.ShouldBe(new HashSet<string>(StringComparer.Ordinal) { realPermission, removedPermission });
+
+            using (var scope = _factory.Services.CreateScope())
+            {
+                scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()
+                    .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(rootTenant);
+
+                var syncer = scope.ServiceProvider.GetRequiredService<RolePermissionSyncer>();
+                await syncer.SyncAsync(CancellationToken.None);
+            }
+
+            // The stale claim is pruned, the real one kept, and nothing else was added —
+            // a custom role's own choice of permissions is never expanded by the syncer.
+            var afterSync = await GetClaimsAsync(rootTenant, customRoleName);
+            afterSync.ShouldBe(new HashSet<string>(StringComparer.Ordinal) { realPermission });
+        }
+        finally
+        {
+            await DeleteRoleAsync(rootTenant, roleId);
+        }
+    }
+
     // ─── helpers ─────────────────────────────────────────────────────
 
     private async Task<AppTenantInfo> GetRootTenantAsync()
@@ -133,5 +197,67 @@ public sealed class RolePermissionSyncerTests
             .ToListAsync();
 
         return claims.ToHashSet(StringComparer.Ordinal);
+    }
+
+    private async Task AddClaimAsync(AppTenantInfo tenant, string roleName, string claimValue)
+    {
+        using var scope = _factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()
+            .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
+
+        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<AppRole>>();
+        var role = await roleManager.Roles.SingleAsync(r => r.Name == roleName);
+
+        var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        db.RoleClaims.Add(new AppRoleClaim
+        {
+            RoleId = role.Id,
+            ClaimType = ClaimConstants.Permission,
+            ClaimValue = claimValue,
+            CreatedBy = nameof(RolePermissionSyncerTests),
+        });
+        await db.SaveChangesAsync();
+    }
+
+    private async Task<string> CreateCustomRoleAsync(AppTenantInfo tenant, string roleName, IReadOnlyCollection<string> claimValues)
+    {
+        using var scope = _factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()
+            .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
+
+        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<AppRole>>();
+        var role = new AppRole(roleName, "Role created for RolePermissionSyncerTests.");
+        var result = await roleManager.CreateAsync(role);
+        result.Succeeded.ShouldBeTrue($"Failed to create test role '{roleName}': " +
+            string.Join(", ", result.Errors.Select(e => e.Description)));
+
+        var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        foreach (var claimValue in claimValues)
+        {
+            db.RoleClaims.Add(new AppRoleClaim
+            {
+                RoleId = role.Id,
+                ClaimType = ClaimConstants.Permission,
+                ClaimValue = claimValue,
+                CreatedBy = nameof(RolePermissionSyncerTests),
+            });
+        }
+        await db.SaveChangesAsync();
+
+        return role.Id;
+    }
+
+    private async Task DeleteRoleAsync(AppTenantInfo tenant, string roleId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()
+            .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
+
+        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<AppRole>>();
+        var role = await roleManager.FindByIdAsync(roleId);
+        if (role is not null)
+        {
+            await roleManager.DeleteAsync(role);
+        }
     }
 }
