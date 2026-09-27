@@ -14,6 +14,7 @@ import {
   formatGateCommands,
   gateCommand,
   PHASE_NAMES,
+  type FallbackAccountSetting,
   type ResolvedLimits,
   type ResolvedModels,
   type SandcastleConfig,
@@ -200,6 +201,7 @@ export function renderDryRun(
   limits: ResolvedLimits,
   models: ResolvedModels,
   query: IssueQuery,
+  fallback: FallbackAccountSetting = { enabled: false },
 ): string {
   const lines: string[] = [
     "",
@@ -224,6 +226,10 @@ export function renderDryRun(
         : `probe every ${limits.usagePollMinutes} min, give up after ` +
           `${limits.usageMaxWaitHours} h (a run confirms it with one ` +
           `startup probe of ${config.usageProbeModel})`),
+    `  fallback account     ` +
+      (fallback.enabled
+        ? "ON (a run probes its token once at startup and drops it if broken)"
+        : "OFF (SANDCASTLE_FALLBACK_ACCOUNT is not on)"),
     "",
     "Models",
   ];

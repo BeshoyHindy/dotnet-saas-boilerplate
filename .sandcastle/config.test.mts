@@ -3,11 +3,13 @@ import test from "node:test";
 
 import {
   defineConfig,
+  envFileKeys,
   formatGateCommands,
   gateCommand,
   gateNames,
   issueBranch,
   joinGateCommands,
+  resolveFallbackAccount,
   resolveLimits,
   resolveModels,
   type GateConfig,
@@ -212,6 +214,50 @@ test("the planner queue is clamped up to the concurrency cap, never below it", (
   assert.equal(resolveLimits(limits, { MAX_CONCURRENT_AGENTS: "2" }).plannerQueueDepth, 10);
 });
 
+test("SANDCASTLE_MAX_ITERATIONS overrides the round cap, and absent or blank keeps it", () => {
+  assert.equal(resolveLimits(limits, { SANDCASTLE_MAX_ITERATIONS: "250" }).maxIterations, 250);
+  assert.equal(resolveLimits(limits, {}).maxIterations, limits.maxIterations);
+  assert.equal(
+    resolveLimits(limits, { SANDCASTLE_MAX_ITERATIONS: " " }).maxIterations,
+    limits.maxIterations,
+  );
+});
+
+test("a malformed SANDCASTLE_MAX_ITERATIONS throws instead of falling back", () => {
+  for (const raw of ["0", "-3", "1.5", "lots"]) {
+    assert.throws(
+      () => resolveLimits(limits, { SANDCASTLE_MAX_ITERATIONS: raw }),
+      new RegExp(`SANDCASTLE_MAX_ITERATIONS must be an integer >= 1, got "${raw}"`),
+    );
+  }
+});
+
+test("PLANNER_QUEUE_DEPTH overrides the queue depth, and absent or blank keeps it", () => {
+  assert.equal(resolveLimits(limits, { PLANNER_QUEUE_DEPTH: "15" }).plannerQueueDepth, 15);
+  assert.equal(resolveLimits(limits, {}).plannerQueueDepth, limits.plannerQueueDepth);
+  assert.equal(
+    resolveLimits(limits, { PLANNER_QUEUE_DEPTH: "" }).plannerQueueDepth,
+    limits.plannerQueueDepth,
+  );
+});
+
+test("a malformed PLANNER_QUEUE_DEPTH throws instead of falling back", () => {
+  for (const raw of ["0", "-1", "2.5", "deep"]) {
+    assert.throws(
+      () => resolveLimits(limits, { PLANNER_QUEUE_DEPTH: raw }),
+      new RegExp(`PLANNER_QUEUE_DEPTH must be an integer >= 1, got "${raw}"`),
+    );
+  }
+});
+
+test("an overridden queue depth is still clamped up to the concurrency cap", () => {
+  assert.equal(
+    resolveLimits(limits, { PLANNER_QUEUE_DEPTH: "2", MAX_CONCURRENT_AGENTS: "4" })
+      .plannerQueueDepth,
+    4,
+  );
+});
+
 // --- models ----------------------------------------------------------------
 
 test("resolveModels keeps the configured models when nothing is overridden", () => {
@@ -300,6 +346,78 @@ test("a model the agent CLI cannot route throws instead of falling back", () => 
     () => resolveModels(models, { SANDCASTLE_PLANNER_MODEL: "claude-test model" }),
     /SANDCASTLE_PLANNER_MODEL.*no whitespace/,
   );
+});
+
+// --- fallback account ------------------------------------------------------
+
+const TOKEN = "CLAUDE_CODE_OAUTH_TOKEN_FALLBACK";
+const listed = new Set(["CLAUDE_CODE_OAUTH_TOKEN", TOKEN]);
+
+test("the fallback account is off when its switch is absent, blank or off", () => {
+  // A token sitting in .env stays unused.
+  for (const value of [undefined, "", "  ", "off", "OFF"]) {
+    assert.deepEqual(
+      resolveFallbackAccount({ SANDCASTLE_FALLBACK_ACCOUNT: value, [TOKEN]: "t" }, listed),
+      { enabled: false },
+    );
+  }
+});
+
+test("the fallback account is on when switched on with a listed token", () => {
+  assert.deepEqual(
+    resolveFallbackAccount({ SANDCASTLE_FALLBACK_ACCOUNT: "on", [TOKEN]: "t" }, listed),
+    { enabled: true },
+  );
+});
+
+test("a malformed fallback switch throws instead of falling back", () => {
+  assert.throws(
+    () => resolveFallbackAccount({ SANDCASTLE_FALLBACK_ACCOUNT: "yes", [TOKEN]: "t" }, listed),
+    /SANDCASTLE_FALLBACK_ACCOUNT must be "on" or "off", got "yes"/,
+  );
+});
+
+test("the fallback switched on without a token throws at startup", () => {
+  assert.throws(
+    () => resolveFallbackAccount({ SANDCASTLE_FALLBACK_ACCOUNT: "on", [TOKEN]: " " }, listed),
+    /CLAUDE_CODE_OAUTH_TOKEN_FALLBACK is blank/,
+  );
+});
+
+test("a fallback token exported from the shell but not listed in .sandcastle/.env throws", () => {
+  assert.throws(
+    () =>
+      resolveFallbackAccount(
+        { SANDCASTLE_FALLBACK_ACCOUNT: "on", [TOKEN]: "t" },
+        new Set(["CLAUDE_CODE_OAUTH_TOKEN"]),
+      ),
+    /not listed in \.sandcastle\/\.env/,
+  );
+});
+
+test("the fallback switched on alongside an API key throws", () => {
+  assert.throws(
+    () =>
+      resolveFallbackAccount(
+        { SANDCASTLE_FALLBACK_ACCOUNT: "on", [TOKEN]: "t", ANTHROPIC_API_KEY: "k" },
+        listed,
+      ),
+    /ANTHROPIC_API_KEY is set/,
+  );
+});
+
+test("envFileKeys reads the keys the library forwards, skipping comments", () => {
+  const keys = envFileKeys(
+    [
+      "# a comment",
+      `CLAUDE_CODE_OAUTH_TOKEN=abc`,
+      `  ${TOKEN}=`,
+      "# ANTHROPIC_API_KEY=",
+      "not a pair",
+      "",
+    ].join("\n"),
+  );
+  assert.deepEqual([...keys].sort(), ["CLAUDE_CODE_OAUTH_TOKEN", TOKEN]);
 });
 
 // --- branches --------------------------------------------------------------

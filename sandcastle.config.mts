@@ -133,8 +133,12 @@ export default defineConfig({
   ],
 
   limits: {
-    // Raise for a large backlog; lower for a quick smoke-test run.
-    maxIterations: 40,
+    // A ceiling, not a target: the loop already ends as soon as the planner
+    // finds no unblocked issue, so a high cap costs nothing on a small backlog.
+    // It only keeps a long unattended run (one that waits out several usage
+    // windows) from stopping early. Per-run override: SANDCASTLE_MAX_ITERATIONS
+    // in .sandcastle/.env — lower it for a quick smoke-test run.
+    maxIterations: 100,
 
     // A RAM budget, not a throughput dial. Each agent may run a full Release
     // build with analyzers plus a test suite: budget ~3-4 GB of Docker RAM per
@@ -153,6 +157,8 @@ export default defineConfig({
     // tail (planner + merger + the host-side gates, during which EVERY slot
     // idles) over more issues. The ceiling is merge risk, not memory: every
     // queued issue is one more branch the single merger must land in one pass.
+    // Per-run override: PLANNER_QUEUE_DEPTH in .sandcastle/.env (still clamped
+    // up to the concurrency cap).
     plannerQueueDepth: 10,
 
     // The timer resets only on AGENT output, and a foreground gate emits none

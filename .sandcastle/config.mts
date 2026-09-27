@@ -10,6 +10,7 @@
 // This file deliberately holds NO values — only types, defaults-free helpers
 // and the `defineConfig` identity that gives the root file its type checking.
 
+import { FALLBACK_ACCOUNT } from "./accounts.mts";
 import type { LogParserName } from "./log-parsers.mts";
 
 /**
@@ -86,7 +87,10 @@ export interface GitConfig {
 }
 
 export interface LimitsConfig {
-  /** Maximum plan → execute → merge cycles before the run stops. */
+  /**
+   * Maximum plan → execute → merge cycles before the run stops. Overridden
+   * per run by `SANDCASTLE_MAX_ITERATIONS`.
+   */
   readonly maxIterations: number;
   /**
    * Hard cap on simultaneously running issue sandboxes. A RAM budget, not a
@@ -97,6 +101,7 @@ export interface LimitsConfig {
    * How many issues the planner queues per round — deliberately MORE than can
    * run at once, so a pipeline that finishes early starts the next issue
    * instead of idling its slot. Clamped up to `maxConcurrentAgents`.
+   * Overridden per run by `PLANNER_QUEUE_DEPTH`.
    */
   readonly plannerQueueDepth: number;
   /**
@@ -265,9 +270,19 @@ export function resolveLimits(
     return parsed;
   };
 
+  const maxIterations = readInt(
+    "SANDCASTLE_MAX_ITERATIONS",
+    limits.maxIterations,
+    1,
+  );
   const maxConcurrentAgents = readInt(
     "MAX_CONCURRENT_AGENTS",
     limits.maxConcurrentAgents,
+    1,
+  );
+  const plannerQueueDepth = readInt(
+    "PLANNER_QUEUE_DEPTH",
+    limits.plannerQueueDepth,
     1,
   );
   const healAttempts = readInt(
@@ -289,11 +304,12 @@ export function resolveLimits(
 
   return {
     ...limits,
+    maxIterations,
     maxConcurrentAgents,
     healAttempts,
     usagePollMinutes,
     usageMaxWaitHours,
-    plannerQueueDepth: Math.max(limits.plannerQueueDepth, maxConcurrentAgents),
+    plannerQueueDepth: Math.max(plannerQueueDepth, maxConcurrentAgents),
   };
 }
 
@@ -362,6 +378,93 @@ export function resolveModels(
     };
   }
   return resolved;
+}
+
+/** Whether the run may move phases onto the fallback Claude account. */
+export interface FallbackAccountSetting {
+  readonly enabled: boolean;
+}
+
+/** The on/off switch for the fallback account. */
+export const FALLBACK_SWITCH = "SANDCASTLE_FALLBACK_ACCOUNT";
+
+/**
+ * Read the fallback-account switch, `SANDCASTLE_FALLBACK_ACCOUNT=on|off`. OFF
+ * when blank or unset, so a fallback token can sit in `.sandcastle/.env`
+ * unused.
+ *
+ * THROWS, before anything starts, on every mistake that would otherwise only
+ * show on the night the main account runs out:
+ *
+ * - a switch value other than `on` or `off`;
+ * - `on` with no fallback token;
+ * - `on` with the token not listed in `.sandcastle/.env` itself
+ *   (`envFileKeys`), since the library forwards into the sandboxes only the
+ *   keys named in that file, so a token exported from the shell alone never
+ *   reaches a phase;
+ * - `on` while `ANTHROPIC_API_KEY` is set, since `claude` prefers the API key
+ *   and would ignore the swapped token.
+ *
+ * Whether the token WORKS is a probe's question, asked once at startup
+ * (usage-limit.mts, `checkFallbackAccount`).
+ */
+export function resolveFallbackAccount(
+  env: Readonly<Record<string, string | undefined>>,
+  envFileKeys: ReadonlySet<string>,
+): FallbackAccountSetting {
+  const raw = env[FALLBACK_SWITCH]?.trim().toLowerCase();
+  if (raw === undefined || raw === "" || raw === "off") {
+    return { enabled: false };
+  }
+  if (raw !== "on") {
+    throw new Error(
+      `${FALLBACK_SWITCH} must be "on" or "off", got ${JSON.stringify(env[FALLBACK_SWITCH])}`,
+    );
+  }
+
+  const tokenVar = FALLBACK_ACCOUNT.tokenVar;
+  if ((env[tokenVar]?.trim() ?? "") === "") {
+    throw new Error(
+      `${FALLBACK_SWITCH} is on, but ${tokenVar} is blank. Put the second ` +
+        `account's token (from \`claude setup-token\`) in .sandcastle/.env, or ` +
+        `set ${FALLBACK_SWITCH}=off.`,
+    );
+  }
+  if (!envFileKeys.has(tokenVar)) {
+    throw new Error(
+      `${FALLBACK_SWITCH} is on, but ${tokenVar} is not listed in ` +
+        ".sandcastle/.env. Only keys listed there reach a sandbox, so a " +
+        "token exported from the shell alone would never reach a phase.",
+    );
+  }
+  if ((env.ANTHROPIC_API_KEY?.trim() ?? "") !== "") {
+    throw new Error(
+      `${FALLBACK_SWITCH} is on while ANTHROPIC_API_KEY is set. Claude Code ` +
+        "prefers the API key and would ignore the fallback token. Unset one " +
+        "of them.",
+    );
+  }
+  return { enabled: true };
+}
+
+/**
+ * The keys a `.sandcastle/.env` file lists, read the way the library reads
+ * them when it decides what to forward into a sandbox: one `KEY=value` per
+ * line, `#` comments and lines without `=` skipped.
+ */
+export function envFileKeys(content: string): Set<string> {
+  const keys = new Set<string>();
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed === "" || trimmed.startsWith("#")) {
+      continue;
+    }
+    const eq = trimmed.indexOf("=");
+    if (eq !== -1) {
+      keys.add(trimmed.slice(0, eq).trim());
+    }
+  }
+  return keys;
 }
 
 /** The branch an issue is worked on. Re-planning an issue must reproduce it exactly. */
