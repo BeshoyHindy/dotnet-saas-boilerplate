@@ -46,4 +46,18 @@ refute_match "first sign-in no longer points at the dashboard's example host" "$
   'sign in at `https://app\.example\.com`'
 assert_match "the seeded admin is named at first sign-in" "$guide_text" 'admin@root\.com'
 
+# ── D1: the backup and restore runbook exists and names the exact commands ──
+# The ticket is done when the runbook gives the exact restore commands, not a
+# description of the shape of one — pin the command a reader would actually
+# copy-paste, not just the section heading.
+assert_match "the guide has a back up and restore section" "$guide_text" \
+  '## 10\. Back up and restore Postgres'
+assert_match "the runbook names the backup schedule and retention keys" "$guide_text" \
+  'BACKUP_SCHEDULE'
+assert_match "the runbook names the retention key" "$guide_text" 'BACKUP_KEEP_DAYS'
+assert_match "the runbook's restore uses --clean --if-exists --no-owner" "$guide_text" \
+  'pg_restore --clean --if-exists --no-owner'
+assert_match "the runbook warns to stop the app stack before restoring" "$guide_text" \
+  'Stop the app stack first'
+
 summary

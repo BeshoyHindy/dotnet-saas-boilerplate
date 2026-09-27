@@ -14,7 +14,7 @@ has no shell to run a container `HEALTHCHECK` with.
 
 | File | What it is |
 |---|---|
-| [`deploy/dokploy/data-services.compose.yml`](../deploy/dokploy/data-services.compose.yml) | PostgreSQL, Valkey, MinIO, bucket creator |
+| [`deploy/dokploy/data-services.compose.yml`](../deploy/dokploy/data-services.compose.yml) | PostgreSQL, Valkey, MinIO, bucket creator, scheduled Postgres backup |
 | [`deploy/dokploy/app.compose.yml`](../deploy/dokploy/app.compose.yml) | the application services, in order, all pulled from GHCR |
 | [`deploy/dokploy/.env.example`](../deploy/dokploy/.env.example) | the variable contract, key names only |
 | [`deploy/dokploy/dokploy-deploy.sh`](../deploy/dokploy/dokploy-deploy.sh) | trigger a deploy from CI and wait for it |
@@ -192,6 +192,9 @@ in both.
 | `MINIO_ROOT_PASSWORD` | both | generated | generated, different |
 | `STORAGE_BUCKET` | both | `boilerplate` | `boilerplate` |
 | `STORAGE_REGION` | app | `us-east-1` | `us-east-1` |
+| `BACKUP_BUCKET` | data | `boilerplate-backups` | `boilerplate-backups` |
+| `BACKUP_SCHEDULE` | data | blank (daily at 03:00) | same, or a quieter hour |
+| `BACKUP_KEEP_DAYS` | data | blank (7) | same, or longer |
 | `JWT_SIGNING_KEY` | app | generated | generated, different |
 | `SEED_ADMIN_PASSWORD` | app | generated | generated, different |
 | `MAIL_FROM` | app | `no-reply@example.com` | `no-reply@example.com` |
@@ -210,6 +213,13 @@ name. Two environments sharing a `STACK_NAME` will fight over both.
 Telemetry needs **both** OTLP keys or neither: Production ships the exporter
 disabled, so an endpoint with `OTEL_EXPORTER_ENABLED=false` is dead
 configuration that looks live.
+
+`BACKUP_SCHEDULE` and `BACKUP_KEEP_DAYS` are, like the `*_MEM_LIMIT` keys, the
+one other class of variable allowed to stay blank — leaving them empty means
+"daily at 03:00, keep 7 days", not "never back up". `BACKUP_BUCKET` is a plain
+required key like `STORAGE_BUCKET`, and must **not** be the same bucket:
+`STORAGE_BUCKET` carries the anonymous `uploads/` read grant (§0), and a
+database dump must never be reachable unsigned.
 
 `ALLOWED_HOSTS` is a semicolon-separated list and must contain `API_DOMAIN`.
 `*` is rejected outright. It is also the `Host` that Traefik's readiness probe
@@ -434,8 +444,8 @@ Bumping the branch alone changes nothing about the running code, and bumping
 
 **Rollback** is the previous tag: set `IMAGE_TAG` back and deploy. The data
 stack is untouched — but a migration that has already run is *not* rolled back
-by this, so a rollback across a destructive migration needs a restore, not a
-redeploy.
+by this, so a rollback across a destructive migration needs a restore
+([§10](#10-back-up-and-restore-postgres)), not a redeploy.
 
 ## 8. Tests
 
@@ -452,13 +462,20 @@ deploy script itself. Two suites:
   `:latest`, the migrator gate, the external network, the `/health/ready`
   load-balancer probe with `passhostheader`, no host port published, no literal
   credential, anonymous storage reads scoped to `uploads/` and never widened to
-  the bucket or to `tenants/`, and `.env.example` matching the interpolated
-  variables in both directions.
+  the bucket or to `tenants/`, `.env.example` matching the interpolated
+  variables in both directions, and the backup pair — `postgres-backup` pinned
+  to the same Postgres major version by tag *and* digest, its schedule and
+  retention window env-configurable with the ticket's own defaults (daily,
+  keep 7), and `postgres-backup-upload` mirroring to a `BACKUP_BUCKET` that
+  never gets the anonymous read grant `STORAGE_BUCKET` does.
 - **`dokploy-deploy.test.sh`** — the deploy script against a stubbed `curl`:
   success, failure, cancellation, timeout, an unregistered deployment, a
   malformed body, a JSON object where an array was documented, an unknown
   status, HTTP errors, a refused `--api-key`, and *somebody else's* deployment
   going green while ours is still running.
+- **`docs-deploy.test.sh`** — pins prose in this file: the DNS/sign-in fixes
+  from D6, and the *Back up and restore* section's heading and `pg_restore`
+  command.
 
 Also useful directly:
 
@@ -497,7 +514,89 @@ signature carries the access, so `publicUrl` must never be persisted: un-sharing
 a file stops issuance immediately, but a signature already handed out stays
 usable until it expires.
 
-## 10. When it does not work
+## 10. Back up and restore Postgres
+
+D1 (deploy-operability research): `pg_data` was a plain named Docker volume
+with no snapshot, replication or export step — a host disk failure, an
+operator `docker volume rm`, or a destructive migration had no recovery path
+other than "there is no backup". The data stack now runs two more services:
+
+- **`postgres-backup`** — the same `postgres:18-alpine` image as `postgres`
+  (pinned by tag *and* digest, so its `pg_dump` can never drift ahead of or
+  behind the server it dumps), running `pg_dump -Fc` on a cron schedule
+  (`BACKUP_SCHEDULE`, default `0 3 * * *` — daily at 03:00) into its own
+  `pg_backups` volume, then deleting dumps older than `BACKUP_KEEP_DAYS`
+  (default 7) from that volume.
+- **`postgres-backup-upload`** — `mc mirror --watch --remove` from the same
+  volume to `BACKUP_BUCKET` in the object store, continuously. A dump lands in
+  the bucket within seconds of being written, and a local retention delete is
+  mirrored as a delete in the bucket, so `BACKUP_KEEP_DAYS` is the only
+  retention setting to reason about.
+
+`BACKUP_BUCKET` is a separate bucket from `STORAGE_BUCKET` on purpose:
+`STORAGE_BUCKET` carries the anonymous `uploads/` read grant (§0), and a
+database dump must never be reachable unsigned.
+
+`BACKUP_KEEP_DAYS` bounds dump *age*, not dump *count* — with the daily
+default they come to the same thing, but a `BACKUP_SCHEDULE` set to run more
+than once a day keeps every dump from every run within the window, not just
+the last 7.
+
+### Restore
+
+Stop the app stack first, in the Dokploy UI (or scale `api` to 0) — a
+`--clean` restore drops and recreates every object in the target database, and
+the API holding open connections against it will error mid-restore.
+
+Then, from a machine that can reach `dokploy-network` (the Dokploy host
+itself, or any container joined to it):
+
+```bash
+# 1. List the available dumps and pick one. Filenames are
+#    ${POSTGRES_DB}-<UTC timestamp>.dump (e.g. boilerplate-20260115T030001Z.dump),
+#    so a plain `sort` on the listing puts them in chronological order.
+docker run --rm --network dokploy-network \
+  -e MC_HOST_local="http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@${STACK_NAME}-minio:9000" \
+  --entrypoint mc cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1 \
+  ls "local/${BACKUP_BUCKET}" | sort
+
+# 2. Copy the chosen dump into a throwaway volume. mc runs as uid 65532
+#    (Chainguard's non-root user), so the volume is chowned to it first —
+#    the same reason minio-volume-owner exists in the data stack.
+docker volume create restore-scratch
+docker run --rm -v restore-scratch:/restore \
+  --entrypoint chown postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873 \
+  65532:65532 /restore
+docker run --rm --network dokploy-network -v restore-scratch:/restore \
+  -e MC_HOST_local="http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@${STACK_NAME}-minio:9000" \
+  --entrypoint mc cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1 \
+  cp "local/${BACKUP_BUCKET}/<POSTGRES_DB>-<timestamp>.dump" /restore/restore.dump
+
+# 3. Restore. --clean --if-exists drops existing objects first (safe against a
+#    partially-migrated or corrupted database); --no-owner because the role
+#    names in the dump may not match ${POSTGRES_USER} in this environment.
+docker run --rm --network dokploy-network -v restore-scratch:/restore \
+  -e PGPASSWORD="${POSTGRES_PASSWORD}" \
+  postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873 \
+  pg_restore --clean --if-exists --no-owner \
+    -h "${STACK_NAME}-postgres" -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" /restore/restore.dump
+
+# 4. Clean up the scratch volume, then redeploy (start) the app stack.
+docker volume rm restore-scratch
+```
+
+This is the exact shape verified locally for this ticket: seed a table, run
+`postgres-backup`'s dump script, confirm `postgres-backup-upload` mirrors it
+into the bucket within seconds, then run steps 1–3 above against a fresh
+database and confirm the seeded rows come back.
+
+A migration that ran *after* the dump was taken is not restored by this — the
+schema in the dump is whatever it was at dump time. Restoring across a
+destructive migration means restoring the dump taken before that migration
+ran, then re-applying migrations up to the target version, not the other way
+around.
+
+## 11. When it does not work
 
 | Symptom | Cause |
 |---|---|
@@ -518,6 +617,8 @@ usable until it expires.
 | `migrator` retries PostgreSQL and then fails | The data stack is not up, or `POSTGRES_PASSWORD` was changed against an existing volume. |
 | `api` never starts, no error of its own | The migrator exited non-zero. Read the migrator's log — the API is gated on it and is behaving correctly by not starting. |
 | Deploy script reports `timed out` while the UI shows success | The successful deployment is not the one the script started (another deploy of the same service). Check the deployment titles; the script's carries its `dpl-…` token. |
+| No dumps appear in `BACKUP_BUCKET` | Read `postgres-backup`'s log for a `pg_dump` error (often a `PGPASSWORD`/`POSTGRES_USER` mismatch after a password rotation), or `postgres-backup-upload`'s log if a dump exists on the `pg_backups` volume but never reaches the bucket. |
+| `postgres-backup-upload` never starts | `minio-init` did not complete — it creates `BACKUP_BUCKET` alongside `STORAGE_BUCKET`. Same fix as the `NoSuchBucket` row above: redeploy the data stack. |
 
 ## See also
 
