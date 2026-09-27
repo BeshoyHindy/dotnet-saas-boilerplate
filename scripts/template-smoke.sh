@@ -156,7 +156,6 @@ if [ "$FRONTEND" = true ]; then
   exists "clients/console"
   exists ".github/workflows/frontend.yml"
   exists ".agents/rules/frontend"
-  exists "scripts/export-openapi.sh"
   for client in dashboard console; do
     grep -q "^  ${client}:" "$OUT/docker-compose.yml" \
       || fail "docker-compose lost the ${client} service"
@@ -164,10 +163,14 @@ if [ "$FRONTEND" = true ]; then
       || fail "the deploy stack lost the ${client} service"
   done
 else
-  not_exists "clients"
+  # The clients go; the API contract they were typed from stays, with its backend drift
+  # gate — an API-only product still has consumers, and the contract is the one agreed
+  # description of what they can call.
+  not_exists "clients/dashboard"
+  not_exists "clients/console"
   not_exists ".github/workflows/frontend.yml"
   not_exists ".agents/rules/frontend"
-  not_exists "scripts/export-openapi.sh"
+  [ "$(ls -A "$OUT/clients")" = "openapi" ] || fail "clients/ holds more than the API contract"
   for client in dashboard console; do
     ! grep -q "^  ${client}:" "$OUT/docker-compose.yml" \
       || fail "docker-compose still has a ${client} service"
@@ -177,6 +180,11 @@ else
   ! grep -q 'AddJavaScriptApp' "$OUT/src/Host/$NAME.AppHost/AppHost.cs" 2>/dev/null \
     || fail "the AppHost still starts a client app"
 fi
+
+# In every variant: the contract and the gate that keeps it honest.
+exists "clients/openapi/v1.json"
+exists "scripts/export-openapi.sh"
+exists "scripts/check-openapi-drift.sh"
 
 if [ "$SANDCASTLE" = true ]; then
   exists ".sandcastle"
@@ -209,6 +217,26 @@ for proj in Architecture Auditing Caching Generic Identity Multitenancy Files Fr
   echo "--- ${proj}.Tests"
   dotnet test "$OUT/src/Tests/${proj}.Tests" -c Release --no-build
 done
+
+# ── OpenAPI drift ────────────────────────────────────────────────────
+# The gate CI's `openapi-drift` job runs on every PR that touches src/**: the renamed
+# API must re-export exactly the renamed contract the scaffold ships. The script asks
+# `git status`, so the scaffold gets a throwaway repository with one commit (an
+# uncommitted file would read as drift), removed again straight after.
+step "OpenAPI drift check (backend)"
+git -C "$OUT" init -q
+git -C "$OUT" add -A
+git -C "$OUT" -c user.name=template-smoke -c user.email=template-smoke@localhost \
+  -c commit.gpgsign=false commit -q -m scaffold
+(cd "$OUT" && bash scripts/check-openapi-drift.sh backend)
+rm -rf "$OUT/.git"
+
+# The scaffold's AGENTS.md lists `gitleaks dir .` as a gate; run it when the tool is
+# here (the CI runner has no gitleaks — the product's own gitleaks workflow owns it).
+if command -v gitleaks >/dev/null; then
+  step "gitleaks over the scaffold"
+  gitleaks dir "$OUT" --no-banner
+fi
 
 # ── Deploy contract ──────────────────────────────────────────────────
 # Pure bash assertions over the compose stacks and the env contract — no Docker,

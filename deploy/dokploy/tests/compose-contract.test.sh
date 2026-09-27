@@ -303,6 +303,18 @@ assert_match "both clients are in the CORS allow-list" "$api_block" \
   'CorsOptions__AllowedOrigins__1:[[:space:]]*https://\$\{CONSOLE_DOMAIN\}'
 #endif
 
+# An API-only product (`--frontend false`) ships no client page to link to, so mailed
+# links carry the API's own public origin rather than a hostname nothing serves. The
+# origin must still be SET: the Identity module refuses to mail a link without one
+# (MailLinkOrigin). Decided at run time, like the image count above, because the
+# template's own tree carries both variants' lines.
+if ! grep -qE '^  dashboard:' "$APP"; then
+  assert_match "API-only: mailed links point at the API's own origin" "$api_block" \
+    'OriginOptions__OriginUrl:[[:space:]]*https://\$\{API_DOMAIN\}'
+  refute_match "API-only: no client hostname is named" "$both_text" 'DASHBOARD_DOMAIN|CONSOLE_DOMAIN'
+  refute_match "API-only: no CORS allow-list without a browser client" "$api_block" 'CorsOptions__AllowedOrigins'
+fi
+
 # Traefik reports a middleware that two different containers define as a
 # configuration error, so every redirect middleware name must be unique.
 mw_names="$(printf '%s\n' "$both_text" | grep -oE 'traefik\.http\.middlewares\.[^.]+' | sort -u | wc -l | tr -d ' ')"

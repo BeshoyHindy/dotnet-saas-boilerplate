@@ -7,7 +7,7 @@ namespace Boilerplate.Api;
 /// <summary>
 /// The `--export-openapi &lt;file&gt;` switch (ADR-0004): writes the versioned OpenAPI document to disk
 /// and exits, so <c>scripts/export-openapi.sh</c> can keep <c>clients/openapi/v1.json</c> — the
-/// contract the console's types are generated from — in the repository.
+/// contract a client's types are generated from — in the repository.
 ///
 /// <para>
 /// It deliberately does NOT run <c>UseHeroPlatform</c>. The document is built from endpoint metadata

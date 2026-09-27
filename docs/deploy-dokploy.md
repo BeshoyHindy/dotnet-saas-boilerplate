@@ -180,8 +180,10 @@ in both.
 | `IMAGE_OWNER` | app | your GHCR owner, lowercase | same |
 | `IMAGE_TAG` | app | `dev-latest` | `1.4.0` |
 | `API_DOMAIN` | app | `api.staging.example.com` | `api.example.com` |
+<!--#if (frontend) -->
 | `DASHBOARD_DOMAIN` | app | `app.staging.example.com` | `app.example.com` |
 | `CONSOLE_DOMAIN` | app | `console.staging.example.com` | `console.example.com` |
+<!--#endif -->
 | `STORAGE_DOMAIN` | both | `storage.staging.example.com` | `storage.example.com` |
 | `TRAEFIK_CERT_RESOLVER` | both | `letsencrypt` | `letsencrypt` |
 | `ALLOWED_HOSTS` | app | `api.staging.example.com` | `api.example.com` |
@@ -641,10 +643,16 @@ around.
 | `… 'AllowedHosts' contains '*'` | Name the hostnames. `*` is rejected in Production because a poisoned `Host` reaches password-reset links. |
 | `… still holds a template placeholder` | A secret looks like a sample (`changeme`, `secret`, `dev-only`). Regenerate it with the commands in §3. |
 | `ProxyOptions: Enabled is true but nothing is trusted` | `PROXY_KNOWN_NETWORK` is unset. Run the `docker network inspect` command in §3. |
+<!--#if (frontend) -->
 | 404 from Traefik on a domain | The stack deployed before the DNS record existed, or `API_DOMAIN`/`DASHBOARD_DOMAIN`/`CONSOLE_DOMAIN` does not match the record. Compose domains are label-driven and **not** hot-reloaded: redeploy after changing one. |
+<!--#else -->
+| 404 from Traefik on a domain | The stack deployed before the DNS record existed, or `API_DOMAIN` does not match the record. Compose domains are label-driven and **not** hot-reloaded: redeploy after changing one. |
+<!--#endif -->
 | 502/503 from Traefik, API container running | The readiness probe is failing. `curl` the API container directly from the host, or read `GET /health` for the full report. A missing `API_DOMAIN` in `ALLOWED_HOSTS` does this — the probe sends that Host and host filtering answers 400. |
 | Certificate never issued | The `A` record did not resolve when Traefik asked, or port 80 is blocked. Fix DNS, then redeploy. |
+<!--#if (frontend) -->
 | A client loads but every call is a CORS error | `DASHBOARD_DOMAIN`/`CONSOLE_DOMAIN` is not the origin the browser actually uses; both are what the API puts in its allow-list. Mailed links use `DASHBOARD_DOMAIN`. |
+<!--#endif -->
 | Password-reset links point at a container IP | Traefik is not passing the original `Host`. `passhostheader=true` must stay on the API's load-balancer labels — `X-Forwarded-Host` is deliberately never honoured, so that label is the only path for the real host. |
 | Uploads fail with a signature error | `STORAGE_DOMAIN` differs between the two stacks, or `Storage__S3__ServiceUrl` was pointed at an internal alias. The signature covers the host. |
 | `NoSuchBucket` on first upload | The data stack's `minio-init` did not run, or `STORAGE_BUCKET` differs between the two stacks. |

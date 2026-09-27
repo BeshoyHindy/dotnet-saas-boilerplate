@@ -331,12 +331,19 @@ jobs:
           awk "BEGIN { exit !(${LINE} >= ${MIN_LINE}) }" || { echo "::error::Line coverage ${LINE}% is below the ${MIN_LINE}% floor"; exit 1; }
 
   # ── Images ──────────────────────────────────────────────────────────
-  # Three images, one job, one tag set: deploy/dokploy/app.compose.yml brings up
-  # migrator + api + console at a single ${IMAGE_TAG}, so a tag that exists for
-  # two of the three is a broken deploy. They are built with Buildx from the
-  # Dockerfiles the deploy actually runs (ADR-0005) — NOT `dotnet publish
-  # /t:PublishContainer`, which produced a differently-based image than the one
-  # src/Host/Dockerfile defines and reviewers read.
+  #if (frontend)
+  # Four images, one job, one tag set: deploy/dokploy/app.compose.yml brings up
+  # migrator + api + dashboard + console at a single ${IMAGE_TAG}, so a tag that
+  # exists for only some of them is a broken deploy.
+  #else
+  # Two images, one job, one tag set: deploy/dokploy/app.compose.yml brings up
+  # migrator + api at a single ${IMAGE_TAG}, so a tag that exists for only one of
+  # them is a broken deploy.
+  #endif
+  # They are built with Buildx from the Dockerfiles the deploy actually runs
+  # (ADR-0005) — NOT `dotnet publish /t:PublishContainer`, which produced a
+  # differently-based image than the one src/Host/Dockerfile defines and
+  # reviewers read.
   #
   # There is no NuGet.org publishing anywhere in this repo — container images
   # are the only artifact CI produces.
@@ -523,9 +530,11 @@ jobs:
 
   # ── OpenAPI drift (issue #15, ADR-0004) ─────────────────────────────
   # The drift gate lives next to the build that produces the document: the API
-  # re-exports clients/openapi/v1.json and fails if that changes anything. The
-  # frontend half (regenerating src/api/schema.d.ts from the same file) lives
+  # re-exports clients/openapi/v1.json and fails if that changes anything.
+  #if (frontend)
+  # The frontend half (regenerating src/api/schema.d.ts from the same file) lives
   # in frontend.yml — together the two block drift on both sides.
+  #endif
   openapi-drift:
     name: OpenAPI Drift (backend)
     needs: changes

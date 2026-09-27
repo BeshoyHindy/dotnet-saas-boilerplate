@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+#if (frontend)
 # OpenAPI drift gate, both sides (issue #15, ADR-0008). The checked-in contract,
 # clients/openapi/v1.json, must be reproducible from the API, and EVERY client's
 # generated types must be reproducible from that one contract — this is the single
@@ -6,6 +7,14 @@
 #
 #   bash scripts/check-openapi-drift.sh backend   # re-export the document from the API
 #   bash scripts/check-openapi-drift.sh frontend  # regenerate both clients' types
+#else
+# OpenAPI drift gate. The checked-in contract, clients/openapi/v1.json, must be
+# reproducible from the API: it is the one agreed description of the API, so a change
+# to the surface shows up in review as a diff to it. CI's `openapi-drift` job and a
+# developer ask the same question here.
+#
+#   bash scripts/check-openapi-drift.sh backend   # re-export the document from the API
+#endif
 #
 # `git status --porcelain`, not `git diff --exit-code`: a regeneration that
 # DELETES a file or leaves an untracked one is drift too, and diff --exit-code
@@ -22,6 +31,7 @@ case "$MODE" in
     PATHS=(clients/openapi/)
     FIX="bash scripts/export-openapi.sh"
     ;;
+#if (frontend)
   frontend)
     # Both clients generate from the same checked-in document, so both are asked.
     # A client whose schema.d.ts is stale is drift even if the other one is current.
@@ -32,8 +42,13 @@ case "$MODE" in
     done
     FIX="pnpm generate:api (in clients/dashboard and clients/console)"
     ;;
+#endif
   *)
-    echo "usage: check-openapi-drift.sh {backend|frontend}" >&2
+    usage="backend"
+#if (frontend)
+    usage="{backend|frontend}"
+#endif
+    echo "usage: check-openapi-drift.sh ${usage}" >&2
     exit 2
     ;;
 esac

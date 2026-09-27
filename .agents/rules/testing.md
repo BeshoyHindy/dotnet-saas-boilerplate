@@ -41,8 +41,10 @@ If Docker is down, integration tests fail fast with `DockerUnavailableException`
 - Set the Finbuckle tenant context **inline** in the test method (AsyncLocal — an awaited helper loses it → NRE in the tenant filter).
 - `AddHeroStorage` reads config eagerly; rewire `IStorageService` **after** registration in the factory.
 
+<!--#if (frontend) -->
 ## Frontend tests
 
 Per client (ADR-0008 — there are two: `clients/dashboard` and `clients/console`): Vitest units
 (`cd clients/<app> && pnpm test`) plus a small route-mocked Playwright smoke suite
 (`pnpm exec playwright test --workers=1`) — see `frontend/clients.md`.
+<!--#endif -->

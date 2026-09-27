@@ -218,15 +218,22 @@ services:
       CachingOptions__Redis: valkey:6379
       CachingOptions__EnableSsl: "false"
       JwtOptions__SigningKey: ${JWT_SIGNING_KEY:?run scripts/local-env.sh to generate .env}
+      #if (frontend)
       # Mailed links (password reset, email confirmation) go to a tenant's users, so the
       # origin the API writes into them defaults to the DASHBOARD's. MailLinkOrigin swaps in
       # the console's for the root tenant's own users (operators) — see ConsoleOriginUrl below.
+      #else
+      # No client ships with this product, so mailed links (password reset, email
+      # confirmation) carry the API's own origin until you point this at the front end
+      # you build. Unset, the API refuses to send those mails at all. There is no CORS
+      # allow-list either: nothing browser-based calls this API yet.
+      #endif
       OriginOptions__OriginUrl: ${APP_DASHBOARD_URL:-http://localhost:8081}
       #if (frontend)
       MailLinkOrigin__ConsoleOriginUrl: ${APP_CONSOLE_URL:-http://localhost:8082}
-      #endif
       CorsOptions__AllowedOrigins__0: ${APP_DASHBOARD_URL:-http://localhost:8081}
       CorsOptions__AllowedOrigins__1: ${APP_CONSOLE_URL:-http://localhost:8082}
+      #endif
       AllowedHosts: ${ALLOWED_HOSTS:-localhost;127.0.0.1;api}
       # Nothing fronts the API here — it is published straight onto a host port — so forwarded
       # headers must not be honoured. appsettings.Production.json enables them for a Traefik

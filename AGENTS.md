@@ -23,8 +23,11 @@ Gitflow (ADR-0007). Branch from `develop` as `feature/<slug>` (agents: `sandcast
 Area rules live in `.agents/rules/`, one file per area — read the one covering what you are about to
 change. `architecture.md` and `modules/*.md` carry the module rules; `buildingblocks-protection.md`
 guards `src/BuildingBlocks/`, which is shared by every module and is not modified without explicit
-approval. `frontend/clients.md` covers both React clients; `frontend/dashboard.md` and
+approval.
+<!--#if (frontend) -->
+`frontend/clients.md` covers both React clients; `frontend/dashboard.md` and
 `frontend/console.md` cover what is true of only one.
+<!--#endif -->
 
 The tenancy invariant (ADR-0002) constrains almost everything: a caller never names a tenant, every
 endpoint declares exactly one authorization intent, tenant-less background work is `[SystemJob]`, and
@@ -37,6 +40,7 @@ fails for each.
 ```bash
 dotnet build src/Boilerplate.slnx -warnaserror
 dotnet test src/Boilerplate.slnx                    # integration suites need Docker
+bash scripts/check-openapi-drift.sh backend         # the committed API contract is current
 <!--#if (frontend) -->
 cd clients/dashboard && pnpm test && pnpm build     # Vitest + type-checked build
 cd clients/console   && pnpm test && pnpm build     # …and again for the operator tool
@@ -54,4 +58,8 @@ After an API-surface change, re-export the contract and regenerate BOTH clients'
 `clients/console` — there are two clients, ADR-0008) and commit every artifact —
 CI re-derives both sides and fails on drift. `bash scripts/check-openapi-drift.sh backend|frontend`
 asks the same question locally.
+<!--#else -->
+After an API-surface change, re-export the contract (`bash scripts/export-openapi.sh`) and commit
+`clients/openapi/v1.json` — CI re-derives it and fails on drift. There is no client in this
+product; the directory name is where a client's generated types would read the contract from.
 <!--#endif -->
