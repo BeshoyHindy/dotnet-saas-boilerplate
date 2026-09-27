@@ -103,6 +103,14 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # Bundle budget (size-limit, `.size-limit.json` per client): the gzipped entry
+      # chunk, the entry stylesheet and the sum of every route's JS must stay under
+      # their limits, set ~15% above the sizes when the budget was introduced. A
+      # step over budget fails here; raise a limit deliberately, in the same PR as
+      # the dependency or page that earns it.
+      - name: Bundle budget
+        run: pnpm size
+
       - name: Unit tests
         run: pnpm test
 

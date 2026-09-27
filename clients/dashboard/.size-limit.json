@@ -1,0 +1,5 @@
+[
+  { "name": "Entry chunk (JS)", "path": "dist/assets/index-*.js", "gzip": true, "limit": "75 kB" },
+  { "name": "Entry stylesheet", "path": "dist/assets/index-*.css", "gzip": true, "limit": "22 kB" },
+  { "name": "All JS, every route", "path": "dist/assets/*.js", "gzip": true, "limit": "357 kB" }
+]

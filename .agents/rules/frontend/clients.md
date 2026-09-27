@@ -111,6 +111,18 @@ stranger's cached data.
 - `pnpm test` runs Vitest (jsdom) over `src/**/*.test.ts`, next to the code. Pure logic belongs here:
   the API client's error mapping, the token store, audit humanisation, tenant resolution. Prefer
   adding one of these.
+- **Page tests** (`src/pages/**/*.test.tsx`, React Testing Library) cover the busiest list and
+  detail page of each client — the dashboard's users list and user detail, the console's tenant
+  registry and tenant detail — in each of their states: loading, data, empty, error. Render with
+  `renderPage(<Page />, { path, url })` from `src/test/render-page.tsx` (a fresh `QueryClient`
+  with retries off, inside a `MemoryRouter`), and `vi.mock` the page's `@/api/*` module and
+  `@/auth/use-auth` — a page test never reaches `fetch` or the real `AuthProvider`. `pending()`
+  holds a query in its loading state. Add a page here only when it is as central as these; the
+  default for new logic is still a `*.test.ts`.
+- `pnpm size` checks the bundle budget in `.size-limit.json` (size-limit, gzipped) against
+  `dist/` — run it after `pnpm build`. CI fails a PR that takes the entry chunk, the entry
+  stylesheet or the total route JS over its limit. Raise a limit on purpose, in the PR that earns
+  it, and keep it ~15% above the new size.
 - `pnpm exec playwright test --workers=1` runs the **smoke** suite — the dashboard: sign-in and user
   CRUD; the console: sign-in and an operator entering a tenant. Each is deliberately small
   (ADR-0008); do not grow a page-per-spec suite back into either.

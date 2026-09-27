@@ -65,7 +65,8 @@ password) are disabled — the API refuses them from an actor anyway.
 |---|---|
 | `pnpm dev` | Vite dev server on port 5174 |
 | `pnpm build` | `tsc -b && vite build` — the typecheck + bundle gate |
-| `pnpm test` | Vitest units (jsdom), beside the source |
+| `pnpm test` | Vitest units (jsdom), beside the source, plus page tests for the tenant registry and tenant detail |
+| `pnpm size` | Bundle budget (size-limit, `.size-limit.json`) — run after `pnpm build` |
 | `pnpm test:e2e` | Playwright smoke suite: sign-in, user CRUD, operator enters a tenant |
 | `pnpm lint` | ESLint |
 | `pnpm generate:api` | Regenerate `src/api/schema.d.ts` from the checked-in contract |
