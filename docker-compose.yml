@@ -48,7 +48,7 @@ services:
   # Valkey (BSD-licensed Redis fork). No password: the port is compose-internal
   # only, and a fake one here would just be a credential-shaped literal to leak.
   valkey:
-    image: valkey/valkey:9.1.0-alpine
+    image: valkey/valkey:9.1.2-alpine
     restart: unless-stopped
     command: ["valkey-server", "--appendonly", "yes"]
     volumes:
@@ -153,7 +153,7 @@ services:
   # To keep it set without repeating it on the command line, put the same
   # OTEL_EXPORTER_OTLP_ENDPOINT line in .env instead (see .env.example).
   otlp-receiver:
-    image: mcr.microsoft.com/dotnet/aspire-dashboard:9.0@sha256:d595645ca7f5c075174db998302d8fb09e040516b14dfcb06dd02996659e1c77
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.5.2@sha256:0ef531119b8073aed12b0db2b4e4ab02866c6c69b7a52264269abd00cfb48a34
     restart: unless-stopped
     profiles: ["otel"]
     environment:

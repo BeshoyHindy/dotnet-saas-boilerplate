@@ -32,7 +32,7 @@ var apiPgConnection = ReferenceExpression.Create(
     $"{postgres.Resource.ConnectionStringExpression};Minimum Pool Size=5");
 
 // Valkey (BSD-3 Redis fork) as a plain container: Aspire 13.4.0 AddRedis() forces TLS-by-default in run mode and never materializes the container, so we drop to plain RESP over TCP. Name stays "redis" so config keys don't churn.
-var redis = builder.AddContainer("redis", "valkey/valkey", "9.1.0")
+var redis = builder.AddContainer("redis", "valkey/valkey", "9.1.2")
     .WithEndpoint(targetPort: 6379, scheme: "tcp", name: "tcp")
     .WithVolume($"{appPrefix}-redis-data", "/data")
     .WithLifetime(ContainerLifetime.Persistent);

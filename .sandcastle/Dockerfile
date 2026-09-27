@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim
+FROM node:24-bookworm-slim
 
 # The agent sandbox image. Rebuild it (`pnpm sandcastle:build-image`) when:
 #   - global.json moves to a new .NET feature band, or
@@ -30,7 +30,7 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
   && rm -rf /var/lib/apt/lists/*
 
 # .NET SDK — the 10.0 channel tracks the latest release of that major, which is
-# the window global.json (10.0.100, rollForward: latestFeature) accepts.
+# the window global.json (10.0.400, rollForward: latestFeature) accepts.
 # Installed system-wide as root so agents cannot corrupt it.
 ENV DOTNET_ROOT=/usr/share/dotnet \
     DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true \
@@ -51,7 +51,7 @@ ENV COREPACK_HOME=/usr/local/share/corepack
 ENV PATH="${PNPM_HOME}/bin:${PNPM_HOME}:${PATH}"
 RUN mkdir -p "${PNPM_HOME}" "${COREPACK_HOME}" \
   && corepack enable pnpm \
-  && corepack prepare pnpm@12.3.4 --activate \
+  && corepack prepare pnpm@12.6.0 --activate \
   # pnpm ships a per-platform native binary that `corepack prepare` does NOT
   # fetch — only the first run downloads it (into ${COREPACK_HOME}). Warm it up
   # here, while network is still enabled, or every later pnpm call fails once

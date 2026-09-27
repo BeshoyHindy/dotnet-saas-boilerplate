@@ -516,7 +516,7 @@ public sealed class OperatorTokenExchangeTests : IAsyncLifetime
 
         var detail = await AuditTestHelper.GetByIdAsync(actingClient, summary.Id);
         detail.ShouldNotBeNull();
-        var payload = detail!.Payload.GetRawText();
+        var payload = detail.Payload.GetRawText();
         // The operator's own subject/tenant must appear — that is what makes this "really acting".
         payload.ShouldContain(_rootAdminUserId);
         payload.ShouldContain(TestConstants.RootTenantId);

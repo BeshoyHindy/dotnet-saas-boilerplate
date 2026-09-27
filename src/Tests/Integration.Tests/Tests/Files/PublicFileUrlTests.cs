@@ -50,7 +50,7 @@ public sealed class PublicFileUrlTests
         dto.PublicUrl.ShouldNotBeNullOrWhiteSpace();
 
         using var anonymous = new HttpClient();
-        using var fetched = await anonymous.GetAsync(new Uri(dto.PublicUrl!));
+        using var fetched = await anonymous.GetAsync(new Uri(dto.PublicUrl));
 
         // Assert — 200 with the exact bytes (before the fix this 403'd: unsigned tenants/ URL).
         fetched.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -69,8 +69,8 @@ public sealed class PublicFileUrlTests
 
         // Assert — a presigned GET, not the bucket's unsigned object URL, and short-lived.
         dto.PublicUrl.ShouldNotBeNull();
-        dto.PublicUrl!.ShouldContain("X-Amz-Signature");
-        var expires = ExpiresSeconds(dto.PublicUrl!);
+        dto.PublicUrl.ShouldContain("X-Amz-Signature");
+        var expires = ExpiresSeconds(dto.PublicUrl);
         expires.ShouldBeGreaterThan(0);
         expires.ShouldBeLessThanOrEqualTo(15 * 60, "public reads must stay short-lived — revocation is bounded by this TTL");
     }
@@ -91,7 +91,7 @@ public sealed class PublicFileUrlTests
         // Assert
         dto.PublicUrl.ShouldNotBeNullOrWhiteSpace();
         using var anonymous = new HttpClient();
-        using var fetched = await anonymous.GetAsync(new Uri(dto.PublicUrl!));
+        using var fetched = await anonymous.GetAsync(new Uri(dto.PublicUrl));
         fetched.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await fetched.Content.ReadAsByteArrayAsync()).ShouldBe(bytes);
     }
@@ -113,7 +113,7 @@ public sealed class PublicFileUrlTests
         // Assert — list rows seed the same fetchable URL (the preview dialog paints straight from them).
         row.PublicUrl.ShouldNotBeNullOrWhiteSpace();
         using var anonymous = new HttpClient();
-        using var fetched = await anonymous.GetAsync(new Uri(row.PublicUrl!));
+        using var fetched = await anonymous.GetAsync(new Uri(row.PublicUrl));
         fetched.StatusCode.ShouldBe(HttpStatusCode.OK);
         (await fetched.Content.ReadAsByteArrayAsync()).ShouldBe(bytes);
     }

@@ -33,7 +33,7 @@ public sealed class IdempotencyRedisReplayTests : IAsyncLifetime
     private const string IdempotencyHeader = "Idempotency-Key";
     private const string ReplayedHeader = "Idempotency-Replayed";
 
-    private readonly RedisContainer _redis = new RedisBuilder("valkey/valkey:9.1.0-alpine").Build();
+    private readonly RedisContainer _redis = new RedisBuilder("valkey/valkey:9.1.2-alpine").Build();
     private int _runs;
 
     public Task InitializeAsync() => _redis.StartAsync();

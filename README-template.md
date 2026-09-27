@@ -10,10 +10,10 @@ the shared code lives in `src/BuildingBlocks` and is yours to change.
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 <!--#if (frontend) -->
-- [Node.js 20+](https://nodejs.org) and [pnpm](https://pnpm.io) — for the two React clients
+- [Node.js 22.22+](https://nodejs.org) and [pnpm](https://pnpm.io) — for the two React clients
 <!--#endif -->
 <!--#if (!frontend && sandcastle) -->
-- [Node.js 20+](https://nodejs.org) and [pnpm](https://pnpm.io) — for the agent pipeline
+- [Node.js 22.22+](https://nodejs.org) and [pnpm](https://pnpm.io) — for the agent pipeline
 <!--#endif -->
 - [Docker](https://www.docker.com/) — PostgreSQL, Valkey, RustFS
 

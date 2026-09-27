@@ -92,7 +92,7 @@ public sealed class TenantService : ITenantService
         ArgumentNullException.ThrowIfNull(tenant);
 
         await _tenantScope.RunAsync(
-            tenant.Id!,
+            tenant.Id,
             async (services, ct) =>
             {
                 foreach (var initializer in services.GetServices<IDbInitializer>())
@@ -108,7 +108,7 @@ public sealed class TenantService : ITenantService
         ArgumentNullException.ThrowIfNull(tenant);
 
         await _tenantScope.RunAsync(
-            tenant.Id!,
+            tenant.Id,
             async (services, ct) =>
             {
                 foreach (var initializer in services.GetServices<IDbInitializer>())
@@ -190,11 +190,11 @@ public sealed class TenantService : ITenantService
 
         return new TenantStatusDto
         {
-            Id = tenant.Id!,
+            Id = tenant.Id,
             Name = tenant.Name!,
             IsActive = tenant.IsActive,
             ValidUpto = tenant.ValidUpto,
-            AdminEmail = tenant.AdminEmail!,
+            AdminEmail = tenant.AdminEmail,
             Issuer = tenant.Issuer,
             ExpiryState = expiryState,
             GraceEndsUtc = graceEnds

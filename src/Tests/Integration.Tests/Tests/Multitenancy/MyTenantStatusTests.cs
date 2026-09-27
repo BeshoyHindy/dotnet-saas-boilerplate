@@ -44,9 +44,9 @@ public sealed class MyTenantStatusTests
 
         var status = await resp.Content.ReadFromJsonAsync<MyStatus>(Json);
         status.ShouldNotBeNull();
-        status!.Id.ShouldBe(tenantId);
+        status.Id.ShouldBe(tenantId);
         status.ValidUpto.ShouldNotBeNull();
-        status.ValidUpto!.Value.ShouldBeGreaterThan(DateTime.UtcNow);
+        status.ValidUpto.Value.ShouldBeGreaterThan(DateTime.UtcNow);
         status.ExpiryState.ShouldBe("Active");
     }
 

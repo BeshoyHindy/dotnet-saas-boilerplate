@@ -63,7 +63,7 @@ public sealed class GenerateTokenCommandHandler
             // 1) Audit failed login BEFORE throwing
             await _securityAudit.LoginFailedAsync(
                 subjectIdOrName: request.Email,
-                clientId: clientId!,
+                clientId: clientId,
                 reason: "InvalidCredentials",
                 ip: ip,
                 ct: cancellationToken);
@@ -78,7 +78,7 @@ public sealed class GenerateTokenCommandHandler
         await _securityAudit.LoginSucceededAsync(
             userId: subject,
             userName: claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? request.Email,
-            clientId: clientId!,
+            clientId: clientId,
             ip: ip,
             userAgent: ua,
             ct: cancellationToken);
@@ -106,7 +106,7 @@ public sealed class GenerateTokenCommandHandler
         await _securityAudit.TokenIssuedAsync(
             userId: subject,
             userName: claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? request.Email,
-            clientId: clientId!,
+            clientId: clientId,
             tokenFingerprint: fingerprint,
             expiresUtc: token.AccessTokenExpiresAt,
             ct: cancellationToken);
@@ -124,7 +124,7 @@ public sealed class GenerateTokenCommandHandler
             Source: "Identity",
             UserId: subject,
             Email: request.Email,
-            ClientId: clientId!,
+            ClientId: clientId,
             IpAddress: ip,
             UserAgent: ua,
             TokenFingerprint: fingerprint,
