@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Security.Cryptography;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
@@ -221,8 +220,7 @@ public sealed class PurgeJobsTests
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var presigned = await response.DeserializeAsync<PresignedUploadResponse>();
 
-        byte[] bytes = new byte[sizeBytes];
-        RandomNumberGenerator.Fill(bytes);
+        byte[] bytes = UploadPayloads.Pdf(sizeBytes);
         using var raw = new HttpClient();
         using var put = new HttpRequestMessage(HttpMethod.Put, presigned.UploadUrl)
         {

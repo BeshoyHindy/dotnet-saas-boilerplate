@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Boilerplate.Modules.Files.Contracts.v1.DTOs;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
@@ -42,7 +41,7 @@ public sealed class PublicFileUrlTests
     {
         // Arrange — a Public file with known bytes in real S3-compatible storage.
         using var client = await _auth.CreateRootAdminClientAsync();
-        var bytes = RandomBytes(1024);
+        var bytes = UploadPayloads.Pdf(1024);
         var id = await UploadAndFinalizeAsync(client, "public-asset.pdf", "application/pdf", bytes, visibility: 0);
 
         // Act — read the metadata the SPA uses to paint the asset, then fetch that URL with no auth
@@ -63,7 +62,7 @@ public sealed class PublicFileUrlTests
     {
         // Arrange
         using var client = await _auth.CreateRootAdminClientAsync();
-        var id = await UploadAndFinalizeAsync(client, "signed.pdf", "application/pdf", RandomBytes(128), visibility: 0);
+        var id = await UploadAndFinalizeAsync(client, "signed.pdf", "application/pdf", UploadPayloads.Pdf(128), visibility: 0);
 
         // Act
         var dto = await GetMetadataAsync(client, id);
@@ -81,7 +80,7 @@ public sealed class PublicFileUrlTests
     {
         // Arrange — the PATCH response itself carries the URL the SPA renders immediately.
         using var client = await _auth.CreateRootAdminClientAsync();
-        var bytes = RandomBytes(256);
+        var bytes = UploadPayloads.Pdf(256);
         var id = await UploadAndFinalizeAsync(client, "flip-to-public.pdf", "application/pdf", bytes, visibility: 1);
 
         // Act
@@ -102,7 +101,7 @@ public sealed class PublicFileUrlTests
     {
         // Arrange
         using var client = await _auth.CreateRootAdminClientAsync();
-        var bytes = RandomBytes(256);
+        var bytes = UploadPayloads.Pdf(256);
         var id = await UploadAndFinalizeAsync(client, "listed-public.pdf", "application/pdf", bytes, visibility: 0);
 
         // Act
@@ -128,7 +127,7 @@ public sealed class PublicFileUrlTests
     {
         // Arrange — take the presigned URL the API returned and strip the signature query.
         using var client = await _auth.CreateRootAdminClientAsync();
-        var id = await UploadAndFinalizeAsync(client, "no-anon-grant.pdf", "application/pdf", RandomBytes(128), visibility: 0);
+        var id = await UploadAndFinalizeAsync(client, "no-anon-grant.pdf", "application/pdf", UploadPayloads.Pdf(128), visibility: 0);
         var dto = await GetMetadataAsync(client, id);
 
         var unsigned = new Uri(new Uri(dto.PublicUrl!).GetLeftPart(UriPartial.Path));
@@ -148,7 +147,7 @@ public sealed class PublicFileUrlTests
     {
         // Arrange
         using var client = await _auth.CreateRootAdminClientAsync();
-        var id = await UploadAndFinalizeAsync(client, "secret.pdf", "application/pdf", RandomBytes(128), visibility: 1);
+        var id = await UploadAndFinalizeAsync(client, "secret.pdf", "application/pdf", UploadPayloads.Pdf(128), visibility: 1);
 
         // Act
         var dto = await GetMetadataAsync(client, id);
@@ -162,7 +161,7 @@ public sealed class PublicFileUrlTests
     public async Task ListMy_Should_Return_No_PublicUrl_For_A_Private_File()
     {
         using var client = await _auth.CreateRootAdminClientAsync();
-        var id = await UploadAndFinalizeAsync(client, "secret-listed.pdf", "application/pdf", RandomBytes(128), visibility: 1);
+        var id = await UploadAndFinalizeAsync(client, "secret-listed.pdf", "application/pdf", UploadPayloads.Pdf(128), visibility: 1);
 
         using var response = await client.GetAsync($"{FilesBasePath}/mine?page=1&pageSize=100");
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -180,7 +179,7 @@ public sealed class PublicFileUrlTests
     {
         // Arrange — a Public file whose URL has already been handed to a browser.
         using var client = await _auth.CreateRootAdminClientAsync();
-        var bytes = RandomBytes(256);
+        var bytes = UploadPayloads.Pdf(256);
         var id = await UploadAndFinalizeAsync(client, "revoke-me.pdf", "application/pdf", bytes, visibility: 0);
         var issued = new Uri((await GetMetadataAsync(client, id)).PublicUrl!);
 
@@ -237,13 +236,6 @@ public sealed class PublicFileUrlTests
         using var response = await client.GetAsync($"{FilesBasePath}/{id}");
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         return await response.DeserializeAsync<FileAssetDto>();
-    }
-
-    private static byte[] RandomBytes(int size)
-    {
-        byte[] bytes = new byte[size];
-        RandomNumberGenerator.Fill(bytes);
-        return bytes;
     }
 
     private static async Task<Guid> UploadAndFinalizeAsync(

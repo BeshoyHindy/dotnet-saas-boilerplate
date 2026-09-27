@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Boilerplate.Modules.Files.Contracts.v1.DTOs;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
@@ -57,8 +56,7 @@ public sealed class FinalizeEdgeCasesTests
         // Declare 256 bytes, upload 32 KB. The handler allows declared+1% slack (min 1 KiB), so 32 KB busts it.
         var presigned = await RequestPresignedUploadAsync(client, "lying.pdf", "application/pdf", 256, "Document");
 
-        byte[] bytes = new byte[32 * 1024];
-        RandomNumberGenerator.Fill(bytes);
+        byte[] bytes = UploadPayloads.Pdf(32 * 1024);
 
         using var raw = new HttpClient();
         using var put = new HttpRequestMessage(HttpMethod.Put, presigned.UploadUrl)
@@ -109,8 +107,7 @@ public sealed class FinalizeEdgeCasesTests
         int sizeBytes,
         string category)
     {
-        byte[] bytes = new byte[sizeBytes];
-        RandomNumberGenerator.Fill(bytes);
+        byte[] bytes = UploadPayloads.Pdf(sizeBytes);
 
         var presigned = await RequestPresignedUploadAsync(client, fileName, contentType, sizeBytes, category);
 

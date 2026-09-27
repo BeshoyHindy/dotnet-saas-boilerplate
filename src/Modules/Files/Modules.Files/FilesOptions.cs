@@ -32,6 +32,19 @@ public sealed class FilesOptions
 
 public sealed class FileCategoryOptions
 {
+    /// <summary>
+    /// Extensions this category accepts. Each must have a known content signature
+    /// (<c>UploadContentCheck</c>): finalize reads the object's first bytes and refuses a file whose
+    /// bytes are not the declared type.
+    /// </summary>
     public List<string> AllowedExtensions { get; set; } = [];
     public long MaxBytes { get; set; }
+
+    /// <summary>
+    /// Allows types a browser runs script from when opened inline (SVG, HTML). Off by default and in
+    /// every shipped category: any Files asset can be served inline (a Public one always is), and
+    /// such a file then runs its script for whoever opens the link. Setting it is a category's
+    /// explicit acceptance of that.
+    /// </summary>
+    public bool AllowScriptCapableTypes { get; set; }
 }

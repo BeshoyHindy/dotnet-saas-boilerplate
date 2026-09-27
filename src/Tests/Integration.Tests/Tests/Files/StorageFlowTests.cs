@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Boilerplate.Modules.Files.Contracts.v1.DTOs;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
@@ -30,8 +29,7 @@ public sealed class StorageFlowTests
     {
         // Arrange — upload known bytes through the presigned PUT, then finalize.
         using var client = await _auth.CreateRootAdminClientAsync();
-        byte[] bytes = new byte[2048];
-        RandomNumberGenerator.Fill(bytes);
+        byte[] bytes = UploadPayloads.Pdf(2048);
         var id = await UploadAndFinalizeAsync(client, "roundtrip.pdf", "application/pdf", bytes);
 
         // Act — mint a presigned GET and fetch the bytes straight from MinIO.
@@ -52,7 +50,7 @@ public sealed class StorageFlowTests
     public async Task DownloadUrl_Should_Request_Attachment_Disposition_With_Original_Filename_By_Default()
     {
         using var client = await _auth.CreateRootAdminClientAsync();
-        var id = await UploadAndFinalizeAsync(client, "report-final.pdf", "application/pdf", RandomBytes(512));
+        var id = await UploadAndFinalizeAsync(client, "report-final.pdf", "application/pdf", UploadPayloads.Pdf(512));
 
         // Default (no ?inline) → S3 echoes Content-Disposition: attachment; filename="report-final.pdf".
         using var urlResp = await client.GetAsync($"{FilesBasePath}/{id}/url");
@@ -73,7 +71,7 @@ public sealed class StorageFlowTests
     public async Task DownloadUrl_Should_Request_Inline_Disposition_When_Inline_True()
     {
         using var client = await _auth.CreateRootAdminClientAsync();
-        var id = await UploadAndFinalizeAsync(client, "preview.pdf", "application/pdf", RandomBytes(512));
+        var id = await UploadAndFinalizeAsync(client, "preview.pdf", "application/pdf", UploadPayloads.Pdf(512));
 
         using var urlResp = await client.GetAsync($"{FilesBasePath}/{id}/url?inline=true");
         urlResp.StatusCode.ShouldBe(HttpStatusCode.OK);
@@ -99,7 +97,7 @@ public sealed class StorageFlowTests
         // signed response-content-disposition header (issue #72); the same sanitizer that guards
         // PublicFileUrlFactory guards this path.
         using var client = await _auth.CreateRootAdminClientAsync();
-        var id = await UploadAndFinalizeAsync(client, "my \"quarterly\" report.pdf", "application/pdf", RandomBytes(256));
+        var id = await UploadAndFinalizeAsync(client, "my \"quarterly\" report.pdf", "application/pdf", UploadPayloads.Pdf(256));
 
         // Act
         using var urlResp = await client.GetAsync($"{FilesBasePath}/{id}/url");
@@ -119,13 +117,6 @@ public sealed class StorageFlowTests
     #endregion
 
     // ─── helpers ─────────────────────────────────────────────────────
-
-    private static byte[] RandomBytes(int size)
-    {
-        byte[] bytes = new byte[size];
-        RandomNumberGenerator.Fill(bytes);
-        return bytes;
-    }
 
     private static async Task<Guid> UploadAndFinalizeAsync(
         HttpClient client, string fileName, string contentType, byte[] bytes)

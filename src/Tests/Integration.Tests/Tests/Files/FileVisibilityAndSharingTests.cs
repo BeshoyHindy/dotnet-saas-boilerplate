@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
@@ -291,8 +290,7 @@ public sealed class FileVisibilityAndSharingTests
         int sizeBytes,
         int visibility)
     {
-        byte[] bytes = new byte[sizeBytes];
-        RandomNumberGenerator.Fill(bytes);
+        byte[] bytes = UploadPayloads.Pdf(sizeBytes);
 
         using var urlResponse = await client.PostAsJsonAsync($"{FilesBasePath}/upload-url", new
         {

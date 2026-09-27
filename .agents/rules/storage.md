@@ -19,7 +19,7 @@
 Don't stream large files through the API. The pattern (see Files module):
 1. `RequestUploadUrl` — server validates category/extension/size, returns a presigned PUT URL, persists a `PendingUpload` record.
 2. Client uploads **directly** to storage.
-3. `FinalizeUpload` — verifies the stored object, flips to `Available`, publishes `FileFinalizedIntegrationEvent`.
+3. `FinalizeUpload` — verifies the stored object (size, content type, and the signature of its first bytes), flips to `Available`, publishes `FileFinalizedIntegrationEvent`.
 
 Local/dev without MinIO uses `LocalPresignTokenStore` (in-memory one-shot tokens) — issued but never consumed by any endpoint, so the Files upload flow effectively needs the `s3` provider. A token carries an already-authorized physical key and `Consume(token, tenantId)` re-checks that key's owner, so a token is not a bearer capability for whatever it happens to name.
 

@@ -51,24 +51,21 @@ public sealed class FinalizeUploadCommandHandler(
         var maxAllowed = asset.SizeBytes + Math.Max(1024L, asset.SizeBytes / 100);
         if (head.SizeBytes > maxAllowed)
         {
-            await storage.RemoveAsync(asset.StorageKey, cancellationToken).ConfigureAwait(false);
-            db.FileAssets.Remove(asset);
-            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            throw new CustomException(
-                $"uploaded size ({head.SizeBytes}) exceeds declared ({asset.SizeBytes})",
-                (IEnumerable<string>?)null,
-                HttpStatusCode.BadRequest);
+            throw await RefuseAsync(asset, $"uploaded size ({head.SizeBytes}) exceeds declared ({asset.SizeBytes})", cancellationToken).ConfigureAwait(false);
         }
 
         if (!string.Equals(head.ContentType, asset.ContentType, StringComparison.OrdinalIgnoreCase))
         {
-            await storage.RemoveAsync(asset.StorageKey, cancellationToken).ConfigureAwait(false);
-            db.FileAssets.Remove(asset);
-            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            throw new CustomException(
-                "uploaded content-type mismatch",
-                (IEnumerable<string>?)null,
-                HttpStatusCode.BadRequest);
+            throw await RefuseAsync(asset, "uploaded content-type mismatch", cancellationToken).ConfigureAwait(false);
+        }
+
+        // The two checks above only compare the caller's own metadata with itself; this one reads
+        // the bytes (ASVS V5.2.2). It is not malware scanning — that is IFileScanner's, below.
+        var prefix = await ReadPrefixAsync(asset.StorageKey, cancellationToken).ConfigureAwait(false);
+        var verdict = UploadContentCheck.Verify(Path.GetExtension(asset.OriginalFileName), asset.ContentType, prefix);
+        if (verdict != UploadContentVerdict.Match)
+        {
+            throw await RefuseAsync(asset, "uploaded content does not match its declared type", cancellationToken).ConfigureAwait(false);
         }
 
         var scanResult = await scanner.ScanAsync(asset.StorageKey, cancellationToken).ConfigureAwait(false);
@@ -94,5 +91,34 @@ public sealed class FinalizeUploadCommandHandler(
             FinalStatus: (int)asset.Status), cancellationToken).ConfigureAwait(false);
 
         return FileAssetMapper.ToDto(asset);
+    }
+
+    private async Task<byte[]> ReadPrefixAsync(string storageKey, CancellationToken cancellationToken)
+    {
+        // No ranged read on IStorageService: open the object, take the first bytes, and dispose,
+        // which drops the rest of the transfer.
+        var download = await storage.DownloadAsync(storageKey, cancellationToken).ConfigureAwait(false);
+        if (download is null)
+        {
+            return [];
+        }
+
+        await using (download.Stream.ConfigureAwait(false))
+        {
+            var buffer = new byte[UploadContentCheck.PrefixLength];
+            var read = await download.Stream
+                .ReadAtLeastAsync(buffer, buffer.Length, throwOnEndOfStream: false, cancellationToken)
+                .ConfigureAwait(false);
+            return buffer[..read];
+        }
+    }
+
+    /// <summary>Deletes the object and the pending row; returns the 400 the caller throws.</summary>
+    private async Task<CustomException> RefuseAsync(FileAsset asset, string reason, CancellationToken cancellationToken)
+    {
+        await storage.RemoveAsync(asset.StorageKey, cancellationToken).ConfigureAwait(false);
+        db.FileAssets.Remove(asset);
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return new CustomException(reason, (IEnumerable<string>?)null, HttpStatusCode.BadRequest);
     }
 }
