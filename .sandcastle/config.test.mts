@@ -3,11 +3,13 @@ import test from "node:test";
 
 import {
   defineConfig,
+  envFileKeys,
   formatGateCommands,
   gateCommand,
   gateNames,
   issueBranch,
   joinGateCommands,
+  resolveFallbackAccount,
   resolveLimits,
   resolveModels,
   type GateConfig,
@@ -300,6 +302,78 @@ test("a model the agent CLI cannot route throws instead of falling back", () => 
     () => resolveModels(models, { SANDCASTLE_PLANNER_MODEL: "claude-test model" }),
     /SANDCASTLE_PLANNER_MODEL.*no whitespace/,
   );
+});
+
+// --- fallback account ------------------------------------------------------
+
+const TOKEN = "CLAUDE_CODE_OAUTH_TOKEN_FALLBACK";
+const listed = new Set(["CLAUDE_CODE_OAUTH_TOKEN", TOKEN]);
+
+test("the fallback account is off when its switch is absent, blank or off", () => {
+  // A token sitting in .env stays unused.
+  for (const value of [undefined, "", "  ", "off", "OFF"]) {
+    assert.deepEqual(
+      resolveFallbackAccount({ SANDCASTLE_FALLBACK_ACCOUNT: value, [TOKEN]: "t" }, listed),
+      { enabled: false },
+    );
+  }
+});
+
+test("the fallback account is on when switched on with a listed token", () => {
+  assert.deepEqual(
+    resolveFallbackAccount({ SANDCASTLE_FALLBACK_ACCOUNT: "on", [TOKEN]: "t" }, listed),
+    { enabled: true },
+  );
+});
+
+test("a malformed fallback switch throws instead of falling back", () => {
+  assert.throws(
+    () => resolveFallbackAccount({ SANDCASTLE_FALLBACK_ACCOUNT: "yes", [TOKEN]: "t" }, listed),
+    /SANDCASTLE_FALLBACK_ACCOUNT must be "on" or "off", got "yes"/,
+  );
+});
+
+test("the fallback switched on without a token throws at startup", () => {
+  assert.throws(
+    () => resolveFallbackAccount({ SANDCASTLE_FALLBACK_ACCOUNT: "on", [TOKEN]: " " }, listed),
+    /CLAUDE_CODE_OAUTH_TOKEN_FALLBACK is blank/,
+  );
+});
+
+test("a fallback token exported from the shell but not listed in .sandcastle/.env throws", () => {
+  assert.throws(
+    () =>
+      resolveFallbackAccount(
+        { SANDCASTLE_FALLBACK_ACCOUNT: "on", [TOKEN]: "t" },
+        new Set(["CLAUDE_CODE_OAUTH_TOKEN"]),
+      ),
+    /not listed in \.sandcastle\/\.env/,
+  );
+});
+
+test("the fallback switched on alongside an API key throws", () => {
+  assert.throws(
+    () =>
+      resolveFallbackAccount(
+        { SANDCASTLE_FALLBACK_ACCOUNT: "on", [TOKEN]: "t", ANTHROPIC_API_KEY: "k" },
+        listed,
+      ),
+    /ANTHROPIC_API_KEY is set/,
+  );
+});
+
+test("envFileKeys reads the keys the library forwards, skipping comments", () => {
+  const keys = envFileKeys(
+    [
+      "# a comment",
+      `CLAUDE_CODE_OAUTH_TOKEN=abc`,
+      `  ${TOKEN}=`,
+      "# ANTHROPIC_API_KEY=",
+      "not a pair",
+      "",
+    ].join("\n"),
+  );
+  assert.deepEqual([...keys].sort(), ["CLAUDE_CODE_OAUTH_TOKEN", TOKEN]);
 });
 
 // --- branches --------------------------------------------------------------

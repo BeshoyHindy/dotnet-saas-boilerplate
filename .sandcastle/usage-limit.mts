@@ -35,6 +35,8 @@
 // Pure by injection — probe, sleep, clock and log all arrive as arguments — so
 // the tests below drive every path with no CLI, no model and no real time.
 
+import { MAIN_ACCOUNT, type ClaudeAccount } from "./accounts.mts";
+
 /**
  * What one probe of a model established.
  *
@@ -51,8 +53,11 @@ export type ProbeOutcome =
   | { readonly verdict: "answered" }
   | { readonly verdict: "limited" | "unavailable"; readonly detail: string };
 
-/** Probes one model. Must not throw; a throw is treated as `unavailable`. */
-export type Probe = (model: string) => Promise<ProbeOutcome>;
+/**
+ * Probes one model on one account. Must not throw; a throw is treated as
+ * `unavailable`.
+ */
+export type Probe = (model: string, account: ClaudeAccount) => Promise<ProbeOutcome>;
 
 /** What the probe asks. A one-word reply keeps it as cheap as a call can be. */
 export const PROBE_PROMPT = "Reply with the single word OK.";
@@ -162,16 +167,29 @@ export interface UsageWaitOptions {
   readonly pollMs: number;
   /** The per-call wait budget, counted from the first limit hit. 0 = off. */
   readonly maxWaitMs: number;
+  /**
+   * The accounts a phase may run on, in priority order: the main account
+   * first, then the optional fallback. Defaults to the main account alone,
+   * which is the plain wait with no switching.
+   */
+  readonly accounts?: readonly ClaudeAccount[];
 }
 
 export interface UsageWait {
   /** False when the budget is 0: `run` then only ever calls `fn` once. */
   readonly enabled: boolean;
   /**
-   * Run one agent phase. When it throws and `model` is not answering, wait
-   * until it answers again (up to the budget) and run the phase again.
+   * Run one agent phase on the account the run is on. When it throws and
+   * `model` is not answering on that account, re-run it at once on the first
+   * other account that answers; when none does, wait until one answers (up to
+   * the budget) and run the phase again there. `fn` is handed the account it
+   * runs on.
    */
-  run<T>(label: string, model: string, fn: () => Promise<T>): Promise<T>;
+  run<T>(
+    label: string,
+    model: string,
+    fn: (account: ClaudeAccount) => Promise<T>,
+  ): Promise<T>;
 }
 
 function minutes(ms: number): string {
@@ -181,14 +199,46 @@ function minutes(ms: number): string {
 
 export function createUsageWait(options: UsageWaitOptions): UsageWait {
   const { probe, sleep, now, log, pollMs, maxWaitMs } = options;
+  const accounts = options.accounts ?? [MAIN_ACCOUNT];
+  if (accounts.length === 0) {
+    throw new Error("The usage-limit wait needs at least one account");
+  }
+  const main = accounts[0]!;
+  const multi = accounts.length > 1;
+  const on = (account: ClaudeAccount) => (multi ? ` on the ${account.name} account` : "");
 
-  // The ONE in-flight probe per model. A phase that needs an answer while a
-  // probe of its model is already on its way joins it instead of starting its
-  // own, which is what keeps concurrent waiters on a single probe loop.
+  // The account new phases start on. Moves to another account when the one
+  // the run is on stops answering, and back to the main account once it
+  // answers again.
+  let active = main;
+  // When the main account was last asked whether it answers again, so that is
+  // asked at most once per poll interval however many phases start.
+  let mainCheckedAt = 0;
+
+  const switchTo = (account: ClaudeAccount, reason: string): void => {
+    if (account === active) {
+      return;
+    }
+    active = account;
+    if (account !== main) {
+      mainCheckedAt = now();
+    }
+    log(`  Usage-limit wait: ${reason} New phases start on the ${account.name} account.`);
+  };
+
+  // The ONE in-flight probe per account and model. A phase that needs an
+  // answer while a probe of the same pair is already on its way joins it
+  // instead of starting its own, which is what keeps concurrent waiters on a
+  // single probe loop.
   const inFlight = new Map<string, Promise<boolean>>();
 
-  const answers = (model: string, afterMs: number): Promise<boolean> => {
-    const pending = inFlight.get(model);
+  const answers = (
+    model: string,
+    account: ClaudeAccount,
+    afterMs: number,
+  ): Promise<boolean> => {
+    const key = `${account.name}\u0000${model}`;
+    const pending = inFlight.get(key);
     if (pending !== undefined) {
       return pending;
     }
@@ -197,41 +247,88 @@ export function createUsageWait(options: UsageWaitOptions): UsageWait {
         if (afterMs > 0) {
           await sleep(afterMs);
         }
-        return (await probe(model)).verdict === "answered";
+        return (await probe(model, account)).verdict === "answered";
       } catch {
         return false;
       }
     })();
-    inFlight.set(model, next);
+    inFlight.set(key, next);
     // Registered before any joiner's await, so the slot is free again by the
     // time a joiner asks for the next probe. Never rejects: see the catch.
     void next.then(() => {
-      if (inFlight.get(model) === next) {
-        inFlight.delete(model);
+      if (inFlight.get(key) === next) {
+        inFlight.delete(key);
       }
     });
     return next;
   };
 
-  /** Poll until `model` answers (true) or `deadline` passes (false). */
-  const answersBy = async (model: string, deadline: number): Promise<boolean> => {
-    while (now() < deadline) {
-      if (await answers(model, pollMs)) {
-        return true;
+  /**
+   * One poll: wait a poll interval, then ask every account in priority order.
+   * The first that answers wins, so the main account wins a tie.
+   */
+  const pollOnce = async (model: string): Promise<ClaudeAccount | undefined> => {
+    if (await answers(model, main, pollMs)) {
+      return main;
+    }
+    for (const account of accounts.slice(1)) {
+      if (await answers(model, account, 0)) {
+        return account;
       }
     }
-    return false;
+    return undefined;
+  };
+
+  /** Poll until an account answers `model`, or `deadline` passes. */
+  const answeringBy = async (
+    model: string,
+    deadline: number,
+  ): Promise<ClaudeAccount | undefined> => {
+    while (now() < deadline) {
+      const account = await pollOnce(model);
+      if (account !== undefined) {
+        return account;
+      }
+    }
+    return undefined;
+  };
+
+  /**
+   * The account a new phase starts on. While the run is on another account,
+   * first ask whether the main account answers again — at most once per poll
+   * interval, shared by every phase. Phases already running stay where they
+   * are.
+   */
+  const accountFor = async (model: string): Promise<ClaudeAccount> => {
+    if (active === main || now() - mainCheckedAt < pollMs) {
+      return active;
+    }
+    mainCheckedAt = now();
+    if (await answers(model, main, 0)) {
+      switchTo(main, `the main account answers ${model} again.`);
+    }
+    return active;
   };
 
   return {
     enabled: maxWaitMs > 0,
-    async run<T>(label: string, model: string, fn: () => Promise<T>): Promise<T> {
+    async run<T>(
+      label: string,
+      model: string,
+      fn: (account: ClaudeAccount) => Promise<T>,
+    ): Promise<T> {
+      if (maxWaitMs <= 0) {
+        return fn(main);
+      }
+      let account = await accountFor(model);
       let firstHit: number | undefined;
       for (;;) {
         try {
-          return await fn();
+          return await fn(account);
         } catch (error) {
-          if (maxWaitMs <= 0 || (await answers(model, 0))) {
+          // The account the phase RAN on is the one diagnosed: a real failure
+          // on the fallback is re-thrown, never bounced back to the main one.
+          if (await answers(model, account, 0)) {
             throw error;
           }
           firstHit ??= now();
@@ -244,12 +341,33 @@ export function createUsageWait(options: UsageWaitOptions): UsageWait {
             );
             throw error;
           }
+
+          // Another account that answers takes the phase at once.
+          let next: ClaudeAccount | undefined;
+          for (const other of accounts) {
+            if (other !== account && (await answers(model, other, 0))) {
+              next = other;
+              break;
+            }
+          }
+          if (next !== undefined) {
+            log(
+              `  ${label}: failed and ${model} is not answering on the ` +
+                `${account.name} account — re-running the phase at once on ` +
+                `the ${next.name} account.`,
+            );
+            switchTo(next, `the ${account.name} account is not answering ${model}.`);
+            account = next;
+            continue;
+          }
+
           log(
-            `  ${label}: failed and ${model} is not answering — most likely a ` +
-              `usage limit. Probing every ${minutes(pollMs)} for up to ` +
+            `  ${label}: failed and ${model} is not answering${multi ? " on any account" : ""} — ` +
+              `most likely a usage limit. Probing every ${minutes(pollMs)} for up to ` +
               `${minutes(left)}, then re-running the phase.`,
           );
-          if (!(await answersBy(model, deadline))) {
+          const back = await answeringBy(model, deadline);
+          if (back === undefined) {
             log(
               `  ${label}: ${model} did not answer within the ` +
                 `${minutes(maxWaitMs)} usage-limit wait. Giving up with the ` +
@@ -257,7 +375,9 @@ export function createUsageWait(options: UsageWaitOptions): UsageWait {
             );
             throw error;
           }
-          log(`  ${label}: ${model} answers again — re-running the phase.`);
+          log(`  ${label}: ${model} answers again${on(back)} — re-running the phase.`);
+          switchTo(back, `the ${back.name} account answers ${model}.`);
+          account = back;
         }
       }
     },
@@ -290,7 +410,7 @@ export async function checkUsageProbe(options: {
 
   let outcome: ProbeOutcome;
   try {
-    outcome = await probe(model);
+    outcome = await probe(model, MAIN_ACCOUNT);
   } catch (error) {
     outcome = {
       verdict: "unavailable",
@@ -315,6 +435,54 @@ export async function checkUsageProbe(options: {
           `answer the startup probe of ${model} (${outcome.detail}), so a ` +
           "phase failure could not be told apart from a usage limit. A failed " +
           "phase ends the run as it would without the wait.",
+      );
+      return false;
+  }
+}
+
+/**
+ * The fallback account's startup check: probe it once, so a broken token is
+ * reported now rather than discovered mid-round, on the night the main
+ * account runs out. Returns whether the fallback stays in the run.
+ *
+ * A fallback that answers, or is merely limited right now, stays: a spent
+ * quota recovers on its own. One the CLI cannot use at all (a typo in the
+ * token, a revoked one) is dropped with a warning, and the run goes on with
+ * the main account alone.
+ */
+export async function checkFallbackAccount(options: {
+  readonly probe: Probe;
+  readonly model: string;
+  readonly account: ClaudeAccount;
+  readonly log: (line: string) => void;
+}): Promise<boolean> {
+  const { probe, model, account, log } = options;
+  let outcome: ProbeOutcome;
+  try {
+    outcome = await probe(model, account);
+  } catch (error) {
+    outcome = {
+      verdict: "unavailable",
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  switch (outcome.verdict) {
+    case "answered":
+      log(`Fallback account: ON (the startup probe of ${model} on it answered).`);
+      return true;
+    case "limited":
+      log(
+        `Fallback account: ON. Its startup probe of ${model} was refused for a ` +
+          `limit (${outcome.detail}); it is used once that clears.`,
+      );
+      return true;
+    case "unavailable":
+      log(
+        `Fallback account: DROPPED for this run. Its startup probe of ${model} ` +
+          `could not be answered (${outcome.detail}), so its token looks ` +
+          `broken. Check ${account.tokenVar} in .sandcastle/.env. The run goes ` +
+          "on with the main account alone.",
       );
       return false;
   }

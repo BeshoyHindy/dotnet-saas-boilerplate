@@ -24,7 +24,8 @@
 // Every phase runs through the usage-limit wait (usage-limit.mts): a phase that
 // fails while a probe of its model gets no answer waits for the model and
 // re-runs, instead of ending the run. On by default; see `limits` in the root
-// config.
+// config. An optional fallback Claude account (off by default,
+// SANDCASTLE_FALLBACK_ACCOUNT) takes phases over while the main one is limited.
 //
 // Every phase runs in a git worktree (merge-to-head or an explicit branch) —
 // NEVER the host working directory — so untracked/gitignored files such as
@@ -61,9 +62,11 @@ import { dirname, isAbsolute, join } from "node:path";
 
 import config from "../sandcastle.config.mts";
 import {
+  envFileKeys,
   formatGateCommands,
   gateNames,
   joinGateCommands,
+  resolveFallbackAccount,
   resolveLimits,
   resolveModels,
   type PhaseModel,
@@ -102,24 +105,40 @@ import {
   preserveMergerDirt,
 } from "./merger-dirt.mts";
 import {
+  checkFallbackAccount,
   checkUsageProbe,
   classifyProbeOutput,
   createUsageWait,
   probeArgs,
   type ProbeOutcome,
 } from "./usage-limit.mts";
+import {
+  CLAUDE_TOKEN_VAR,
+  FALLBACK_ACCOUNT,
+  MAIN_ACCOUNT,
+  onAccount,
+  type ClaudeAccount,
+} from "./accounts.mts";
 
 // ---------------------------------------------------------------------------
 // Resolved configuration
 // ---------------------------------------------------------------------------
 
 // Environment overrides (MAX_CONCURRENT_AGENTS, SANDCASTLE_HEAL_ATTEMPTS,
-// SANDCASTLE_USAGE_POLL_MINUTES, SANDCASTLE_USAGE_MAX_WAIT_HOURS, and the
-// per-phase SANDCASTLE_<PHASE>_MODEL / SANDCASTLE_<PHASE>_EFFORT) are applied
-// here and nowhere else; a malformed one THROWS rather than silently restoring
-// a default that may not fit this machine or this run.
+// SANDCASTLE_USAGE_POLL_MINUTES, SANDCASTLE_USAGE_MAX_WAIT_HOURS, the
+// per-phase SANDCASTLE_<PHASE>_MODEL / SANDCASTLE_<PHASE>_EFFORT, and the
+// SANDCASTLE_FALLBACK_ACCOUNT switch) are applied here and nowhere else; a
+// malformed one THROWS rather than silently restoring a default that may not
+// fit this machine or this run.
 const limits = resolveLimits(config.limits, process.env);
 const models = resolveModels(config.models, process.env);
+// The fallback token must be LISTED in .sandcastle/.env to reach a sandbox, so
+// the resolver is told which keys that file lists (see accounts.mts).
+const SANDCASTLE_ENV_FILE = join(process.cwd(), ".sandcastle", ".env");
+const fallback = resolveFallbackAccount(
+  process.env,
+  envFileKeys(existsSync(SANDCASTLE_ENV_FILE) ? readFileSync(SANDCASTLE_ENV_FILE, "utf8") : ""),
+);
 // The one channel by which a prompt learns a gate command — see config.mts.
 const GATE_COMMANDS = formatGateCommands(config.gates);
 
@@ -143,6 +162,7 @@ if (isDryRun(process.argv.slice(2), process.env)) {
       limits,
       models,
       listAgentIssues(config.issues.listArgs, exec),
+      fallback,
     ),
   );
   process.exit(0);
@@ -443,17 +463,21 @@ function reconcilePendingCloses(): void {
 //
 // Every agent phase runs through `usage.run(label, model, fn)`: when it fails
 // and a probe of its model gets no answer, it waits for the model and re-runs
-// instead of ending the run.
+// instead of ending the run. With the fallback account on, it re-runs on the
+// fallback at once instead, and new phases return to the main account once it
+// answers again. `fn` is handed the account, and its agent runs there through
+// `onAccount` (a command prefix; see accounts.mts for why not agent env).
 
 // A probe that has not answered in this long is not answering.
 const PROBE_TIMEOUT_MS = 2 * 60_000;
 
 // One real `claude -p` call on the HOST, with the host's own credentials (the
-// ones the `sandcastle` script loads from .sandcastle/.env). Run from an empty
-// temporary directory so no repository instructions load, with stdin closed so
-// print mode never waits for more prompt. Never throws: a CLI that cannot be
-// started is simply a probe that did not answer.
-const probeModel = (model: string): Promise<ProbeOutcome> =>
+// ones the `sandcastle` script loads from .sandcastle/.env), on `account`: a
+// probe of the fallback runs with its token in place of the main one. Run from
+// an empty temporary directory so no repository instructions load, with stdin
+// closed so print mode never waits for more prompt. Never throws: a CLI that
+// cannot be started is simply a probe that did not answer.
+const probeModel = (model: string, account: ClaudeAccount): Promise<ProbeOutcome> =>
   new Promise((resolve) => {
     const dir = mkdtempSync(join(tmpdir(), "sandcastle-probe-"));
     const child = execFile(
@@ -464,6 +488,10 @@ const probeModel = (model: string): Promise<ProbeOutcome> =>
         encoding: "utf8",
         timeout: PROBE_TIMEOUT_MS,
         maxBuffer: 16 * 1024 * 1024,
+        env:
+          account.tokenVar === CLAUDE_TOKEN_VAR
+            ? process.env
+            : { ...process.env, [CLAUDE_TOKEN_VAR]: process.env[account.tokenVar] ?? "" },
       },
       (error, stdout, stderr) => {
         rmSync(dir, { recursive: true, force: true });
@@ -489,6 +517,26 @@ const usageWaitOn = await checkUsageProbe({
   log: (line) => console.log(line),
 });
 
+// The fallback account, when switched on: probed once now so a broken token is
+// reported before the first round, never in the middle of one. It is only
+// ever reached through the wait, so with the wait off it has nothing to do.
+let fallbackOn = false;
+if (fallback.enabled) {
+  if (usageWaitOn) {
+    fallbackOn = await checkFallbackAccount({
+      probe: probeModel,
+      model: config.usageProbeModel,
+      account: FALLBACK_ACCOUNT,
+      log: (line) => console.log(line),
+    });
+  } else {
+    console.log(
+      "Fallback account: UNUSED for this run. Phases move to it only through " +
+        "the usage-limit wait, which is off.",
+    );
+  }
+}
+
 const usage = createUsageWait({
   probe: probeModel,
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
@@ -496,6 +544,7 @@ const usage = createUsageWait({
   log: (line) => console.warn(line),
   pollMs: limits.usagePollMinutes * 60_000,
   maxWaitMs: usageWaitOn ? usageMaxWaitMs : 0,
+  accounts: fallbackOn ? [MAIN_ACCOUNT, FALLBACK_ACCOUNT] : [MAIN_ACCOUNT],
 });
 
 // ---------------------------------------------------------------------------
@@ -527,14 +576,14 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
   // out.
   // -------------------------------------------------------------------------
   // Every phase below runs through the usage-limit wait (see above).
-  const plan = await usage.run("planner", models.planner.model, () => sandcastle.run({
+  const plan = await usage.run("planner", models.planner.model, (account) => sandcastle.run({
     sandbox: makeSandbox(),
     branchStrategy: { type: "merge-to-head" },
     name: "planner",
     // One iteration is enough: the planner just needs to read and reason,
     // not write code. (Structured output requires maxIterations: 1.)
     maxIterations: 1,
-    agent: agentFor(models.planner),
+    agent: onAccount(agentFor(models.planner), account),
     promptFile: config.prompts.plan,
     promptArgs: {
       PROJECT_NAME: config.project.name,
@@ -596,11 +645,11 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
           // attempt's uncommitted work is still there for the next one to
           // continue (implement-prompt.md shows it).
           runImplementer: () =>
-            usage.run(`${issue.id} implementer`, models.implementer.model, () => sandbox.run({
+            usage.run(`${issue.id} implementer`, models.implementer.model, (account) => sandbox.run({
               name: "implementer",
               maxIterations: 100,
               idleTimeoutSeconds: limits.idleTimeoutSeconds,
-              agent: agentFor(models.implementer),
+              agent: onAccount(agentFor(models.implementer), account),
               promptFile: config.prompts.implement,
               promptArgs: {
                 TASK_ID: issue.id,
@@ -611,7 +660,7 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
               },
             })),
           runReviewer: () =>
-            usage.run(`${issue.id} reviewer`, models.reviewer.model, () => sandbox.run({
+            usage.run(`${issue.id} reviewer`, models.reviewer.model, (account) => sandbox.run({
               name: "reviewer",
               // 3, not 1: with a single iteration the reviewer is cut off
               // mid-gates and its uncommitted refactors are discarded when the
@@ -619,7 +668,7 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
               // and observe the gate result.
               maxIterations: 3,
               idleTimeoutSeconds: limits.idleTimeoutSeconds,
-              agent: agentFor(models.reviewer),
+              agent: onAccount(agentFor(models.reviewer), account),
               promptFile: config.prompts.review,
               promptArgs: {
                 TASK_ID: issue.id,
@@ -747,7 +796,7 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
   })));
 
   try {
-    await usage.run("merger", models.merger.model, () => sandcastle.run({
+    await usage.run("merger", models.merger.model, (account) => sandcastle.run({
       sandbox: makeSandbox(),
       branchStrategy: { type: "merge-to-head" },
       name: "merger",
@@ -755,7 +804,7 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
       // gates still running AND never reaches its final report.
       maxIterations: 2,
       idleTimeoutSeconds: limits.idleTimeoutSeconds,
-      agent: agentFor(models.merger),
+      agent: onAccount(agentFor(models.merger), account),
       promptFile: config.prompts.merge,
       promptArgs: {
         // A markdown list of branch names, one per line.
@@ -916,7 +965,7 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
         // `claude -p` on the host otherwise denies every edit and command.
         // That trust decision is exactly why healing is OFF by default.
         // -------------------------------------------------------------------
-        await usage.run(`healer-${attempt}`, models.healer.model, () => sandcastle.run({
+        await usage.run(`healer-${attempt}`, models.healer.model, (account) => sandcastle.run({
           sandbox: noSandbox({ env: { ...config.sandbox.hostEnv } }),
           branchStrategy: { type: "merge-to-head" },
           name: `healer-${attempt}`,
@@ -924,7 +973,10 @@ for (let iteration = 1; iteration <= limits.maxIterations; iteration++) {
           // suite, then finish and report.
           maxIterations: 3,
           idleTimeoutSeconds: limits.idleTimeoutSeconds,
-          agent: agentFor(models.healer, { permissionMode: "bypassPermissions" }),
+          agent: onAccount(
+            agentFor(models.healer, { permissionMode: "bypassPermissions" }),
+            account,
+          ),
           promptFile: config.prompts.heal,
           promptArgs: {
             ATTEMPT: String(attempt),

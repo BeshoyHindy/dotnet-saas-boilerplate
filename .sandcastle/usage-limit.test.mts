@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { FALLBACK_ACCOUNT, MAIN_ACCOUNT, type ClaudeAccount } from "./accounts.mts";
 import {
+  checkFallbackAccount,
   checkUsageProbe,
   classifyProbeOutput,
   createUsageWait,
@@ -425,4 +427,245 @@ test("started inside a limit, the first phase waits for the reset and resumes", 
   assert.deepEqual(await wait.run("planner", "m", fn), { issues: [] });
   assert.equal(calls(), 2);
   assert.equal(now(), 10 * MIN);
+});
+
+// --- fallback account ------------------------------------------------------
+
+/**
+ * The fake clock again, with the probe scripted per ACCOUNT for the one model
+ * `m`. Each probe call takes the next verdict for its account; the last one
+ * repeats once the script runs out.
+ */
+function accountHarness(
+  scripts: { main: ProbeOutcome[]; fallback: ProbeOutcome[] },
+  over: Partial<UsageWaitOptions> = {},
+) {
+  let clock = 0;
+  const probes: { account: string; at: number }[] = [];
+  const lines: string[] = [];
+  const probe: Probe = async (_model, account) => {
+    probes.push({ account: account.name, at: clock });
+    const script = scripts[account.name as "main" | "fallback"];
+    return script.length > 1 ? script.shift()! : script[0]!;
+  };
+  const wait = createUsageWait({
+    probe,
+    sleep: async (ms) => {
+      clock += ms;
+    },
+    now: () => clock,
+    log: (line) => lines.push(line),
+    pollMs: 5 * MIN,
+    maxWaitMs: 6 * HOUR,
+    accounts: [MAIN_ACCOUNT, FALLBACK_ACCOUNT],
+    ...over,
+  });
+  return {
+    wait,
+    probes,
+    lines,
+    now: () => clock,
+    advance: (ms: number) => {
+      clock += ms;
+    },
+  };
+}
+
+/** A phase that fails on every account in `failOn`, and records where it ran. */
+function accountPhase<T>(value: T, failOn: readonly string[] = []) {
+  const ranOn: string[] = [];
+  const fn = async (account: ClaudeAccount) => {
+    ranOn.push(account.name);
+    if (failOn.includes(account.name)) {
+      throw new Error(`exit 1 on ${account.name}`);
+    }
+    return value;
+  };
+  return { fn, ranOn };
+}
+
+test("a limit on the main account re-runs the phase at once on the fallback", async () => {
+  const { wait, now, lines } = accountHarness({ main: [limited], fallback: [answered] });
+  const { fn, ranOn } = accountPhase("done", ["main"]);
+
+  assert.equal(await wait.run("#4 implementer", "m", fn), "done");
+  // Handed the account it runs on: main first, then the fallback.
+  assert.deepEqual(ranOn, ["main", "fallback"]);
+  assert.equal(now(), 0);
+  assert.match(lines.join("\n"), /re-running the phase at once on the fallback account/);
+});
+
+test("with the fallback off, a limit never touches a second account", async () => {
+  const { wait, probes } = accountHarness(
+    { main: [limited, answered], fallback: [answered] },
+    { accounts: [MAIN_ACCOUNT] },
+  );
+  const { fn, ranOn } = accountPhase("planned");
+  let calls = 0;
+  const result = await wait.run("planner", "m", async (account) => {
+    calls += 1;
+    if (calls === 1) {
+      ranOn.push(account.name);
+      throw new Error("exit 1");
+    }
+    return fn(account);
+  });
+
+  assert.equal(result, "planned");
+  assert.deepEqual(ranOn, ["main", "main"]);
+  assert.ok(probes.every((p) => p.account === "main"));
+});
+
+test("new phases start on the fallback while the main account is limited", async () => {
+  const { wait, advance } = accountHarness({ main: [limited], fallback: [answered] });
+  await wait.run("planner", "m", accountPhase("plan", ["main"]).fn);
+
+  advance(MIN);
+  const next = accountPhase("merged");
+  await wait.run("merger", "m", next.fn);
+  assert.deepEqual(next.ranOn, ["fallback"]);
+});
+
+test("new phases return to the main account, checked at most once per poll interval", async () => {
+  const { wait, probes, advance, lines } = accountHarness({
+    // Diagnosis: limited. The first check an interval later: still limited.
+    // The next one: answers.
+    main: [limited, limited, answered],
+    fallback: [answered],
+  });
+  await wait.run("planner", "m", accountPhase("plan", ["main"]).fn);
+  const mainProbes = () => probes.filter((p) => p.account === "main").length;
+  assert.equal(mainProbes(), 1);
+
+  // Within the poll interval: the main account is not asked again.
+  advance(MIN);
+  const first = accountPhase("a");
+  const second = accountPhase("b");
+  await Promise.all([
+    wait.run("#1 implementer", "m", first.fn),
+    wait.run("#2 implementer", "m", second.fn),
+  ]);
+  assert.equal(mainProbes(), 1);
+  assert.deepEqual([...first.ranOn, ...second.ranOn], ["fallback", "fallback"]);
+
+  // One interval later: asked once for two phases, still limited, so both
+  // stay on the fallback.
+  advance(5 * MIN);
+  const third = accountPhase("c");
+  const fourth = accountPhase("d");
+  await Promise.all([
+    wait.run("#3 implementer", "m", third.fn),
+    wait.run("#4 implementer", "m", fourth.fn),
+  ]);
+  assert.equal(mainProbes(), 2);
+  assert.deepEqual([...third.ranOn, ...fourth.ranOn], ["fallback", "fallback"]);
+
+  // Another interval: it answers, and new phases are back on the main account.
+  advance(5 * MIN);
+  const back = accountPhase("e");
+  await wait.run("merger", "m", back.fn);
+  assert.equal(mainProbes(), 3);
+  assert.deepEqual(back.ranOn, ["main"]);
+  assert.match(lines.join("\n"), /main account answers m again/);
+});
+
+test("a real failure on the fallback is re-thrown, not bounced back to the main account", async () => {
+  const { wait, probes } = accountHarness({ main: [limited], fallback: [answered] });
+  const real = new Error("a real failure");
+  let calls = 0;
+  const run = wait.run("reviewer", "m", async (account) => {
+    calls += 1;
+    if (account === MAIN_ACCOUNT) {
+      throw new Error("exit 1");
+    }
+    throw real;
+  });
+
+  await assert.rejects(run, (error) => error === real);
+  assert.equal(calls, 2);
+  // Main diagnosed once; the fallback asked once to take over and once to
+  // diagnose its own failure. The main account is never asked again.
+  assert.deepEqual(probes.map((p) => p.account), ["main", "fallback", "fallback"]);
+});
+
+test("with both accounts out, the run waits and resumes on whichever answers first", async () => {
+  const { wait, now } = accountHarness({
+    // Main: diagnosis, then never back. Fallback: the take-over ask, the first
+    // poll, then back on the second poll.
+    main: [limited],
+    fallback: [limited, limited, answered],
+  });
+  const { fn, ranOn } = accountPhase("done", ["main"]);
+
+  assert.equal(await wait.run("#5 implementer", "m", fn), "done");
+  assert.deepEqual(ranOn, ["main", "fallback"]);
+  assert.equal(now(), 10 * MIN);
+});
+
+test("when both accounts answer again in the same poll, the main account wins", async () => {
+  const { wait, probes } = accountHarness({
+    main: [limited, answered],
+    fallback: [limited, answered],
+  });
+  let calls = 0;
+  const ranOn: string[] = [];
+  const result = await wait.run("merger", "m", async (account) => {
+    calls += 1;
+    ranOn.push(account.name);
+    if (calls === 1) {
+      throw new Error("exit 1");
+    }
+    return "merged";
+  });
+
+  assert.equal(result, "merged");
+  assert.deepEqual(ranOn, ["main", "main"]);
+  // Diagnosis, take-over ask, then one poll the main account won outright.
+  assert.deepEqual(probes.map((p) => p.account), ["main", "fallback", "main"]);
+});
+
+test("with both accounts out past the budget, the original error is re-thrown", async () => {
+  const { wait, now } = accountHarness(
+    { main: [limited], fallback: [limited] },
+    { maxWaitMs: HOUR },
+  );
+  const boom = new Error("exit 1 on main");
+  let calls = 0;
+  const run = wait.run("#6 implementer", "m", async () => {
+    calls += 1;
+    throw boom;
+  });
+
+  await assert.rejects(run, (error) => error === boom);
+  assert.equal(calls, 1);
+  assert.equal(now(), HOUR);
+});
+
+test("the startup check keeps a fallback that answers or is merely limited", async () => {
+  for (const outcome of [answered, limited]) {
+    const kept = await checkFallbackAccount({
+      probe: async (_model, account) => {
+        assert.equal(account, FALLBACK_ACCOUNT);
+        return outcome;
+      },
+      model: "probe-model",
+      account: FALLBACK_ACCOUNT,
+      log: () => {},
+    });
+    assert.equal(kept, true);
+  }
+});
+
+test("the startup check drops a fallback whose token is broken, loudly", async () => {
+  const lines: string[] = [];
+  const kept = await checkFallbackAccount({
+    probe: async () => unavailable,
+    model: "probe-model",
+    account: FALLBACK_ACCOUNT,
+    log: (line) => lines.push(line),
+  });
+
+  assert.equal(kept, false);
+  assert.match(lines.join("\n"), /DROPPED for this run/);
+  assert.match(lines.join("\n"), /CLAUDE_CODE_OAUTH_TOKEN_FALLBACK/);
 });
