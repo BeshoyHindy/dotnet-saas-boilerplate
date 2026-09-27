@@ -134,6 +134,19 @@ The JwtBearer `OnTokenValidated` hook (`Authorization/Jwt/ConfigureJwtBearerOpti
 - **A token with no `sid` is refused**, explicitly. Login and refresh always mint one; the only issuer that omits it is `IImpersonationTokenIssuer`, whose acting tokens (`act_sub` present) skip the session check and are governed by their grant instead (below).
 - The tenant's *activation* is not checked here — the deactivated-tenant guard still answers 403 after resolution. A `SecurityStamp` change still kills a session only at its next refresh, not per request.
 
+### Deactivating or deleting a user ends their sessions (#124)
+
+`UserStatusService`'s deactivate path — which `DeleteAsync` is — revokes every `UserSession` of the
+user and bumps their `SecurityStamp` **in the same save as the status change**:
+`ISessionService.RevokeAllSessionsWithinSaveAsync` stages the revocations on the scoped
+`IdentityDbContext`, and the save it is handed is `UserManager.UpdateSecurityStampAsync`, whose one
+`SaveChanges` carries the status, the stamp and the rows. A failed save throws (a failed
+`IdentityResult` is turned into an exception) and the staged rows are put back, so neither half
+lands; the sessions are marked in `SessionLiveness` only after it succeeds. With the `sid` check
+above, the user's live access token is refused on its next request. **Reactivation revokes nothing
+and restores nothing** — the user signs in again. Don't split this into a revoke followed by an
+update: two saves are two commits.
+
 ## Acting as someone else (impersonation + operator token exchange)
 
 `IImpersonationTokenIssuer` is **the** place a token is minted for another identity. Two surfaces call it and they share everything downstream — one `ImpersonationGrant` table, one jti revocation list, one lifetime ceiling (`OperatorExchange:MaxMinutes`, clamped server-side), one audit record:
