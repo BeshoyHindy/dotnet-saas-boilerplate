@@ -29,7 +29,9 @@ Because it enumerates, **your new endpoint is swept the day you map it**. Two th
 
 **Opting out is explicit and costs a sentence:** `.ExemptFromTenantSweep("why this id is not a tenant-scoped resource")` at the mapping site (`Boilerplate.BuildingBlocks.Shared.Multitenancy`). The reason is mandatory and the sweep prints the exempt list on every run. It is not a way to silence a leak — an endpoint that answers 200 or 403 for another tenant's id is a bug in the endpoint.
 
-The sweep also runs a **positive control** (the same request with the caller's own id must not 404), a **root-token pass** (root has no override — ADR-0002 — so it must 404 too, except for the declared platform-wide kinds), and a **list pass**: every seeded row carries a per-tenant marker, and no collection endpoint called with A's token may contain it. The list pass needs no registration at all.
+The sweep also runs a **positive control** (the same request with the caller's own id must not 404), a **root-token pass** (root has no override — ADR-0002 — so it must 404 too, except for the declared platform-wide kinds), and a **list pass**: every seeded row carries a per-tenant marker, and no collection endpoint called with A's token may contain it.
+
+The list pass needs no registry entry, but it does need **a seeded row the list would show** — otherwise "no tenant-B row in A's list" holds only because B has none, and keeps holding the day the list loses its tenant filter. So every swept list is also called with its own tenant's token and must show one of that tenant's seeded rows (marker, admin e-mail or user id, or a seeded id). A new list-only noun (`GET notes/`) fails `Every_Swept_List_Shows_Its_Own_Tenant_A_Seeded_Row` with the route and the fix: add a `ResourceKind` and a seeder in `TenantSweepSeeder` that creates a row carrying the marker in a field the list returns — or, if the list holds no tenant rows at all (a static catalog, a count), name it in `TenantSweepExceptions.ListsWithNothingSeeded` with the reason.
 
 ### The sweep covers route ids only
 

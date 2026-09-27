@@ -78,6 +78,18 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
             problemDetails.Title = "Bad Request";
             problemDetails.Detail = badRequest.Message;
         }
+        else if (exception is Finbuckle.MultiTenant.Abstractions.MultiTenantException)
+        {
+            // Finbuckle refused to read or write outside the ambient tenant — typically a handler
+            // that copied a tenant id from the request onto a row (ADR-0002: a caller never names a
+            // tenant). Nothing crossed the boundary; the request asked for something that cannot be
+            // done in the caller's tenant. The message is not echoed: it names the library and
+            // describes the mismatch, and neither is the caller's business.
+            statusCode = StatusCodes.Status400BadRequest;
+            problemDetails.Status = statusCode;
+            problemDetails.Title = "Bad Request";
+            problemDetails.Detail = "The request cannot be carried out in the caller's tenant.";
+        }
         else
         {
             statusCode = StatusCodes.Status500InternalServerError;

@@ -59,7 +59,9 @@ Constants in `Shared/Identity/*Permissions.cs` (e.g. `IdentityPermissions`). App
 - `.RequireAuthenticatedOnly()` — self-service routes scoped to the caller (own profile, own password, own 2FA).
 - `.AllowAnonymous()` — genuinely public (token issue/refresh, health, OpenAPI).
 
-`EndpointAuthorizationIntentTests` (Integration.Tests) reads the running host's `EndpointDataSource` and fails the build on an endpoint that declares nothing or more than one.
+`EndpointAuthorizationIntentTests` (Integration.Tests, so Docker) reads the running host's `EndpointDataSource` and fails on an endpoint that declares nothing or more than one. The build and Architecture.Tests stay green on such an endpoint — run the integration suite before you push.
+
+**A request never names a tenant** (ADR-0002). A command or query an endpoint binds or builds may not carry a property with "tenant" in its name; the tenant is the token's `tenant` claim, already ambient in the handler. `CallerNeverNamesATenantTests` (Architecture.Tests, no Docker) fails on one, and its allow-list holds only root-only operations on a tenant and the `{tenant}` segment of the anonymous auth routes, each with its reason. If a handler copies a tenant id onto a row anyway, Finbuckle refuses the save and the caller gets a 400 that names neither the exception nor the tenant.
 
 ## Specifications
 
