@@ -488,7 +488,8 @@ internal sealed class UserRegistrationService(
             Id: Guid.NewGuid(),
             OccurredOnUtc: TimeProvider.System.GetUtcNow().UtcDateTime,
             TenantId: tenantId,
-            CorrelationId: Guid.NewGuid().ToString(),
+            // The current trace id, so the event joins back to the request's spans, logs and audit rows.
+            CorrelationId: Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString(),
             Source: source,
             UserId: user.Id,
             Email: user.Email ?? string.Empty,

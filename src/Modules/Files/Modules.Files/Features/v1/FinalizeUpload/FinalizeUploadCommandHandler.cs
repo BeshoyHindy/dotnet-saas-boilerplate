@@ -73,7 +73,8 @@ public sealed class FinalizeUploadCommandHandler(
 
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        var correlationId = Activity.Current?.Id ?? Guid.NewGuid().ToString();
+        // The trace id (not the traceparent), so it equals the request's audit and log TraceId.
+        var correlationId = Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString();
 
         // Outbox rather than the bus: a crash between the SaveChanges above and delivery would
         // otherwise leave the file marked available with no consumer ever told about it.

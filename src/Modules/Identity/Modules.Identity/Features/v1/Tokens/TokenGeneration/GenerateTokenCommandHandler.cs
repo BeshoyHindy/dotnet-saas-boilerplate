@@ -1,4 +1,5 @@
-﻿using Finbuckle.MultiTenant.Abstractions;
+﻿using System.Diagnostics;
+using Finbuckle.MultiTenant.Abstractions;
 using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.BuildingBlocks.Eventing.Outbox;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
@@ -112,7 +113,8 @@ public sealed class GenerateTokenCommandHandler
 
         // 4) Enqueue integration event for token generation (sample event for testing eventing)
         var tenantId = _multiTenantContextAccessor.MultiTenantContext?.TenantInfo?.Id;
-        var correlationId = Guid.NewGuid().ToString();
+        // The request's trace id, so the event joins back to its request's spans, logs and audit rows.
+        var correlationId = Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString();
 
         var integrationEvent = new TokenGeneratedIntegrationEvent(
             Id: Guid.NewGuid(),

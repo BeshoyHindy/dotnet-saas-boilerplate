@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Boilerplate.BuildingBlocks.Eventing.Abstractions;
 using Boilerplate.BuildingBlocks.Jobs;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
@@ -129,7 +130,8 @@ public sealed class TenantExpiryScanJob
         string noticeType, AppTenantInfo tenant, DateTime validUpto, DateTime graceEnds, DateTime now)
     {
         var id = Guid.NewGuid();
-        var correlationId = Guid.NewGuid().ToString();
+        // The scan job's trace id, so the notice joins back to the run that raised it.
+        var correlationId = Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString();
         const string source = "Multitenancy";
         var name = tenant.Name ?? tenant.Id;
         var email = tenant.AdminEmail;

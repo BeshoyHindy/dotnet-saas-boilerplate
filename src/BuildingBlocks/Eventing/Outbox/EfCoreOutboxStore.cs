@@ -126,6 +126,10 @@ public sealed partial class EfCoreOutboxStore : IOutboxStore
         await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
+    public Task<int> CountPendingAsync(CancellationToken ct = default) =>
+        _dbContext.Set<OutboxMessage>()
+            .CountAsync(m => !m.IsDead && m.ProcessedOnUtc == null, ct);
+
     public async Task MarkAsFailedAsync(OutboxMessage message, string error, bool isDead, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(message);

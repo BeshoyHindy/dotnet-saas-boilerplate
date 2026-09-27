@@ -59,6 +59,10 @@ recurringJobs.AddOrUpdate<PurgeOrphanedFilesJob>("files:purge-orphaned",
 
 Examples in the tree: `PurgeOrphanedFiles`/`PurgeDeletedFiles` (Files), `AuditRetentionJob` (Auditing), `TenantExpiryScanJob` (Multitenancy). Eventing is not a module and has no `MapEndpoints`, so `EventingRetentionScheduler` makes the same `AddOrUpdate` call from a hosted service at start-up.
 
+## Tracing
+
+`HangfireTelemetryFilter` stores the enqueuer's W3C `traceparent`/`tracestate` as job parameters and starts the job's span (source `Boilerplate.Hangfire`) as its child, so a request and the job it enqueued are one trace. A job enqueued with no trace in scope — a recurring trigger — starts a root span.
+
 ## The Job monitor & config (ADR-0009)
 
 The **Job monitor** is Hangfire's dashboard — call it that, not "the dashboard" (that is the tenant client). `/jobs` (`HangfireOptions.Route`), mapped as a routed endpoint after `UseAuthentication`/`UseAuthorization` and gated by `.RequirePermission(SystemPermissions.Hangfire.View)` — a root-only operator permission. There is no dashboard credential: anonymous → 401, signed in without the permission → 403. Hangfire's own `DashboardOptions.Authorization` is empty on purpose, so ASP.NET Core authorization is the single gate.
