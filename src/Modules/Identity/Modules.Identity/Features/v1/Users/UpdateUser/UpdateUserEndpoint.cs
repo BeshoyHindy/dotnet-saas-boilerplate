@@ -15,7 +15,12 @@ public static class UpdateUserEndpoint
 {
     internal static RouteHandlerBuilder MapUpdateUserEndpoint(this IEndpointRouteBuilder endpoints)
     {
-        return endpoints.MapPut("/profile", async ([FromBody] UpdateUserCommand request, ClaimsPrincipal user, IMediator mediator, CancellationToken cancellationToken) =>
+        return endpoints.MapPut("/profile", async (
+            [FromBody] UpdateUserCommand request,
+            [FromHeader(Name = "If-Match")] string? ifMatch,
+            ClaimsPrincipal user,
+            IMediator mediator,
+            CancellationToken cancellationToken) =>
         {
             if (user.GetUserId() is not { } userId || string.IsNullOrEmpty(userId))
             {
@@ -26,6 +31,10 @@ public static class UpdateUserEndpoint
             // only, regardless of any id the caller supplied in the body.
             request.Id = userId;
 
+            // Optional: absent means "no precondition". Present, it must name the version from
+            // GET /profile's ETag, or the update is refused with 412 before anything is stored (#107).
+            request.IfMatch = ifMatch;
+
             await mediator.Send(request, cancellationToken);
             return TypedResults.Ok();
         })
@@ -34,9 +43,10 @@ public static class UpdateUserEndpoint
         .RequireAuthorization()
         // Self-service: the handler forces the target id to the caller's own.
         .RequireAuthenticatedOnly()
-        .WithDescription("Update profile details for the authenticated user. Any signed-in user may edit their own profile; no admin permission required.")
+        .WithDescription("Update profile details for the authenticated user. Any signed-in user may edit their own profile; no admin permission required. Send the ETag from GET /profile in If-Match to refuse the update with 412 if the profile changed since it was read.")
         .Produces(StatusCodes.Status200OK)
         .Produces(StatusCodes.Status401Unauthorized)
-        .Produces(StatusCodes.Status400BadRequest);
+        .Produces(StatusCodes.Status400BadRequest)
+        .Produces(StatusCodes.Status412PreconditionFailed);
     }
 }

@@ -32,8 +32,13 @@ public interface IUserProfileService
     /// deliberately no "set my image URL" entry point: the one it replaced let a user name any
     /// string, including another user's avatar in the same tenant, which the next replace would then
     /// delete. <paramref name="deleteCurrentImage"/> is the removal path.</para>
+    ///
+    /// <para><b>Optimistic concurrency (#107).</b> <paramref name="ifMatch"/> is the caller's raw
+    /// <c>If-Match</c> header, or null when it sent none. When present it is checked against the
+    /// loaded row before anything else happens — before the avatar upload or delete — and a
+    /// mismatch, like a <c>ConcurrencyFailure</c> from the save itself, is a 412.</para>
     /// </summary>
-    Task UpdateAsync(string userId, string firstName, string lastName, string phoneNumber, FileUploadRequest image, bool deleteCurrentImage, CancellationToken cancellationToken = default);
+    Task UpdateAsync(string userId, string firstName, string lastName, string phoneNumber, FileUploadRequest image, bool deleteCurrentImage, string? ifMatch = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Checks if a user exists with the given email.

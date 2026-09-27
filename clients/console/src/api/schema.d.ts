@@ -629,12 +629,12 @@ export interface paths {
         };
         /**
          * Get current user profile
-         * @description Retrieve the authenticated user's profile from the access token.
+         * @description Retrieve the authenticated user's profile from the access token. The strong ETag response header is the profile's version; send it back in If-Match on PUT /profile.
          */
         get: operations["GetCurrentUserProfile"];
         /**
          * Update user profile
-         * @description Update profile details for the authenticated user. Any signed-in user may edit their own profile; no admin permission required.
+         * @description Update profile details for the authenticated user. Any signed-in user may edit their own profile; no admin permission required. Send the ETag from GET /profile in If-Match to refuse the update with 412 if the profile changed since it was read.
          */
         put: operations["UpdateUserProfile"];
         post?: never;
@@ -3427,7 +3427,9 @@ export interface operations {
     UpdateUserProfile: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "If-Match"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -3453,6 +3455,13 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Precondition Failed */
+            412: {
                 headers: {
                     [name: string]: unknown;
                 };

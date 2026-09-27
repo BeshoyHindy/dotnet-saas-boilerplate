@@ -4110,7 +4110,7 @@
     },
     "/api/v1/identity/profile": {
       "get": {
-        "description": "Retrieve the authenticated user's profile from the access token.",
+        "description": "Retrieve the authenticated user's profile from the access token. The strong ETag response header is the profile's version; send it back in If-Match on PUT /profile.",
         "operationId": "GetCurrentUserProfile",
         "responses": {
           "200": {
@@ -4138,8 +4138,17 @@
         ]
       },
       "put": {
-        "description": "Update profile details for the authenticated user. Any signed-in user may edit their own profile; no admin permission required.",
+        "description": "Update profile details for the authenticated user. Any signed-in user may edit their own profile; no admin permission required. Send the ETag from GET /profile in If-Match to refuse the update with 412 if the profile changed since it was read.",
         "operationId": "UpdateUserProfile",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "If-Match",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -4159,6 +4168,9 @@
           },
           "401": {
             "description": "Unauthorized"
+          },
+          "412": {
+            "description": "Precondition Failed"
           }
         },
         "security": [

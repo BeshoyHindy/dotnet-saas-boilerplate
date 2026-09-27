@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.Net.Http.Headers;
 using System;
+using System.Linq;
 using AspNetCorsOptions = Microsoft.AspNetCore.Cors.Infrastructure.CorsOptions;
 
 namespace Boilerplate.BuildingBlocks.Web.Cors;
@@ -57,14 +59,37 @@ public static class Extensions
                     {
                         builder
                             .WithOrigins(settings.AllowedOrigins)
-                            .WithHeaders(settings.AllowedHeaders)
+                            .WithHeaders(WithIfMatch(settings.AllowedHeaders))
                             .WithMethods(settings.AllowedMethods);
                     }
+
+                    // The profile's version travels as ETag out and If-Match back (#107). A browser
+                    // hides a response header from script unless it is exposed — AllowAnyHeader
+                    // covers request headers only — so both branches expose it.
+                    builder.WithExposedHeaders(HeaderNames.ETag);
                 });
             });
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// The configured request headers plus <c>If-Match</c>, which the clients always send on a
+    /// profile update (#107). A lone <c>*</c> is left alone: CORS treats the list as "any header"
+    /// only while it is exactly that, so appending to it would narrow the policy.
+    /// </summary>
+    internal static string[] WithIfMatch(string[] allowedHeaders)
+    {
+        ArgumentNullException.ThrowIfNull(allowedHeaders);
+
+        if (allowedHeaders is ["*"]
+            || allowedHeaders.Contains(HeaderNames.IfMatch, StringComparer.OrdinalIgnoreCase))
+        {
+            return allowedHeaders;
+        }
+
+        return [.. allowedHeaders, HeaderNames.IfMatch];
     }
 
     public static void UseHeroCors(this WebApplication app)
