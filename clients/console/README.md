@@ -23,7 +23,7 @@ the refresh token is an `HttpOnly; SameSite=Strict` cookie and CORS allows no cr
 (ADR-0002), so the browser must see one origin.
 
 Easiest full stack: `dotnet run --project src/Host/Boilerplate.AppHost` from the repository root,
-which starts PostgreSQL, Valkey, MinIO, Mailpit, the migrator, the API and this console.
+which starts PostgreSQL, Valkey, RustFS, Mailpit, the migrator, the API and this console.
 
 ## The API contract
 

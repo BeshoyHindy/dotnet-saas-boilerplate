@@ -172,7 +172,7 @@ jobs:
     if: github.event_name != 'push' && needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     # Testcontainers requires Docker — ubuntu-latest has it pre-installed.
-    # This is the slowest gate in the repo (PostgreSQL + Redis + MinIO per
+    # This is the slowest gate in the repo (PostgreSQL + Redis + RustFS per
     # assembly), so it gets a generous but finite budget: a hung container must
     # fail the run, not hold a runner for six hours.
     timeout-minutes: 45

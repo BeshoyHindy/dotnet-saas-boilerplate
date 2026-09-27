@@ -19,7 +19,7 @@ if [ -f "$ENV_FILE" ] && [ "${1:-}" != "--force" ]; then
   exit 0
 fi
 
-# Alphanumeric-only output: these values land in a Postgres connection string and a MinIO URL,
+# Alphanumeric-only output: these values land in a Postgres connection string and an object-store URL,
 # where '/', '+', '=' and ':' would need escaping.
 rand() {
   LC_ALL=C openssl rand -base64 "$1" | LC_ALL=C tr -dc 'A-Za-z0-9' | cut -c "1-$2"
@@ -43,7 +43,7 @@ cat > "$ENV_FILE" <<EOF
 # default in docker-compose.yml; see .env.example for the full list and override what you like.
 
 POSTGRES_PASSWORD=$(rand 24 32)
-MINIO_ROOT_PASSWORD=$(rand 24 32)
+STORAGE_SECRET_KEY=$(rand 24 32)
 JWT_SIGNING_KEY=$(rand 48 64)
 SEED_ADMIN_PASSWORD=${SEED_ADMIN_PASSWORD}
 SEED_DEMO_PASSWORD=${SEED_DEMO_PASSWORD}

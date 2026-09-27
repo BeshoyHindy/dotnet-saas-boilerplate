@@ -73,26 +73,26 @@ dotnet run --project src/Host/Acme.AppHost
 ```
 
 <!--#if (frontend) -->
-Aspire starts PostgreSQL, Valkey, MinIO and Mailpit, runs the migrator to completion, then the API,
+Aspire starts PostgreSQL, Valkey, RustFS and Mailpit, runs the migrator to completion, then the API,
 then both clients.
 <!--#else -->
-Aspire starts PostgreSQL, Valkey, MinIO and Mailpit, runs the migrator to completion, then the API.
+Aspire starts PostgreSQL, Valkey, RustFS and Mailpit, runs the migrator to completion, then the API.
 <!--#endif -->
 The Aspire dashboard is at <https://localhost:15888>; it also shows the generated
-MinIO, seeded-admin and demo passwords (Resources → Parameters).
+object-store secret key, seeded-admin and demo passwords (Resources → Parameters).
 
 #### Running two AppHosts at once
 
-Every container the AppHost starts (PostgreSQL, Valkey, MinIO, Mailpit) lets Aspire allocate its
+Every container the AppHost starts (PostgreSQL, Valkey, RustFS, Mailpit) lets Aspire allocate its
 host port, so a second checkout or worktree can run its own stack alongside yours. Read the actual
 addresses off the dashboard; nothing in the stack hard-codes them, and everything that needs one —
-the API's `Storage__S3__*`, `minio-init`, the SMTP host — takes it from an endpoint reference.
+the API's `Storage__S3__*`, `storage-init`, the SMTP host — takes it from an endpoint reference.
 
-This was not always true. Until the fix in `AppHost.cs`, MinIO pinned host ports 9000/9001 and its
-container is `Persistent`, so the second instance's `minio` container failed to bind, came up
-attached to no network, and `minio-init` looped on `waiting for minio...` — which, through
-`.WaitForCompletion(minioInit)`, silently hung the API and every client behind it. If you ever see
-that loop (`docker logs <minio-init container>`), you are running an older revision.
+This was not always true. Until the fix in `AppHost.cs`, the object store (then MinIO) pinned host
+ports 9000/9001 and its container is `Persistent`, so the second instance's `minio` container failed
+to bind, came up attached to no network, and `minio-init` looped on `waiting for minio...` — which,
+through `.WaitForCompletion(minioInit)`, silently hung the API and every client behind it. If you ever
+see that loop (`docker logs <minio-init container>`), you are running an older revision.
 
 What is still pinned, deliberately: the API (`7030`/`5030`, from `launchSettings.json`, quoted by
 the `.http` request files and the devcontainer), the Aspire dashboard (`15888`) and the client dev

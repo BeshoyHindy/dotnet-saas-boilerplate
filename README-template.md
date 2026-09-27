@@ -12,7 +12,7 @@ the shared code lives in `src/BuildingBlocks` and is yours to change.
 <!--#if (frontend) -->
 - [Node.js 20+](https://nodejs.org) — for the two React clients
 <!--#endif -->
-- [Docker](https://www.docker.com/) — Postgres, Redis, MinIO
+- [Docker](https://www.docker.com/) — Postgres, Redis, RustFS
 
 ## Quick start
 
@@ -24,10 +24,10 @@ dotnet run --project src/Host/Boilerplate.AppHost
 ```
 
 <!--#if (frontend) -->
-Aspire starts Postgres, Redis, and MinIO, runs database migrations, then launches the API
+Aspire starts Postgres, Redis, and RustFS, runs database migrations, then launches the API
 **and both React clients**.
 <!--#else -->
-Aspire starts Postgres, Redis, and MinIO, runs database migrations, then launches the API.
+Aspire starts Postgres, Redis, and RustFS, runs database migrations, then launches the API.
 <!--#endif -->
 
 | Surface | URL |
@@ -141,10 +141,10 @@ curl -fsS http://localhost:8080/health/ready
 
 <!--#if (frontend) -->
 This runs the same `api` / `migrator` / client images a deployment uses, against PostgreSQL,
-Valkey, MinIO and a Mailpit mail catcher.
+Valkey, RustFS and a Mailpit mail catcher.
 <!--#else -->
 This runs the same `api` / `migrator` images a deployment uses, against PostgreSQL, Valkey,
-MinIO and a Mailpit mail catcher.
+RustFS and a Mailpit mail catcher.
 <!--#endif -->
 The containers run as Production, so placeholder secrets and
 `AllowedHosts: *` are refused exactly as they would be on a server — hence the generated `.env`.

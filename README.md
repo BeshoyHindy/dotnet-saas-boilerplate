@@ -57,7 +57,7 @@ Run the whole thing locally — scaffold, build, test, brand-grep — with
 - **Modules** (bounded contexts, each with a `.Contracts` project as its only public surface):
   Identity, Multitenancy, Files, Auditing, Notifications.
 - **BuildingBlocks**: core domain primitives, persistence, web pipeline, caching (HybridCache on
-  Valkey), eventing (outbox/inbox), jobs (Hangfire), storage (S3/MinIO), mailing.
+  Valkey), eventing (outbox/inbox), jobs (Hangfire), storage (S3/RustFS), mailing.
 - **Hosts**: `Boilerplate.Api` (composition root), `Boilerplate.DbMigrator` (one-shot migrate/seed —
   the API never migrates at startup), `Boilerplate.AppHost` (Aspire orchestrator).
 - **Clients**: two React 19 apps (ADR-0008) — `clients/dashboard`, what a tenant's users sign in to,
@@ -70,7 +70,7 @@ Run the whole thing locally — scaffold, build, test, brand-grep — with
 ## Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download) (pinned in `global.json`)
-- [Docker](https://www.docker.com/) — Postgres, Valkey and MinIO are started by Aspire, and the
+- [Docker](https://www.docker.com/) — Postgres, Valkey and RustFS are started by Aspire, and the
   integration tests use Testcontainers
 - [Node 20+](https://nodejs.org/) for the React clients
 
@@ -89,23 +89,23 @@ parameters, environment variables or that same store, never from `appsettings*.j
 
 The Aspire dashboard is at <https://localhost:15888>; the API and its Scalar reference at
 <https://localhost:7030/scalar>; the dashboard at <http://localhost:5173> and the console at
-<http://localhost:5174>. MinIO and Mailpit get host
+<http://localhost:5174>. RustFS and Mailpit get host
 ports allocated by Aspire — open them from the dashboard's resource list rather than a remembered
-port. Aspire starts PostgreSQL, Valkey, MinIO and Mailpit, runs the migrator to completion, then the
+port. Aspire starts PostgreSQL, Valkey, RustFS and Mailpit, runs the migrator to completion, then the
 API, then both clients.
 
 **Container host ports are not pinned**, so a second checkout or worktree can run its own AppHost
-while yours is up: MinIO and Mailpit take whatever host port is free. (The API's `7030`/`5030`, the
+while yours is up: RustFS and Mailpit take whatever host port is free. (The API's `7030`/`5030`, the
 Aspire dashboard's `15888` and the clients' `5173`/`5174` *are* fixed — they are part of the documented
 developer contract, and unlike a container they fail loudly and immediately when taken.) If you see
-`minio-init` looping on `waiting for minio...`, you are on an older revision where 9000/9001 were
-pinned; the fix is in `AppHost.cs`.
+`minio-init` looping on `waiting for minio...`, you are on an older revision (the MinIO era) where
+9000/9001 were pinned; the fix is in `AppHost.cs`.
 
 Separately: the initial migrations were regenerated while this template was built, so a database
 migrated before that is incompatible and needs a fresh volume —
 `docker volume rm boilerplate-postgres-data` (destructive; local development data).
 
-The MinIO password, the seeded root admin password and the demo password are Aspire parameters,
+The object store's secret key, the seeded root admin password and the demo password are Aspire parameters,
 generated on first run and persisted to the AppHost's user-secrets; read the current values from the
 Aspire dashboard (Resources → Parameters).
 
@@ -136,7 +136,7 @@ docker compose down -v
 ```
 
 This builds and runs the same `api`, `migrator` and client images a deployment uses, against
-PostgreSQL, Valkey, MinIO and a Mailpit mail catcher. The containers run as **Production**, so the
+PostgreSQL, Valkey, RustFS and a Mailpit mail catcher. The containers run as **Production**, so the
 same fail-fast guards apply as on a server: no placeholder secrets, no `AllowedHosts: *`. That is
 why the secrets have no default in `docker-compose.yml` and `scripts/local-env.sh` generates them
 instead — including `SEED_DEMO_PASSWORD`, the one password the demo accounts above share. The
