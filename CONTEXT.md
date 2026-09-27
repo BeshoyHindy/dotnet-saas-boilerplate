@@ -113,13 +113,25 @@ jobs page.
 
 **Module**:
 A bounded context: one runtime project plus one `.Contracts` project that is its entire public
-surface. There are five and only five — Identity, Multitenancy, Auditing, Files, Notifications
-(ADR-0003) — and a module never references another module's runtime.
+surface. A module never references another module's runtime. There are two kinds, and the same rules
+apply to both, plus one direction: a product module may use a platform module's `.Contracts`, and a
+platform module never references a product module (ADR-0010).
 _Avoid_: service, package, feature area, subsystem.
 
+**Platform module**:
+One of the modules the template ships: Identity, Multitenancy, Auditing, Files, Notifications
+(ADR-0003). A product keeps merging them from upstream, which is why they never depend on product
+code.
+_Avoid_: core module, built-in module, framework module.
+
+**Product module**:
+A module a product adds for a bounded context of its own, such as `Notes`. One per bounded context,
+not one per feature: a later Note feature is a slice inside `Notes` (ADR-0010).
+_Avoid_: custom module, app module, feature module, the `Product` module.
+
 **Reachability rule**:
-The rule that decides what else survives: a building block, package or feature stays only if one of
-the five modules or a host references it. Nothing is kept because it might be useful.
+The rule that decides what else survives: a building block, package or feature stays only if a
+module or a host references it. Nothing is kept because it might be useful.
 _Avoid_: dead code policy, pruning, tree-shaking.
 
 **Building block**:
