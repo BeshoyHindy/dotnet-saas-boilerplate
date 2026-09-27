@@ -32,10 +32,14 @@ updates:
 
 #if (frontend || sandcastle)
   # ── Node ────────────────────────────────────────────────────────────
+  #if (frontend)
   # Independent pnpm lockfiles: the repo root (the sandcastle orchestrator) and one
   # per client — neither client is a workspace package (ADR-0008), because each
   # container image is built from its own directory as the Docker context, so its
   # manifest and lockfile have to live beside it. One PR covers them all.
+  #else
+  # The one pnpm lockfile at the repo root: the sandcastle orchestrator's.
+  #endif
   - package-ecosystem: npm
     directories:
       #if (sandcastle)

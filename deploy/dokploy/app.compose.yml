@@ -63,11 +63,20 @@ services:
       CachingOptions__Redis: ${STACK_NAME}-valkey:6379
       CachingOptions__EnableSsl: "false"
       JwtOptions__SigningKey: ${JWT_SIGNING_KEY}
+      #if (frontend)
       # Mailed links go to a tenant's users, so the origin the API writes into them is
       # the DASHBOARD's. Both clients are in the CORS allow-list (ADR-0008).
+      #else
+      # No client ships with this product, so mailed links (password reset, email
+      # confirmation) carry the API's own origin until you point this at the front end
+      # you build. Unset, the API refuses to send those mails at all. There is no CORS
+      # allow-list either: nothing browser-based calls this API yet.
+      #endif
       OriginOptions__OriginUrl: https://${DASHBOARD_DOMAIN}
+      #if (frontend)
       CorsOptions__AllowedOrigins__0: https://${DASHBOARD_DOMAIN}
       CorsOptions__AllowedOrigins__1: https://${CONSOLE_DOMAIN}
+      #endif
       # Host allow-list. Must contain API_DOMAIN and must not contain "*", or the
       # host refuses to boot. It is also the Host that Traefik's healthcheck
       # sends (see the healthcheck.hostname label), so a mismatch shows up as a

@@ -113,6 +113,12 @@ Shared framework code under `src/BuildingBlocks/`, consumed by every module and 
 Changing one has the blast radius of the whole application.
 _Avoid_: common, shared library, infrastructure, core (Core is one building block among several).
 
+<!--#if (!frontend) -->
+_This product was scaffolded with `--frontend false`: neither the Dashboard nor the Console below
+ships in it, and nor does their drift-gate half. The entries stay so that a client added later takes
+the agreed name._
+
+<!--#endif -->
 **Dashboard**:
 The React application a tenant's own users sign in to (`clients/dashboard`) — the product (ADR-0008).
 It holds one credential, the signed-in user's own, and has no platform surface.

@@ -231,14 +231,24 @@ var api = builder.AddProject<Projects.Boilerplate_Api>($"{appPrefix}-api")
     .WithEnvironment("Storage__S3__SecretKey", minioPassword)
     .WithEnvironment("Storage__S3__ForcePathStyle", "true")
     .WithEnvironment("Storage__S3__PublicBaseUrl", ReferenceExpression.Create($"{minioApiEndpoint}/{MinioBucket}"))
-//#if (frontend)
-    // Password-reset and email-confirmation links point at a client page, so the origin
-    // the API mails has to be a client's (issue #46), not the API's own — and it is the
-    // DASHBOARD's: those mails go to a tenant's users, who live there. An operator never
-    // receives one at the console (ADR-0008).
-    .WithEnvironment("OriginOptions__OriginUrl", DashboardOrigin)
-//#endif
     ;
+
+// The origin the API writes into password-reset and email-confirmation links. It must be
+// set: the Identity module refuses to mail a link without one rather than guess it from the
+// request. Two separately conditioned statements, in this order, because the template's
+// markers are plain C# comments: both run in the template's own tree, and the later one
+// wins there.
+//#if (!frontend)
+// No client ships with this product, so there is no client page to link to yet: the links
+// carry the API's own origin until the front end you build takes over.
+api.WithEnvironment("OriginOptions__OriginUrl", api.GetEndpoint("https"));
+//#endif
+//#if (frontend)
+// The links point at a client page, so the origin has to be a client's (issue #46), not
+// the API's own — and it is the DASHBOARD's: those mails go to a tenant's users, who live
+// there. An operator never receives one at the console (ADR-0008).
+api.WithEnvironment("OriginOptions__OriginUrl", DashboardOrigin);
+//#endif
 
 //#if (frontend)
 // The two React clients (ADR-0008), each its own independent pnpm project and its own
@@ -277,9 +287,6 @@ builder.AddJavaScriptApp($"{appPrefix}-console", "../../../clients/console", "de
     // Prefills the seeded operator's email only. Its password is `seed-admin-password`
     // above, not the demo tenants' shared one, so the console never signs in for you.
     .WithEnvironment("VITE_DEMO_MODE", "true");
-//#else
-// React apps excluded: discard the unused api handle to keep the no-frontend scaffold warning-clean (S1481 under TreatWarningsAsErrors).
-_ = api;
 //#endif
 
 await builder.Build().RunAsync();

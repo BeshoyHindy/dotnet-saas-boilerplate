@@ -24,7 +24,7 @@ scopes, the JWT issuer and audience and each client's `localStorage` prefixes.
 
 | Parameter | Default | What `false` drops |
 |---|---|---|
-| `--frontend` | `true` | `clients/**` (BOTH clients), their services in `docker-compose.yml` and the app stack, both images, the client CI workflow, ADR-0004 + ADR-0008 |
+| `--frontend` | `true` | `clients/dashboard` and `clients/console` (BOTH clients), their services in `docker-compose.yml` and the app stack, both images, the client CI workflow, ADR-0004 + ADR-0008. The API contract (`clients/openapi/v1.json`) and its backend drift gate stay: the API still has consumers. |
 | `--aspire` | `true` | the AppHost project |
 | `--sandcastle` | `true` | `.sandcastle/`, `sandcastle.config.mts`, the root pnpm project that exists only for them, its workflow, ADR-0006 |
 
@@ -72,8 +72,13 @@ migrator. `--force` regenerates.
 dotnet run --project src/Host/Acme.AppHost
 ```
 
+<!--#if (frontend) -->
 Aspire starts PostgreSQL, Valkey, MinIO and Mailpit, runs the migrator to completion, then the API,
-then both clients. The Aspire dashboard is at <https://localhost:15888>; it also shows the generated
+then both clients.
+<!--#else -->
+Aspire starts PostgreSQL, Valkey, MinIO and Mailpit, runs the migrator to completion, then the API.
+<!--#endif -->
+The Aspire dashboard is at <https://localhost:15888>; it also shows the generated
 MinIO, seeded-admin and demo passwords (Resources → Parameters).
 
 #### Running two AppHosts at once
@@ -117,6 +122,7 @@ The one exception is the `migrator` service, which runs as Development: it is as
 accounts below, and demo seeding is refused in a Production host. Remove `--demo` and that
 `DOTNET_ENVIRONMENT` line together if you want the migrator on Production too.
 
+<!--#if (frontend) -->
 ### A client on its own
 
 ```bash
@@ -133,6 +139,14 @@ CORS error is a proxy misconfiguration, not a reason to point the client elsewhe
 
 Sign in as the seeded root admin (`admin@root.com`) with the password from the Aspire dashboard or
 `.env`, and rotate it.
+<!--#else -->
+### Signing in
+
+This product ships no client, so sign in through the API: `POST /api/v1/tenants/root/auth/token`
+as the seeded root admin (`admin@root.com`) with the password from the Aspire dashboard or `.env`,
+and rotate it. Mailed links (password reset, email confirmation) carry the API's own origin until
+you set `OriginOptions__OriginUrl` to the front end you build.
+<!--#endif -->
 
 ### Demo accounts
 
@@ -222,6 +236,7 @@ Every event is published under a tenant; one that genuinely is not must implemen
 
 ### A change to the API surface
 
+<!--#if (frontend) -->
 Re-export the contract and regenerate BOTH clients' types, and commit every artifact:
 
 ```bash
@@ -233,14 +248,27 @@ cd clients/console   && pnpm generate:api
 The **drift gate** re-derives both sides in CI and fails when either differs from what is committed —
 including a regeneration that deletes a file. `bash scripts/check-openapi-drift.sh backend|frontend`
 asks the same question locally.
+<!--#else -->
+Re-export the contract and commit it:
+
+```bash
+bash scripts/export-openapi.sh
+```
+
+The **drift gate** re-derives `clients/openapi/v1.json` in CI and fails when it differs from what is
+committed. `bash scripts/check-openapi-drift.sh backend` asks the same question locally.
+<!--#endif -->
 
 ### Before you push
 
 ```bash
 dotnet build src/Acme.slnx -warnaserror
 dotnet test src/Acme.slnx            # integration suites need Docker
+bash scripts/check-openapi-drift.sh backend
+<!--#if (frontend) -->
 cd clients/dashboard && pnpm test && pnpm build
 cd clients/console   && pnpm test && pnpm build
+<!--#endif -->
 ```
 
 The rule files under `.agents/rules/` are the long form of everything above, one file per area.
@@ -252,12 +280,19 @@ a `v*` tag publishes versioned images and deploys production; `workflow_dispatch
 hatch. Path filters mean a docs-only change skips the expensive jobs while the gate job still reports
 green, and every workflow cancels superseded runs and carries a timeout.
 
-Workflows: backend (build, unit, integration, migrator image smoke, coverage floor, image publish,
-optional deploy), frontend (Vitest, Playwright smoke, drift), deploy contract, gitleaks, CodeQL and
-sandcastle. The brand gate and the template smoke stay behind in the template repository — they
+Workflows: backend (build, unit, integration, migrator image smoke, coverage floor, OpenAPI drift,
+image publish, optional deploy),
+<!--#if (frontend) -->
+frontend (Vitest, Playwright smoke, drift),
+<!--#endif -->
+deploy contract, gitleaks, CodeQL and sandcastle. The brand gate and the template smoke stay behind in the template repository — they
 prove the template, not your product.
 
+<!--#if (frontend) -->
 Images go to GHCR as `<name>-api`, `<name>-db-migrator`, `<name>-dashboard` and `<name>-console`, tagged
+<!--#else -->
+Images go to GHCR as `<name>-api` and `<name>-db-migrator`, tagged
+<!--#endif -->
 `dev-<sha>` / `dev-latest` from `develop` and `<version>` from a `v*` tag. Never a bare `latest`.
 
 **GitHub settings the owner must set by hand** — CI is written for them and stays skipped or red
@@ -317,11 +352,18 @@ Stated plainly, because each is a deliberate trade rather than an oversight.
   needs it registers its own `IFileScanner` (ClamAV, a cloud scanning service) after the Files
   module, and the last registration wins; finalize calls it, and an `Infected` result leaves the
   file `Quarantined` instead of `Available`.
+<!--#if (frontend) -->
 - **Three React Compiler lint rules sit at `warn`** in both clients (`set-state-in-effect`,
   `static-components`, `refs`). Each needs a real design change, not a mechanical fix; they are left
   visible rather than disabled, and no `eslint-disable` comment exists in `src/`.
+<!--#endif -->
+<!--#if (frontend) -->
 - **TypeScript is held below 7** (`^6.0.3`) across both clients and the root pnpm project. Bump
   deliberately, not with a dependency batch.
+<!--#else -->
+- **TypeScript is held below 7** (`^6.0.3`) in the root pnpm project. Bump deliberately, not with a
+  dependency batch.
+<!--#endif -->
 - **Production refuses the Local storage provider.** It defaults to `s3` and fails fast on `local`,
   which would serve files from `wwwroot` with no signing; overriding that needs an explicit
   `Storage:AllowLocalProviderInProduction=true`. Not a limit so much as a door that is locked from
