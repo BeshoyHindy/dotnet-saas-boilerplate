@@ -71,16 +71,44 @@ public sealed class UserPasswordServiceTests
         // Act
         await sut.ForgotPasswordAsync(email, "https://appbase.codefi.com.br/", CancellationToken.None);
 
-        // Assert
-        var body = CaptureSentMail().Body!;
-        body.ShouldContain("https://appbase.codefi.com.br/reset-password?");
-        body.ShouldNotContain("//reset-password");                       // defect 3: no double slash
-        body.ShouldContain($"&tenant={TenantId}");                       // defect 4: tenant present
+        // Assert — the link's shape is checked on the text part, which carries the URL verbatim (the
+        // HTML part entity-encodes its '&', see the next test).
+        var text = CaptureSentMail().TextBody!;
+        text.ShouldContain("https://appbase.codefi.com.br/reset-password?");
+        text.ShouldNotContain("//reset-password");                       // defect 3: no double slash
+        text.ShouldContain($"&tenant={TenantId}");                       // defect 4: tenant present
         // defect 5: reserved chars are encoded — '+' must become %2B (an unencoded '+' would decode to a
         // space). '@' is left as-is, which is valid in a query component per RFC 3986 (QueryHelpers encodes
         // only what is required, matching GetEmailVerificationUriAsync).
-        body.ShouldContain("email=marcelo%2Breset");
-        body.ShouldNotContain("email=marcelo+reset");                    // raw '+' must not leak
+        text.ShouldContain("email=marcelo%2Breset");
+        text.ShouldNotContain("email=marcelo+reset");                    // raw '+' must not leak
+    }
+
+    [Fact]
+    public async Task ForgotPasswordAsync_Should_SendTheResetLinkAsAnEncodedAnchor_WithATextAlternative()
+    {
+        // Arrange — the body goes out as text/html. The reset mail used to be a plain sentence with a
+        // bare URL in it: not a clickable link in most clients, and its raw '&' was not valid markup.
+        const string email = "marcelo@codefi.com.br";
+        var user = new AppUser { Email = email, UserName = email };
+        _userManager.FindByEmailAsync(email).Returns(user);
+        _userManager.GeneratePasswordResetTokenAsync(user).Returns("raw-token");
+
+        var sut = CreateSut();
+
+        // Act
+        await sut.ForgotPasswordAsync(email, "https://appbase.codefi.com.br", CancellationToken.None);
+
+        // Assert
+        var mail = CaptureSentMail();
+        var url = mail.TextBody!["Please reset your password using the following link: ".Length..];
+        url.ShouldStartWith("https://appbase.codefi.com.br/reset-password?token=");
+
+        var body = mail.Body!;
+        body.ShouldStartWith("<!DOCTYPE html>");
+        body.ShouldContain($"<a href=\"{System.Net.WebUtility.HtmlEncode(url)}\"");
+        body.ShouldContain($"&amp;tenant={TenantId}");
+        body.ShouldNotContain($"&tenant={TenantId}");                    // no raw '&' in the markup
     }
 
     [Fact]

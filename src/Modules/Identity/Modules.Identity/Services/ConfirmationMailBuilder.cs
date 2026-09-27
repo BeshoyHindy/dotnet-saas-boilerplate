@@ -91,7 +91,7 @@ internal sealed class ConfirmationMailBuilder(
                                 <tr>
                                     <td style="padding: 40px;">
                                         <p style="margin: 0 0 20px 0; color: #334155; font-size: 16px; line-height: 1.6;">
-                                            Hi {System.Net.WebUtility.HtmlEncode(userName)},
+                                            Hi {HtmlEmail.Encode(userName)},
                                         </p>
                                         <p style="margin: 0 0 20px 0; color: #334155; font-size: 16px; line-height: 1.6;">
                                             Thank you for registering! Please confirm your email address by clicking the button below:
@@ -99,7 +99,7 @@ internal sealed class ConfirmationMailBuilder(
                                         <table role="presentation" style="width: 100%; border-collapse: collapse;">
                                             <tr>
                                                 <td align="center" style="padding: 30px 0;">
-                                                    <a href="{System.Net.WebUtility.HtmlEncode(confirmationUrl)}" style="display: inline-block; padding: 14px 32px; background-color: #2563eb; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 6px;">
+                                                    <a href="{HtmlEmail.Encode(confirmationUrl)}" style="display: inline-block; padding: 14px 32px; background-color: #2563eb; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 600; border-radius: 6px;">
                                                         Confirm Email Address
                                                     </a>
                                                 </td>
@@ -109,7 +109,7 @@ internal sealed class ConfirmationMailBuilder(
                                             If the button doesn't work, copy and paste this link into your browser:
                                         </p>
                                         <p style="margin: 0 0 20px 0; color: #2563eb; font-size: 14px; line-height: 1.6; word-break: break-all;">
-                                            {System.Net.WebUtility.HtmlEncode(confirmationUrl)}
+                                            {HtmlEmail.Encode(confirmationUrl)}
                                         </p>
                                         <p style="margin: 30px 0 0 0; color: #64748b; font-size: 14px; line-height: 1.6;">
                                             If you didn't create an account, you can safely ignore this email.

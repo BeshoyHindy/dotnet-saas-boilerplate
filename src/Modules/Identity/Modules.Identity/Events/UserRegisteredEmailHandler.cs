@@ -34,10 +34,14 @@ public sealed class UserRegisteredEmailHandler
 
         try
         {
+            // The body is sent as text/html and the first name is caller-supplied on self-registration,
+            // so it goes through the shared encoder; the text part carries the same sentence verbatim.
+            var greeting = $"Hi {@event.FirstName}, thanks for registering.";
             var mail = new MailRequest(
                 to: new System.Collections.ObjectModel.Collection<string> { @event.Email },
                 subject: "Welcome!",
-                body: $"Hi {@event.FirstName}, thanks for registering.");
+                body: HtmlEmail.Notice("Welcome!", greeting),
+                textBody: greeting);
 
             await _mailService.SendAsync(mail, ct).ConfigureAwait(false);
         }
