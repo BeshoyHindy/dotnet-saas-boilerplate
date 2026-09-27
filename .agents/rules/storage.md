@@ -10,7 +10,7 @@
 
 ## Providers
 
-`AddHeroStorage(config)` reads `Storage:Provider` **eagerly at registration**: `"s3"` → `S3StorageService` (supports MinIO via `ServiceUrl` + `ForcePathStyle`), else `LocalStorageService`. The chosen implementation is registered directly as `IStorageService`.
+`AddHeroStorage(config)` reads `Storage:Provider` **eagerly at registration**: `"s3"` → `S3StorageService` (supports S3-compatible storage via `ServiceUrl` + `ForcePathStyle`), else `LocalStorageService`. The chosen implementation is registered directly as `IStorageService`.
 
 **Production refuses to boot on Local.** `ProductionConfigurationGuard` fails fast unless `Storage:Provider=s3` (with a `Storage:S3:Bucket`) or the deployment opts in with `Storage:AllowLocalProviderInProduction=true` — Local serves every object anonymously out of `wwwroot`, which would publish private Files objects. `appsettings.Production.json` ships `s3`; compose and Dokploy set it too.
 
@@ -21,7 +21,7 @@ Don't stream large files through the API. The pattern (see Files module):
 2. Client uploads **directly** to storage.
 3. `FinalizeUpload` — verifies the stored object (size, content type, and the signature of its first bytes), flips to `Available`, publishes `FileFinalizedIntegrationEvent`.
 
-Local/dev without MinIO uses `LocalPresignTokenStore` (in-memory one-shot tokens) — issued but never consumed by any endpoint, so the Files upload flow effectively needs the `s3` provider. A token carries an already-authorized physical key and `Consume(token, tenantId)` re-checks that key's owner, so a token is not a bearer capability for whatever it happens to name.
+Local/dev without the bundled object store uses `LocalPresignTokenStore` (in-memory one-shot tokens) — issued but never consumed by any endpoint, so the Files upload flow effectively needs the `s3` provider. A token carries an already-authorized physical key and `Consume(token, tenantId)` re-checks that key's owner, so a token is not a bearer capability for whatever it happens to name.
 
 ## The block prefixes the tenant — you never do (ADR-0002)
 
@@ -61,7 +61,7 @@ Still true, and still worth doing: never pass a caller-supplied string to `Downl
 
 ## Test gotcha
 
-`AddHeroStorage` reads `Storage:Provider` **before** a test factory's in-memory config overlay applies, so it wires `LocalStorageService`. Integration tests that need MinIO must **remove the `IStorageService`/`LocalStorageService`/`S3StorageService` descriptors post-registration and re-register the S3 stack** pointed at the MinIO container (see `AppWebApplicationFactory`). See `integration-testing.md`.
+`AddHeroStorage` reads `Storage:Provider` **before** a test factory's in-memory config overlay applies, so it wires `LocalStorageService`. Integration tests that need the object store must **remove the `IStorageService`/`LocalStorageService`/`S3StorageService` descriptors post-registration and re-register the S3 stack** pointed at the RustFS container (see `AppWebApplicationFactory`). See `integration-testing.md`.
 
 The test bucket carries the deploy stacks' grant — anonymous GET on `uploads/` and nowhere else — so an assertion that a durable avatar URL *works* is the real answer, and `tenants/` staying closed is testable.
 

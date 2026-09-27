@@ -129,8 +129,8 @@ services:
       Storage__S3__PublicBaseUrl: https://${STORAGE_DOMAIN}/${STORAGE_BUCKET}
       Storage__S3__Region: ${STORAGE_REGION}
       Storage__S3__Bucket: ${STORAGE_BUCKET}
-      Storage__S3__AccessKey: ${MINIO_ROOT_USER}
-      Storage__S3__SecretKey: ${MINIO_ROOT_PASSWORD}
+      Storage__S3__AccessKey: ${STORAGE_ACCESS_KEY}
+      Storage__S3__SecretKey: ${STORAGE_SECRET_KEY}
       Storage__S3__ForcePathStyle: "true"
       MailOptions__UseSendGrid: "false"
       MailOptions__From: ${MAIL_FROM}

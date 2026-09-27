@@ -82,20 +82,20 @@ dotnet run --project src/Host/Boilerplate.AppHost
 ```
 
 <!--#if (frontend) -->
-Aspire starts PostgreSQL, Valkey, MinIO and Mailpit, runs the migrator to completion, then the API,
+Aspire starts PostgreSQL, Valkey, RustFS and Mailpit, runs the migrator to completion, then the API,
 then both clients.
 <!--#else -->
-Aspire starts PostgreSQL, Valkey, MinIO and Mailpit, runs the migrator to completion, then the API.
+Aspire starts PostgreSQL, Valkey, RustFS and Mailpit, runs the migrator to completion, then the API.
 <!--#endif -->
 The Aspire dashboard is at <https://localhost:15888>; it also shows the generated
-MinIO, seeded-admin and demo passwords (Resources → Parameters).
+object-store secret key, seeded-admin and demo passwords (Resources → Parameters).
 
 #### Running two AppHosts at once
 
-Every container the AppHost starts (PostgreSQL, Valkey, MinIO, Mailpit) lets Aspire allocate its
+Every container the AppHost starts (PostgreSQL, Valkey, RustFS, Mailpit) lets Aspire allocate its
 host port, so a second checkout or worktree can run its own stack alongside yours. Read the actual
 addresses off the dashboard; nothing in the stack hard-codes them, and everything that needs one —
-the API's `Storage__S3__*`, `minio-init`, the SMTP host — takes it from an endpoint reference.
+the API's `Storage__S3__*`, `storage-init`, the SMTP host — takes it from an endpoint reference.
 
 What is still pinned, deliberately: the API (`7030`/`5030`, from `launchSettings.json`, quoted by
 the `.http` request files and the devcontainer) and the Aspire dashboard (`15888`).

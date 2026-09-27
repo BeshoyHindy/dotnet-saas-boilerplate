@@ -14,7 +14,7 @@ has no shell to run a container `HEALTHCHECK` with.
 
 | File | What it is |
 |---|---|
-| [`deploy/dokploy/data-services.compose.yml`](../deploy/dokploy/data-services.compose.yml) | PostgreSQL, Valkey, MinIO, bucket creator, scheduled Postgres backup |
+| [`deploy/dokploy/data-services.compose.yml`](../deploy/dokploy/data-services.compose.yml) | PostgreSQL, Valkey, RustFS, bucket creator, scheduled Postgres backup |
 | [`deploy/dokploy/app.compose.yml`](../deploy/dokploy/app.compose.yml) | the application services, in order, all pulled from GHCR |
 | [`deploy/dokploy/.env.example`](../deploy/dokploy/.env.example) | the variable contract, key names only |
 | [`deploy/dokploy/dokploy-deploy.sh`](../deploy/dokploy/dokploy-deploy.sh) | trigger a deploy from CI and wait for it |
@@ -34,14 +34,14 @@ Four hostnames point at the server. Create one `A` record each:
 | API | `api.example.com` | the .NET API |
 | Dashboard | `app.example.com` | the tenant app a product's own users sign in to |
 | Console | `console.example.com` | the operator tool root operators sign in to |
-| Storage | `storage.example.com` | MinIO's S3 endpoint |
+| Storage | `storage.example.com` | RustFS S3 endpoint |
 <!--#else -->
 Two hostnames point at the server. Create one `A` record each:
 
 | Record | Example | Serves |
 |---|---|---|
 | API | `api.example.com` | the .NET API |
-| Storage | `storage.example.com` | MinIO's S3 endpoint |
+| Storage | `storage.example.com` | RustFS S3 endpoint |
 <!--#endif -->
 
 Storage needs its own public name because the API hands the browser **presigned**
@@ -141,7 +141,7 @@ placeholder — `changeme`, `secret`, `dev-only` and friends:
 
 ```bash
 openssl rand -base64 24 | tr -dc 'A-Za-z0-9'        # POSTGRES_PASSWORD
-openssl rand -base64 24 | tr -dc 'A-Za-z0-9'        # MINIO_ROOT_PASSWORD
+openssl rand -base64 24 | tr -dc 'A-Za-z0-9'        # STORAGE_SECRET_KEY
 openssl rand -base64 48 | tr -dc 'A-Za-z0-9'        # JWT_SIGNING_KEY (32+ chars)
 echo "$(openssl rand -base64 18 | tr -dc 'A-Za-z0-9')Aa1"   # SEED_ADMIN_PASSWORD
 ```
@@ -190,8 +190,8 @@ in both.
 | `PROXY_KNOWN_NETWORK` | app | from `docker network inspect` | same server, same value |
 | `POSTGRES_DB` / `POSTGRES_USER` | both | `boilerplate` | `boilerplate` |
 | `POSTGRES_PASSWORD` | both | generated | generated, different |
-| `MINIO_ROOT_USER` | both | `boilerplate` | `boilerplate` |
-| `MINIO_ROOT_PASSWORD` | both | generated | generated, different |
+| `STORAGE_ACCESS_KEY` | both | `boilerplate` | `boilerplate` |
+| `STORAGE_SECRET_KEY` | both | generated | generated, different |
 | `STORAGE_BUCKET` | both | `boilerplate` | `boilerplate` |
 | `STORAGE_REGION` | app | `us-east-1` | `us-east-1` |
 | `BACKUP_BUCKET` | data | `boilerplate-backups` | `boilerplate-backups` |
@@ -250,12 +250,13 @@ container-level `labels` and has no `depends_on` conditions, so both the Traefik
 routing and the migrator gate would silently stop working.
 
 Paste the `[data]` and `[both]` variables into **Environment**, then **Deploy**.
-Watch the deployment log until it settles; `postgres`, `valkey` and `minio`
-should be running, and `minio-volume-owner`, `minio-init` and
-`minio-public-prefix` should each have exited 0 — the first handing the MinIO
-volume to the image's non-root user (uid 65532), the second creating the
-bucket, the third opening anonymous reads on the `uploads/` prefix that avatars
+Watch the deployment log until it settles; `postgres`, `valkey` and `storage`
+should be running, and `storage-init` should have exited 0 — creating the
+buckets idempotently and opening anonymous reads on the `uploads/` prefix that avatars
 and tenant branding are served from.
+
+The object store is RustFS; it replaced MinIO before any product deployed this stack, so no
+MinIO-to-RustFS data migration ships.
 
 Deploy this stack again only when a data-service image version changes. That is
 the whole point of the split: an application redeploy can never recreate,
@@ -311,7 +312,7 @@ curl -fsS https://app.example.com/config.json     # dashboard got its runtime co
 curl -fsSI https://console.example.com/ | head -1 # console serves
 curl -fsS https://console.example.com/config.json # console got its runtime config
 <!--#endif -->
-curl -fsSI https://storage.example.com/minio/health/live | head -1
+curl -fsSI https://storage.example.com/health | head -1
 ```
 
 `/health/live` runs no checks and answers as soon as the process is listening.
@@ -555,13 +556,13 @@ receiver + viewer — see [`README.md`](../README.md).
 Two things this stack does are correct-but-broad, and worth tightening once a
 deployment is real:
 
-- **The API signs with the MinIO root credentials.** `Storage__S3__AccessKey` /
-  `SecretKey` are `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`, so the application
-  can create and delete buckets, not only objects in its own. The tighter shape
-  is a MinIO service account (`mc admin user svcacct add`) carrying a policy
-  scoped to `arn:aws:s3:::<bucket>/*` with just the object verbs the app uses —
-  `GetObject`, `PutObject`, `DeleteObject`, `ListBucket` — and those keys in the
-  app stack instead. Nothing in the compose files changes but the two values.
+- **The API signs with the object store root credentials.** `Storage__S3__AccessKey` /
+  `SecretKey` are `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY`, the root credentials.
+  The tighter shape is a RustFS access key carrying a policy scoped to
+  `arn:aws:s3:::<bucket>/*` with just the object verbs the app uses — `GetObject`,
+  `PutObject`, `DeleteObject`, `ListBucket` — which you can create via the RustFS
+  console's access-key page or its MinIO-compatible admin API (`/rustfs/admin/v3/add-service-account`).
+  Nothing in the compose files changes but the two values in the app stack.
 - **Anonymous reads are open on `uploads/`.** That prefix holds avatars and
   tenant branding, which are unsigned URLs by design. It is as narrow as the
   code currently allows, but it is still public-by-prefix rather than
@@ -590,11 +591,11 @@ other than "there is no backup". The data stack now runs two more services:
   (`BACKUP_SCHEDULE`, default `0 3 * * *` — daily at 03:00) into its own
   `pg_backups` volume, then deleting dumps older than `BACKUP_KEEP_DAYS`
   (default 7) from that volume.
-- **`postgres-backup-upload`** — `mc mirror --watch --remove` from the same
-  volume to `BACKUP_BUCKET` in the object store, continuously. A dump lands in
-  the bucket within seconds of being written, and a local retention delete is
-  mirrored as a delete in the bucket, so `BACKUP_KEEP_DAYS` is the only
-  retention setting to reason about.
+- **`postgres-backup-upload`** — `aws s3 sync --delete` from the same
+  volume to `BACKUP_BUCKET` in the object store, running every 60 seconds.
+  A dump reaches the bucket within about a minute of being written, and a
+  local retention delete is mirrored as a delete in the bucket, so `BACKUP_KEEP_DAYS`
+  is the only retention setting to reason about.
 
 `BACKUP_BUCKET` is a separate bucket from `STORAGE_BUCKET` on purpose:
 `STORAGE_BUCKET` carries the anonymous `uploads/` read grant (§0), and a
@@ -619,21 +620,23 @@ itself, or any container joined to it):
 #    ${POSTGRES_DB}-<UTC timestamp>.dump (e.g. boilerplate-20260115T030001Z.dump),
 #    so a plain `sort` on the listing puts them in chronological order.
 docker run --rm --network dokploy-network \
-  -e MC_HOST_local="http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@${STACK_NAME}-minio:9000" \
-  --entrypoint mc cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1 \
-  ls "local/${BACKUP_BUCKET}" | sort
+  -e AWS_ACCESS_KEY_ID="${STORAGE_ACCESS_KEY}" \
+  -e AWS_SECRET_ACCESS_KEY="${STORAGE_SECRET_KEY}" \
+  -e AWS_DEFAULT_REGION=us-east-1 \
+  -e AWS_ENDPOINT_URL="http://${STACK_NAME}-storage:9000" \
+  amazon/aws-cli:2.37.4@sha256:fdd8d1fcbea9c371678dee5a40df8b178c7a781b4586605756ee28114c97ead6 \
+  s3 ls "s3://${BACKUP_BUCKET}" | sort
 
-# 2. Copy the chosen dump into a throwaway volume. mc runs as uid 65532
-#    (Chainguard's non-root user), so the volume is chowned to it first —
-#    the same reason minio-volume-owner exists in the data stack.
+# 2. Copy the chosen dump into a throwaway volume. The aws-cli image runs as
+#    root, so the fresh volume needs no chown first.
 docker volume create restore-scratch
-docker run --rm -v restore-scratch:/restore \
-  --entrypoint chown postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873 \
-  65532:65532 /restore
 docker run --rm --network dokploy-network -v restore-scratch:/restore \
-  -e MC_HOST_local="http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@${STACK_NAME}-minio:9000" \
-  --entrypoint mc cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1 \
-  cp "local/${BACKUP_BUCKET}/<POSTGRES_DB>-<timestamp>.dump" /restore/restore.dump
+  -e AWS_ACCESS_KEY_ID="${STORAGE_ACCESS_KEY}" \
+  -e AWS_SECRET_ACCESS_KEY="${STORAGE_SECRET_KEY}" \
+  -e AWS_DEFAULT_REGION=us-east-1 \
+  -e AWS_ENDPOINT_URL="http://${STACK_NAME}-storage:9000" \
+  amazon/aws-cli:2.37.4@sha256:fdd8d1fcbea9c371678dee5a40df8b178c7a781b4586605756ee28114c97ead6 \
+  s3 cp "s3://${BACKUP_BUCKET}/<POSTGRES_DB>-<timestamp>.dump" /restore/restore.dump
 
 # 3. Restore. --clean --if-exists drops existing objects first (safe against a
 #    partially-migrated or corrupted database); --no-owner because the role
@@ -679,15 +682,15 @@ around.
 <!--#endif -->
 | Password-reset links point at a container IP | Traefik is not passing the original `Host`. `passhostheader=true` must stay on the API's load-balancer labels — `X-Forwarded-Host` is deliberately never honoured, so that label is the only path for the real host. |
 | Uploads fail with a signature error | `STORAGE_DOMAIN` differs between the two stacks, or `Storage__S3__ServiceUrl` was pointed at an internal alias. The signature covers the host. |
-| `NoSuchBucket` on first upload | The data stack's `minio-init` did not run, or `STORAGE_BUCKET` differs between the two stacks. |
-| `minio` exits with `Unable to write to the backend` | `minio-volume-owner` did not complete, so the volume is still owned by root (the MinIO images before Chainguard's ran as root; this one runs as uid 65532). Read its log and redeploy the data stack; it is idempotent. Never rename the volume to get past this — that strands every upload. |
-| Avatars and tenant logos 403 | `minio-public-prefix` did not run. Redeploy the data stack; it is idempotent. Buckets are private by default and those URLs are unsigned. |
+| `NoSuchBucket` on first upload | The data stack's `storage-init` did not run, or `STORAGE_BUCKET` differs between the two stacks. |
+| `storage` restarts with a permission error on `/data` | The volume was not created by this image. RustFS runs as uid 10001 and a fresh `storage_data` volume inherits that owner from the image; a volume created some other way (restored from elsewhere, or written by another image) may belong to a different uid. `chown -R 10001:10001` it from a one-off root container, then redeploy. Never rename the volume to get past this — that strands every upload. |
+| Avatars and tenant logos 403 | The `storage-init` one-shot did not complete or the anonymous read policy was not applied. Redeploy the data stack; it is idempotent. Buckets are private by default and those URLs are unsigned. |
 | Traces and metrics never arrive | `OTEL_EXPORTER_ENABLED` is not `true`. The endpoint alone does nothing — Production ships the exporter disabled. |
 | `migrator` retries PostgreSQL and then fails | The data stack is not up, or `POSTGRES_PASSWORD` was changed against an existing volume. |
 | `api` never starts, no error of its own | The migrator exited non-zero. Read the migrator's log — the API is gated on it and is behaving correctly by not starting. |
 | Deploy script reports `timed out` while the UI shows success | The successful deployment is not the one the script started (another deploy of the same service). Check the deployment titles; the script's carries its `dpl-…` token. |
 | No dumps appear in `BACKUP_BUCKET` | Read `postgres-backup`'s log for a `pg_dump` error (often a `PGPASSWORD`/`POSTGRES_USER` mismatch after a password rotation), or `postgres-backup-upload`'s log if a dump exists on the `pg_backups` volume but never reaches the bucket. |
-| `postgres-backup-upload` never starts | `minio-init` did not complete — it creates `BACKUP_BUCKET` alongside `STORAGE_BUCKET`. Same fix as the `NoSuchBucket` row above: redeploy the data stack. |
+| `postgres-backup-upload` never starts | `storage-init` did not complete — it creates `BACKUP_BUCKET` alongside `STORAGE_BUCKET`. Same fix as the `NoSuchBucket` row above: redeploy the data stack. |
 
 ## See also
 

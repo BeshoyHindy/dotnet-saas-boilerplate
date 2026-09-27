@@ -15,7 +15,7 @@ the shared code lives in `src/BuildingBlocks` and is yours to change.
 <!--#if (!frontend && sandcastle) -->
 - [Node.js 20+](https://nodejs.org) and [pnpm](https://pnpm.io) — for the agent pipeline
 <!--#endif -->
-- [Docker](https://www.docker.com/) — PostgreSQL, Valkey, MinIO
+- [Docker](https://www.docker.com/) — PostgreSQL, Valkey, RustFS
 
 ## Quick start
 
@@ -38,10 +38,10 @@ dotnet run --project src/Host/Boilerplate.AppHost
 ```
 
 <!--#if (frontend) -->
-Aspire starts PostgreSQL, Valkey, MinIO and Mailpit, runs database migrations, then launches the
+Aspire starts PostgreSQL, Valkey, RustFS and Mailpit, runs database migrations, then launches the
 API **and both React clients**.
 <!--#else -->
-Aspire starts PostgreSQL, Valkey, MinIO and Mailpit, runs database migrations, then launches the
+Aspire starts PostgreSQL, Valkey, RustFS and Mailpit, runs database migrations, then launches the
 API.
 <!--#endif -->
 
@@ -157,10 +157,10 @@ curl -fsS http://localhost:8080/health/ready
 
 <!--#if (frontend) -->
 This runs the same `api` / `migrator` / client images a deployment uses, against PostgreSQL,
-Valkey, MinIO and a Mailpit mail catcher.
+Valkey, RustFS and a Mailpit mail catcher.
 <!--#else -->
 This runs the same `api` / `migrator` images a deployment uses, against PostgreSQL, Valkey,
-MinIO and a Mailpit mail catcher.
+RustFS and a Mailpit mail catcher.
 <!--#endif -->
 The containers run as Production, so placeholder secrets and
 `AllowedHosts: *` are refused exactly as they would be on a server — hence the generated `.env`.

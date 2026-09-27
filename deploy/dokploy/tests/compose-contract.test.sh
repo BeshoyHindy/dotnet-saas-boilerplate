@@ -104,20 +104,28 @@ assert_true "data stack declares images" test -n "$data_images"
 while IFS= read -r image; do
   [ -n "$image" ] || continue
   # An explicit tag, a digest, or both, and never a floating tag: the data
-  # plane must come back byte-identical after a host reboot. A digest is the
-  # only pin an image published solely as :latest (Chainguard's MinIO) can
-  # have; postgres-backup pins both (tag so a reader can tell the Postgres
-  # major version at a glance, digest so it is exactly the same bytes as the
-  # `postgres` service above it).
+  # plane must come back byte-identical after a host reboot. The object
+  # store, its aws-cli one-shots and postgres-backup pin both (tag so a reader
+  # can tell the version at a glance, digest so it is exactly the same bytes
+  # on every host).
   assert_match "data image is pinned — $image" "$image" \
     '^[a-z0-9./-]+((:[A-Za-z0-9._-]+)?@sha256:[0-9a-f]{64}|:[A-Za-z0-9._-]+)$'
   refute_match "data image is not :latest — $image" "$image" ':latest$'
 done <<< "$data_images"
 refute_match "data stack interpolates no image tag" "$data_images" '\$\{'
-# Docker Hub and then quay.io both stopped serving MinIO anonymously; a MinIO
-# image from either would leave the whole object store undeployable.
-refute_match "no MinIO image comes from quay.io" "$data_images" 'quay\.io'
-refute_match "no MinIO image comes from Docker Hub" "$data_images" '^minio/'
+# MinIO's images are gone from Docker Hub and quay.io and Chainguard's publish
+# only :latest (issue #95); the object store is RustFS now, and nothing may
+# pull a MinIO image back in.
+refute_match "no image comes from quay.io" "$data_images" 'quay\.io'
+refute_match "no MinIO image from Docker Hub" "$data_images" '^minio/'
+refute_match "no Chainguard MinIO image" "$data_images" 'chainguard/minio'
+assert_match "the object store is RustFS, pinned by tag and digest" "$data_images" \
+  '^rustfs/rustfs:[0-9][A-Za-z0-9._-]*@sha256:[0-9a-f]{64}$'
+# Every aws-cli service carries the same pin, so a bump is one value.
+awscli_pins="$(printf '%s\n' "$data_images" | grep '^amazon/aws-cli' | sort -u)"
+assert_eq "every aws-cli service shares one pin" "1" "$(printf '%s\n' "$awscli_pins" | grep -c .)"
+assert_match "the aws-cli pin is a tag and a digest" "$awscli_pins" \
+  '^amazon/aws-cli:[0-9][A-Za-z0-9._-]*@sha256:[0-9a-f]{64}$'
 
 # ── Migrator gates the API ───────────────────────────────────────────
 api_block="$(service_block "$APP" api)"
@@ -150,46 +158,60 @@ assert_match "migrator gets the migrations assembly" "$migrator_block" 'Database
 # the top level: one one-shot has to cover tenants provisioned long after the
 # stack was deployed. So the assertions below pin both edges — the grant is not
 # the whole bucket, and it is not narrowed to one tenant either.
-init_block="$(service_block "$DATA" minio-init)"
-public_block="$(service_block "$DATA" minio-public-prefix)"
-assert_match "the bucket is created once, idempotently" "$init_block" 'command:.*mb.*--ignore-existing.*\$\{STORAGE_BUCKET\}'
-assert_match "anonymous download is granted" "$public_block" 'command:.*anonymous.*set.*download'
-assert_match "the grant is scoped to the uploads/ prefix" "$public_block" \
-  'local/\$\{STORAGE_BUCKET\}/uploads'
-refute_match "the grant is never the whole bucket" "$public_block" \
-  '"local/\$\{STORAGE_BUCKET\}"\]'
-refute_match "the grant stops at the uploads/ top level" "$public_block" \
+init_block="$(service_block "$DATA" storage-init)"
+assert_true "storage-init is a service in the data stack" test -n "$init_block"
+assert_match "storage-init names the Files bucket" "$init_block" 'FILES_BUCKET:[[:space:]]*\$\{STORAGE_BUCKET\}'
+assert_match "the bucket is created only when head-bucket says it is missing (idempotent)" "$init_block" \
+  'head-bucket.*\|\|.*create-bucket'
+assert_match "anonymous GetObject is granted by bucket policy" "$init_block" \
+  'put-bucket-policy.*s3:GetObject'
+assert_match "the policy is applied to the Files bucket" "$init_block" 'put-bucket-policy --bucket "\$\$FILES_BUCKET"'
+assert_match "the grant is scoped to the uploads/ prefix" "$init_block" \
+  'arn:aws:s3:::\$\$FILES_BUCKET/uploads/\*'
+refute_match "the grant is never the whole bucket" "$init_block" \
+  'arn:aws:s3:::\$\$FILES_BUCKET/\*'
+refute_match "the grant stops at the uploads/ top level" "$init_block" \
   'uploads/[A-Za-z0-9$]'
-refute_match "the grant never reaches the tenants/ prefix" "$data_text" 'download.*tenants'
-assert_match "the grant runs after the bucket exists" "$public_block" \
-  'condition:[[:space:]]*service_completed_successfully'
-assert_match "the grant is one-shot" "$public_block" '^[[:space:]]*restart:[[:space:]]*"no"'
+refute_match "the grant never reaches the tenants/ prefix" "$data_text" 'arn:aws:s3:::[^"]*tenants'
+refute_match "no action beyond GetObject is granted" "$init_block" 's3:(Put|Delete|List|\*)'
+assert_match "storage-init waits for the store to be healthy" "$init_block" \
+  'condition:[[:space:]]*service_healthy'
+assert_match "storage-init is one-shot" "$init_block" '^[[:space:]]*restart:[[:space:]]*"no"'
 
-# ── The MinIO volume belongs to the image's non-root user ────────────
-# The Chainguard image runs as uid 65532; the images before it ran as root, so
-# the production minio_data is root-owned and the server refuses to start on it.
-# A root one-shot chowns the volume in place before MinIO starts. Renaming the
-# volume instead would strand every upload, so the chain is pinned here.
-minio_block="$(service_block "$DATA" minio)"
-owner_block="$(service_block "$DATA" minio-volume-owner)"
-assert_true "minio-volume-owner is a service in the data stack" test -n "$owner_block"
-assert_match "minio depends_on minio-volume-owner" "$minio_block" '^[[:space:]]*minio-volume-owner:[[:space:]]*$'
-assert_match "minio waits for the volume owner to complete successfully" "$minio_block" \
-  'condition:[[:space:]]*service_completed_successfully'
-assert_match "the volume owner runs as root" "$owner_block" '^[[:space:]]*user:[[:space:]]*"0:0"'
-assert_match "the volume owner hands /data to uid 65532" "$owner_block" \
-  'command:.*"-R".*"65532:65532".*"/data"'
-assert_match "the volume owner mounts the MinIO volume" "$owner_block" '^[[:space:]]*-[[:space:]]*minio_data:/data'
-assert_match "the volume owner is one-shot" "$owner_block" '^[[:space:]]*restart:[[:space:]]*"no"'
-assert_match "minio still mounts the same volume" "$minio_block" '^[[:space:]]*-[[:space:]]*minio_data:/data'
+# ── The object store: RustFS, healthy, reachable only through Traefik ─
+# RustFS runs as uid 10001 and its image owns /data, so a fresh named volume
+# is writable as is: there is no volume-owner one-shot, and a root one must not
+# creep back in. Readiness gates storage-init on /health/ready (the S3 API),
+# while Traefik probes the liveness endpoint /health.
+storage_block="$(service_block "$DATA" storage)"
+assert_true "storage is a service in the data stack" test -n "$storage_block"
+assert_match "storage runs the RustFS image" "$storage_block" '^[[:space:]]*image:[[:space:]]*rustfs/rustfs:'
+assert_match "storage mounts its data volume" "$storage_block" '^[[:space:]]*-[[:space:]]*storage_data:/data'
+refute_match "no service runs as root to fix volume ownership" "$data_text" '^[[:space:]]*user:[[:space:]]*"0:0"'
+assert_match "storage takes its root access key from the environment" "$storage_block" \
+  'RUSTFS_ACCESS_KEY:[[:space:]]*\$\{STORAGE_ACCESS_KEY\}'
+assert_match "storage takes its root secret key from the environment" "$storage_block" \
+  'RUSTFS_SECRET_KEY:[[:space:]]*\$\{STORAGE_SECRET_KEY\}'
+assert_match "storage's container healthcheck waits for the S3 API" "$storage_block" \
+  'test:.*curl.*/health/ready'
+assert_match "storage's Traefik healthcheck is RustFS's /health" "$storage_block" \
+  'loadbalancer\.healthcheck\.path=/health"'
+assert_match "storage keeps the Host header the client signed" "$storage_block" 'loadbalancer\.passhostheader=true'
+refute_match "no MinIO environment is left behind" "$data_text" 'MINIO_'
+#if (frontend)
+# Both clients PUT presigned uploads from the browser, so the store answers CORS
+# for exactly their two origins (and nothing wider).
+assert_match "storage allows CORS from both client origins" "$storage_block" \
+  'RUSTFS_CORS_ALLOWED_ORIGINS:[[:space:]]*https://\$\{DASHBOARD_DOMAIN\},https://\$\{CONSOLE_DOMAIN\}$'
+#endif
 
 # ── D1: Postgres is backed up on a schedule and mirrored off-box ────
 # deploy-operability research D1: pg_data was a plain named volume with no
 # snapshot, replication or export step — a host disk failure, `docker volume
 # rm`, or a destructive migration had no recovery path but "there is no
 # backup". postgres-backup runs pg_dump on a cron schedule into its own
-# volume; postgres-backup-upload mirrors that volume to the object store's
-# (separate) backup bucket, `--remove` so retention only has to be declared
+# volume; postgres-backup-upload syncs that volume to the object store's
+# (separate) backup bucket, `--delete` so retention only has to be declared
 # once.
 backup_block="$(service_block "$DATA" postgres-backup)"
 upload_block="$(service_block "$DATA" postgres-backup-upload)"
@@ -218,27 +240,30 @@ assert_match "postgres-backup installs the schedule into cron" "$backup_block" \
   '/etc/crontabs/root'
 assert_match "postgres-backup writes dumps to its own volume" "$backup_block" \
   '^[[:space:]]*-[[:space:]]*pg_backups:/backups[[:space:]]*$'
-# The mirror side: watches the dump volume continuously and follows deletes,
-# so BACKUP_KEEP_DAYS is the only retention knob and nothing here needs its
-# own schedule.
+# The upload side: syncs the dump volume in a loop and follows deletes, so
+# BACKUP_KEEP_DAYS is the only retention knob.
 assert_match "postgres-backup-upload runs after the backup bucket exists" "$upload_block" \
-  'minio-init:[[:space:]]*$'
+  'storage-init:[[:space:]]*$'
 assert_match "postgres-backup-upload waits for the bucket-creating one-shot" "$upload_block" \
   'condition:[[:space:]]*service_completed_successfully'
 assert_match "postgres-backup-upload mounts the dump volume read-only" "$upload_block" \
   '^[[:space:]]*-[[:space:]]*pg_backups:/backups:ro[[:space:]]*$'
-assert_match "postgres-backup-upload watches for new dumps continuously" "$upload_block" \
-  'mirror.*--watch'
+assert_match "postgres-backup-upload keeps syncing for the life of the container" "$upload_block" \
+  'while true'
+assert_match "postgres-backup-upload syncs the dump volume" "$upload_block" 'aws s3 sync.*/backups'
 assert_match "postgres-backup-upload follows local retention deletes to the bucket" "$upload_block" \
-  'mirror.*--remove'
-assert_match "postgres-backup-upload targets the backup bucket" "$upload_block" \
-  'local/\$\{BACKUP_BUCKET\}'
+  'sync --delete'
+assert_match "postgres-backup-upload names the backup bucket" "$upload_block" \
+  'DUMPS_BUCKET:[[:space:]]*\$\{BACKUP_BUCKET\}'
+assert_match "postgres-backup-upload targets the backup bucket" "$upload_block" 's3://\$\$DUMPS_BUCKET'
 # A database dump must never be reachable unsigned: only STORAGE_BUCKET's
-# uploads/ prefix gets the anonymous download grant, never BACKUP_BUCKET.
-refute_match "the backup bucket is never granted anonymous access" "$data_text" \
-  'anonymous.*\$\{BACKUP_BUCKET\}'
+# uploads/ prefix gets the anonymous read policy, never BACKUP_BUCKET.
+refute_match "the backup bucket is never given a bucket policy" "$data_text" \
+  'put-bucket-policy --bucket "\$\$DUMPS_BUCKET"'
 assert_match "the backup bucket is created alongside the Files bucket" "$init_block" \
-  'command:.*mb.*--ignore-existing.*\$\{STORAGE_BUCKET\}.*\$\{BACKUP_BUCKET\}'
+  'DUMPS_BUCKET:[[:space:]]*\$\{BACKUP_BUCKET\}'
+assert_match "storage-init creates both buckets" "$init_block" \
+  'for b in "\$\$FILES_BUCKET" "\$\$DUMPS_BUCKET"'
 
 # ── The shared external network ──────────────────────────────────────
 for f in "$DATA" "$APP"; do
@@ -349,7 +374,7 @@ refute_match "app stack publishes no host ports"  "$app_text"  '^[[:space:]]*por
 # D2/D4 (deploy-operability research): no per-service memory cap and no log
 # rotation on either stack meant one misbehaving container could exhaust the
 # 4 GB host, and unbounded json-file logs shared the disk with pg_data and
-# minio_data forever. Looping over `service_names` rather than a hardcoded
+# the object store's volume forever. Looping over `service_names` rather than a hardcoded
 # list means a service a sibling ticket adds to either file is caught by this
 # loop the moment it lands, not silently exempted.
 for f in "$DATA" "$APP"; do
