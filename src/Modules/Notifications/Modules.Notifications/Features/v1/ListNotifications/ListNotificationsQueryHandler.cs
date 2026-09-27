@@ -1,6 +1,7 @@
-using System.Collections.ObjectModel;
 using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Boilerplate.Modules.Notifications.Contracts.v1.DTOs;
 using Boilerplate.Modules.Notifications.Contracts.v1.Queries;
 using Boilerplate.Modules.Notifications.Data;
@@ -13,33 +14,34 @@ namespace Boilerplate.Modules.Notifications.Features.v1.ListNotifications;
 public sealed class ListNotificationsQueryHandler(
     NotificationsDbContext db,
     ICurrentUser currentUser)
-    : IQueryHandler<ListNotificationsQuery, ReadOnlyCollection<NotificationDto>>
+    : IQueryHandler<ListNotificationsQuery, PagedResponse<NotificationDto>>
 {
-    public async ValueTask<ReadOnlyCollection<NotificationDto>> Handle(ListNotificationsQuery q, CancellationToken cancellationToken)
+    /// <summary>Page size when the caller names none; the shared pager's own default is smaller.</summary>
+    public const int DefaultPageSize = 50;
+
+    public async ValueTask<PagedResponse<NotificationDto>> Handle(ListNotificationsQuery q, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(q);
         var userId = currentUser.GetUserId();
         if (userId == Guid.Empty) throw new UnauthorizedException("no current user");
         var currentUserId = userId.ToString();
 
-        int page = Math.Max(1, q.Page);
-        int pageSize = Math.Clamp(q.PageSize, 1, 200);
+        q.PageSize ??= DefaultPageSize;
 
         var query = db.Notifications.AsNoTracking()
             .Where(n => n.UserId == currentUserId);
 
-        if (q.UnreadOnly)
+        if (q.UnreadOnly == true)
         {
             query = query.Where(n => n.ReadAtUtc == null);
         }
 
-        var rows = await query
+        // Id breaks CreatedAtUtc ties so a row never appears on two pages.
+        return await query
             .OrderByDescending(n => n.CreatedAtUtc)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken)
+            .ThenByDescending(n => n.Id)
+            .Select(NotificationMappers.ToDtoProjection)
+            .ToPagedResponseAsync(q, cancellationToken)
             .ConfigureAwait(false);
-
-        return rows.Select(n => n.ToDto()).ToList().AsReadOnly();
     }
 }

@@ -51,7 +51,7 @@ Don't catch broadly to swallow. Background loops may `catch (Exception)` to stay
 
 ## Permissions
 
-Constants in `Shared/Identity/*Permissions.cs` (e.g. `IdentityPermissions`). Apply with `.RequirePermission(...)` on the endpoint. `RequiredPermissionAttribute` implements `IRequiredPermissionMetadata` — never let a duplicate of that interface appear; it silently disables **all** `.RequirePermission()` gates.
+Constants live in each module's Contracts project: `Modules.{X}.Contracts/Authorization/{X}Permissions.cs` (e.g. `IdentityPermissions`, `NotificationPermissions`) — one nested class per resource with a `Resource` string and `Permissions.{Resource}.{Action}` constants, plus an `All` list registered via `AddPermissions(...)`. `IsBasic`/`IsRoot` and how new permissions reach roles: `docs/new-project-guide.md` §3. Apply with `.RequirePermission(...)` on the endpoint. `RequiredPermissionAttribute` implements `IRequiredPermissionMetadata` — never let a duplicate of that interface appear; it silently disables **all** `.RequirePermission()` gates.
 
 **Every endpoint must declare exactly one intent**, and the permission policy fails closed — an endpoint declaring none is denied for everyone:
 
@@ -69,8 +69,8 @@ Use `Specification<T>` (`src/BuildingBlocks/Persistence/Specifications/`) for qu
 
 ## Adding a feature (checklist)
 
-1. Command/query + response in `Modules.{Name}.Contracts/v1/{Area}/{Feature}/`.
-2. Handler in `Modules.{Name}/Features/v1/{Area}/{Feature}/`.
+1. Command/query + response in `Modules.{Name}.Contracts/v1/[{Area}/]{Feature}/` (the `{Area}/` level only in a module with several areas — see `architecture.md`).
+2. Handler in `Modules.{Name}/Features/v1/[{Area}/]{Feature}/`.
 3. Validator in the same folder.
 4. Endpoint in the same folder; wire in module `MapEndpoints()`.
 5. Tests in `Tests/{Name}.Tests/` (+ integration test if it touches DB/IO).

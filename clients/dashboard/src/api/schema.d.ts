@@ -1789,6 +1789,19 @@ export interface components {
             /** Format: int32 */
             totalPages: number;
         };
+        PagedResponseOfNotificationDto: {
+            hasNext: boolean;
+            hasPrevious: boolean;
+            items: components["schemas"]["NotificationDto"][];
+            /** Format: int32 */
+            pageNumber: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int64 */
+            totalCount: number;
+            /** Format: int32 */
+            totalPages: number;
+        };
         PagedResponseOfRoleDto: {
             hasNext: boolean;
             hasPrevious: boolean;
@@ -4513,9 +4526,10 @@ export interface operations {
     ListNotifications: {
         parameters: {
             query?: {
-                unreadOnly?: boolean;
-                page?: number;
-                pageSize?: number;
+                PageNumber?: number;
+                PageSize?: number;
+                Sort?: string;
+                UnreadOnly?: boolean;
             };
             header?: never;
             path?: never;
@@ -4529,8 +4543,22 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["NotificationDto"][];
+                    "application/json": components["schemas"]["PagedResponseOfNotificationDto"];
                 };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

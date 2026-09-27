@@ -1,4 +1,5 @@
 using FluentValidation;
+using Boilerplate.BuildingBlocks.Web.Validation;
 using Boilerplate.Modules.Notifications.Contracts.v1.Queries;
 
 namespace Boilerplate.Modules.Notifications.Features.v1.ListNotifications;
@@ -7,7 +8,6 @@ public sealed class ListNotificationsQueryValidator : AbstractValidator<ListNoti
 {
     public ListNotificationsQueryValidator()
     {
-        RuleFor(x => x.Page).GreaterThanOrEqualTo(1);
-        RuleFor(x => x.PageSize).InclusiveBetween(1, 200);
+        Include(new PagedQueryValidator<ListNotificationsQuery>());
     }
 }

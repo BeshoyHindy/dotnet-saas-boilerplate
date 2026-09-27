@@ -148,6 +148,23 @@
                     }
                 }
             ]
+        },
+        ".gitignore": {
+            "flagPrefix": "#",
+            "operations": [
+                {
+                    "type": "conditional",
+                    "configuration": {
+                        "if": ["#if"],
+                        "else": ["#else"],
+                        "elseif": ["#elseif"],
+                        "endif": ["#endif"],
+                        "trim": true,
+                        "wholeLine": true,
+                        "evaluator": "C++"
+                    }
+                }
+            ]
         }
     },
     "sources": [
@@ -206,6 +223,7 @@
                 ".agents/workflows/**",
                 "skills-lock.json",
                 "docs/adr/0001-*",
+                "docs/research/**",
                 ".github/workflows/brand-gate.yml",
                 ".github/workflows/template-smoke.yml",
                 "scripts/brand-gate.sh",

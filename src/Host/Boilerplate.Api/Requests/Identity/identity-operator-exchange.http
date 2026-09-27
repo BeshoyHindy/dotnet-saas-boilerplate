@@ -1,5 +1,8 @@
 @baseUrl = https://localhost:7030
 @tenant = root
+# The seeded root admin's password is generated, never a literal in the repository: paste it from
+# the Aspire dashboard (Resources → Parameters) or SEED_ADMIN_PASSWORD in .env. Don't commit it.
+@adminPassword =
 @targetTenant = acme
 
 ### 0. Sign in as a root operator (the exchange is root-only)
@@ -9,7 +12,7 @@ Content-Type: application/json
 
 {
   "email": "admin@root.com",
-  "password": "Password123!"
+  "password": "{{adminPassword}}"
 }
 
 ### 1. Exchange the operator token for one that acts inside {{targetTenant}}

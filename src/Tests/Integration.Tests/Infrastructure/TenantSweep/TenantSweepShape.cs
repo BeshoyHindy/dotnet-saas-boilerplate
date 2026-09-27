@@ -100,7 +100,7 @@ public static class TenantSweepShape
     };
 
     /// <summary>
-    /// Every route carrying <c>[TenantSweepExempt]</c>. A group-level exemption would show up here as
+    /// Every route exempted with <c>.ExemptFromTenantSweep(...)</c>. A group-level exemption would show up here as
     /// a burst of new names at once — which is the whole point of pinning it.
     /// </summary>
     public static IReadOnlySet<string> ExemptRoutes { get; } = new HashSet<string>(StringComparer.Ordinal)

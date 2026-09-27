@@ -9,7 +9,14 @@ type RouteGuardProps = {
    * Use this on the route's `element` to gate by permission per-page —
    * ProtectedRoute itself only handles the auth-vs-anonymous question.
    */
-  perms: readonly string[];
+  perms?: readonly string[];
+  /**
+   * Visible only if the user holds *at least one* of these permissions —
+   * for a route that fronts several independently-gated sub-views (e.g.
+   * Trash). Combined with `perms` via AND, same semantics as nav-data.ts's
+   * `isNavItemVisible`.
+   */
+  anyPerms?: readonly string[];
   children: ReactNode;
 };
 
@@ -23,7 +30,7 @@ type RouteGuardProps = {
  * flight (permissionsHydrated=false), we render a quiet loading slug instead
  * of 403 to avoid a flash of "access denied" on first paint.
  */
-export function RouteGuard({ perms, children }: RouteGuardProps) {
+export function RouteGuard({ perms = [], anyPerms, children }: RouteGuardProps) {
   const { user, permissionsHydrated } = useAuth();
 
   if (!permissionsHydrated) {
@@ -40,9 +47,10 @@ export function RouteGuard({ perms, children }: RouteGuardProps) {
 
   const granted = user?.permissions ?? [];
   const missing = perms.filter((p) => !granted.includes(p));
+  const missingAny = anyPerms && !anyPerms.some((p) => granted.includes(p)) ? anyPerms : [];
 
-  if (missing.length > 0) {
-    return <ForbiddenView missing={missing} />;
+  if (missing.length > 0 || missingAny.length > 0) {
+    return <ForbiddenView missing={[...missing, ...missingAny]} />;
   }
 
   return <>{children}</>;

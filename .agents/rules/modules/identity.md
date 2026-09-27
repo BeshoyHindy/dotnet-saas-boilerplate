@@ -101,7 +101,7 @@ The avatar's object key carries the user id (`uploads/tenants/{t}/appuser/{userI
 
 ## Permission gating footgun
 
-`RequiredPermissionAttribute` implements `Boilerplate.BuildingBlocks.Shared.Identity.Authorization.IRequiredPermissionMetadata`. **Never let a second/duplicate `IRequiredPermissionMetadata` appear** — it silently disables **all** `.RequirePermission()` gates across the app. Permission constants live in `Shared/Identity/*Permissions.cs`.
+`RequiredPermissionAttribute` implements `Boilerplate.BuildingBlocks.Shared.Identity.Authorization.IRequiredPermissionMetadata`. **Never let a second/duplicate `IRequiredPermissionMetadata` appear** — it silently disables **all** `.RequirePermission()` gates across the app. Permission constants live in `Modules.{X}.Contracts/Authorization/{X}Permissions.cs` (here: `IdentityPermissions`).
 
 ## Hosted services (background)
 

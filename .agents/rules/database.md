@@ -4,9 +4,10 @@ Read before touching entities, DbContexts, migrations, or query filters.
 
 ## Entities
 
-- `BaseEntity` — `Id`, `CreatedAt`, `UpdatedAt`, `TenantId`.
-- `AggregateRoot` — `BaseEntity` + domain events (`IHasDomainEvents`, `_domainEvents` list).
-- Marker interfaces: `IHasTenant`, `IAuditableEntity`, `ISoftDeletable`, `IGlobalEntity`.
+- `BaseEntity<TId>` — `Id` and domain events (`IHasDomainEvents`: `DomainEvents`, `AddDomainEvent`, `ClearDomainEvents`). Nothing else: no timestamps, no `TenantId`.
+- `AggregateRoot<TId>` — a `BaseEntity<TId>` that marks an aggregate root; it adds no members.
+- **Don't declare a `TenantId` property.** Tenant isolation adds `TenantId` as a *shadow* column to every entity that is not `IGlobalEntity`, and the default-on filter reads it (next section). `IHasTenant` (an explicit `TenantId`) is the rare exception — one entity, `TenantTheme`, uses it.
+- Audit timestamps come from `IAuditableEntity` (`CreatedOnUtc`, `CreatedBy`, `LastModifiedOnUtc`, `LastModifiedBy`); soft delete from `ISoftDeletable` (`IsDeleted`, `DeletedOnUtc`, `DeletedBy`). Opt out of tenant isolation with `IGlobalEntity`.
 - Domain events inherit `DomainEvent` (record: `EventId`, `OccurredOnUtc`, `CorrelationId`, `TenantId`). Integration events implement `IIntegrationEvent`; handlers `IIntegrationEventHandler<T>`.
 
 ## Tenant isolation (default-ON)

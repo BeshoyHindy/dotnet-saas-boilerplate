@@ -7,7 +7,7 @@ for local orchestration with .NET Aspire.
 Derived from [fullstackhero/dotnet-starter-kit](https://github.com/fullstackhero/dotnet-starter-kit) (MIT), trimmed to a brand-free template with stricter tenancy and a Dokploy deploy path.
 
 `Boilerplate` is the placeholder root name. A new product renames it in one command
-(`dotnet new saas -n Acme`) — see [`docs/adr/0001-placeholder-namespace-and-dotnet-new-rename.md`](docs/adr/0001-placeholder-namespace-and-dotnet-new-rename.md).
+(`dotnet new saas -n Contoso`) — see [`docs/adr/0001-placeholder-namespace-and-dotnet-new-rename.md`](docs/adr/0001-placeholder-namespace-and-dotnet-new-rename.md).
 
 Three docs carry the rest:
 
@@ -19,10 +19,23 @@ Three docs carry the rest:
 ## Start a new product from it
 
 ```bash
-git clone https://github.com/BeshoyHindy/dotnet-saas-boilerplate Acme && cd Acme
+git clone https://github.com/BeshoyHindy/dotnet-saas-boilerplate && cd dotnet-saas-boilerplate
+dotnet new uninstall             # lists what is installed: remove any older `saas` first
 dotnet new install .            # the repository root IS the template
-dotnet new saas -n Acme -o ../Acme.App
+dotnet new saas -n Contoso -o ../Contoso
 ```
+
+Then follow the scaffold's own `docs/new-project-guide.md` from §2 (`git init -b develop` first).
+
+**Check for a stale install first.** `dotnet new` resolves `saas` to whichever install of the
+`Boilerplate.Saas` identity it has — an older clone installed months ago wins silently. Run
+`dotnet new uninstall` with no arguments, and `dotnet new uninstall <that path>` for any other clone
+listing `saas`.
+
+**Install from a clean clone.** `dotnet new install .` scans the whole tree. In a working checkout
+where `pnpm install` has run, or that has agent worktrees under `.claude/worktrees/`, it prints
+`Failed to load template from …/node_modules/…` errors and duplicate-identity warnings. The install
+still succeeds and the root template wins, but a fresh `git clone` is quiet and unambiguous.
 
 Nothing is published to NuGet.org: `dotnet new install <path>` on a clone is the supported
 install route, so there is no package version to keep in step with the source.
@@ -36,8 +49,8 @@ install route, so there is no package version to keep in step with the source.
 `--skipRestore`, `--contactEmail`, `--contactUrl` and `--mailFrom` are also accepted
 (`dotnet new saas --help` lists them all).
 
-`Boilerplate` → `Acme` is a plain text replacement across every file type, and a second derived
-symbol renames the lowercase/kebab form (`boilerplate` → `acme`: image names, database and bucket
+`Boilerplate` → `Contoso` is a plain text replacement across every file type, and a second derived
+symbol renames the lowercase/kebab form (`boilerplate` → `contoso`: image names, database and bucket
 names, the compose project, npm scopes, JWT issuer and audience, `localStorage` key prefixes).
 The two `UserSecretsId` GUIDs are regenerated per scaffold, and the API and DbMigrator keep
 sharing one. A scaffold carries `AGENTS.md`, `CLAUDE.md`, `.agents/rules/`, `CONTRIBUTING.md`
@@ -72,7 +85,7 @@ Run the whole thing locally — scaffold, build, test, brand-grep — with
 - [.NET 10 SDK](https://dotnet.microsoft.com/download) (pinned in `global.json`)
 - [Docker](https://www.docker.com/) — Postgres, Valkey and MinIO are started by Aspire, and the
   integration tests use Testcontainers
-- [Node 20+](https://nodejs.org/) for the React clients
+- [Node 20+](https://nodejs.org/) and [pnpm](https://pnpm.io) for the React clients and the agent pipeline
 
 ## Run
 
@@ -103,7 +116,7 @@ pinned; the fix is in `AppHost.cs`.
 
 Separately: the initial migrations were regenerated while this template was built, so a database
 migrated before that is incompatible and needs a fresh volume —
-`docker volume rm boilerplate-postgres-data` (destructive; local development data).
+`docker volume rm boilerplate-postgres-data-v2` (destructive; local development data).
 
 The MinIO password, the seeded root admin password and the demo password are Aspire parameters,
 generated on first run and persisted to the AppHost's user-secrets; read the current values from the

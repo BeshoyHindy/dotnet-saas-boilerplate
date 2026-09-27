@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { mockJsonResponse, mockProblemDetails } from "../helpers/api-mocks";
 
-// The dashboard login page: Boilerplate logo lockup + ".NET 10 Starter Kit" caption, and
+// The dashboard login page: Boilerplate logo lockup + "Multi-tenant SaaS" caption, and
 // an email/password card. NOBODY TYPES A TENANT (ADR-0008) — it is resolved from the URL,
 // the hostname, the last sign-in on this device, or the configured default, and the
 // "Workspace" field only appears when the arrival did not name one.
@@ -35,7 +35,7 @@ test.describe("login — page chrome", () => {
   test("renders the Boilerplate wordmark lockup with the .NET 10 caption", async ({ page }) => {
     await page.goto("/login");
     await expect(page.getByText("Boilerplate").first()).toBeVisible();
-    await expect(page.getByText(/\.NET 10 Starter Kit/i)).toBeVisible();
+    await expect(page.getByText(/multi-tenant saas/i)).toBeVisible();
     await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
     await expect(page.getByText(/sign in to your account/i)).toBeVisible();
   });
