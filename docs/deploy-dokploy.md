@@ -26,13 +26,23 @@ has no shell to run a container `HEALTHCHECK` with.
 - A domain you control, with DNS you can edit.
 - The container images published to GHCR (see [Images](#images)).
 
-Three hostnames point at the server. Create one `A` record each:
+<!--#if (frontend) -->
+Four hostnames point at the server. Create one `A` record each:
 
 | Record | Example | Serves |
 |---|---|---|
 | API | `api.example.com` | the .NET API |
-| Console | `app.example.com` | the web front end, and the API's CORS origin |
+| Dashboard | `app.example.com` | the tenant app a product's own users sign in to |
+| Console | `console.example.com` | the operator tool root operators sign in to |
 | Storage | `storage.example.com` | MinIO's S3 endpoint |
+<!--#else -->
+Two hostnames point at the server. Create one `A` record each:
+
+| Record | Example | Serves |
+|---|---|---|
+| API | `api.example.com` | the .NET API |
+| Storage | `storage.example.com` | MinIO's S3 endpoint |
+<!--#endif -->
 
 Storage needs its own public name because the API hands the browser **presigned**
 upload and download URLs. An S3 signature covers the host it was signed for, so
@@ -298,8 +308,15 @@ one Traefik gates traffic on. `GET /health` returns the full report of every
 check, which is the one to read when `ready` is failing and you want to know
 which dependency.
 
-Then sign in at `https://app.example.com` as `admin@root.com` with
-`SEED_ADMIN_PASSWORD`, and change that password.
+<!--#if (frontend) -->
+Then sign in at `https://console.example.com` as `admin@root.com` with
+`SEED_ADMIN_PASSWORD`, and change that password. The seeded root admin is a
+root-tenant operator, so the Console — never the Dashboard, which is the
+tenant app a product's own users sign in to — is where that account signs in.
+<!--#else -->
+Then authenticate as `admin@root.com` with `SEED_ADMIN_PASSWORD` against the
+API's own sign-in endpoint, and change that password.
+<!--#endif -->
 
 ## 6. Deploy from CI
 
