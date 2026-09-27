@@ -16,12 +16,32 @@
 #
 # Deploy this stack FIRST and only again when a data-service version changes.
 # See docs/deploy-dokploy.md.
+#
+# Every service below carries a memory limit and log rotation:
+#   - Memory (`mem_limit`) is the one operator-tunable resource cap: an
+#     `${..._MEM_LIMIT:-default}` so the 4 GB VPS the guide recommends gets
+#     isolation between "one service misbehaves" and "the whole box goes down"
+#     out of the box, but a bigger box can raise it without editing this file.
+#     The defaults here sum to ~1.9 GB, leaving room for the app stack
+#     (app.compose.yml) and Traefik/Dokploy's own processes on the same host.
+#   - Logging (`logging: *default-logging`) rotates the default unbounded
+#     `json-file` driver so container stdout cannot fill the disk that also
+#     holds `pg_data` and `minio_data`. Fixed, not env-overridable — there is
+#     no per-environment reason to want unbounded logs.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   # ── PostgreSQL ──────────────────────────────────────────────────────
   postgres:
     image: postgres:18-alpine
     restart: unless-stopped
+    mem_limit: ${POSTGRES_MEM_LIMIT:-1g}
+    logging: *default-logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -49,6 +69,8 @@ services:
   valkey:
     image: valkey/valkey:9.1.0-alpine
     restart: unless-stopped
+    mem_limit: ${VALKEY_MEM_LIMIT:-256m}
+    logging: *default-logging
     command: ["valkey-server", "--appendonly", "yes"]
     volumes:
       - valkey_data:/data
@@ -74,6 +96,8 @@ services:
   minio-volume-owner:
     image: cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1
     restart: "no"
+    mem_limit: ${MINIO_ONESHOT_MEM_LIMIT:-64m}
+    logging: *default-logging
     user: "0:0"
     entrypoint: ["chown"]
     command: ["-R", "65532:65532", "/data"]
@@ -97,6 +121,8 @@ services:
   minio:
     image: cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1
     restart: unless-stopped
+    mem_limit: ${MINIO_MEM_LIMIT:-512m}
+    logging: *default-logging
     depends_on:
       minio-volume-owner:
         condition: service_completed_successfully
@@ -153,6 +179,8 @@ services:
   minio-init:
     image: cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1
     restart: "no"
+    mem_limit: ${MINIO_ONESHOT_MEM_LIMIT:-64m}
+    logging: *default-logging
     depends_on:
       minio:
         condition: service_healthy
@@ -191,6 +219,8 @@ services:
   minio-public-prefix:
     image: cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1
     restart: "no"
+    mem_limit: ${MINIO_ONESHOT_MEM_LIMIT:-64m}
+    logging: *default-logging
     depends_on:
       minio-init:
         condition: service_completed_successfully

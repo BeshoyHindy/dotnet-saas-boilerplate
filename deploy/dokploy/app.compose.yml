@@ -22,6 +22,24 @@
 # no `service_completed_successfully` and ignores container-level `labels`.
 #
 # See docs/deploy-dokploy.md.
+#
+# Every service below carries a memory limit and log rotation:
+#   - Memory (`mem_limit`) is the one operator-tunable resource cap: an
+#     `${..._MEM_LIMIT:-default}` so the 4 GB VPS the guide recommends gets
+#     isolation between "one service misbehaves" and "the whole box goes down"
+#     out of the box, but a bigger box can raise it without editing this file.
+#     The defaults here sum to ~1.5 GB, leaving room for the data stack
+#     (data-services.compose.yml) and Traefik/Dokploy's own processes.
+#   - Logging (`logging: *default-logging`) rotates the default unbounded
+#     `json-file` driver so container stdout cannot fill the disk. Fixed, not
+#     env-overridable — there is no per-environment reason to want unbounded
+#     logs.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   # ── One-shot migrator ───────────────────────────────────────────────
@@ -32,6 +50,8 @@ services:
     image: ${IMAGE_REGISTRY}/${IMAGE_OWNER}/boilerplate-db-migrator:${IMAGE_TAG}
     pull_policy: always
     restart: "no"
+    mem_limit: ${MIGRATOR_MEM_LIMIT:-512m}
+    logging: *default-logging
     environment:
       DOTNET_ENVIRONMENT: Production
       DatabaseOptions__Provider: POSTGRESQL
@@ -50,6 +70,16 @@ services:
     image: ${IMAGE_REGISTRY}/${IMAGE_OWNER}/boilerplate-api:${IMAGE_TAG}
     pull_policy: always
     restart: unless-stopped
+    mem_limit: ${API_MEM_LIMIT:-768m}
+    logging: *default-logging
+    # Compose's own default is 10s: SIGTERM, then SIGKILL if the process has not
+    # exited. ASP.NET Core's Generic Host gives every IHostedService — Hangfire's
+    # BackgroundJobServer and the outbox dispatcher included — a 30s
+    # HostOptions.ShutdownTimeout to drain in-flight work on StopAsync. 35s keeps
+    # Docker's clock from SIGKILLing the process while it still believes it has
+    # up to 30s left, on every ordinary redeploy (pull_policy: always recreates
+    # this container each time).
+    stop_grace_period: 35s
     depends_on:
       migrator:
         condition: service_completed_successfully
@@ -149,6 +179,8 @@ services:
     image: ${IMAGE_REGISTRY}/${IMAGE_OWNER}/boilerplate-dashboard:${IMAGE_TAG}
     pull_policy: always
     restart: unless-stopped
+    mem_limit: ${DASHBOARD_MEM_LIMIT:-128m}
+    logging: *default-logging
     depends_on:
       api:
         condition: service_started
@@ -197,6 +229,8 @@ services:
     image: ${IMAGE_REGISTRY}/${IMAGE_OWNER}/boilerplate-console:${IMAGE_TAG}
     pull_policy: always
     restart: unless-stopped
+    mem_limit: ${CONSOLE_MEM_LIMIT:-128m}
+    logging: *default-logging
     depends_on:
       api:
         condition: service_started

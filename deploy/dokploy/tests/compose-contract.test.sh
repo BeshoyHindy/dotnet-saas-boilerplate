@@ -32,6 +32,20 @@ service_block() {
   ' "$1"
 }
 
+# Every service name declared directly under `services:`, one per line — the
+# top-level `services:` block up to the next top-level key, filtered to lines
+# that open a service (`  <name>:` with nothing after the colon). Used to
+# assert a property "on every service" without hardcoding the service list, so
+# a service added by a sibling ticket is caught by the loop instead of silently
+# skipped.
+service_names() {
+  awk '
+    /^services:[[:space:]]*$/ { inside = 1; next }
+    inside && /^[^ ]/ { inside = 0 }
+    inside && /^  [A-Za-z0-9_-]+:[[:space:]]*$/ { print }
+  ' "$1" | sed -E 's/^  ([A-Za-z0-9_-]+):.*/\1/'
+}
+
 # Every ${VAR} / ${VAR:-...} referenced by a compose file, one per line, sorted.
 compose_vars() {
   grep -ohE '\$\{[A-Za-z_][A-Za-z0-9_]*' "$@" | cut -c3- | sort -u
@@ -256,6 +270,37 @@ refute_match "api declares no container healthcheck" "$api_block" '^[[:space:]]*
 refute_match "data stack publishes no host ports" "$data_text" '^[[:space:]]*ports:'
 refute_match "app stack publishes no host ports"  "$app_text"  '^[[:space:]]*ports:'
 
+# ── Every service is bounded: memory limit and log rotation ──────────
+# D2/D4 (deploy-operability research): no per-service memory cap and no log
+# rotation on either stack meant one misbehaving container could exhaust the
+# 4 GB host, and unbounded json-file logs shared the disk with pg_data and
+# minio_data forever. Looping over `service_names` rather than a hardcoded
+# list means a service a sibling ticket adds to either file is caught by this
+# loop the moment it lands, not silently exempted.
+for f in "$DATA" "$APP"; do
+  name="${f##*/}"
+  file_text="$(cat "$f")"
+  assert_match "$name declares a default logging anchor (json-file, rotated)" \
+    "$file_text" 'x-logging:[[:space:]]*&default-logging'
+  assert_match "$name's driver is json-file" "$file_text" '^[[:space:]]*driver:[[:space:]]*json-file'
+  assert_match "$name's logs are capped by size" "$file_text" '^[[:space:]]*max-size:'
+  assert_match "$name's logs are capped by count" "$file_text" '^[[:space:]]*max-file:'
+  while IFS= read -r svc; do
+    [ -n "$svc" ] || continue
+    block="$(service_block "$f" "$svc")"
+    assert_match "$name/$svc has a memory limit" "$block" '^[[:space:]]*mem_limit:[[:space:]]*\$\{[A-Za-z_][A-Za-z0-9_]*(:-[^}]+)?\}'
+    assert_match "$name/$svc rotates its logs" "$block" '^[[:space:]]*logging:[[:space:]]*\*default-logging'
+  done <<< "$(service_names "$f")"
+done
+
+# D3: Compose's own default stop_grace_period (10s) is shorter than the 30s
+# ASP.NET Core's Generic Host gives every IHostedService — Hangfire's
+# BackgroundJobServer and the outbox dispatcher included — to drain on
+# StopAsync. 35s keeps every ordinary redeploy (pull_policy: always recreates
+# the api container) from SIGKILLing the process mid-drain.
+assert_match "api's stop grace period exceeds the host's 30s shutdown timeout" "$api_block" \
+  '^[[:space:]]*stop_grace_period:[[:space:]]*35s'
+
 # ── No literal secrets ───────────────────────────────────────────────
 # Any assignment whose key looks credential-shaped must take its value from the
 # environment, never from this repository.
@@ -290,6 +335,10 @@ if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; 
       SMTP_PORT)       value="587" ;;
       IMAGE_REGISTRY)  value="ghcr.io" ;;
       IMAGE_TAG)       value="0.0.0-test" ;;
+      # Left empty on purpose: these are the one class of key with a compose-file
+      # default (`${VAR:-default}`), so an empty value here exercises the actual
+      # default instead of a placeholder `mem_limit` docker compose would reject.
+      *_MEM_LIMIT)     value="" ;;
       *)               value="unset-in-tests" ;;
     esac
     printf '%s=%s\n' "$key" "$value" >> "$tmp_env"
