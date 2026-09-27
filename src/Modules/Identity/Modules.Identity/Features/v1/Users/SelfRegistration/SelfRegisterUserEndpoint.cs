@@ -21,8 +21,8 @@ public static class SelfRegisterUserEndpoint
         .WithSummary("Self register user")
         .WithDescription("Allow a user to self-register. Anonymous; the tenant is taken from the '{tenant}' route segment.")
         // Deliberately not .WithIdempotency(): an anonymous route has no subject to bind the replay
-        // partition to, so the key alone would hand a guessed key someone else's stored response
-        // (#84). A sequential retry is safe without it anyway — UserRegistrationService refuses a
+        // partition to, so the key alone would hand a guessed key someone else's stored response.
+        // A sequential retry is safe without it anyway — UserRegistrationService refuses a
         // duplicate email/username with 400 rather than creating a second user.
         .AllowAnonymous()
         .Produces<RegisterUserResponse>(StatusCodes.Status201Created)

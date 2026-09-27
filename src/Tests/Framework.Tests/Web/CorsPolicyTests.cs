@@ -10,9 +10,9 @@ using AspNetCorsOptions = Microsoft.AspNetCore.Cors.Infrastructure.CorsOptions;
 namespace Framework.Tests.Web;
 
 /// <summary>
-/// The CORS policy <c>AddHeroCors</c> builds, as a browser would meet it. The profile's version
-/// travels as <c>ETag</c> out and <c>If-Match</c> back (#107), so a cross-origin client must be able
-/// to read the one and send the other in both branches of the policy.
+/// The CORS policy <c>AddAppCors</c> builds, as a browser would meet it. The profile's version
+/// travels as <c>ETag</c> out and <c>If-Match</c> back for optimistic concurrency control,
+/// so a cross-origin client must be able to read the one and send the other in both branches of the policy.
 /// </summary>
 public sealed class CorsPolicyTests
 {
@@ -24,7 +24,7 @@ public sealed class CorsPolicyTests
 
         var services = new ServiceCollection();
         services.AddSingleton(environment);
-        services.AddHeroCors(configuration);
+        services.AddAppCors(configuration);
 
         using var provider = services.BuildServiceProvider();
         return provider.GetRequiredService<IOptions<AspNetCorsOptions>>().Value.GetPolicy("AppCorsPolicy")!;

@@ -17,7 +17,7 @@ public sealed class IdempotencyFilterTests
         _auth = new AuthHelper(factory);
     }
 
-    // Replay is observable here now (#82). The filter keeps its own entries in IDistributedCache,
+    // Replay is observable here with the filter's own entries in IDistributedCache.
     // which this host has — an in-memory one, which works perfectly well when used directly; it is
     // HybridCache that ignores it as an L2. It also captures the executed response rather than the
     // raw IResult, so "the second response is the first response" is an assertion about the body.

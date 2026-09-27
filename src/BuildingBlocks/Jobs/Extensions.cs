@@ -19,7 +19,7 @@ namespace Boilerplate.BuildingBlocks.Jobs;
 
 public static class Extensions
 {
-    public static IServiceCollection AddHeroJobs(this IServiceCollection services)
+    public static IServiceCollection AddAppJobs(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
 
@@ -53,7 +53,7 @@ public static class Extensions
                 o.UseNpgsqlConnection(dbOptions.ConnectionString);
             });
 
-            config.UseHeroJobPipeline(provider);
+            config.UseAppJobPipeline(provider);
         });
 
         // Deferred stale lock cleanup — runs after app starts accepting requests
@@ -88,7 +88,7 @@ public static class Extensions
     /// storage — the integration-test host runs it in memory — reconfigures storage <i>only</i>,
     /// instead of quietly losing the pipeline and testing a job runtime nobody ships.
     /// </summary>
-    public static IGlobalConfiguration UseHeroJobPipeline(this IGlobalConfiguration config, IServiceProvider provider)
+    public static IGlobalConfiguration UseAppJobPipeline(this IGlobalConfiguration config, IServiceProvider provider)
     {
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(provider);
@@ -112,7 +112,7 @@ public static class Extensions
     /// monitor cookie scheme authenticate a request here and nowhere else (ADR-0009). Without
     /// <see cref="SystemPermissions.Hangfire.Manage"/> the Job monitor is read-only.
     /// </remarks>
-    public static IEndpointRouteBuilder MapHeroJobDashboard(this IEndpointRouteBuilder endpoints, IConfiguration config)
+    public static IEndpointRouteBuilder MapAppJobDashboard(this IEndpointRouteBuilder endpoints, IConfiguration config)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
         ArgumentNullException.ThrowIfNull(config);

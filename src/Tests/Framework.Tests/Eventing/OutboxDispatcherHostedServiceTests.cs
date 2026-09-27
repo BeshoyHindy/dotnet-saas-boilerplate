@@ -15,7 +15,7 @@ namespace Framework.Tests.Eventing;
 public class OutboxDispatcherHostedServiceTests
 {
     /// <summary>
-    /// There is one database (#75) and outbox rows are <c>IGlobalEntity</c> carrying an explicit
+    /// There is one database per tenant and outbox rows are <c>IGlobalEntity</c> carrying an explicit
     /// <c>TenantId</c>, so one cycle is one pass: one scope, one dispatcher, one claim.
     /// </summary>
     [Fact]

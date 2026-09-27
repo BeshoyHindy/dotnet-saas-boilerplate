@@ -28,7 +28,7 @@ import { cn } from "@/lib/cn";
  *
  * The theme endpoints are current-tenant scoped server-side, and since ADR-0002 an operator
  * cannot name a tenant on the wire. So this card edits `tenantId` only while the operator is
- * ACTING inside it (issue #9's token exchange): then the request's tenant *is* this tenant, and
+ * acting inside it via the token exchange: then the request's tenant *is* this tenant, and
  * the same endpoints that serve a tenant admin serve the operator, unchanged.
  *
  * Until then it shows the way in rather than a disabled form — fetching or saving with the

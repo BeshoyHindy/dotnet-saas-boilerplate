@@ -169,7 +169,7 @@ public sealed partial class IdempotencyFilterOrderTests
         // .AllowAnonymous() plainly: RouteChains removes it before any scanner sees the chain.
         const string Source = """
             endpoints.MapPost("/register", (RegisterUserCommand command) => TypedResults.Ok())
-            // .WithIdempotency() // deliberately not idempotent: see #84
+            // .WithIdempotency() // deliberately not idempotent: anonymous routes cannot be idempotent
             /* .WithIdempotency() */
             .AllowAnonymous();
             """;

@@ -12,7 +12,7 @@ namespace Boilerplate.BuildingBlocks.Storage.Keys;
 /// put tenant isolation behind a permission, which is the failure mode the tenant endpoint sweep
 /// exists to catch. The message is deliberately the same as any other miss.</para>
 ///
-/// <para>Also raised for a stale handle — a pre-#78 flat <c>uploads/{type}/…</c> key still sitting
+/// <para>Also raised for a stale handle — a flat <c>uploads/{type}/…</c> key from before the tenant prefix existed, still sitting
 /// in a development database, say. Deletion paths that must survive one use
 /// <c>IStorageService.RemoveIfOwnedAsync</c>, which skips and logs instead.</para>
 /// </summary>

@@ -28,12 +28,12 @@ public sealed class HealthEndpointsRateLimitTests
         });
 
         builder.Services.AddHealthChecks();
-        builder.Services.AddHeroRateLimiting(builder.Configuration);
+        builder.Services.AddAppRateLimiting(builder.Configuration);
 
         var app = builder.Build();
         app.UseRouting();
-        app.UseHeroRateLimiting();
-        app.MapHeroHealthEndpoints();
+        app.UseAppRateLimiting();
+        app.MapAppHealthEndpoints();
         await app.StartAsync();
         return app;
     }

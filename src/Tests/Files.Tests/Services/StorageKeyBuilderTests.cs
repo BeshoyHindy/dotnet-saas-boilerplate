@@ -5,7 +5,7 @@ namespace Files.Tests.Services;
 
 /// <summary>
 /// What the Files module builds is now only the tenant-<i>relative</i> part of a key: the tenant
-/// prefix is the Storage block's, composed by <c>IStorageService.ComposeKey</c> (ADR-0002, #78).
+/// prefix is the Storage block's, composed by <c>IStorageService.ComposeKey</c> (ADR-0002).
 /// So there is no tenant id to pass and no <c>tenants/</c> literal to assert.
 /// </summary>
 public class StorageKeyBuilderTests

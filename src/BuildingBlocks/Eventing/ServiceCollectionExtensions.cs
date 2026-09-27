@@ -48,9 +48,9 @@ public static class ServiceCollectionExtensions
 
         // One framework-owned context owns the outbox/inbox tables, so each store has exactly
         // one registration. Registering them per module DbContext (the old
-        // AddEventingForDbContext<T>) left .NET DI resolving whichever module registered last —
-        // for the whole application, including Identity's working outbox (issue #1349).
-        services.AddHeroDbContext<EventingDbContext>();
+        // AddEventingForDbContext<T>) left .NET DI resolving whichever module registered last,
+        // for the whole application, including Identity's working outbox.
+        services.AddAppDbContext<EventingDbContext>();
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IDbInitializer, EventingDbInitializer>());
         services.TryAddScoped<IOutboxStore, EfCoreOutboxStore>();
 

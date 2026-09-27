@@ -184,7 +184,7 @@ completion before the API starts — Aspire chains it as a
 way — and the API never migrates.
 
 The `db:tenants-migrations` health check that reported pending
-migrations per tenant was removed with per-tenant databases (#75): with
+migrations per tenant was removed once every tenant moved to one shared database: with
 one shared schema it asked a single question once per tenant, and it was
 never tagged for readiness, so it never kept a pod out of rotation
 either. `db:multitenancy` is the readiness-tagged check and answers
@@ -204,7 +204,7 @@ merely behind. Run `list-pending` for that answer.
 4. Migrates the shared module schema **once**, through
    `ITenantService.MigrateTenantAsync` in the root tenant's scope, which
    walks every registered `IDbInitializer`. Every tenant lives in this
-   one database (#75), so running it per tenant would be the same
+   one database, so running it per tenant would be the same
    migration N times.
 5. With `seed` or `--seed`, reads every `AppTenantInfo` from the catalog
    and calls `ITenantService.SeedTenantAsync` for each — this pass *is*

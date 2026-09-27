@@ -11,7 +11,7 @@
 ## Must-know gotchas
 
 - **Tenant context is AsyncLocal — set it inline.** Set the Finbuckle tenant context **in the same method** as the `UserManager`/`DbContext` call. Setting it in an awaited helper loses it across the async boundary → NRE in the tenant query filter.
-- **Storage is wired eagerly.** `AddHeroStorage` reads `Storage:Provider` before the test config overlay, so it picks `LocalStorageService`. The factory **removes the `IStorageService`/`LocalStorageService`/`S3StorageService` descriptors post-registration and re-registers the S3 stack** at RustFS. Follow that when a test needs real object storage. (See `storage.md`.)
+- **Storage is wired eagerly.** `AddAppStorage` reads `Storage:Provider` before the test config overlay, so it picks `LocalStorageService`. The factory **removes the `IStorageService`/`LocalStorageService`/`S3StorageService` descriptors post-registration and re-registers the S3 stack** at RustFS. Follow that when a test needs real object storage. (See `storage.md`.)
 - **Rate limiting is read eagerly** — `Integration.Middleware.Tests` sets `RateLimitingOptions:Enabled` via env var **before** host build, since flipping it after has no effect.
 
 ## The cross-tenant sweep — read this before adding an endpoint

@@ -257,7 +257,7 @@ services:
       # Mailpit speaks plain SMTP on the compose network and never advertises STARTTLS, which the
       # default (StartTls) requires. A real relay keeps the default.
       MailOptions__Smtp__SecureSocket: None
-      # The literal OTEL_EXPORTER_OTLP_ENDPOINT name matters: AddHeroOpenTelemetry / AddHeroLogging
+      # The literal OTEL_EXPORTER_OTLP_ENDPOINT name matters: AddAppOpenTelemetry / AddAppLogging
       # auto-detect that exact env var (the same convention Aspire uses to inject its own dashboard)
       # and export to it even though Exporter.Otlp.Enabled stays false in appsettings.Production.json —
       # no other wiring needed. Blank by default (nothing exported); point it at the otlp-receiver

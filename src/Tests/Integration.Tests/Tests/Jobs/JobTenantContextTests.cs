@@ -10,7 +10,7 @@ namespace Integration.Tests.Tests.Jobs;
 
 /// <summary>
 /// ADR-0002, "Jobs and events", end to end through Hangfire's real client and perform pipeline
-/// (<c>AppJobFilter</c> + <c>AppJobActivator</c>, wired by <c>UseHeroJobPipeline</c> in the test host):
+/// (<c>AppJobFilter</c> + <c>AppJobActivator</c>, wired by <c>UseAppJobPipeline</c> in the test host):
 ///
 /// <list type="bullet">
 ///   <item>a job enqueued from a background context — no HttpContext anywhere — inside

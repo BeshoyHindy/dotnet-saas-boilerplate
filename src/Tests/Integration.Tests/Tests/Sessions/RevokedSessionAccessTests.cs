@@ -6,7 +6,7 @@ using System.Text;
 namespace Integration.Tests.Tests.Sessions;
 
 /// <summary>
-/// Revoking a session takes effect on the next request, not when the access token expires (#118).
+/// Revoking a session takes effect on the next request, not when the access token expires.
 /// Every access token minted at login or refresh names its session in <c>sid</c>, and authentication
 /// refuses the token with 401 once that session is revoked, expired or gone. A token that names no
 /// session at all is refused too — nothing could ever revoke it.

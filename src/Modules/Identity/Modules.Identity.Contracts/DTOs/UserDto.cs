@@ -27,8 +27,8 @@ public class UserDto
 
     /// <summary>
     /// The row's version (<c>AppUser.ConcurrencyStamp</c>). Never serialized: <c>GET /identity/profile</c>
-    /// sends it as the <c>ETag</c> header instead, and the other endpoints returning this DTO do not
-    /// expose it at all (#107).
+    /// sends it as the <c>ETag</c> header instead for optimistic concurrency, and other endpoints
+    /// returning this DTO do not expose it at all.
     /// </summary>
     [JsonIgnore]
     public string? ConcurrencyStamp { get; set; }

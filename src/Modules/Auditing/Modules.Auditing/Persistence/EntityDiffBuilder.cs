@@ -120,7 +120,7 @@ internal static class EntityDiffBuilder
         // The one canonical list (BuildingBlocks/Shared/Security) — no second copy of "what reads as
         // a secret" here. A matching value is masked, not merely flagged: AuditRecords is readable by
         // anyone holding AuditTrails.View in the tenant, and a hash or stamp in clear text there is
-        // exactly what #103 closes. Null stays null — there is nothing to mask.
+        // exactly what this masking closes. Null stays null — there is nothing to mask.
         var isSensitive = SensitiveFieldNames.IsSensitive(property.Metadata.Name);
         if (isSensitive)
         {

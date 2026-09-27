@@ -1,4 +1,4 @@
-# Secret scanning configuration (issue #13).
+# Secret scanning configuration.
 #
 #   gitleaks dir .            # working tree, uses this file automatically
 #   gitleaks detect --no-git  # same, for older invocations

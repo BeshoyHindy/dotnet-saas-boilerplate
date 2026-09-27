@@ -45,7 +45,7 @@ const user = unwrap(await api.GET("/api/v1/identity/users/{id}", { params: { pat
 
 ## Acting as someone else
 
-Two ways in (ADR-0002, issue #9), one credential, and it is **never stored**:
+Two ways in (ADR-0002), one credential, and it is **never stored**:
 
 | | Endpoint | Who |
 |---|---|---|

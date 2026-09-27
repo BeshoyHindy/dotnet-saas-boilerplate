@@ -45,14 +45,13 @@ const MAX_BYTES = 2 * 1024 * 1024;
 
 /**
  * ImageInput — pick an image, uploaded as bytes through the owning module's own endpoint, or remove
- * the one that is stored. There is no "paste a URL" mode any more (#83): the API stopped accepting
- * an asset URL from a client, because a URL a client names may be an object belonging to someone
- * else in the same tenant, and replacing or removing the asset would then delete *their* bytes. What
- * the field shows is the URL the server issued.
+ * the one that is stored. The API no longer accepts asset URLs from the client because a URL a
+ * client names may belong to someone else in the same tenant, and replacing or removing the asset
+ * would then delete their bytes. The field shows only the URL the server issued.
  *
- * It does NOT go through the Files module. A Files `publicUrl` is a presigned GET that expires in
- * minutes (see `.agents/rules/modules/files.md`), so persisting one on an entity column — an
- * avatar, a tenant logo — stores a link that is dead by the time anyone loads the page (issue #72).
+ * It does NOT go through the Files module. Presigned URLs expire in minutes (see
+ * `.agents/rules/modules/files.md`), so persisting one on an entity column — an avatar, a tenant
+ * logo — would result in a dead link.
  */
 export function ImageInput({
   value,

@@ -1,5 +1,5 @@
 /**
- * The "acting" layer (ADR-0002, issue #9).
+ * The "acting" layer (ADR-0002).
  *
  * While someone is acting as another user they hold TWO credentials: their own session
  * (localStorage, refreshable — untouched) and a short-lived token naming the subject

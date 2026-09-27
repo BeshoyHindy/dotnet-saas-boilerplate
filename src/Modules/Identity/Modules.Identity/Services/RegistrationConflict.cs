@@ -18,7 +18,7 @@ internal readonly record struct RegistrationConflictKind(bool EmailTaken, bool U
 
 /// <summary>
 /// Reads a failed registration and decides whether it was a lost race for the address, the username,
-/// or neither (#86).
+/// or neither.
 ///
 /// <para>A race is refused in one of **two** shapes, and a fix that knows only one of them is a fix
 /// that works under `dotnet test` and fails in production. If the loser's write reaches the database

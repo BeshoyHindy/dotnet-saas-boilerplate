@@ -51,11 +51,9 @@ public sealed class OutboxAtomicityTests
     [Fact]
     public async Task EnlistInAmbientTransactionAsync_Should_Find_The_Ambient_Transaction()
     {
-        // Covers issue #105: AmbientDbTransactionRegistry's hooks used to have signatures that
-        // didn't match IDbTransactionInterceptor, so they silently fell through to the
-        // interface's no-op defaults and the registry never recorded anything. This asserts the
-        // registry itself, not just the outcome Npgsql happens to produce anyway when every
-        // context shares one connection.
+        // Asserts that AmbientDbTransactionRegistry's hooks properly implement IDbTransactionInterceptor
+        // and record the transaction. This asserts the registry itself, not just the outcome Npgsql
+        // happens to produce anyway when every context shares one connection.
         var (scope, tenant) = await NewScopeAsync();
         using var scopeHandle = scope;
         scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()

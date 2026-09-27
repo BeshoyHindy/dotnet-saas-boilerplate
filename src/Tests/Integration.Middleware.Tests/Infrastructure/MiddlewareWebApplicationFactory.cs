@@ -59,7 +59,7 @@ public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Prog
         .WithCleanUp(true)
         .Build();
 
-    // RustFS, the S3-compatible store every stack runs (#95), pinned by the same tag and digest as the
+    // RustFS, the S3-compatible store every stack runs, pinned by the same tag and digest as the
     // AppHost and both compose stacks. A generic container, not a store-specific module: Testcontainers
     // dropped its MinIO module and has no RustFS one. No volume is mounted, so the image's own /data
     // (owned by the image's non-root user) is writable as is.
@@ -75,8 +75,8 @@ public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Prog
 
     public MiddlewareWebApplicationFactory()
     {
-        // AddHeroRateLimiting reads config EAGERLY at registration (before ConfigureWebHost's overlay merges)
-        // and appsettings ships Enabled=false; set env vars here (in the up-front config) to flip it. Cf. AddHeroStorage.
+        // AddAppRateLimiting reads config EAGERLY at registration (before ConfigureWebHost's overlay merges)
+        // and appsettings ships Enabled=false; set env vars here (in the up-front config) to flip it. Cf. AddAppStorage.
         Environment.SetEnvironmentVariable("RateLimitingOptions__Enabled", "true");
         Environment.SetEnvironmentVariable("RateLimitingOptions__Auth__PermitLimit", "3");
         Environment.SetEnvironmentVariable("RateLimitingOptions__Auth__WindowSeconds", "300");
@@ -228,7 +228,7 @@ public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Prog
             services.AddHangfire((provider, config) =>
             {
                 config.UseInMemoryStorage();
-                config.UseHeroJobPipeline(provider);
+                config.UseAppJobPipeline(provider);
             });
             services.AddHangfireServer(options =>
             {
@@ -372,8 +372,8 @@ public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Prog
                     // Deliberately carries NO authorization intent (no .AllowAnonymous(),
                     // .RequirePermission(...) or .RequireAuthenticatedOnly()) — a stand-in for a real
                     // endpoint that forgot to declare one, so UnmatchedRouteTests can prove it still
-                    // hits FallbackPolicy (401) and is unaffected by the unmatched-path catch-all
-                    // (issue #47), which must only intercept requests that matched nothing.
+                    // hits FallbackPolicy (401) and is unaffected by the unmatched-path catch-all,
+                    // which must only intercept requests that matched nothing.
                     routeBuilder.MapGet("/__test/no-metadata", () => Results.Ok());
                 }
             };

@@ -20,7 +20,7 @@ type DraftAssets = TenantThemeDraft["brandAssets"];
 
 /**
  * The draft's asset half: the URLs the server issued, plus whatever is staged for this save. The
- * URLs are read-only as far as the API is concerned (#83) — they are here because the editor shows
+ * URLs are read-only as far as the API is concerned — they are here because the editor shows
  * them, not because a save sends them.
  */
 function assets(overrides: Partial<DraftAssets> = {}): DraftAssets {
@@ -94,7 +94,7 @@ describe("themeFingerprint", () => {
 });
 
 /**
- * #83: the save sends the theme's WRITE model, which carries bytes and delete flags and no URL.
+ * The save sends the theme's WRITE model, which carries bytes and delete flags and no URL.
  * The draft the editor holds does carry the URLs the server issued — it shows them — so the one
  * place the two halves are separated again is here, and this is what pins it. A client that put a
  * URL back on the wire would be naming an object it may not own: inside one tenant that could be

@@ -1,13 +1,15 @@
 ---
 name: add-module
-description: Create a new module (bounded context) — runtime + Contracts projects, IModule, DbContext, permissions, migrations, and the four registration sites. Use when adding a distinct business domain. For a feature in an existing module, use add-feature.
+description: Create a new module (bounded context) — runtime + Contracts projects, IModule, DbContext, permissions, migrations, and the four registration lists. Use when adding a distinct business domain (a product module — ADR-0010). For a feature in an existing module, use add-feature.
 argument-hint: "[ModuleName]"
 ---
 
 # Add Module
 
-High-ceremony. The part people get wrong is **registration — a module must be wired in FOUR places**
-(see Step 6). Architecture rules: `.agents/rules/architecture.md`.
+High-ceremony. The part people get wrong is **registration — a module must be wired in FOUR lists**
+(see Step 6). This recipe builds a **product module** (ADR-0010): the template's own five **platform
+modules** (Identity, Multitenancy, Auditing, Files, Notifications — ADR-0003) already exist, and a
+platform module never references a product module. Architecture rules: `.agents/rules/architecture.md`.
 
 ## Projects
 
@@ -26,7 +28,7 @@ the Contracts project references `Mediator` + shared contracts.
 In `{Name}Module.cs`, above the namespace:
 
 ```csharp
-[assembly: AppModule(typeof(Boilerplate.Modules.{Name}.{Name}Module), 900)]   // (Type, order)
+[assembly: AppModule(typeof(Boilerplate.Modules.{Name}.{Name}Module), 1000)]   // (Type, order)
 
 namespace Boilerplate.Modules.{Name};
 
@@ -36,7 +38,7 @@ public sealed class {Name}Module : IModule
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddPermissions({Name}Permissions.All);
-        builder.Services.AddHeroDbContext<{Name}DbContext>();
+        builder.Services.AddAppDbContext<{Name}DbContext>();
         builder.Services.AddScoped<IDbInitializer, {Name}DbInitializer>();
 
         // Only if the module HANDLES integration events:
@@ -63,7 +65,7 @@ public sealed class {Name}Module : IModule
 }
 ```
 
-`Order` controls load sequence (Auditing 300, Files 350, Notifications 750). If your module consumes another's events, load after it.
+`Order` controls load sequence (platform modules: Auditing 300, Files 350, Notifications 750). Product modules take order 1000 and up, in steps of 100, so they start after every platform module. If your module consumes another's events, load after it.
 
 ## Step 2 — Permissions (Contracts/Authorization)
 
@@ -112,20 +114,20 @@ dotnet sln src/Boilerplate.slnx add src/Modules/{Name}/Modules.{Name}/Modules.{N
 dotnet sln src/Boilerplate.slnx add src/Modules/{Name}/Modules.{Name}.Contracts/Modules.{Name}.Contracts.csproj
 ```
 
-Add a `<ProjectReference>` to the runtime module from **both** `Boilerplate.Api` and `Boilerplate.DbMigrator`, and reference the runtime project from `Boilerplate.Migrations.PostgreSQL`.
+Add a `<ProjectReference>` to the runtime module from **both** `Boilerplate.Api` and `Boilerplate.DbMigrator`, and from `Boilerplate.Migrations.PostgreSQL` — the Migrations project's reference is how both hosts reach the module's migrations.
 
 ## Step 5 — Migrations folder
 
 Add a `{Name}/` folder in `src/Host/Boilerplate.Migrations.PostgreSQL`, then create the initial migration (see **create-migration**) with `--context {Name}DbContext`.
 
-## Step 6 — ⚠️ Register in ALL FOUR places (the footgun)
+## Step 6 — ⚠️ Register in ALL FOUR lists (the footgun)
 
-Identical edits in **both** `Boilerplate.Api/Program.cs` **and** `Boilerplate.DbMigrator/Program.cs`:
+Per host (**both** `Boilerplate.Api` and `Boilerplate.DbMigrator`), two edits:
 
-1. Mediator `o.Assemblies` — add **two** markers: a Contracts type (e.g. `typeof(Boilerplate.Modules.{Name}.Contracts.{Name}ContractsMarker)`) **and** the module type (`typeof({Name}Module)`).
-2. `moduleAssemblies` array — add `typeof({Name}Module).Assembly`.
+1. `HostModules.cs` — add `typeof({Name}Module).Assembly` to `HostModules.All`.
+2. `Program.cs` — Mediator `o.Assemblies` — add **two** markers: a Contracts type (e.g. `typeof(Boilerplate.Modules.{Name}.Contracts.{Name}ContractsMarker)`) **and** the module type (`typeof({Name}Module)`). This list stays a literal `typeof` list because Mediator's source generator reads it as written.
 
-Miss the Mediator marker → handlers silently undiscovered. Miss the assembly entry → module never loads. Miss the DbMigrator pair → migrate/seed skips the module.
+Miss the Mediator marker → handlers silently undiscovered. Miss the `HostModules.All` entry → module never loads. Miss the DbMigrator pair → migrate/seed skips the module. `HostModuleListTests` (Architecture.Tests) fails loudly and names the list and file to edit if you miss one.
 
 ## Step 7 — Verify
 
@@ -139,9 +141,10 @@ dotnet test src/Boilerplate.slnx
 
 - [ ] Two projects (copied csproj), added to `.slnx`, referenced from Api + DbMigrator (+ Migrations)
 - [ ] `[assembly: AppModule(typeof({Name}Module), order)]` (assembly-level, positional)
-- [ ] `IModule`: `AddHeroDbContext<T>()`, `services.AddPermissions(...)`, version-set group, eventing trio if needed
+- [ ] `IModule`: `AddAppDbContext<T>()`, `services.AddPermissions(...)`, version-set group, eventing trio if needed
 - [ ] `{Name}DbContext : BaseDbContext`, 4-arg ctor, `base.OnModelCreating` last
 - [ ] `{Name}Permissions` in Contracts/Authorization
 - [ ] Migrations folder + initial migration (`--context {Name}DbContext`)
-- [ ] **Registered in all four places** (Api + DbMigrator × Mediator + moduleAssemblies)
+- [ ] **Registered in all four lists** (Api + DbMigrator × `HostModules.All` + Mediator `o.Assemblies`)
+- [ ] Own rule file at `.agents/rules/modules/<name>.md`
 - [ ] Build + Architecture.Tests green

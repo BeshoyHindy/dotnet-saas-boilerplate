@@ -9,7 +9,7 @@ namespace Boilerplate.Modules.Identity.Events;
 ///
 /// **It must not publish an integration event.** It used to, and that was a second
 /// <c>UserRegisteredIntegrationEvent</c> for every registration — a duplicate welcome mail, and now
-/// it would be a duplicate confirmation mail too (#86). `UserRegistrationService` publishes that
+/// it would be a duplicate confirmation mail too. `UserRegistrationService` publishes that
 /// event itself, inside the registration transaction, which is the only way the row can share the
 /// sign-up's fate: a publish from here runs in <c>DomainEventsInterceptor</c>, which logs and
 /// swallows handler failures, so a lost outbox write would leave a committed user nobody was ever

@@ -46,7 +46,7 @@ public sealed class LogoutTests
         using var cookieRefresh = await RefreshWithCookieAsync(TestConstants.RootTenantId, token.RefreshToken);
         cookieRefresh.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
 
-        // The access token dies with its session on the very next request (#118)...
+        // The access token dies with its session on the very next request...
         using (var bearer = _factory.CreateClient())
         {
             bearer.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token.AccessToken);

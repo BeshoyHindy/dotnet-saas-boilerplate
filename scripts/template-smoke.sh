@@ -276,8 +276,8 @@ if [ "$SKIP_NODE" = true ]; then
 fi
 
 # Every client app is discovered by glob, and its package manager by lockfile, so
-# nothing here names a client directory — the loop was unchanged when the clients
-# went from two to one (issue #14) and back to two (ADR-0008).
+# nothing here names a client directory — the loop adapts to changes in client count
+# and app locations across template revisions (ADR-0008).
 if [ "$FRONTEND" = true ]; then
   found_client=false
   for pkg in "$OUT"/clients/*/package.json; do

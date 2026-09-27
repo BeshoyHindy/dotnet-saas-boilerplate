@@ -7,7 +7,7 @@ namespace Boilerplate.DbMigrator;
 /// <summary>
 /// Reads what the shared module schema still owes.
 ///
-/// There is one database for every tenant (#75), so "what is pending" is one question with one
+/// All tenants live in one shared database, so "what is pending" is one question with one
 /// answer per module <see cref="DbContext"/> — not one per tenant. The contexts are discovered by
 /// scanning the module assemblies the migrator already loads, rather than listed here, so adding a
 /// module does not add a fifth place to register it (see <c>.agents/rules/architecture.md</c>).

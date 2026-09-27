@@ -47,7 +47,7 @@ public sealed class FilesModule : IModule
         builder.Services.AddPermissions(FilesPermissions.All);
 
         builder.Services.Configure<FilesOptions>(builder.Configuration.GetSection("Files"));
-        builder.Services.AddHeroDbContext<FilesDbContext>();
+        builder.Services.AddAppDbContext<FilesDbContext>();
         builder.Services.AddScoped<IDbInitializer, FilesDbInitializer>();
 
         builder.Services.AddScoped<FileAccessPolicyRegistry>();

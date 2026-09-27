@@ -21,7 +21,7 @@ public interface ITenantThemeService
 
     /// <summary>
     /// Updates the theme for the specified tenant. Takes the <b>write</b> model: brand assets arrive
-    /// as bytes to upload or a flag to remove, never as a URL (#83).
+    /// as bytes to upload or a flag to remove, never as a URL.
     /// </summary>
     Task UpdateThemeAsync(string tenantId, TenantThemeUpdateDto theme, CancellationToken ct = default);
 

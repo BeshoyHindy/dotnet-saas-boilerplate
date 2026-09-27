@@ -10,8 +10,8 @@ namespace Integration.Tests.Infrastructure;
 /// a named tenant, on demand.
 ///
 /// It is the fault-injection seam for the provisioning failure and retry suites. It replaces the
-/// previous seam — a well-formed but unreachable per-tenant connection string, which stopped
-/// existing when per-tenant databases were cut (#75). The throw lands in exactly the same place
+/// previous seam — a well-formed but unreachable per-tenant connection string (no longer used with
+/// per-tenant databases). The throw lands in exactly the same place
 /// the old one did: <c>ITenantService.MigrateTenantAsync</c> iterates every registered
 /// <see cref="IDbInitializer"/> inside <c>ITenantScope.RunAsync</c>, so
 /// <c>TenantProvisioningJob</c>'s catch converts it to

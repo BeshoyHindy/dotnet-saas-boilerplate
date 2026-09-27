@@ -1,8 +1,8 @@
 # Domain docs
 
 Single-context repo: one [`CONTEXT.md`](../../CONTEXT.md) at the root, one `docs/adr/` beside it.
-There is no `CONTEXT-MAP.md` and there are no per-module ADR folders — the five modules are one
-bounded context, not five.
+There is no `CONTEXT-MAP.md` and there are no per-module ADR folders — every module, platform or
+product (ADR-0010), shares this one glossary and this one `docs/adr/`, not a folder each.
 
 ## Read before exploring
 

@@ -9,8 +9,8 @@ namespace Integration.Tests.Tests.Users;
 /// <summary>
 /// Covers the self-service profile surface: UpdateUser (PUT /profile), which forces the target id to
 /// the authenticated user, so any signed-in user may edit their own profile — and is now the only
-/// way an avatar is set or cleared (#83; the owner-scoped deletes it performs are asserted end to
-/// end in <c>Tests/Storage/ServerIssuedAssetUrlTests</c>).
+/// way an avatar is set or cleared; the owner-scoped deletes it performs are asserted end to
+/// end in <c>Tests/Storage/ServerIssuedAssetUrlTests</c>.
 /// </summary>
 [Collection(AppCollectionDefinition.Name)]
 public sealed class UserProfileTests
@@ -116,7 +116,7 @@ public sealed class UserProfileTests
     [Fact]
     public async Task UpdateProfile_Should_StoreADurableUploadsUrl_When_AnAvatarIsUploaded()
     {
-        // Arrange — this is the path the console's avatar picker takes (issue #72): the image
+        // Arrange — this is the path the console's avatar picker takes: the image
         // rides on the profile PUT and the server writes it with IStorageService.UploadAsync.
         using var adminClient = await _auth.CreateRootAdminClientAsync();
         var user = await IdentityUserSeeder.CreateLoginableUserAsync(_factory, adminClient, "avatar-upload");
@@ -161,7 +161,7 @@ public sealed class UserProfileTests
 
     #endregion
 
-    #region ETag / If-Match (#107)
+    #region ETag / If-Match
 
     private static readonly object TextOnlyUpdate = new { firstName = "Grace", lastName = "Hopper" };
 
@@ -297,7 +297,7 @@ public sealed class UserProfileTests
 
     #endregion
 
-    #region The avatar column takes no URL from anyone (#83)
+    #region The avatar column takes no URL from anyone
 
     [Fact]
     public async Task SetProfileImageByUrl_Should_NoLongerExist()

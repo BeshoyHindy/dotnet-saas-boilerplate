@@ -12,7 +12,7 @@ using System.Text.Json;
 namespace Integration.Tests.Tests.Storage;
 
 /// <summary>
-/// The storage half of tenant isolation, on real MinIO (ADR-0002, #78): the object <b>key</b> is
+/// The storage half of tenant isolation, on real MinIO (ADR-0002): the object <b>key</b> is
 /// tenant-prefixed by the Storage block, and the block refuses a key the ambient tenant does not
 /// own before it reaches the backend.
 ///
@@ -155,8 +155,8 @@ public sealed class StorageTenantIsolationTests : IAsyncLifetime
     [Fact]
     public async Task ReplacingAnAvatar_Should_Delete_The_Object_It_Replaced()
     {
-        // Before #78 this silently did nothing on path-style S3 (MinIO): the bucket segment of the
-        // persisted URL survived into the key, so the delete addressed an object that never existed.
+        // Previously, this silently did nothing on path-style S3 (MinIO): the bucket segment of the
+        // persisted URL would survive into the key, so the delete would address an object that never existed.
         using var clientB = await ClientForAsync(_tenantB, _tenantBAdmin);
         var first = await UploadAvatarAsync(clientB, "first.png");
         var firstKey = KeyFromPublicUrl(first);

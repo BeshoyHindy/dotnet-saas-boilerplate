@@ -14,8 +14,8 @@ describe("isOperator", () => {
   });
 
   it("refuses a tenant administrator, however senior", () => {
-    // Full control of one tenant is not platform operation: Users.Impersonate is the
-    // SAME-tenant grant (issue #9), and the server refuses a cross-tenant start with it.
+    // Full control of one tenant is not platform operation: Users.Impersonate is a
+    // same-tenant grant, and the server refuses a cross-tenant start with it.
     expect(
       isOperator([
         IdentityPermissions.Users.Update,

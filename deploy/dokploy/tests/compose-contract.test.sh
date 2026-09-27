@@ -113,9 +113,9 @@ while IFS= read -r image; do
   refute_match "data image is not :latest — $image" "$image" ':latest$'
 done <<< "$data_images"
 refute_match "data stack interpolates no image tag" "$data_images" '\$\{'
-# MinIO's images are gone from Docker Hub and quay.io and Chainguard's publish
-# only :latest (issue #95); the object store is RustFS now, and nothing may
-# pull a MinIO image back in.
+# MinIO's images are gone from Docker Hub and quay.io and Chainguard publishes
+# only :latest tags; the object store is now RustFS and must never pull a MinIO
+# image back.
 refute_match "no image comes from quay.io" "$data_images" 'quay\.io'
 refute_match "no MinIO image from Docker Hub" "$data_images" '^minio/'
 refute_match "no Chainguard MinIO image" "$data_images" 'chainguard/minio'
@@ -154,7 +154,7 @@ assert_match "migrator gets the migrations assembly" "$migrator_block" 'Database
 # silently publish every private file and make ChangeFileVisibility a no-op.
 #
 # Within `uploads/` the objects are tenant-prefixed by the Storage block
-# (`uploads/tenants/{tenantId}/…`, ADR-0002 / issue #78), but this grant stays at
+# (`uploads/tenants/{tenantId}/…`, ADR-0002), but this grant stays at
 # the top level: one one-shot has to cover tenants provisioned long after the
 # stack was deployed. So the assertions below pin both edges — the grant is not
 # the whole bucket, and it is not narrowed to one tenant either.

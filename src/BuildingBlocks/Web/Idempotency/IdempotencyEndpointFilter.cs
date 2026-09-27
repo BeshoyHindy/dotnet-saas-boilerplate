@@ -29,7 +29,7 @@ namespace Boilerplate.BuildingBlocks.Web.Idempotency;
 /// <c>IDistributedCache</c>, which cannot work: HybridCache frames its L2 payload (version byte,
 /// expiry, key, tags, then the value), so the probe read bytes that are not JSON and threw — the
 /// first replay of every key answered 500 against a real Redis, and answered nothing at all with the
-/// in-memory fallback, which HybridCache ignores as an L2 (issue #82). A replay store needs exactly
+/// in-memory fallback, which HybridCache ignores as an L2. A replay store needs exactly
 /// get and set-with-TTL, which is what <c>IDistributedCache</c> is; HybridCache's get-only probe gap
 /// is dotnet/aspnetcore#57191. An architecture test keeps this file on the short allow-list of
 /// application code permitted to touch <c>IDistributedCache</c> at all.
@@ -64,7 +64,7 @@ namespace Boilerplate.BuildingBlocks.Web.Idempotency;
 /// <b>An anonymous route is never marked idempotent.</b> For an anonymous caller there is no subject
 /// to bind the partition to, so it collapses to the client-supplied key alone: anyone who presents
 /// another caller's key on that route is handed their stored response. <c>SelfRegisterUser</c> used
-/// to be the one exception (#84) — it is not anymore, and it did not need to be: a sequential retry
+/// to be marked idempotent, but it is not anymore, and it did not need to be: a sequential retry
 /// of a registration is already safe, because <c>UserRegistrationService</c> refuses a duplicate
 /// email/username with 400 rather than creating a second user. This also covers a token-issuing
 /// endpoint — the same anonymous-partition hazard is why none of the anonymous
@@ -82,7 +82,7 @@ namespace Boilerplate.BuildingBlocks.Web.Idempotency;
 /// </para>
 /// <para>
 /// <b>A response that carries a short-lived capability is never marked idempotent either.</b>
-/// <c>RequestUploadUrl</c> used to be (#85): its response is a presigned PUT URL valid for minutes,
+/// <c>RequestUploadUrl</c> used to be: its response is a presigned PUT URL valid for minutes,
 /// but a replay entry lives for the idempotency TTL (24h), so a retry under the same key past the
 /// URL's expiry was handed a dead link rather than a fresh one. A repeated call is harmless without
 /// replay — it creates another pending <c>FileAsset</c> whose <c>UploadDeadline</c> passes and which
@@ -93,7 +93,7 @@ namespace Boilerplate.BuildingBlocks.Web.Idempotency;
 /// <b>A committed handler runs to completion even if the client is already gone.</b> Before
 /// <c>next(context)</c> the bound <see cref="CancellationToken"/> argument and
 /// <see cref="HttpContext.RequestAborted"/> are swapped for a token that never fires, so a disconnect
-/// between the handler's commit and the capture cannot cancel either one (#104, upstream
+/// between the handler's commit and the capture cannot cancel either one (upstream
 /// <c>bf86648</c> part c). A half-finished side effect with no stored entry is the worse outcome: the
 /// retry the client is bound to send would run it again. The real token comes back only for the final
 /// write in <see cref="FlushAsync"/> — that one is allowed to fail, because by then the entry already
@@ -212,14 +212,14 @@ public sealed class IdempotencyEndpointFilter : IEndpointFilter
         }
 
         // A client that hangs up between here and the capture below must not undo a handler that has
-        // already committed its side effect (issue #104, upstream bf86648 part c). Two places would
-        // otherwise see that abort: the bound CancellationToken argument the handler itself may read
-        // again after committing (an outbox dispatch, a follow-up query), and RequestAborted, which the
-        // executed IResult's own body-writing reads too — a cancelled write there does not throw so
-        // much as silently write nothing, caching an empty 2xx for the entry's whole TTL. Swapping both
-        // for a token that never fires lets the handler and the capture run to completion regardless;
-        // restored before the final flush below, because that write really is talking to the client,
-        // and by then the entry is already safely stored either way.
+        // already committed its side effect. Two places would otherwise see that abort: the bound
+        // CancellationToken argument the handler itself may read again after committing (an outbox
+        // dispatch, a follow-up query), and RequestAborted, which the executed IResult's own body-writing
+        // reads too — a cancelled write there does not throw so much as silently write nothing, caching
+        // an empty 2xx for the entry's whole TTL. Swapping both for a token that never fires lets the
+        // handler and the capture run to completion regardless; restored before the final flush below,
+        // because that write really is talking to the client, and by then the entry is already safely
+        // stored either way.
         var callerAborted = httpContext.RequestAborted;
         httpContext.RequestAborted = CancellationToken.None;
         for (var i = 0; i < context.Arguments.Count; i++)

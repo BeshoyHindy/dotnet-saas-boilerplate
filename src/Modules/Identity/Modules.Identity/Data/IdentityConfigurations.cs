@@ -20,7 +20,7 @@ public class ApplicationUserConfig : IEntityTypeConfiguration<AppUser>
             .Property(u => u.ObjectId)
                 .HasMaxLength(256);
 
-        // E-mail uniqueness is the database's answer, not a validator's read (#86). ASP.NET Identity
+        // E-mail uniqueness is enforced by the database, not by a validator's read. ASP.NET Identity
         // maps NormalizedEmail as a plain lookup index and enforces `RequireUniqueEmail` with a query
         // before the insert, so two concurrent sign-ups with the same address both passed. The index
         // is widened with TenantId by hand because Finbuckle only adjusts indexes that are ALREADY

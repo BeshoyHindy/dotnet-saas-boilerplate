@@ -32,7 +32,8 @@ public static class UpdateUserEndpoint
             request.Id = userId;
 
             // Optional: absent means "no precondition". Present, it must name the version from
-            // GET /profile's ETag, or the update is refused with 412 before anything is stored (#107).
+            // GET /profile's ETag for optimistic concurrency, or the update is refused with 412
+            // before anything is stored.
             request.IfMatch = ifMatch;
 
             await mediator.Send(request, cancellationToken);

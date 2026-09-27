@@ -62,9 +62,9 @@ internal sealed class UserProfileService(
         _ = user ?? throw new NotFoundException("user not found");
 
         // The precondition is checked here, straight after the load and before the storage calls
-        // below: a stale request must not upload a new avatar or delete the current one (#107).
-        // A save that lands after this check is still caught — UserManager saves with the stamp it
-        // loaded, and that comes back as ConcurrencyFailure.
+        // below: a stale request must not upload a new avatar or delete the current one for
+        // optimistic concurrency. A save that lands after this check is still caught — UserManager
+        // saves with the stamp it loaded, and that comes back as ConcurrencyFailure.
         if (!ProfileETag.Matches(ifMatch, user.ConcurrencyStamp))
         {
             throw new ProfileChangedException();
@@ -74,8 +74,8 @@ internal sealed class UserProfileService(
         // image is optional: text-only edits forward a null FileUploadRequest, so guard before
         // dereferencing Data or the common no-image update path NREs.
         //
-        // The previous value is dropped with the OWNER-scoped RemoveIfOwnedAsync<AppUser> (#83), not
-        // the tenant-wide one: tenant ownership cannot tell this user's avatar from the user's at the
+        // The previous value is dropped with the OWNER-scoped RemoveIfOwnedAsync<AppUser>, not the
+        // tenant-wide one: tenant ownership cannot tell this user's avatar from the user's at the
         // next desk, and before the URL input was removed a caller could put someone else's avatar in
         // this column precisely so that the next replace would delete it. What this skips over — a
         // legacy row holding a pasted URL, or a key from before the owner segment — is logged, not

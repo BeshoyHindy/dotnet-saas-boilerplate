@@ -48,8 +48,8 @@ public sealed class ConfirmationEmailLinkTests
         var unique = Guid.NewGuid().ToString("N")[..8];
         var email = $"confirm-link-{unique}@example.com";
 
-        // Act — self-register; the confirmation mail hangs off the registration event (#86), so it is
-        // published with the user row and delivered on a dispatch cycle rather than inside the request.
+        // Act — self-register; the confirmation mail is published as a registration event,
+        // delivered on a dispatch cycle rather than inside the request.
         var response = await client.PostAsJsonAsync($"{TestConstants.RootAuthBasePath}/register", new
         {
             firstName = "Confirm",

@@ -9,8 +9,8 @@ using Xunit;
 namespace Architecture.Tests;
 
 /// <summary>
-/// Guards the defect behind issue #1349: IOutboxStore/IInboxStore were registered
-/// once per module DbContext, non-keyed, so .NET DI silently resolved whichever
+/// Guards against a defect where IOutboxStore/IInboxStore are registered
+/// once per module DbContext, non-keyed, so .NET DI silently resolves whichever
 /// module registered last — for the whole application, including Identity.
 /// </summary>
 public class EventingRegistrationTests
@@ -39,7 +39,7 @@ public class EventingRegistrationTests
     {
         BuildServices()
             .Count(d => d.ServiceType == typeof(IOutboxStore))
-            .ShouldBe(1, "a second IOutboxStore registration silently hijacks every module's outbox (issue #1349)");
+            .ShouldBe(1, "a second IOutboxStore registration silently hijacks every module's outbox");
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public class EventingRegistrationTests
     {
         BuildServices()
             .Count(d => d.ServiceType == typeof(IInboxStore))
-            .ShouldBe(1, "a second IInboxStore registration silently redirects idempotency writes (issue #1349)");
+            .ShouldBe(1, "a second IInboxStore registration silently redirects idempotency writes");
     }
 
     [Fact]
@@ -59,9 +59,9 @@ public class EventingRegistrationTests
         services.AddEventingCore(configuration);
 
         services.Count(d => d.ServiceType == typeof(IOutboxStore))
-            .ShouldBe(1, "calling AddEventingCore twice must not multiply the IOutboxStore registration — that would reintroduce the exact ambiguity issue #1349 is about");
+            .ShouldBe(1, "calling AddEventingCore twice must not multiply the IOutboxStore registration — that would reintroduce the exact ambiguity of having multiple registrations");
         services.Count(d => d.ServiceType == typeof(IInboxStore))
-            .ShouldBe(1, "calling AddEventingCore twice must not multiply the IInboxStore registration — that would reintroduce the exact ambiguity issue #1349 is about");
+            .ShouldBe(1, "calling AddEventingCore twice must not multiply the IInboxStore registration — that would reintroduce the exact ambiguity of having multiple registrations");
     }
 
     [Fact]
@@ -70,6 +70,6 @@ public class EventingRegistrationTests
         typeof(ServiceCollectionExtensions)
             .GetMethods()
             .Any(m => m.Name == "AddEventingForDbContext")
-            .ShouldBeFalse("per-DbContext outbox registration is the #1349 footgun; the framework owns one EventingDbContext");
+            .ShouldBeFalse("per-DbContext outbox registration is the footgun (multiple registrations with no keying); the framework owns one EventingDbContext");
     }
 }

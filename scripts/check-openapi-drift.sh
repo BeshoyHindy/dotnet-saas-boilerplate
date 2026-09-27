@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #if (frontend)
-# OpenAPI drift gate, both sides (issue #15, ADR-0008). The checked-in contract,
+# OpenAPI drift gate, both sides (ADR-0008). The checked-in contract,
 # clients/openapi/v1.json, must be reproducible from the API, and EVERY client's
 # generated types must be reproducible from that one contract — this is the single
 # place both CI jobs and a developer ask either question.

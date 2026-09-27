@@ -7,7 +7,7 @@ namespace Identity.Tests.Services;
 
 /// <summary>
 /// <see cref="SessionLiveness"/> is what makes a revoked session stop working on the next request
-/// rather than when the access token expires (#118). These tests pin the answer for each state a
+/// rather than when the access token expires. These tests pin the answer for each state a
 /// session row can be in, that the answer is cached for <see cref="SessionLiveness.CacheDuration"/>
 /// and no longer, and that a revocation on this instance wins over the cache immediately — including
 /// over a lookup that was already in flight when the revocation landed.

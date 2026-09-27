@@ -41,7 +41,7 @@ beforeEach(() => {
 });
 
 describe("getMyProfile", () => {
-  it("returns the profile's version from the ETag header (#107)", async () => {
+  it("returns the profile's version from the ETag header", async () => {
     get.mockResolvedValue({
       data: { id: "u-1", firstName: "Ada" },
       response: new Response(null, { status: 200, headers: { ETag: '"v1"' } }),

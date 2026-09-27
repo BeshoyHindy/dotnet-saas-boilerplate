@@ -16,7 +16,7 @@ public static class Extensions
     /// To add a new version, add another entry to the <c>OpenApiOptions:Versions</c> array
     /// or call <c>AddOpenApi("v2", ...)</c> after this method.
     /// </summary>
-    public static IServiceCollection AddHeroOpenApi(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddAppOpenApi(this IServiceCollection services, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -68,7 +68,7 @@ public static class Extensions
         return services;
     }
 
-    public static void UseHeroOpenApi(
+    public static void UseAppOpenApi(
         this WebApplication app,
         string openApiPath = "/openapi/{documentName}.json")
     {

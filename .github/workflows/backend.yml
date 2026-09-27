@@ -528,7 +528,7 @@ jobs:
             fi
           done
 
-  # ── OpenAPI drift (issue #15, ADR-0004) ─────────────────────────────
+  # ── OpenAPI drift (ADR-0004) ─────────────────────────────
   # The drift gate lives next to the build that produces the document: the API
   # re-exports clients/openapi/v1.json and fails if that changes anything.
   #if (frontend)

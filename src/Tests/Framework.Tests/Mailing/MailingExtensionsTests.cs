@@ -24,14 +24,14 @@ public sealed class MailingExtensionsTests
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddLogging();
-        services.AddHeroMailing();
+        services.AddAppMailing();
         return services.BuildServiceProvider();
     }
 
     #region Service selection
 
     [Fact]
-    public void AddHeroMailing_Should_RegisterSmtpService_When_UseSendGridFalse()
+    public void AddAppMailing_Should_RegisterSmtpService_When_UseSendGridFalse()
     {
         // Arrange
         using var provider = BuildProvider(useSendGrid: false);
@@ -44,7 +44,7 @@ public sealed class MailingExtensionsTests
     }
 
     [Fact]
-    public void AddHeroMailing_Should_RegisterSendGridService_When_UseSendGridTrue()
+    public void AddAppMailing_Should_RegisterSendGridService_When_UseSendGridTrue()
     {
         // Arrange
         using var provider = BuildProvider(useSendGrid: true);
@@ -57,7 +57,7 @@ public sealed class MailingExtensionsTests
     }
 
     [Fact]
-    public void AddHeroMailing_Should_ReturnSameServiceCollection_When_Chained()
+    public void AddAppMailing_Should_ReturnSameServiceCollection_When_Chained()
     {
         // Arrange
         var configuration = new ConfigurationBuilder().Build();
@@ -66,7 +66,7 @@ public sealed class MailingExtensionsTests
         services.AddLogging();
 
         // Act
-        var result = services.AddHeroMailing();
+        var result = services.AddAppMailing();
 
         // Assert
         result.ShouldBeSameAs(services);

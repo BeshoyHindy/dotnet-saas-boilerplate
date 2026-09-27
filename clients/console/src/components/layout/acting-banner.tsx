@@ -10,7 +10,7 @@ import { cn } from "@/lib/cn";
 /**
  * ActingBanner — shown across every page while the signed-in user is acting as someone
  * else: an operator inside another tenant through the token exchange, or an admin
- * impersonating one of their own users (ADR-0002, issue #9).
+ * impersonating one of their own users (ADR-0002).
  *
  * Deliberately loud and always present: every request made from here is attributed to
  * that other user (with the actor recorded in `act_sub`), and nothing else on screen

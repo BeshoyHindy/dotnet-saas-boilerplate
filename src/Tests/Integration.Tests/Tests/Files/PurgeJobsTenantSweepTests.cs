@@ -12,7 +12,7 @@ namespace Integration.Tests.Tests.Files;
 /// The two purge sweeps are <c>[SystemJob]</c>s. They used to read the database with
 /// <c>IgnoreQueryFilters()</c> standing in for a tenant, which made them cross-tenant by accident;
 /// they are now tenant sweeps, fanning out through <c>ITenantScope.RunForEachTenantAsync</c> and
-/// lifting only the named <c>SoftDelete</c> filter inside each pass (#74).
+/// lifting only the named <c>SoftDelete</c> filter inside each pass.
 ///
 /// The proof is rows seeded into two different ordinary tenants plus a control row in root: one run
 /// must take all of them, and must leave the rows that are still inside their window alone. A sweep

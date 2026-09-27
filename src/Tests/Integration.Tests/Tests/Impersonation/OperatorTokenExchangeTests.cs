@@ -647,7 +647,7 @@ public sealed class OperatorTokenExchangeTests : IAsyncLifetime
         return client;
     }
 
-    // The paged search is the only user listing (#136). The target tenant holds a handful of
+    // The paged search is the only user listing. The target tenant holds a handful of
     // users, so one max-size page is the whole set — asserted, so a ShouldNotContain can never
     // pass merely because the row sat on a later page.
     private static async Task<List<UserPayload>> ListAllUsersAsync(HttpClient client)

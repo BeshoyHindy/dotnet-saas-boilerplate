@@ -8,7 +8,7 @@ namespace Framework.Tests.Web.Logging;
 
 /// <summary>
 /// A Serilog sink the <c>Serilog</c> config section can name (<c>"Using": ["Boilerplate.Framework.Tests"]</c>,
-/// <c>"WriteTo": [{ "Name": "Capture" }]</c>), so a test host wired by <c>AddHeroLogging</c> — which
+/// <c>"WriteTo": [{ "Name": "Capture" }]</c>), so a test host wired by <c>AddAppLogging</c> — which
 /// builds its logger from configuration only — writes into memory the test can read.
 /// Shared across tests: each test filters by a marker of its own (a unique path or message).
 /// </summary>

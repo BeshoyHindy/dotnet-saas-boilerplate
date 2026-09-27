@@ -2,7 +2,7 @@ namespace Boilerplate.BuildingBlocks.Shared.Constants;
 
 /// <summary>
 /// Cross-cutting platform permissions that don't belong to a specific business module.
-/// Registered automatically during <c>AddHeroPlatform</c>.
+/// Registered automatically during <c>AddAppPlatform</c>.
 /// </summary>
 public static class SystemPermissions
 {

@@ -12,7 +12,7 @@ namespace Integration.Tests.Tests.Files;
 
 /// <summary>
 /// Finalize reads the stored object's first bytes and matches them against the declared type
-/// (ASVS 5.0 V5.2.2, #125). The PUTs below send the <i>same</i> <c>Content-Type</c> the upload was
+/// (ASVS 5.0 V5.2.2). The PUTs below send the <i>same</i> <c>Content-Type</c> the upload was
 /// declared with, so the older header-vs-declaration check passes and only the bytes can refuse it.
 /// </summary>
 [Collection(AppCollectionDefinition.Name)]

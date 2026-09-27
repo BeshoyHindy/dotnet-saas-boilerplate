@@ -8,7 +8,7 @@ namespace Auditing.Tests.Persistence;
 
 /// <summary>
 /// <see cref="AuditingSaveChangesInterceptor"/> against a real SaveChanges pipeline (in-memory
-/// SQLite): pins #103's <see cref="IAuditExempt"/> opt-out — a matching entity is skipped entirely,
+/// SQLite): validates the <see cref="IAuditExempt"/> opt-out — a matching entity is skipped entirely,
 /// with no EntityChange event published at all, as opposed to a sensitive property, which is
 /// published but masked (<see cref="EntityDiffBuilderTests"/>).
 /// </summary>

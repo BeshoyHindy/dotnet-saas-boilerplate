@@ -19,7 +19,7 @@ internal enum UploadContentVerdict
 }
 
 /// <summary>
-/// Checks an upload's bytes against its declared type (ASVS 5.0 V5.2.2, #125). Without it, finalize
+/// Checks an upload's bytes against its declared type (ASVS 5.0 V5.2.2). Without it, finalize
 /// only compared the caller's declared <c>Content-Type</c> with the header the same caller sent on
 /// the presigned PUT, which proves nothing about the bytes.
 /// <para>

@@ -141,7 +141,7 @@ public sealed class RegisterUserCommandHandlerTests
     {
         // Arrange — the mailed link's base URL is configuration, not anything the caller controls.
         // It no longer travels into registration: the confirmation mail is built by the handler of
-        // the registration event (#86), which resolves the same configured origin. What is left here
+        // the registration event, which resolves the same configured origin. What is left here
         // is the precondition — an origin exists, so the sign-up may proceed.
         var command = ValidCommand();
         _userService.RegisterAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())

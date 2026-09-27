@@ -267,9 +267,9 @@ var api = builder.AddProject<Projects.Boilerplate_Api>($"{appPrefix}-api")
 api.WithEnvironment("OriginOptions__OriginUrl", api.GetEndpoint("https"));
 //#endif
 //#if (frontend)
-// The links point at a client page, so the origin has to be a client's (issue #46), not
-// the API's own — and it is the DASHBOARD's: those mails go to a tenant's users, who live
-// there. An operator never receives one at the console (ADR-0008).
+// The links point at a client page, so the origin has to be a client's, not the API's own
+// — and it is the DASHBOARD's: those mails go to a tenant's users, who live there. An
+// operator never receives one at the console (ADR-0008).
 api.WithEnvironment("OriginOptions__OriginUrl", DashboardOrigin);
 //#endif
 

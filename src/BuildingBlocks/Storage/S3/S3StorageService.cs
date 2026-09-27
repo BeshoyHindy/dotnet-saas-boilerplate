@@ -44,7 +44,7 @@ internal sealed class S3StorageService : IStorageService
     /// path before checking it against the key grammar. A bucket, or a prefix whose first segment,
     /// named the same as one of <see cref="TenantStorageKeyRules.KeyRootSegments"/> would make that
     /// stripping eat the key's own first segment instead — silently mapping every URL to the wrong
-    /// key (#78 hardening item 2). Refused at construction, not discovered at the first delete.
+    /// key — a hardening fix. Refused at construction, not discovered at the first delete.
     /// </summary>
     private static void RejectIfKeyRoot(string? value, string settingName)
     {
@@ -143,7 +143,7 @@ internal sealed class S3StorageService : IStorageService
     /// <summary>
     /// Deletes an already-authorized logical <paramref name="key"/>. Both public delete entry
     /// points route here instead of calling each other, so <see cref="ToLogicalKey"/> — which
-    /// strips the bucket and deployment prefix — runs exactly once per call (#78 hardening item 3;
+    /// strips the bucket and deployment prefix — runs exactly once per call (a hardening fix;
     /// calling the public <see cref="RemoveAsync"/> from <see cref="RemoveIfOwnedAsync"/> would
     /// strip <c>Storage:S3:Prefix</c> a second time and delete the wrong physical object).
     /// </summary>
@@ -460,8 +460,8 @@ internal sealed class S3StorageService : IStorageService
     /// the key grammar refuses it. A backslash is refused the same way — unlike
     /// <see cref="Local.LocalStorageService"/>, which legitimately sees Windows-form disk paths, S3
     /// object keys never contain one, so repairing it here would be exactly the silent normalisation
-    /// <see cref="TenantStorageKeyRules.TryAuthorize"/> documents that it never does (#78 hardening
-    /// item 1).
+    /// <see cref="TenantStorageKeyRules.TryAuthorize"/> documents that it never does — a hardening
+    /// fix.
     /// </summary>
     private string ToLogicalKey(string? handle)
     {

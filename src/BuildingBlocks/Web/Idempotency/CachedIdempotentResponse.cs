@@ -12,8 +12,8 @@ namespace Boilerplate.BuildingBlocks.Web.Idempotency;
 /// finds a version it does not know treats the entry as a miss and re-runs the handler; it never
 /// tries to interpret it. That is the whole reason the field exists: without it, a format change —
 /// or any foreign bytes under the key, such as the framed payload HybridCache writes — becomes a
-/// deserialization exception on the replay path, which is how issue #82 turned the first replay of
-/// every key into a 500.
+/// deserialization exception on the replay path, which would turn the first replay of every key into
+/// a 500.
 /// </para>
 /// <para>
 /// <see cref="Headers"/> holds only the response headers the filter is willing to replay

@@ -34,7 +34,7 @@ public sealed class HybridCacheRedisTests : IAsyncLifetime
             })
             .Build();
         services.AddSingleton<IConfiguration>(config);
-        services.AddHeroCaching(config, singleTenant: true);
+        services.AddAppCaching(config, singleTenant: true);
         var provider = services.BuildServiceProvider();
         return (provider.GetRequiredService<HybridCache>(),
                 provider.GetRequiredService<IDistributedCache>(),

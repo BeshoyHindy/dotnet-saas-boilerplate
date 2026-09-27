@@ -3,8 +3,8 @@ using System.ComponentModel.DataAnnotations;
 namespace Boilerplate.Modules.Identity;
 
 /// <summary>
-/// Lifetime ceiling for every token that crosses — or borrows — an identity: the operator token
-/// exchange (#9) and impersonation both mint through the same issuer, so there is exactly one
+/// Lifetime ceiling for every token that crosses — or borrows — an identity: operator token
+/// exchange and impersonation both mint through the same issuer, so there is exactly one
 /// number to reason about (config section <c>"OperatorExchange"</c>).
 /// </summary>
 public sealed class OperatorExchangeOptions : IValidatableObject

@@ -7,7 +7,7 @@ namespace Caching.Tests;
 
 /// <summary>
 /// End-to-end behavior tests for HybridCache using the in-memory distributed cache backend
-/// wired through <see cref="Extensions.AddHeroCaching"/>. Covers the core GetOrCreate / Set /
+/// wired through <see cref="Extensions.AddAppCaching"/>. Covers the core GetOrCreate / Set /
 /// Remove / RemoveByTag paths consumers rely on.
 /// </summary>
 public sealed class HybridCacheBehaviorTests
@@ -16,7 +16,7 @@ public sealed class HybridCacheBehaviorTests
     {
         var services = new ServiceCollection();
         var config = new ConfigurationBuilder().Build();
-        services.AddHeroCaching(config, singleTenant: true);
+        services.AddAppCaching(config, singleTenant: true);
         return services.BuildServiceProvider().GetRequiredService<HybridCache>();
     }
 
