@@ -23,14 +23,35 @@ public sealed class DataPlaneImagePinningTests
     private const string ValkeyDigest = "48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11";
     private const string PinnedValkeyImage = $"valkey/valkey:{ValkeyTag}@sha256:{ValkeyDigest}";
 
+    private const string MailpitTag = "v1.31";
+    private const string MailpitDigest = "74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d";
+    private const string PinnedMailpitImage = $"axllent/mailpit:{MailpitTag}@sha256:{MailpitDigest}";
+
+    private static readonly string SolutionRoot = ModuleArchitectureTestsFixture.SolutionRoot;
+
+    // Forward slashes on purpose: Path.Combine accepts them on every OS, and they read like the
+    // paths the failure messages name.
+    private const string LocalComposePath = "docker-compose.yml";
+    private const string DokployComposePath = "deploy/dokploy/data-services.compose.yml";
+
+//#if (aspire)
+    private const string AppHostPath = "src/Host/Boilerplate.AppHost/AppHost.cs";
+
+    // The AppHost's Postgres comes from Aspire.Hosting.PostgreSQL's own default tag, "18" — the
+    // Debian-based image, not the compose stacks' "18-alpine" — so it is pinned to a different
+    // digest than the one above.
+    private const string AppHostPostgresTag = "18";
+    private const string AppHostPostgresDigest = "5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722";
+
     // The AppHost runs Valkey under a bare "9.1.2" tag (no -alpine suffix, pre-existing), so its
     // digest differs from the compose stacks' "9.1.2-alpine" pin above.
     private const string AppHostValkeyTag = "9.1.2";
     private const string AppHostValkeyDigest = "418652cfb58ef879d4978c33553735d7147016032d5aefaa14c828e611eb9dfd";
+//#endif
 
-    private const string MailpitTag = "v1.31";
-    private const string MailpitDigest = "74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d";
-    private const string PinnedMailpitImage = $"axllent/mailpit:{MailpitTag}@sha256:{MailpitDigest}";
+//#if (frontend)
+    private const string DashboardDockerfilePath = "clients/dashboard/Dockerfile";
+    private const string ConsoleDockerfilePath = "clients/console/Dockerfile";
 
     private const string NodeTag = "24-alpine";
     private const string NodeDigest = "ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1";
@@ -39,18 +60,7 @@ public sealed class DataPlaneImagePinningTests
     private const string NginxTag = "1.31-alpine";
     private const string NginxDigest = "6a23acdfca2b9cfbcec61419e3f1426bcbedb91362f2f19306a8567423bb4612";
     private const string PinnedNginxImage = $"nginxinc/nginx-unprivileged:{NginxTag}@sha256:{NginxDigest}";
-
-    private static readonly string SolutionRoot = ModuleArchitectureTestsFixture.SolutionRoot;
-
-    // Forward slashes on purpose: Path.Combine accepts them on every OS, and they read like the
-    // paths the failure messages name.
-//#if (aspire)
-    private const string AppHostPath = "src/Host/Boilerplate.AppHost/AppHost.cs";
 //#endif
-    private const string LocalComposePath = "docker-compose.yml";
-    private const string DokployComposePath = "deploy/dokploy/data-services.compose.yml";
-    private const string DashboardDockerfilePath = "clients/dashboard/Dockerfile";
-    private const string ConsoleDockerfilePath = "clients/console/Dockerfile";
 
     #region Happy Path
 
@@ -81,8 +91,8 @@ public sealed class DataPlaneImagePinningTests
     {
         string appHost = Read(AppHostPath);
 
-        appHost.ShouldContain($"const string PostgresImageTag = \"{PostgresTag}\";");
-        appHost.ShouldContain($"const string PostgresImageDigest = \"{PostgresDigest}\";");
+        appHost.ShouldContain($"const string PostgresImageTag = \"{AppHostPostgresTag}\";");
+        appHost.ShouldContain($"const string PostgresImageDigest = \"{AppHostPostgresDigest}\";");
         appHost.ShouldContain(".WithImageTag(PostgresImageTag)");
         appHost.ShouldContain(".WithImageSHA256(PostgresImageDigest)");
 

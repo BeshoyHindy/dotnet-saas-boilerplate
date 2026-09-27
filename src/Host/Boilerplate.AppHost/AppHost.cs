@@ -21,10 +21,12 @@ var appPrefix = builder.Environment.ApplicationName
 // machine's volume, a regenerated Initial migration), every connection fails with "password
 // authentication failed", the migrator never starts, and the API and clients hang behind it.
 // Bump the suffix to start clean without deleting anyone's data; the old volume is left alone.
-// Pinned by tag AND digest, matching the same Postgres major/image the compose stacks and the
-// dokploy backup service run, so every environment starts byte-identical bits.
-const string PostgresImageTag = "18-alpine";
-const string PostgresImageDigest = "77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873";
+// Pinned by tag AND digest. "18", not "18-alpine": that is Aspire.Hosting.PostgreSQL's own
+// default tag (Debian-based) that AddPostgres already pulled before this pin existed, and
+// switching to the Alpine variant here would silently change the glibc-vs-musl bits underneath
+// the persistent -postgres-data-v2 volume above.
+const string PostgresImageTag = "18";
+const string PostgresImageDigest = "5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722";
 
 var postgresServer = builder.AddPostgres("postgres")
     .WithImageTag(PostgresImageTag)
