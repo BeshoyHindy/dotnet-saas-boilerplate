@@ -17,8 +17,10 @@ public sealed class TenantDbContextFactory : IDesignTimeDbContextFactory<TenantD
             .Build();
 
         var provider = configuration["DatabaseOptions:Provider"] ?? "POSTGRESQL";
-        var connectionString = configuration["DatabaseOptions:ConnectionString"]
-            ?? "Host=localhost;Database=boilerplate-tenant;Username=postgres;Password=postgres";
+        var configuredConnectionString = configuration["DatabaseOptions:ConnectionString"];
+        var connectionString = string.IsNullOrWhiteSpace(configuredConnectionString)
+            ? "Host=localhost;Database=boilerplate-tenant;Username=postgres;Password=postgres"
+            : configuredConnectionString;
         var migrationsAssembly = configuration["DatabaseOptions:MigrationsAssembly"]
             ?? "Boilerplate.Migrations.PostgreSQL";
         var optionsBuilder = new DbContextOptionsBuilder<TenantDbContext>();

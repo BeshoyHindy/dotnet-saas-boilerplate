@@ -136,7 +136,8 @@ Use the **create-migration** skill (build first, correct `--context`):
 dotnet ef migrations add Add{Entity} \
   --project src/Host/Boilerplate.Migrations.PostgreSQL \
   --startup-project src/Host/Boilerplate.Api \
-  --context {X}DbContext
+  --context {X}DbContext \
+  --output-dir {X}
 ```
 
 ## Checklist
