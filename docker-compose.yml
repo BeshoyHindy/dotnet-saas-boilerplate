@@ -140,6 +140,27 @@ services:
     ports:
       - "${MAILPIT_UI_PORT:-8025}:8025"
 
+  # ── Observability (opt-in) ────────────────────────────────────────
+  # Off by default — the API ships full OpenTelemetry instrumentation (traces,
+  # metrics, and OTLP log export via Serilog) but nothing to export it to.
+  # This is a disposable local OTLP receiver + viewer, pinned by tag and
+  # digest, not anything meant to run in production:
+  #   OTEL_EXPORTER_OTLP_ENDPOINT=http://otlp-receiver:18889 docker compose --profile otel up --build
+  # Traces, logs and metrics then show up at http://localhost:${OTEL_UI_PORT:-18888}.
+  # To keep it set without repeating it on the command line, put the same
+  # OTEL_EXPORTER_OTLP_ENDPOINT line in .env instead (see .env.example).
+  otlp-receiver:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:9.0@sha256:d595645ca7f5c075174db998302d8fb09e040516b14dfcb06dd02996659e1c77
+    restart: unless-stopped
+    profiles: ["otel"]
+    environment:
+      # No login token to copy locally: this container only ever exists on a
+      # developer's own machine, reachable from the compose network plus the
+      # one published UI port.
+      DASHBOARD__FRONTEND__AUTHMODE: Unsecured
+    ports:
+      - "${OTEL_UI_PORT:-18888}:18888"
+
   # ── Application ───────────────────────────────────────────────────
   # One-shot migrator. Applies every pending migration under a Postgres advisory
   # lock, seeds the root tenant + its admin user and the demo accounts, then
@@ -223,7 +244,12 @@ services:
       # Mailpit speaks plain SMTP on the compose network and never advertises STARTTLS, which the
       # default (StartTls) requires. A real relay keeps the default.
       MailOptions__Smtp__SecureSocket: None
-      OpenTelemetryOptions__Exporter__Otlp__Endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      # The literal OTEL_EXPORTER_OTLP_ENDPOINT name matters: AddHeroOpenTelemetry / AddHeroLogging
+      # auto-detect that exact env var (the same convention Aspire uses to inject its own dashboard)
+      # and export to it even though Exporter.Otlp.Enabled stays false in appsettings.Production.json —
+      # no other wiring needed. Blank by default (nothing exported); point it at the otlp-receiver
+      # service below, e.g. OTEL_EXPORTER_OTLP_ENDPOINT=http://otlp-receiver:18889 in .env.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     ports:
       - "${APP_API_PORT:-8080}:8080"
     # No container HEALTHCHECK: the runtime image is chiseled, so there is no
