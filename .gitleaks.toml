@@ -14,6 +14,8 @@ useDefault = true
 
 [allowlist]
 description = "Build output and documented non-secrets"
+# Match the regexes below against the whole line, so an entry can name the context around a value.
+regexTarget = "line"
 
 paths = [
   # Build output is a copy of tracked files; scanning it double-reports and, when stale, reports
@@ -36,4 +38,7 @@ regexes = [
   '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\..*''',
   # "S3-compatible" in prose trips the generic-api-key entropy rule.
   '''S3-compatible''',
+  # A container image digest pinned as a C# constant (…Digest = "<64 hex>"): a public content hash,
+  # not a credential, but its entropy trips generic-api-key.
+  '''Digest\s*=\s*"[0-9a-f]{64}"''',
 ]
