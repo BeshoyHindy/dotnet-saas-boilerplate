@@ -103,11 +103,14 @@ data_images="$(printf '%s\n' "$data_text" | grep -E '^[[:space:]]*image:' | sed 
 assert_true "data stack declares images" test -n "$data_images"
 while IFS= read -r image; do
   [ -n "$image" ] || continue
-  # An explicit tag or a digest, and never a floating one: the data plane must
-  # come back byte-identical after a host reboot. A digest is the only pin an
-  # image published solely as :latest (Chainguard's MinIO) can have.
+  # An explicit tag, a digest, or both, and never a floating tag: the data
+  # plane must come back byte-identical after a host reboot. A digest is the
+  # only pin an image published solely as :latest (Chainguard's MinIO) can
+  # have; postgres-backup pins both (tag so a reader can tell the Postgres
+  # major version at a glance, digest so it is exactly the same bytes as the
+  # `postgres` service above it).
   assert_match "data image is pinned — $image" "$image" \
-    '^[a-z0-9./-]+(:[A-Za-z0-9._-]+|@sha256:[0-9a-f]{64})$'
+    '^[a-z0-9./-]+((:[A-Za-z0-9._-]+)?@sha256:[0-9a-f]{64}|:[A-Za-z0-9._-]+)$'
   refute_match "data image is not :latest — $image" "$image" ':latest$'
 done <<< "$data_images"
 refute_match "data stack interpolates no image tag" "$data_images" '\$\{'
@@ -179,6 +182,63 @@ assert_match "the volume owner hands /data to uid 65532" "$owner_block" \
 assert_match "the volume owner mounts the MinIO volume" "$owner_block" '^[[:space:]]*-[[:space:]]*minio_data:/data'
 assert_match "the volume owner is one-shot" "$owner_block" '^[[:space:]]*restart:[[:space:]]*"no"'
 assert_match "minio still mounts the same volume" "$minio_block" '^[[:space:]]*-[[:space:]]*minio_data:/data'
+
+# ── D1: Postgres is backed up on a schedule and mirrored off-box ────
+# deploy-operability research D1: pg_data was a plain named volume with no
+# snapshot, replication or export step — a host disk failure, `docker volume
+# rm`, or a destructive migration had no recovery path but "there is no
+# backup". postgres-backup runs pg_dump on a cron schedule into its own
+# volume; postgres-backup-upload mirrors that volume to the object store's
+# (separate) backup bucket, `--remove` so retention only has to be declared
+# once.
+backup_block="$(service_block "$DATA" postgres-backup)"
+upload_block="$(service_block "$DATA" postgres-backup-upload)"
+assert_true "postgres-backup is a service in the data stack" test -n "$backup_block"
+assert_true "postgres-backup-upload is a service in the data stack" test -n "$upload_block"
+# Same major version as the `postgres` service, pinned by BOTH tag and digest
+# (the ticket's requirement) — pg_dump refuses a server whose major version is
+# newer than its own, so the client here must never drift from the server.
+assert_match "postgres-backup runs the same Postgres major version" "$backup_block" \
+  '^[[:space:]]*image:[[:space:]]*postgres:18-alpine@sha256:[0-9a-f]{64}[[:space:]]*$'
+assert_match "postgres-backup waits for postgres to be healthy" "$backup_block" \
+  '^[[:space:]]*postgres:[[:space:]]*$'
+assert_match "postgres-backup depends on postgres being healthy, not just started" "$backup_block" \
+  'condition:[[:space:]]*service_healthy'
+# Env-configurable, default daily / keep 7 (the ticket's own wording) — the
+# only two keys outside *_MEM_LIMIT that carry a compose-file default.
+assert_match "the schedule is env-configurable with a daily default" "$backup_block" \
+  'BACKUP_SCHEDULE:[[:space:]]*"\$\{BACKUP_SCHEDULE:-0 3 \* \* \*\}"'
+assert_match "the retention window is env-configurable, default 7 days" "$backup_block" \
+  'BACKUP_KEEP_DAYS:[[:space:]]*\$\{BACKUP_KEEP_DAYS:-7\}'
+assert_match "postgres-backup dumps in the custom (pg_restore-able) format" "$backup_block" \
+  'pg_dump -Fc'
+assert_match "postgres-backup prunes dumps older than the retention window" "$backup_block" \
+  "find /backups -name '\\*\\.dump' -mtime"
+assert_match "postgres-backup installs the schedule into cron" "$backup_block" \
+  '/etc/crontabs/root'
+assert_match "postgres-backup writes dumps to its own volume" "$backup_block" \
+  '^[[:space:]]*-[[:space:]]*pg_backups:/backups[[:space:]]*$'
+# The mirror side: watches the dump volume continuously and follows deletes,
+# so BACKUP_KEEP_DAYS is the only retention knob and nothing here needs its
+# own schedule.
+assert_match "postgres-backup-upload runs after the backup bucket exists" "$upload_block" \
+  'minio-init:[[:space:]]*$'
+assert_match "postgres-backup-upload waits for the bucket-creating one-shot" "$upload_block" \
+  'condition:[[:space:]]*service_completed_successfully'
+assert_match "postgres-backup-upload mounts the dump volume read-only" "$upload_block" \
+  '^[[:space:]]*-[[:space:]]*pg_backups:/backups:ro[[:space:]]*$'
+assert_match "postgres-backup-upload watches for new dumps continuously" "$upload_block" \
+  'mirror.*--watch'
+assert_match "postgres-backup-upload follows local retention deletes to the bucket" "$upload_block" \
+  'mirror.*--remove'
+assert_match "postgres-backup-upload targets the backup bucket" "$upload_block" \
+  'local/\$\{BACKUP_BUCKET\}'
+# A database dump must never be reachable unsigned: only STORAGE_BUCKET's
+# uploads/ prefix gets the anonymous download grant, never BACKUP_BUCKET.
+refute_match "the backup bucket is never granted anonymous access" "$data_text" \
+  'anonymous.*\$\{BACKUP_BUCKET\}'
+assert_match "the backup bucket is created alongside the Files bucket" "$init_block" \
+  'command:.*mb.*--ignore-existing.*\$\{STORAGE_BUCKET\}.*\$\{BACKUP_BUCKET\}'
 
 # ── The shared external network ──────────────────────────────────────
 for f in "$DATA" "$APP"; do
@@ -338,10 +398,13 @@ if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; 
       SMTP_PORT)       value="587" ;;
       IMAGE_REGISTRY)  value="ghcr.io" ;;
       IMAGE_TAG)       value="0.0.0-test" ;;
-      # Left empty on purpose: these are the one class of key with a compose-file
-      # default (`${VAR:-default}`), so an empty value here exercises the actual
-      # default instead of a placeholder `mem_limit` docker compose would reject.
-      *_MEM_LIMIT)     value="" ;;
+      # Left empty on purpose: these are the two classes of key with a
+      # compose-file default (`${VAR:-default}`), so an empty value here
+      # exercises the actual default instead of a placeholder `mem_limit`
+      # docker compose would reject, or a placeholder cron expression.
+      *_MEM_LIMIT)          value="" ;;
+      BACKUP_SCHEDULE)      value="" ;;
+      BACKUP_KEEP_DAYS)     value="" ;;
       *)               value="unset-in-tests" ;;
     esac
     printf '%s=%s\n' "$key" "$value" >> "$tmp_env"
