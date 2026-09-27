@@ -37,8 +37,8 @@ public sealed class IdentityModuleAuthenticationToggleTests
             ["DatabaseOptions:MigrationsAssembly"] = "Boilerplate.Migrations.PostgreSQL",
         });
 
-        // Stand in for AddHeroPlatform: publish the one flag IdentityModule reads.
-        builder.SetHeroPlatformOptions(new AppPlatformOptions { EnableAuthentication = enableAuthentication });
+        // Stand in for AddAppPlatform: publish the one flag IdentityModule reads.
+        builder.SetAppPlatformOptions(new AppPlatformOptions { EnableAuthentication = enableAuthentication });
 
         new IdentityModule().ConfigureServices(builder);
 

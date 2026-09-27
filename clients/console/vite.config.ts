@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        "@": path.resolve(__dirname, "./src"),
+        "@": path.resolve(import.meta.dirname, "./src"),
       },
     },
     server: {
@@ -33,11 +33,14 @@ export default defineConfig(({ mode }) => {
         // /system/health page 404s in dev, because Vite would serve the request
         // itself instead of proxying it.
         "/health": { target: apiBase, changeOrigin: true, secure: false },
+        // The Job monitor (ADR-0009) is served by the API; nginx forwards it in production.
+        "/jobs": { target: apiBase, changeOrigin: true, secure: false },
       },
     },
     test: {
       environment: "jsdom",
       include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+      setupFiles: ["src/test/setup.ts"],
       restoreMocks: true,
     },
   };

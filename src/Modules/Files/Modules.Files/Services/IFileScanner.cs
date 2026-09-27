@@ -6,7 +6,8 @@ namespace Boilerplate.Modules.Files.Services;
 /// Hook point for antivirus / content scanning. The Files module's <c>FinalizeUpload</c> handler
 /// calls this after HEAD-ing the freshly uploaded object. Phase A ships a no-op default that always
 /// returns <c>Clean</c>; downstream deployments wire ClamAV / GuardDuty / VirusTotal by replacing
-/// the registration.
+/// the registration. Checking that the bytes are the declared type is separate and always on
+/// (<see cref="UploadContentCheck"/>); this seam is only for malware scanning.
 /// </summary>
 public interface IFileScanner
 {

@@ -9,8 +9,8 @@ namespace Boilerplate.Modules.Files.Domain;
 /// <summary>
 /// A file asset tracked by the Files module. Owns a presigned upload lifecycle (PendingUpload →
 /// Available | Quarantined) plus soft-delete semantics consistent with the kit's other entities.
-/// Tenant scoping is implicit (one DB/schema per tenant via the framework's BaseDbContext); we do
-/// not carry a TenantId column here.
+/// Tenant scoping is the TenantId shadow column Finbuckle adds (see FileAssetConfiguration) and the
+/// default-on query filter; the entity itself carries no TenantId property.
 /// </summary>
 public sealed class FileAsset : AggregateRoot<Guid>, ISoftDeletable
 {
@@ -96,7 +96,12 @@ public sealed class FileAsset : AggregateRoot<Guid>, ISoftDeletable
 
         SizeBytes = actualSize;
         ScanStatus = scanResult;
-        Status = scanResult == ScanStatus.Infected ? FileAssetStatus.Quarantined : FileAssetStatus.Available;
+        // Fail closed: a scan that couldn't reach a verdict is treated the same as an infected
+        // one. Only a scan that came back Clean may serve the file; ScanFailed stays quarantined
+        // for an operator to retry the scan or clear manually, same as Infected.
+        Status = scanResult is ScanStatus.Infected or ScanStatus.ScanFailed
+            ? FileAssetStatus.Quarantined
+            : FileAssetStatus.Available;
         UploadDeadline = null;
         UpdatedAtUtc = DateTime.UtcNow;
 

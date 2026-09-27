@@ -53,7 +53,7 @@ public sealed record PaletteDto
 /// <summary>
 /// The brand assets as the API <b>returns</b> them: the URLs the server issued. There is no input
 /// counterpart here on purpose — uploads and removals live on <see cref="BrandAssetUploadsDto"/>,
-/// and a client never names an asset URL (#83).
+/// and a client never names an asset URL.
 /// </summary>
 [ImmutableObject(true)]
 public sealed record BrandAssetsDto

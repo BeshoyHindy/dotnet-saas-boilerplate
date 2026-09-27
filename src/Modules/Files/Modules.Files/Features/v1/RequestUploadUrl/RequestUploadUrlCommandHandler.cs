@@ -52,6 +52,33 @@ public sealed class RequestUploadUrlCommandHandler(
                 HttpStatusCode.BadRequest);
         }
 
+        // Every category can be served inline (a Public file always is; a private one on request),
+        // so a type a browser runs script from is refused unless the category opts in by name.
+        if (UploadContentCheck.IsScriptCapable(extension) && !category.AllowScriptCapableTypes)
+        {
+            throw new CustomException(
+                $"Extension '{extension}' can carry script and is not allowed for category '{cmd.Category}'.",
+                (IEnumerable<string>?)null,
+                HttpStatusCode.BadRequest);
+        }
+
+        // Refused here, before a presigned PUT is signed for it; finalize checks the bytes.
+        var declaration = UploadContentCheck.VerifyDeclaration(extension, cmd.ContentType);
+        if (declaration == UploadContentVerdict.UnknownType)
+        {
+            throw new CustomException(
+                $"Extension '{extension}' has no known content signature, so an upload of it cannot be verified.",
+                (IEnumerable<string>?)null,
+                HttpStatusCode.BadRequest);
+        }
+        if (declaration != UploadContentVerdict.Match)
+        {
+            throw new CustomException(
+                $"Content type '{cmd.ContentType}' does not match extension '{extension}'.",
+                (IEnumerable<string>?)null,
+                HttpStatusCode.BadRequest);
+        }
+
         if (cmd.SizeBytes > category.MaxBytes)
         {
             throw new CustomException(

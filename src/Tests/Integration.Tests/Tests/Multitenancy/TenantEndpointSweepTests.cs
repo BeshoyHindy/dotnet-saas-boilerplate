@@ -26,7 +26,7 @@ namespace Integration.Tests.Tests.Multitenancy;
 /// The endpoint list comes from <c>EndpointDataSource</c> at run time, so a route added tomorrow is
 /// swept tomorrow. A route the registry cannot seed a resource for fails
 /// <see cref="Every_Resource_Endpoint_Is_Covered_By_The_Registry_Or_Explicitly_Exempt"/> with the
-/// registry key to add; the only way out is <c>[TenantSweepExempt("reason")]</c> at the mapping site.
+/// registry key to add; the only way out is <c>.ExemptFromTenantSweep("reason")</c> at the mapping site.
 ///
 /// <para><b>Shape.</b> These are aggregating tests, not a theory-per-endpoint. xUnit resolves theory
 /// data at discovery time, and the endpoint list does not exist until a host is built — enumerating
@@ -294,9 +294,10 @@ public sealed class TenantEndpointSweepTests
     /// The list half. Every collection endpoint on the versioned API is called with tenant A's token
     /// and the body is searched for tenant B's marker and for the ids of every row seeded in B.
     ///
-    /// Coverage here needs no registry: the marker is stamped into the display fields of every
-    /// seeded row, so a new list endpoint that leaks B's rows is caught the first time it runs,
-    /// whether or not anyone remembered it exists.
+    /// The marker is stamped into the display fields of every seeded row, so a new list endpoint that
+    /// leaks B's rows is caught the first time it runs — <i>provided B has a row that list shows</i>.
+    /// <see cref="Every_Swept_List_Shows_Its_Own_Tenant_A_Seeded_Row"/> is what makes sure it does:
+    /// a list over a noun the sweep never seeds fails there, not silently here.
     ///
     /// <para><b>A list that does not answer 2xx is asserted about too.</b> Skipping on any non-2xx
     /// made the pass silently shrinkable: a list that started 400ing on the sweep's query string, or
@@ -395,6 +396,66 @@ public sealed class TenantEndpointSweepTests
         asserted.ShouldBe(
             discovered - refused.Count,
             "every list endpoint that answered 2xx must have been searched for tenant B's rows");
+    }
+
+    /// <summary>
+    /// The list pass's positive control. "Tenant A's list contains none of tenant B's rows" proves
+    /// something only if B <i>has</i> rows that list would show. A list over a noun the sweep never
+    /// seeds — a product's new <c>GET notes/</c>, with no <c>ResourceKind</c> for a note — passes the
+    /// list pass because B has nothing to leak, and would keep passing the day its query lost the
+    /// tenant filter (the scaffold dry run's F34).
+    ///
+    /// So every list the pass asserts is also called with <b>B's own</b> token, and must show B at
+    /// least one of B's seeded rows (its marker, admin e-mail, or a seeded id — never the bare tenant
+    /// id, which an empty envelope could echo). A list that cannot, and is not named in
+    /// <see cref="TenantSweepExceptions.ListsWithNothingSeeded"/> with the reason, fails here with
+    /// the fix.
+    /// </summary>
+    [Fact]
+    public async Task Every_Swept_List_Shows_Its_Own_Tenant_A_Seeded_Row()
+    {
+        var sweep = await SweepAsync();
+        var needles = NeedlesFor(sweep.B)
+            .Where(needle => !string.Equals(needle, sweep.B.TenantId, StringComparison.Ordinal))
+            .ToList();
+
+        var failures = new List<string>();
+
+        foreach (var endpoint in Ordered(sweep.Endpoints
+            .Where(e => e.Class == SweepClass.Collection && e.IsVersionedApi && !e.IsExempt)
+            .Where(e => !TenantSweepExceptions.ListsThatRefuseATenantAdmin.ContainsKey(e.Name))))
+        {
+            var path = Materialise(endpoint.Template) + ListQuery;
+            using var response = await sweep.B.AdminClient.GetAsync(path);
+            var body = await response.Content.ReadAsStringAsync();
+
+            bool showsASeededRow = response.IsSuccessStatusCode
+                && needles.Exists(needle => body.Contains(needle, StringComparison.OrdinalIgnoreCase));
+            bool exempt = TenantSweepExceptions.ListsWithNothingSeeded.ContainsKey(endpoint.Name);
+
+            if (!showsASeededRow && !exempt)
+            {
+                failures.Add(
+                    $"{endpoint.Name}\n      called as GET {path} with the list's OWN tenant's token, it " +
+                    $"answered {(int)response.StatusCode} without any row the sweep seeded, so the list " +
+                    "pass proves nothing for it: the other tenant has nothing it could leak. Add a " +
+                    $"{nameof(ResourceKind)} and a seeder in {nameof(TenantSweepSeeder)} that creates " +
+                    "one row this list shows, carrying the tenant marker in a field the list returns — " +
+                    $"or, if the list holds no tenant rows at all, name it in {nameof(TenantSweepExceptions)}." +
+                    $"{nameof(TenantSweepExceptions.ListsWithNothingSeeded)} with the reason\n" +
+                    $"      body: {Truncate(body)}");
+            }
+            else if (showsASeededRow && exempt)
+            {
+                failures.Add(
+                    $"{endpoint.Name}\n      shows a seeded row now, but is listed in " +
+                    $"{nameof(TenantSweepExceptions.ListsWithNothingSeeded)}. Delete the stale entry.");
+            }
+        }
+
+        failures.ShouldBeEmpty(
+            "a list the sweep asserts about must be one the other tenant has rows in, or the " +
+            "\"no leak\" verdict is vacuous.\n  " + string.Join("\n  ", failures));
     }
 
     /// <summary>
@@ -702,7 +763,7 @@ public sealed class TenantEndpointSweepTests
         yield return (ResourceKind.Session,
             "/api/v1/identity/sessions?pageNumber=1&pageSize=100", tenant[ResourceKind.Session]);
         yield return (ResourceKind.Notification,
-            "/api/v1/notifications?page=1&pageSize=100", tenant[ResourceKind.Notification]);
+            "/api/v1/notifications?pageNumber=1&pageSize=100", tenant[ResourceKind.Notification]);
         yield return (ResourceKind.ImpersonationGrant,
             "/api/v1/identity/impersonation/grants?take=100", tenant[ResourceKind.ImpersonationGrant]);
         yield return (ResourceKind.TrashedFile,
@@ -714,11 +775,11 @@ public sealed class TenantEndpointSweepTests
 
     /// <summary>
     /// Everything that identifies a row of <paramref name="tenant"/> in a response body: its marker,
-    /// its admin's e-mail, its id, and the id of every row the sweep seeded in it.
+    /// its admin's e-mail and user id, its id, and the id of every row the sweep seeded in it.
     /// </summary>
     private static List<string> NeedlesFor(SeededTenant tenant)
     {
-        var needles = new List<string> { tenant.Marker, tenant.AdminEmail, tenant.TenantId };
+        var needles = new List<string> { tenant.Marker, tenant.AdminEmail, tenant.AdminUserId, tenant.TenantId };
         needles.AddRange(tenant.Ids
             .Where(pair => pair.Key != ResourceKind.Tenant)
             .Select(pair => pair.Value));

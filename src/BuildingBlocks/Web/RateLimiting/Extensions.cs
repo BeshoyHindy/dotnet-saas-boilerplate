@@ -19,7 +19,7 @@ public static class Extensions
     private const string UnknownIpPartitionKey = "ip:unknown";
     private const string TooManyRequestsType = "https://datatracker.ietf.org/doc/html/rfc6585#section-4";
 
-    public static IServiceCollection AddHeroRateLimiting(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddAppRateLimiting(this IServiceCollection services, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -49,7 +49,7 @@ public static class Extensions
         return services;
     }
 
-    public static IApplicationBuilder UseHeroRateLimiting(this IApplicationBuilder app)
+    public static IApplicationBuilder UseAppRateLimiting(this IApplicationBuilder app)
     {
         ArgumentNullException.ThrowIfNull(app);
 

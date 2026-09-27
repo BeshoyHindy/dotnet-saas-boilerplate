@@ -25,7 +25,7 @@ namespace Multitenancy.Tests.Services;
 /// The default theme is the one row in <see cref="TenantDbContext"/> that is <i>not</i> per-tenant —
 /// it is read from the unfiltered catalog context with no <c>TenantId</c> predicate, so it must be
 /// cached and invalidated through <see cref="GlobalHybridCache"/>, not the tenant-scoped one. These
-/// tests wire the real DI-composed cache stack (as <c>AddHeroCaching</c> would) rather than mocking
+/// tests wire the real DI-composed cache stack (as <c>AddAppCaching</c> would) rather than mocking
 /// <see cref="HybridCache"/>, so a regression that quietly goes back to the tenant-scoped cache shows
 /// up as a stale read, not as a changed mock expectation.
 /// </summary>
@@ -110,7 +110,7 @@ public sealed class TenantThemeServiceTests
         tenantAccessor.SetTenant(RootTenantId);
         await sut.SetAsDefaultThemeAsync(TenantAlpha);
 
-        // Back in the uninvolved tenant: before #77's fix, RemoveAsync(CacheKeys.DefaultTheme) on the
+        // Back in the uninvolved tenant: previously, RemoveAsync(CacheKeys.DefaultTheme) on the
         // tenant-scoped cache only ever cleared the caller's (root's) own copy, so tenant beta would
         // still read the stale default here.
         tenantAccessor.SetTenant(TenantBeta);
@@ -136,7 +136,7 @@ public sealed class TenantThemeServiceTests
 
     #endregion
 
-    #region UpdateThemeAsync — brand assets are server-issued, per slot (#83)
+    #region UpdateThemeAsync — brand assets are server-issued, per slot
 
     [Fact]
     public async Task UpdateThemeAsync_Should_UploadEachAsset_UnderItsOwnSlot()
@@ -297,7 +297,7 @@ public sealed class TenantThemeServiceTests
         var config = new ConfigurationBuilder().Build();
         services.AddSingleton<IConfiguration>(config);
         services.AddSingleton(tenantAccessor);
-        services.AddHeroCaching(config);
+        services.AddAppCaching(config);
 
         var provider = services.BuildServiceProvider();
         return new CacheHarness(provider);

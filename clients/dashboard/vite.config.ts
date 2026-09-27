@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        "@": path.resolve(__dirname, "./src"),
+        "@": path.resolve(import.meta.dirname, "./src"),
       },
     },
     server: {
@@ -44,6 +44,7 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: "jsdom",
       include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+      setupFiles: ["src/test/setup.ts"],
       restoreMocks: true,
     },
   };

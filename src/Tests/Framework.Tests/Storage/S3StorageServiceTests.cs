@@ -21,7 +21,7 @@ public sealed class S3StorageServiceTests
     private const string Bucket = "test-bucket";
     private const string ServiceUrl = "http://minio:9000";
 
-    /// <summary>The owner an upload belongs to inside the tenant — a user id, an asset slot (#83).</summary>
+    /// <summary>The owner an upload belongs to inside the tenant — a user id, an asset slot.</summary>
     private const string Owner = "owner-1";
 
     private readonly IAmazonS3 _s3 = Substitute.For<IAmazonS3>();
@@ -102,7 +102,7 @@ public sealed class S3StorageServiceTests
     public async Task UploadAsync_Should_StoreTheContentTypeDerivedFromTheExtension_NotTheClientHeader()
     {
         // Public uploads are served anonymously straight from storage: trusting the client's
-        // Content-Type would let `evil.png` be stored, and served, as text/html (#78 item 4).
+        // Content-Type would let `evil.png` be stored, and served, as text/html (must derive type from extension).
         var sut = Create();
         var request = PngRequest();
         request.ContentType = "text/html";
@@ -186,7 +186,7 @@ public sealed class S3StorageServiceTests
     public async Task RemoveAsync_Should_MapThePathStylePublicUrlBackToItsKey()
     {
         // MinIO and friends address path-style, so BuildPublicUrl puts the bucket in the path.
-        // Before #78 that bucket segment survived into the key and the delete quietly hit nothing,
+        // Previously, that bucket segment would survive into the key and the delete would quietly hit nothing,
         // which is why replacing an avatar left the old object behind.
         var sut = Create();
         var url = await sut.UploadAsync<Probe>(PngRequest(), FileType.Image, Owner);
@@ -251,7 +251,7 @@ public sealed class S3StorageServiceTests
     [InlineData("tenants/acme/..%2f..%2fglobex/x.png")]       // encoded separators
     [InlineData("TENANTS/acme/x.png")]                        // case games
     [InlineData("uploads/Tenants/acme/x.png")]
-    [InlineData("uploads/probe/legacy_avatar.png")]           // pre-#78 flat key
+    [InlineData("uploads/probe/legacy_avatar.png")]           // legacy flat key format
     [InlineData("")]
     [InlineData("   ")]
     public async Task DownloadAsync_Should_Refuse_AKeyOutsideTheTenantsPrefixes(string key)
@@ -291,8 +291,8 @@ public sealed class S3StorageServiceTests
     public async Task RemoveIfOwnedAsync_Should_SendThePrefixPlusTheLogicalKey_Exactly_When_APrefixIsConfigured()
     {
         // RemoveIfOwnedAsync used to authorize then call the public RemoveAsync(key), which re-ran
-        // ToLogicalKey and stripped the deployment prefix a second time (#78 item 3). With a prefix
-        // configured, that second strip would send the wrong physical key to S3.
+        // ToLogicalKey and stripped the deployment prefix a second time, causing issues with configured prefixes.
+        // With a prefix configured, that second strip would send the wrong physical key to S3.
         var sut = Create(new S3StorageOptions { Bucket = Bucket, ServiceUrl = ServiceUrl, Prefix = "env/staging" });
         var key = sut.ComposeKey(StorageSpace.Private, "myfiles/x.pdf");
 
@@ -307,7 +307,7 @@ public sealed class S3StorageServiceTests
     {
         // Same tenant, two owners. The tenant-wide overload cannot tell them apart — inside one
         // tenant both keys are "ours" — so the owner-scoped one is what stands between a user
-        // replacing their avatar and a user deleting someone else's (#83).
+        // replacing their avatar and a user deleting someone else's assets.
         var sut = Create();
         var theirs = await sut.UploadAsync<Probe>(PngRequest(), FileType.Image, "user-b");
         var mine = await sut.UploadAsync<Probe>(PngRequest(), FileType.Image, "user-a");

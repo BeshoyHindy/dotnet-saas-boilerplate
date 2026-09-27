@@ -27,7 +27,7 @@ public static class FileTypeMetadata
     /// The content type stored for an upload, derived from the extension <see cref="GetRules"/>
     /// already validated — never the client-supplied <c>Content-Type</c> header. A public upload
     /// (avatar, brand asset) is served anonymously straight from storage, so trusting the header
-    /// would let <c>evil.png</c> be stored, and served, as <c>text/html</c> (#78 hardening item 4).
+    /// would let <c>evil.png</c> be stored, and served, as <c>text/html</c> — a hardening fix.
     /// An extension outside the allow-list can't reach here; it falls back to the generic binary
     /// type rather than to anything caller-supplied.
     /// </summary>

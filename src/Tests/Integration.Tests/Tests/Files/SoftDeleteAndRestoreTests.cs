@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Boilerplate.Modules.Files.Contracts.v1.DTOs;
 using Integration.Tests.Infrastructure;
@@ -114,8 +113,7 @@ public sealed class SoftDeleteAndRestoreTests
         int sizeBytes,
         string category)
     {
-        byte[] bytes = new byte[sizeBytes];
-        RandomNumberGenerator.Fill(bytes);
+        byte[] bytes = UploadPayloads.Pdf(sizeBytes);
 
         var presigned = await RequestPresignedUploadAsync(client, fileName, contentType, sizeBytes, category);
 

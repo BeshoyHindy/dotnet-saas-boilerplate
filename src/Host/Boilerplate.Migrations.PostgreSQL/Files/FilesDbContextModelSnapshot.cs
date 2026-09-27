@@ -113,6 +113,12 @@ namespace Boilerplate.Migrations.PostgreSQL.Files
                         .HasDatabaseName("UX_FileAsset_StorageKey")
                         .HasFilter("\"IsDeleted\" = FALSE");
 
+                    b.HasIndex("CreatedByUserId", "Status", "CreatedAtUtc")
+                        .HasDatabaseName("IX_FileAsset_CreatedBy");
+
+                    b.HasIndex("TenantId", "Visibility", "Status", "OwnerType", "CreatedAtUtc")
+                        .HasDatabaseName("IX_FileAsset_Shared");
+
                     b.ToTable("FileAssets", "files");
 
                     b.HasAnnotation("Finbuckle:MultiTenant", true);

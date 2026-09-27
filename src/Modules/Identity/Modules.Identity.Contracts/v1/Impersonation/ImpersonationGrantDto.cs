@@ -22,7 +22,7 @@ public sealed record ImpersonationGrantDto(
     ImpersonationGrantStatus Status);
 
 // Serialize as a string ("Active"/"Ended"/...) not the int, so consumers get readable, reorder-safe
-// values. Mirrors how the other status enums in this kit are serialized.
+// values. Mirrors how the other status enums in this codebase are serialized.
 [JsonConverter(typeof(JsonStringEnumConverter<ImpersonationGrantStatus>))]
 public enum ImpersonationGrantStatus
 {

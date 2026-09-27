@@ -42,9 +42,14 @@ public class IdentityDbContext : MultiTenantIdentityDbContext<AppUser,
         ArgumentNullException.ThrowIfNull(builder);
 
         base.OnModelCreating(builder);
+
+        // Required for the trigram GIN indexes on the searched Users/Groups columns. Idempotent
+        // (IF NOT EXISTS); the Audit context declares it too.
+        builder.HasPostgresExtension("pg_trgm");
+
         builder.ApplyConfigurationsFromAssembly(typeof(IdentityDbContext).Assembly);
 
-        // The outbox/inbox tables are framework infrastructure, owned by EventingDbContext (issue #1349).
+        // The outbox/inbox tables are framework infrastructure, owned by EventingDbContext.
 
         // Default-on tenant isolation: non-IGlobalEntity entities get IsMultiTenant() automatically (ImpersonationGrant opts out).
         // Identity tables are already IsMultiTenant in IdentityConfigurations.cs; auto-apply detects that annotation and skips them.

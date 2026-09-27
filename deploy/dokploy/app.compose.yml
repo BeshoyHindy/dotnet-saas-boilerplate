@@ -22,6 +22,24 @@
 # no `service_completed_successfully` and ignores container-level `labels`.
 #
 # See docs/deploy-dokploy.md.
+#
+# Every service below carries a memory limit and log rotation:
+#   - Memory (`mem_limit`) is the one operator-tunable resource cap: an
+#     `${..._MEM_LIMIT:-default}` so the 4 GB VPS the guide recommends gets
+#     isolation between "one service misbehaves" and "the whole box goes down"
+#     out of the box, but a bigger box can raise it without editing this file.
+#     The defaults here sum to ~1.5 GB, leaving room for the data stack
+#     (data-services.compose.yml) and Traefik/Dokploy's own processes.
+#   - Logging (`logging: *default-logging`) rotates the default unbounded
+#     `json-file` driver so container stdout cannot fill the disk. Fixed, not
+#     env-overridable — there is no per-environment reason to want unbounded
+#     logs.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   # ── One-shot migrator ───────────────────────────────────────────────
@@ -32,6 +50,8 @@ services:
     image: ${IMAGE_REGISTRY}/${IMAGE_OWNER}/boilerplate-db-migrator:${IMAGE_TAG}
     pull_policy: always
     restart: "no"
+    mem_limit: ${MIGRATOR_MEM_LIMIT:-512m}
+    logging: *default-logging
     environment:
       DOTNET_ENVIRONMENT: Production
       DatabaseOptions__Provider: POSTGRESQL
@@ -50,6 +70,16 @@ services:
     image: ${IMAGE_REGISTRY}/${IMAGE_OWNER}/boilerplate-api:${IMAGE_TAG}
     pull_policy: always
     restart: unless-stopped
+    mem_limit: ${API_MEM_LIMIT:-768m}
+    logging: *default-logging
+    # Compose's own default is 10s: SIGTERM, then SIGKILL if the process has not
+    # exited. ASP.NET Core's Generic Host gives every IHostedService — Hangfire's
+    # BackgroundJobServer and the outbox dispatcher included — a 30s
+    # HostOptions.ShutdownTimeout to drain in-flight work on StopAsync. 35s keeps
+    # Docker's clock from SIGKILLing the process while it still believes it has
+    # up to 30s left, on every ordinary redeploy (pull_policy: always recreates
+    # this container each time).
+    stop_grace_period: 35s
     depends_on:
       migrator:
         condition: service_completed_successfully
@@ -63,11 +93,22 @@ services:
       CachingOptions__Redis: ${STACK_NAME}-valkey:6379
       CachingOptions__EnableSsl: "false"
       JwtOptions__SigningKey: ${JWT_SIGNING_KEY}
-      # Mailed links go to a tenant's users, so the origin the API writes into them is
-      # the DASHBOARD's. Both clients are in the CORS allow-list (ADR-0008).
+      #if (frontend)
+      # Mailed links go to a tenant's users, so the origin the API writes into them defaults to
+      # the DASHBOARD's. MailLinkOrigin swaps in the console's for the root tenant's own users
+      # (operators) — see ConsoleOriginUrl below. Both clients are in the CORS allow-list (ADR-0008).
+      #else
+      # No client ships with this product, so mailed links (password reset, email
+      # confirmation) carry the API's own origin until you point this at the front end
+      # you build. Unset, the API refuses to send those mails at all. There is no CORS
+      # allow-list either: nothing browser-based calls this API yet.
+      #endif
       OriginOptions__OriginUrl: https://${DASHBOARD_DOMAIN}
+      #if (frontend)
+      MailLinkOrigin__ConsoleOriginUrl: https://${CONSOLE_DOMAIN}
       CorsOptions__AllowedOrigins__0: https://${DASHBOARD_DOMAIN}
       CorsOptions__AllowedOrigins__1: https://${CONSOLE_DOMAIN}
+      #endif
       # Host allow-list. Must contain API_DOMAIN and must not contain "*", or the
       # host refuses to boot. It is also the Host that Traefik's healthcheck
       # sends (see the healthcheck.hostname label), so a mismatch shows up as a
@@ -88,8 +129,8 @@ services:
       Storage__S3__PublicBaseUrl: https://${STORAGE_DOMAIN}/${STORAGE_BUCKET}
       Storage__S3__Region: ${STORAGE_REGION}
       Storage__S3__Bucket: ${STORAGE_BUCKET}
-      Storage__S3__AccessKey: ${MINIO_ROOT_USER}
-      Storage__S3__SecretKey: ${MINIO_ROOT_PASSWORD}
+      Storage__S3__AccessKey: ${STORAGE_ACCESS_KEY}
+      Storage__S3__SecretKey: ${STORAGE_SECRET_KEY}
       Storage__S3__ForcePathStyle: "true"
       MailOptions__UseSendGrid: "false"
       MailOptions__From: ${MAIL_FROM}
@@ -149,6 +190,8 @@ services:
     image: ${IMAGE_REGISTRY}/${IMAGE_OWNER}/boilerplate-dashboard:${IMAGE_TAG}
     pull_policy: always
     restart: unless-stopped
+    mem_limit: ${DASHBOARD_MEM_LIMIT:-128m}
+    logging: *default-logging
     depends_on:
       api:
         condition: service_started
@@ -197,6 +240,8 @@ services:
     image: ${IMAGE_REGISTRY}/${IMAGE_OWNER}/boilerplate-console:${IMAGE_TAG}
     pull_policy: always
     restart: unless-stopped
+    mem_limit: ${CONSOLE_MEM_LIMIT:-128m}
+    logging: *default-logging
     depends_on:
       api:
         condition: service_started

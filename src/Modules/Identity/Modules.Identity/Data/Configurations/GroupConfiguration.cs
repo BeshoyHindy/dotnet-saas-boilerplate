@@ -52,5 +52,14 @@ public class GroupConfiguration : IEntityTypeConfiguration<Group>
         builder.HasIndex(g => g.Name);
         builder.HasIndex(g => g.IsDefault);
         builder.HasIndex(g => g.IsDeleted);
+
+        // GetGroups matches ILIKE '%term%' on Name and Description. pg_trgm GIN indexes serve that
+        // (mirrors AuditRecordConfiguration); the B-tree on Name above still serves ORDER BY Name.
+        builder.HasIndex(g => g.Name, "IX_Groups_Name_trgm")
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops");
+        builder.HasIndex(g => g.Description, "IX_Groups_Description_trgm")
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops");
     }
 }

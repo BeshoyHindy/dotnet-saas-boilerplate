@@ -8,6 +8,7 @@ import {
   unwrapVoid,
 } from "@/lib/api-client";
 import { loadRuntimeConfig } from "@/env";
+import { consumeSignedOutReason } from "@/auth/inactivity";
 
 function result<T>(init: { data?: T; error?: unknown; status: number }) {
   return {
@@ -119,6 +120,16 @@ describe("single-flight refresh", () => {
     expect(first.response.status).toBe(200);
     expect(second.response.status).toBe(200);
     expect(localStorage.getItem("boilerplate.dashboard.accessToken")).toBe("fresh-token");
+  });
+
+  it("a refused refresh mid-session ends it and tells the login page why", async () => {
+    // The call 401s, and so does the refresh it triggers: the session is dead.
+    vi.stubGlobal("fetch", vi.fn(async () => json({ status: 401 }, 401)));
+
+    await api.GET("/api/v1/identity/permissions", SAME_ORIGIN).catch(() => undefined);
+
+    expect(localStorage.getItem("boilerplate.dashboard.accessToken")).toBeNull();
+    expect(consumeSignedOutReason()).toBe("expired");
   });
 
   it("frees the slot so a later 401 can refresh again", async () => {

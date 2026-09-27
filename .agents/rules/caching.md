@@ -16,7 +16,7 @@ how every tenant-less caller quietly ends up sharing one bucket.
 
 ## What's registered
 
-`AddHeroCaching(config)` registers **`HybridCache`** (L1 in-memory + optional L2 Redis) wrapped in
+`AddAppCaching(config)` registers **`HybridCache`** (L1 in-memory + optional L2 Redis) wrapped in
 two decorators: telemetry innermost (so OTel records the *physical* key you can look up in Redis),
 tenant scoping outermost.
 
@@ -27,7 +27,7 @@ tenant scoping outermost.
 - The block learns the ambient tenant through **`ICacheTenantAccessor`**, which it declares and the
   Multitenancy module implements (`FinbuckleCacheTenantAccessor`) — a building block may not
   reference a module. Same seam as `IEventTenantScope` → `FinbuckleEventTenantScope`.
-- A host composed **without** multitenancy says so: `AddHeroCaching(config, singleTenant: true)`.
+- A host composed **without** multitenancy says so: `AddAppCaching(config, singleTenant: true)`.
   Without either, resolving the cache throws with both options spelled out. There is no default.
 
 ## Pattern
@@ -96,7 +96,7 @@ under the wrong tenant.
 deciding between the two caches. Ask it — don't rebuild the format.
 
 `IdempotencyEndpointFilter` is the only caller, and it is the one piece of application code that
-uses **`IDistributedCache` directly** — for both the read and the write. That is deliberate (#82):
+uses **`IDistributedCache` directly** — for both the read and the write. This is deliberate for three reasons:
 
 - HybridCache has no get-only read (dotnet/aspnetcore#57191), and a replay store needs exactly
   get + set-with-TTL. A `GetOrCreateAsync` whose factory runs the endpoint is not that.
@@ -124,10 +124,10 @@ is the whole lifetime story.
 - **HybridCache does not write bare JSON to L2.** It writes a framed payload (version byte, expiry,
   key, tags, then the value). Nothing may read those bytes directly and expect its own format back;
   the idempotency filter used to, which is why its first replay of every key was a 500 against Redis
-  (#82). Anything that needs its own entries in L2 owns both sides of them, as the filter now does.
+  Anything that needs its own entries in L2 owns both sides of them, as the filter now does.
 - Don't reach for `IDistributedCache` directly — it skips the tenant prefix, the telemetry and the
   tag bookkeeping. The allow-list above is the whole set of exceptions.
 
 ## Related, tracked separately
 
-Storage paths are not yet tenant-prefixed by the building block — that is #78.
+Storage paths are not yet tenant-prefixed by the building block — that is tracked separately.

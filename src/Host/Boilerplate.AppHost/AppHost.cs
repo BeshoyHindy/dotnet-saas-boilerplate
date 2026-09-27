@@ -21,7 +21,16 @@ var appPrefix = builder.Environment.ApplicationName
 // machine's volume, a regenerated Initial migration), every connection fails with "password
 // authentication failed", the migrator never starts, and the API and clients hang behind it.
 // Bump the suffix to start clean without deleting anyone's data; the old volume is left alone.
+// Pinned by tag AND digest. "18", not "18-alpine": that is Aspire.Hosting.PostgreSQL's own
+// default tag (Debian-based) that AddPostgres already pulled before this pin existed, and
+// switching to the Alpine variant here would silently change the glibc-vs-musl bits underneath
+// the persistent -postgres-data-v2 volume above.
+const string PostgresImageTag = "18";
+const string PostgresImageDigest = "5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722";
+
 var postgresServer = builder.AddPostgres("postgres")
+    .WithImageTag(PostgresImageTag)
+    .WithImageSHA256(PostgresImageDigest)
     .WithDataVolume($"{appPrefix}-postgres-data-v2")
     .WithLifetime(ContainerLifetime.Persistent);
 
@@ -32,7 +41,13 @@ var apiPgConnection = ReferenceExpression.Create(
     $"{postgres.Resource.ConnectionStringExpression};Minimum Pool Size=5");
 
 // Valkey (BSD-3 Redis fork) as a plain container: Aspire 13.4.0 AddRedis() forces TLS-by-default in run mode and never materializes the container, so we drop to plain RESP over TCP. Name stays "redis" so config keys don't churn.
-var redis = builder.AddContainer("redis", "valkey/valkey", "9.1.0")
+// Pinned by tag AND digest, matching the compose stacks, so every environment runs the same bytes.
+const string ValkeyImage = "valkey/valkey";
+const string ValkeyImageTag = "9.1.2";
+const string ValkeyImageDigest = "418652cfb58ef879d4978c33553735d7147016032d5aefaa14c828e611eb9dfd";
+
+var redis = builder.AddContainer("redis", ValkeyImage, ValkeyImageTag)
+    .WithImageSHA256(ValkeyImageDigest)
     .WithEndpoint(targetPort: 6379, scheme: "tcp", name: "tcp")
     .WithVolume($"{appPrefix}-redis-data", "/data")
     .WithLifetime(ContainerLifetime.Persistent);
@@ -41,9 +56,9 @@ var redisEndpoint = redis.GetEndpoint("tcp");
 var redisConnectionString = ReferenceExpression.Create(
     $"{redisEndpoint.Property(EndpointProperty.HostAndPort)}");
 
-// Object storage (MinIO, S3-compatible). CORS via MINIO_API_CORS_ALLOW_ORIGIN so browser
+// Object storage (RustFS, S3-compatible). CORS via RUSTFS_CORS_ALLOWED_ORIGINS so browser
 // presigned PUTs from a client's dev origin reach it without proxying through the API.
-const string MinioBucket = "boilerplate-uploads";
+const string StorageBucket = "boilerplate-uploads";
 
 // The two clients (ADR-0008): the dashboard is the app a tenant's users work in, the
 // console is the operator tool. Dev ports stay fixed — a client's origin is part of its
@@ -53,68 +68,98 @@ const string MinioBucket = "boilerplate-uploads";
 // Declared unconditionally, outside any template conditional: the template's markers are
 // plain C# comments, so both arms of one reach the real compiler and a constant declared
 // in each would be a duplicate. With `--frontend false` the pair simply goes unused
-// beyond MinIO's CORS header, which is harmless.
+// beyond the object store's CORS allow-list, which is harmless.
 const string DashboardOrigin = "http://localhost:5173";
 const string ConsoleOrigin = "http://localhost:5174";
-// MinIO takes a comma-separated allow-list; both clients upload straight to it.
+// RustFS takes a comma-separated allow-list; both clients upload straight to it.
 const string ClientOrigins = $"{DashboardOrigin},{ConsoleOrigin}";
 
-// Secrets are Aspire parameters, never literals in this file: the password is generated on first
+// Secrets are Aspire parameters, never literals in this file: the secret key is generated on first
 // run and persisted to this project's user-secrets, so it survives restarts without being committed.
 // Read the current values from the Aspire dashboard (Resources → Parameters) if you need them.
-var minioUser = builder.AddParameter("minio-user", "boilerplate");
-var minioPassword = builder.AddParameter(
-    "minio-password",
+var storageAccessKey = builder.AddParameter("storage-access-key", "boilerplate");
+var storageSecretKey = builder.AddParameter(
+    "storage-secret-key",
     new GenerateParameterDefault { MinLength = 24, Lower = true, Upper = true, Numeric = true, Special = false },
     secret: true,
     persist: true);
 
-// quay.io, not the implicit docker.io: MinIO no longer publishes to Docker Hub.
-//
+// RustFS replaced MinIO, whose repository is archived and whose images no registry serves
+// anonymously any more. Pinned by tag AND digest, and every object-store site in the repository
+// (both compose stacks, both integration factories) carries the identical pin, which
+// Architecture.Tests enforces, so a bump is one value, not five drifting ones.
+const string StorageImage = "rustfs/rustfs";
+const string StorageImageTag = "1.0.0";
+const string StorageImageDigest = "8cc9801755448b71a786705ce76692c77e14936cccd87cf2fc31842e58f4d1ff";
+
+// The bucket bootstrap runs the AWS CLI, pinned the same way and to the same pin as the compose
+// stacks' storage-init.
+const string AwsCliImage = "amazon/aws-cli";
+const string AwsCliImageTag = "2.37.4";
+const string AwsCliImageDigest = "fdd8d1fcbea9c371678dee5a40df8b178c7a781b4586605756ee28114c97ead6";
+
 // NO FIXED HOST PORTS. The container listens on its own 9000/9001, but the host side is left to
 // Aspire to allocate. Pinning them made a second AppHost instance (another checkout or worktree)
-// unrunnable in the worst possible way: the persistent MinIO container of the first instance still
+// unrunnable in the worst possible way: the persistent store container of the first instance still
 // holds 9000/9001, the new container fails to bind, Docker leaves it attached to no network, and
-// `minio-init` then loops on "waiting for minio..." forever — which, through `WaitForCompletion`,
-// hangs the API and every client behind it with no error anywhere. Everything that needs the real
-// address takes it from the endpoint below, so nothing here knows a port number.
-var minio = builder.AddContainer("minio", "quay.io/minio/minio", "RELEASE.2025-09-07T16-13-09Z")
-    .WithArgs("server", "/data", "--console-address", ":9001")
+// `storage-init` then waits forever — which, through `WaitForCompletion`, hangs the API and every
+// client behind it with no error anywhere. Everything that needs the real address takes it from
+// the endpoint below, so nothing here knows a port number.
+//
+// The image runs as uid 10001 and owns /data as that user, so a fresh volume is writable with no
+// volume-owner step. The volume is `-storage-data`, not the old `-minio-data`: a volume the MinIO
+// images wrote belongs to another uid (delete the old one with `docker volume rm` when you like).
+var storage = builder.AddContainer("storage", StorageImage, StorageImageTag)
+    .WithImageSHA256(StorageImageDigest)
     .WithHttpEndpoint(targetPort: 9000, name: "api")
+    // The RustFS console; open it at <endpoint>/rustfs/console/ (the endpoint root answers 403).
     .WithHttpEndpoint(targetPort: 9001, name: "console")
-    .WithEnvironment("MINIO_ROOT_USER", minioUser)
-    .WithEnvironment("MINIO_ROOT_PASSWORD", minioPassword)
-    .WithEnvironment("MINIO_API_CORS_ALLOW_ORIGIN", ClientOrigins)
-    .WithVolume($"{appPrefix}-minio-data", "/data")
+    .WithEnvironment("RUSTFS_ACCESS_KEY", storageAccessKey)
+    .WithEnvironment("RUSTFS_SECRET_KEY", storageSecretKey)
+    .WithEnvironment("RUSTFS_CONSOLE_ENABLE", "true")
+    .WithEnvironment("RUSTFS_CORS_ALLOWED_ORIGINS", ClientOrigins)
+    .WithVolume($"{appPrefix}-storage-data", "/data")
+    // The S3 API's readiness, not /health: liveness answers a moment before the API does.
+    .WithHttpHealthCheck("/health/ready", endpointName: "api")
     .WithLifetime(ContainerLifetime.Persistent);
 
-var minioApiEndpoint = minio.GetEndpoint("api");
+var storageApiEndpoint = storage.GetEndpoint("api");
 
-// Init container: bucket bootstrap (create + public-read). Script normalized to LF so /bin/sh in minio/mc doesn't choke on Windows CRLF.
-// The endpoint arrives as $MC_URL: Aspire resolves an endpoint reference injected into a *container*
-// to the container-network form (http://minio:9000), so this keeps working whatever the host port is.
-var minioInitScript = ($$"""
-until mc alias set local "$MC_URL" "$MC_USER" "$MC_PASS"; do
-  echo "waiting for minio...";
-  sleep 2;
-done;
-mc mb --ignore-existing local/{{MinioBucket}};
-mc anonymous set download local/{{MinioBucket}};
+// Init container: create the bucket, then allow anonymous GET under `uploads/` — and nowhere else,
+// the same grant as both compose stacks. Avatars and tenant branding are unsigned URLs there;
+// Files-module objects under `tenants/` stay private. Idempotent: head-bucket skips a create that
+// already happened, and put-bucket-policy rewrites the same policy. Script normalized to LF so bash
+// doesn't choke on Windows CRLF. The endpoint arrives as $AWS_ENDPOINT_URL: Aspire resolves an
+// endpoint reference injected into a *container* to the container-network form
+// (http://storage:9000), so this keeps working whatever the host port is.
+var storageInitScript = ($$"""
+set -euo pipefail
+aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null || aws s3api create-bucket --bucket "$BUCKET"
+aws s3api put-bucket-policy --bucket "$BUCKET" --policy "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Action\":[\"s3:GetObject\"],\"Resource\":[\"arn:aws:s3:::$BUCKET/uploads/*\"]}]}"
 """).ReplaceLineEndings("\n");
 
-var minioInit = builder.AddContainer("minio-init", "quay.io/minio/mc", "RELEASE.2025-08-13T08-35-41Z")
-    .WithEntrypoint("/bin/sh")
-    .WithArgs("-c", minioInitScript)
-    .WithEnvironment("MC_URL", minioApiEndpoint)
-    .WithEnvironment("MC_USER", minioUser)
-    .WithEnvironment("MC_PASS", minioPassword)
-    .WaitFor(minio);
+var storageInit = builder.AddContainer("storage-init", AwsCliImage, AwsCliImageTag)
+    .WithImageSHA256(AwsCliImageDigest)
+    .WithEntrypoint("/bin/bash")
+    .WithArgs("-c", storageInitScript)
+    .WithEnvironment("AWS_ENDPOINT_URL", storageApiEndpoint)
+    .WithEnvironment("AWS_ACCESS_KEY_ID", storageAccessKey)
+    .WithEnvironment("AWS_SECRET_ACCESS_KEY", storageSecretKey)
+    .WithEnvironment("AWS_DEFAULT_REGION", "us-east-1")
+    .WithEnvironment("BUCKET", StorageBucket)
+    .WaitFor(storage);
 
 // Mail catcher: traps every message the API sends instead of delivering it. SMTP and the inbox UI
 // listen on the container's 1025/8025; the host ports are Aspire's to allocate, for the same
-// reason MinIO's are (a second instance must not be blocked by the first). Open the inbox from the
+// reason the object store's are (a second instance must not be blocked by the first). Open the inbox from the
 // Aspire dashboard's "mailpit" resource link; the API is wired to the SMTP endpoint by reference.
-var mailpit = builder.AddContainer("mailpit", "axllent/mailpit", "v1.31")
+// Pinned by tag AND digest, matching docker-compose.yml, so every environment runs the same bytes.
+const string MailpitImage = "axllent/mailpit";
+const string MailpitImageTag = "v1.31";
+const string MailpitImageDigest = "74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d";
+
+var mailpit = builder.AddContainer("mailpit", MailpitImage, MailpitImageTag)
+    .WithImageSHA256(MailpitImageDigest)
     .WithEndpoint(targetPort: 1025, scheme: "tcp", name: "smtp")
     .WithHttpEndpoint(targetPort: 8025, name: "http")
     .WithEnvironment("MP_SMTP_AUTH_ACCEPT_ANY", "true")
@@ -123,7 +168,7 @@ var mailpit = builder.AddContainer("mailpit", "axllent/mailpit", "v1.31")
 
 var mailpitSmtp = mailpit.GetEndpoint("smtp");
 
-// Password the seeded root admin user signs in with. Generated + persisted like the MinIO one above.
+// Password the seeded root admin user signs in with. Generated + persisted like the storage secret key above.
 // IdentityModule's policy is 10+ characters with an upper, a lower and a digit, hence the constraints.
 var seedAdminPassword = builder.AddParameter(
     "seed-admin-password",
@@ -185,7 +230,7 @@ var api = builder.AddProject<Projects.Boilerplate_Api>($"{appPrefix}-api")
     .WaitFor(postgres)
     .WaitFor(redis)
     .WaitFor(mailpit)
-    .WaitForCompletion(minioInit)
+    .WaitForCompletion(storageInit)
     .WaitForCompletion(migrator)
     .WithExternalHttpEndpoints()
     .WithEnvironment("DatabaseOptions__Provider", "POSTGRESQL")
@@ -202,21 +247,31 @@ var api = builder.AddProject<Projects.Boilerplate_Api>($"{appPrefix}-api")
     // Mailpit speaks plain SMTP and never advertises STARTTLS, which the SmtpOptions default requires.
     .WithEnvironment("MailOptions__Smtp__SecureSocket", "None")
     .WithEnvironment("Storage__Provider", "s3")
-    .WithEnvironment("Storage__S3__Bucket", MinioBucket)
+    .WithEnvironment("Storage__S3__Bucket", StorageBucket)
     .WithEnvironment("Storage__S3__Region", "us-east-1")
-    .WithEnvironment("Storage__S3__ServiceUrl", minioApiEndpoint)
-    .WithEnvironment("Storage__S3__AccessKey", minioUser)
-    .WithEnvironment("Storage__S3__SecretKey", minioPassword)
+    .WithEnvironment("Storage__S3__ServiceUrl", storageApiEndpoint)
+    .WithEnvironment("Storage__S3__AccessKey", storageAccessKey)
+    .WithEnvironment("Storage__S3__SecretKey", storageSecretKey)
     .WithEnvironment("Storage__S3__ForcePathStyle", "true")
-    .WithEnvironment("Storage__S3__PublicBaseUrl", ReferenceExpression.Create($"{minioApiEndpoint}/{MinioBucket}"))
-//#if (frontend)
-    // Password-reset and email-confirmation links point at a client page, so the origin
-    // the API mails has to be a client's (issue #46), not the API's own — and it is the
-    // DASHBOARD's: those mails go to a tenant's users, who live there. An operator never
-    // receives one at the console (ADR-0008).
-    .WithEnvironment("OriginOptions__OriginUrl", DashboardOrigin)
-//#endif
+    .WithEnvironment("Storage__S3__PublicBaseUrl", ReferenceExpression.Create($"{storageApiEndpoint}/{StorageBucket}"))
     ;
+
+// The origin the API writes into password-reset and email-confirmation links. It must be
+// set: the Identity module refuses to mail a link without one rather than guess it from the
+// request. Two separately conditioned statements, in this order, because the template's
+// markers are plain C# comments: both run in the template's own tree, and the later one
+// wins there.
+//#if (!frontend)
+// No client ships with this product, so there is no client page to link to yet: the links
+// carry the API's own origin until the front end you build takes over.
+api.WithEnvironment("OriginOptions__OriginUrl", api.GetEndpoint("https"));
+//#endif
+//#if (frontend)
+// The links point at a client page, so the origin has to be a client's, not the API's own
+// — and it is the DASHBOARD's: those mails go to a tenant's users, who live there. An
+// operator never receives one at the console (ADR-0008).
+api.WithEnvironment("OriginOptions__OriginUrl", DashboardOrigin);
+//#endif
 
 //#if (frontend)
 // The two React clients (ADR-0008), each its own independent pnpm project and its own
@@ -255,9 +310,6 @@ builder.AddJavaScriptApp($"{appPrefix}-console", "../../../clients/console", "de
     // Prefills the seeded operator's email only. Its password is `seed-admin-password`
     // above, not the demo tenants' shared one, so the console never signs in for you.
     .WithEnvironment("VITE_DEMO_MODE", "true");
-//#else
-// React apps excluded: discard the unused api handle to keep the no-frontend scaffold warning-clean (S1481 under TreatWarningsAsErrors).
-_ = api;
 //#endif
 
 await builder.Build().RunAsync();

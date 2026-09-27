@@ -13,7 +13,7 @@ public sealed class LocalStorageServiceTests : IDisposable
 
     /// <summary>
     /// The owner every upload here belongs to — a user id for an avatar, an asset slot for a brand
-    /// asset (#83). It becomes a segment of the key, which is what lets a delete be owner-scoped.
+    /// asset. It becomes a segment of the key, which is what lets a delete be owner-scoped.
     /// </summary>
     private const string Owner = "owner-1";
 
@@ -53,7 +53,7 @@ public sealed class LocalStorageServiceTests : IDisposable
         var path = await _sut.UploadAsync<Probe>(request, FileType.Image, Owner);
 
         // Assert — `uploads/` stays outermost (it is what the deploy bucket policy publishes), the
-        // tenant is a directory level inside it, and the owner is a level inside that (#83).
+        // tenant is a directory level inside it, and the owner is a level inside that.
         path.ShouldStartWith("uploads/tenants/acme/probe/owner-1/");
         path.ShouldContain("_avatar.png");
         path.ShouldNotContain("\\");
@@ -88,7 +88,7 @@ public sealed class LocalStorageServiceTests : IDisposable
         exists.ShouldBeTrue();
         size.ShouldBe(4);
         download.ShouldNotBeNull();
-        download!.ContentType.ShouldBe("image/png");
+        download.ContentType.ShouldBe("image/png");
         download.ContentLength.ShouldBe(4);
         await download.Stream.DisposeAsync();
     }
@@ -98,8 +98,7 @@ public sealed class LocalStorageServiceTests : IDisposable
     {
         // Local never persists the client's Content-Type — download derives it from the file name
         // via FileExtensionContentTypeProvider — so a client claiming "evil.png" is text/html can't
-        // get that header served back (#78 hardening item 4; this provider needed no code change,
-        // only pinning that it already holds).
+        // get that header served back (this provider already holds the correct behavior and needed no code change).
         var request = PngRequest();
         request.ContentType = "text/html";
 
@@ -149,7 +148,7 @@ public sealed class LocalStorageServiceTests : IDisposable
 
         // Assert
         metadata.ShouldNotBeNull();
-        metadata!.SizeBytes.ShouldBe(4);
+        metadata.SizeBytes.ShouldBe(4);
         metadata.ContentType.ShouldBe("image/png");
     }
 
@@ -200,7 +199,7 @@ public sealed class LocalStorageServiceTests : IDisposable
     [InlineData("tenants//acme/x.png")]
     [InlineData("tenants/acme/..%2f..%2fglobex/x.png")]           // encoded separators
     [InlineData("Tenants/acme/x.png")]                            // case games
-    [InlineData("uploads/probe/legacy.png")]                      // pre-#78 flat key
+    [InlineData("uploads/probe/legacy.png")]                      // flat key from before the tenant prefix
     [InlineData("")]
     [InlineData("   ")]
     public async Task RemoveAsync_Should_Refuse_AKeyOutsideTheTenantsPrefixes(string key)
@@ -211,8 +210,8 @@ public sealed class LocalStorageServiceTests : IDisposable
     [Fact]
     public async Task RemoveIfOwnedAsync_Should_SkipRatherThanThrow_When_TheHandleIsNotOurs()
     {
-        // The "replace my avatar" path: a development database from before #78 still holds flat
-        // keys, and the profile endpoint lets a user store any URL at all. Neither is ours to
+        // The "replace my avatar" path: a development database from before the tenant prefix was added
+        // still holds flat keys, and the profile endpoint lets a user store any URL at all. Neither is ours to
         // delete, and neither may turn a profile save into a 500.
         (await _sut.RemoveIfOwnedAsync("uploads/probe/legacy_avatar.png")).ShouldBeFalse();
         (await _sut.RemoveIfOwnedAsync("https://cdn.example.com/avatars/me.png")).ShouldBeFalse();
@@ -232,7 +231,7 @@ public sealed class LocalStorageServiceTests : IDisposable
 
     #endregion
 
-    #region Owner scoping inside one tenant (#83)
+    #region Owner scoping inside one tenant
 
     [Fact]
     public async Task UploadAsync_Should_GiveTwoOwnersSeparatePrefixes_When_TheyUploadTheSameFile()
@@ -247,7 +246,7 @@ public sealed class LocalStorageServiceTests : IDisposable
     [Fact]
     public async Task RemoveIfOwnedAsyncOfT_Should_Refuse_AnotherOwnersObject_InTheSameTenant()
     {
-        // The hole #83 closes. Tenant ownership says yes to this key — it is this tenant's — so the
+        // Owner scoping closes the tenant-wide hole. Tenant ownership says yes to this key — it is this tenant's — so the
         // tenant-wide overload would delete it. Inside one tenant that is the difference between
         // "replace my avatar" and "delete the avatar of whoever I named".
         var theirs = await _sut.UploadAsync<Probe>(PngRequest("theirs.png"), FileType.Image, "user-b");
@@ -273,7 +272,7 @@ public sealed class LocalStorageServiceTests : IDisposable
     [Fact]
     public async Task RemoveIfOwnedAsyncOfT_Should_Skip_TheValuesAnExistingRowMayHold()
     {
-        // No migration backfills these (#83): the first replace or remove leaves them alone and the
+        // No migration backfills owner values (pre-owner paths are left as-is): the first replace or remove leaves them alone and the
         // column is then overwritten with a server-issued value.
         (await _sut.RemoveIfOwnedAsync<Probe>("https://cdn.example.com/avatars/me.png", Owner)).ShouldBeFalse();
         (await _sut.RemoveIfOwnedAsync<Probe>("uploads/probe/legacy_avatar.png", Owner)).ShouldBeFalse();

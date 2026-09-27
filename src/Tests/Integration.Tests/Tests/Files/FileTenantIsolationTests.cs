@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Boilerplate.Modules.Files.Contracts.v1.DTOs;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
@@ -175,8 +174,7 @@ public sealed class FileTenantIsolationTests
         int sizeBytes,
         int visibility)
     {
-        byte[] bytes = new byte[sizeBytes];
-        RandomNumberGenerator.Fill(bytes);
+        byte[] bytes = UploadPayloads.Pdf(sizeBytes);
 
         using var urlResponse = await client.PostAsJsonAsync($"{FilesBasePath}/upload-url", new
         {

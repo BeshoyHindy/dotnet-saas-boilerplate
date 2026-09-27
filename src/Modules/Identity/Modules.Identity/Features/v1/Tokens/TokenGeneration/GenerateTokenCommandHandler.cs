@@ -1,4 +1,5 @@
-﻿using Finbuckle.MultiTenant.Abstractions;
+﻿using System.Diagnostics;
+using Finbuckle.MultiTenant.Abstractions;
 using Boilerplate.BuildingBlocks.Core.Context;
 using Boilerplate.BuildingBlocks.Eventing.Outbox;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
@@ -62,7 +63,7 @@ public sealed class GenerateTokenCommandHandler
             // 1) Audit failed login BEFORE throwing
             await _securityAudit.LoginFailedAsync(
                 subjectIdOrName: request.Email,
-                clientId: clientId!,
+                clientId: clientId,
                 reason: "InvalidCredentials",
                 ip: ip,
                 ct: cancellationToken);
@@ -77,7 +78,7 @@ public sealed class GenerateTokenCommandHandler
         await _securityAudit.LoginSucceededAsync(
             userId: subject,
             userName: claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? request.Email,
-            clientId: clientId!,
+            clientId: clientId,
             ip: ip,
             userAgent: ua,
             ct: cancellationToken);
@@ -105,14 +106,15 @@ public sealed class GenerateTokenCommandHandler
         await _securityAudit.TokenIssuedAsync(
             userId: subject,
             userName: claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? request.Email,
-            clientId: clientId!,
+            clientId: clientId,
             tokenFingerprint: fingerprint,
             expiresUtc: token.AccessTokenExpiresAt,
             ct: cancellationToken);
 
         // 4) Enqueue integration event for token generation (sample event for testing eventing)
         var tenantId = _multiTenantContextAccessor.MultiTenantContext?.TenantInfo?.Id;
-        var correlationId = Guid.NewGuid().ToString();
+        // The request's trace id, so the event joins back to its request's spans, logs and audit rows.
+        var correlationId = Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString();
 
         var integrationEvent = new TokenGeneratedIntegrationEvent(
             Id: Guid.NewGuid(),
@@ -122,7 +124,7 @@ public sealed class GenerateTokenCommandHandler
             Source: "Identity",
             UserId: subject,
             Email: request.Email,
-            ClientId: clientId!,
+            ClientId: clientId,
             IpAddress: ip,
             UserAgent: ua,
             TokenFingerprint: fingerprint,

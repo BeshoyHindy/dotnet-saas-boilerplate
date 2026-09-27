@@ -183,7 +183,7 @@ internal sealed class IdentityDbInitializer(
             return;
         }
 
-        if (await userManager.Users.FirstOrDefaultAsync(u => u.Email == multiTenantContextAccessor.MultiTenantContext.TenantInfo!.AdminEmail, cancellationToken)
+        if (await userManager.Users.FirstOrDefaultAsync(u => u.Email == multiTenantContextAccessor.MultiTenantContext.TenantInfo.AdminEmail, cancellationToken)
             is not AppUser adminUser)
         {
             string adminUserName = $"{multiTenantContextAccessor.MultiTenantContext.TenantInfo?.Id.Trim()}.{RoleConstants.Admin}".ToUpperInvariant();
@@ -195,7 +195,7 @@ internal sealed class IdentityDbInitializer(
                 UserName = adminUserName,
                 EmailConfirmed = true,
                 PhoneNumberConfirmed = true,
-                NormalizedEmail = multiTenantContextAccessor.MultiTenantContext.TenantInfo?.AdminEmail!.ToUpperInvariant(),
+                NormalizedEmail = multiTenantContextAccessor.MultiTenantContext.TenantInfo?.AdminEmail.ToUpperInvariant(),
                 NormalizedUserName = adminUserName.ToUpperInvariant(),
                 // No default avatar: the asset was never shipped, and baking an absolute
                 // {OriginUrl}/… URL at seed time pinned it to the seeder's localhost origin
@@ -208,16 +208,18 @@ internal sealed class IdentityDbInitializer(
             {
                 logger.LogInformation("Seeding Default Admin User for '{TenantId}' Tenant.", multiTenantContextAccessor.MultiTenantContext.TenantInfo?.Id);
             }
-            var initialPassword = ResolveInitialAdminPassword(multiTenantContextAccessor.MultiTenantContext.TenantInfo!.Id!);
-            var password = new PasswordHasher<AppUser>();
-            adminUser.PasswordHash = password.HashPassword(adminUser, initialPassword);
+            var initialPassword = ResolveInitialAdminPassword(multiTenantContextAccessor.MultiTenantContext.TenantInfo!.Id);
+            // Through UserManager's password overload, so the tenant admin passes the same password
+            // validators (length, common-password list) as every other user. It used to hash the
+            // password by hand, which skipped them. CreateTenantCommandValidator refuses the same
+            // passwords up front, so an operator hears it as a 400 rather than a Failed provisioning.
             // MUST check IdentityResult: a silent failure (password-policy reject, transient DB error)
             // would mark provisioning "Completed" with no admin user; throwing makes it a retryable Failed.
-            var createResult = await userManager.CreateAsync(adminUser);
+            var createResult = await userManager.CreateAsync(adminUser, initialPassword);
             if (!createResult.Succeeded)
             {
                 throw new InvalidOperationException(
-                    $"Failed to seed admin user for tenant '{multiTenantContextAccessor.MultiTenantContext.TenantInfo!.Id}': "
+                    $"Failed to seed admin user for tenant '{multiTenantContextAccessor.MultiTenantContext.TenantInfo.Id}': "
                     + string.Join("; ", createResult.Errors.Select(e => e.Description)));
             }
         }

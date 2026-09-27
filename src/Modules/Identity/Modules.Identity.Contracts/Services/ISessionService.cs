@@ -85,6 +85,20 @@ public interface ISessionService
         string? reason = null,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Revokes every live session of <paramref name="userId"/> as part of a save the caller owns, so
+    /// the revocation commits together with the caller's own change or not at all. The revocations are
+    /// staged on the scoped Identity context and <paramref name="save"/> is expected to flush that
+    /// context (for example a <c>UserManager</c> update) and to throw when it does not succeed; the
+    /// sessions are refused on this instance only once it returns. Returns the number revoked.
+    /// </summary>
+    Task<int> RevokeAllSessionsWithinSaveAsync(
+        string userId,
+        string revokedBy,
+        string reason,
+        Func<CancellationToken, Task> save,
+        CancellationToken cancellationToken = default);
+
     Task<bool> RevokeSessionForAdminAsync(
         Guid sessionId,
         string revokedBy,

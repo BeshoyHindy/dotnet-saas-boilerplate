@@ -18,4 +18,8 @@
 	  <ProjectReference Include="..\Core\Boilerplate.BuildingBlocks.Core.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <InternalsVisibleTo Include="Boilerplate.Framework.Tests" />
+	</ItemGroup>
+
 </Project>

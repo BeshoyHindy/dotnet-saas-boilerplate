@@ -48,14 +48,11 @@ internal sealed class UserService(
     public Task<UserDto> GetAsync(string userId, CancellationToken cancellationToken)
         => profileService.GetAsync(userId, cancellationToken);
 
-    public Task<List<UserDto>> GetListAsync(CancellationToken cancellationToken)
-        => profileService.GetListAsync(cancellationToken);
-
     public Task<int> GetCountAsync(CancellationToken cancellationToken)
         => profileService.GetCountAsync(cancellationToken);
 
-    public Task UpdateAsync(string userId, string firstName, string lastName, string phoneNumber, FileUploadRequest image, bool deleteCurrentImage, CancellationToken cancellationToken = default)
-        => profileService.UpdateAsync(userId, firstName, lastName, phoneNumber, image, deleteCurrentImage, cancellationToken);
+    public Task UpdateAsync(string userId, string firstName, string lastName, string phoneNumber, FileUploadRequest image, bool deleteCurrentImage, string? ifMatch = null, CancellationToken cancellationToken = default)
+        => profileService.UpdateAsync(userId, firstName, lastName, phoneNumber, image, deleteCurrentImage, ifMatch, cancellationToken);
 
     public Task<bool> ExistsWithEmailAsync(string email, string? exceptId = null, CancellationToken cancellationToken = default)
         => profileService.ExistsWithEmailAsync(email, exceptId, cancellationToken);

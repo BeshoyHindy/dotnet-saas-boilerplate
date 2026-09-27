@@ -93,8 +93,8 @@ Don't weaken these to make a change pass — fix the code.
 
 ## Integration tests
 
-`Integration.Tests` runs over real Postgres/Redis/MinIO via Testcontainers — **Docker required**. Set the
-Finbuckle tenant context inline and rewire `IStorageService` post-registration for MinIO. All detailed in
+`Integration.Tests` runs over real Postgres/Redis/RustFS via Testcontainers — **Docker required**. Set the
+Finbuckle tenant context inline and rewire `IStorageService` post-registration for the object store. All detailed in
 `.agents/rules/integration-testing.md`.
 
 ## Run

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
   ChevronDown,
@@ -58,17 +58,13 @@ export function Sidebar() {
   // owning section. This re-opens the right section when the user
   // navigates via the command palette, browser back/forward, or any
   // link outside the sidebar.
-  useEffect(() => {
-    const next = findSectionForPath(location.pathname);
-    if (next !== null) {
-      setOpenSection(next);
-    }
-    // If the route is a top-level page (Overview / Settings), close the
-    // accordion entirely so no section is highlighted.
-    else {
-      setOpenSection(null);
-    }
-  }, [location.pathname]);
+  // A top-level page (Overview / Settings) owns no section, which closes the
+  // accordion entirely so no section is highlighted.
+  const [sectionPath, setSectionPath] = useState(location.pathname);
+  if (location.pathname !== sectionPath) {
+    setSectionPath(location.pathname);
+    setOpenSection(findSectionForPath(location.pathname));
+  }
 
   return (
     <aside

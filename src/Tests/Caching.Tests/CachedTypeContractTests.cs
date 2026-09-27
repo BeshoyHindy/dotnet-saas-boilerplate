@@ -31,7 +31,7 @@ public sealed class CachedTypeContractTests
                 typeof(LayoutDto),
             };
 
-            // CachedIdempotentResponse is deliberately absent: since #82 the idempotency filter keeps
+            // CachedIdempotentResponse is deliberately absent: the idempotency filter stores
             // its entries in IDistributedCache itself and deserializes them per read, so there is no
             // L1 object to reuse and [ImmutableObject(true)] would promise something nothing relies on.
 
@@ -67,7 +67,7 @@ public sealed class CachedTypeContractTests
 
         attr.ShouldNotBeNull(
             $"{type.FullName} is stored in HybridCache and must have [ImmutableObject(true)] so the runtime can return the same reference across L1 hits instead of re-deserializing.");
-        attr!.Immutable.ShouldBeTrue(
+        attr.Immutable.ShouldBeTrue(
             $"{type.FullName} has [ImmutableObject(false)] — change to [ImmutableObject(true)] or stop caching it.");
     }
 }

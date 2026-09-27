@@ -10,6 +10,7 @@ using Boilerplate.Modules.Identity.Domain;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
 using System.Collections.ObjectModel;
+using System.Net;
 using System.Text;
 
 namespace Boilerplate.Modules.Identity.Services;
@@ -51,10 +52,18 @@ internal sealed class UserPasswordService(
                 ["email"] = email,
                 ["tenant"] = multiTenantContextAccessor?.MultiTenantContext?.TenantInfo?.Id,
             });
+        // The body is sent as text/html, so the link has to be an anchor: a bare URL in an HTML part is
+        // not auto-linked by most clients, and its raw '&' is not valid markup. The text part carries
+        // the URL verbatim.
         var mailRequest = new MailRequest(
             new Collection<string> { user.Email },
             "Reset Password",
-            $"Please reset your password using the following link: {resetPasswordUri}");
+            HtmlEmail.LinkAction(
+                heading: "Reset your password",
+                intro: "Use the link below to choose a new password.",
+                actionUrl: resetPasswordUri,
+                actionLabel: "Reset password"),
+            textBody: $"Please reset your password using the following link: {resetPasswordUri}");
 
         jobService.Enqueue(() => mailService.SendAsync(mailRequest, CancellationToken.None));
     }
@@ -75,7 +84,8 @@ internal sealed class UserPasswordService(
         if (!result.Succeeded)
         {
             var errors = result.Errors.Select(e => e.Description).ToList();
-            throw new CustomException("error resetting password", errors);
+            // A refused password or a dead token is the caller's input, not a server fault.
+            throw new CustomException("error resetting password", errors, HttpStatusCode.BadRequest);
         }
 
         // Raise domain event for password reset
@@ -95,7 +105,8 @@ internal sealed class UserPasswordService(
         if (!result.Succeeded)
         {
             var errors = result.Errors.Select(e => e.Description).ToList();
-            throw new CustomException("failed to change password", errors);
+            // A refused password or a wrong current password is the caller's input, not a server fault.
+            throw new CustomException("failed to change password", errors, HttpStatusCode.BadRequest);
         }
 
         // Raise domain event for password change

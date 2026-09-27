@@ -7,8 +7,8 @@ namespace Boilerplate.BuildingBlocks.Eventing.Inbox;
 /// EF Core inbox store over the framework-owned <see cref="EventingDbContext"/>.
 /// Non-generic for the same reason as <see cref="Outbox.EfCoreOutboxStore"/>: a
 /// per-DbContext generic store meant one non-keyed <c>IInboxStore</c> registration
-/// per module, so .NET DI silently redirected every module's idempotency writes to
-/// whichever context registered last (issue #1349).
+/// per module, so .NET DI would silently redirect every module's idempotency writes to
+/// whichever context registered last.
 /// </summary>
 public sealed class EfCoreInboxStore : IInboxStore
 {

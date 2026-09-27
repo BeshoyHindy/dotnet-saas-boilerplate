@@ -7,13 +7,12 @@ using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace Integration.Tests.Tests.Storage;
 
 /// <summary>
-/// The storage half of tenant isolation, on real MinIO (ADR-0002, #78): the object <b>key</b> is
+/// The storage half of tenant isolation, on real MinIO (ADR-0002): the object <b>key</b> is
 /// tenant-prefixed by the Storage block, and the block refuses a key the ambient tenant does not
 /// own before it reaches the backend.
 ///
@@ -63,7 +62,7 @@ public sealed class StorageTenantIsolationTests : IAsyncLifetime
     {
         // Arrange — tenant B uploads a file the normal way, and we read the key its row holds.
         using var clientB = await ClientForAsync(_tenantB, _tenantBAdmin);
-        var fileId = await UploadAndFinalizeAsync(clientB, "b-secret.pdf", "application/pdf", RandomBytes(512));
+        var fileId = await UploadAndFinalizeAsync(clientB, "b-secret.pdf", "application/pdf", UploadPayloads.Pdf(512));
         var key = await StorageKeyOfAsync(_tenantB, fileId);
 
         key.ShouldStartWith($"tenants/{_tenantB}/");
@@ -123,8 +122,8 @@ public sealed class StorageTenantIsolationTests : IAsyncLifetime
         using var clientA = await ClientForAsync(_tenantA, _tenantAAdmin);
         using var clientB = await ClientForAsync(_tenantB, _tenantBAdmin);
 
-        var a = await UploadAndFinalizeAsync(clientA, "same-name.pdf", "application/pdf", RandomBytes(64));
-        var b = await UploadAndFinalizeAsync(clientB, "same-name.pdf", "application/pdf", RandomBytes(64));
+        var a = await UploadAndFinalizeAsync(clientA, "same-name.pdf", "application/pdf", UploadPayloads.Pdf(64));
+        var b = await UploadAndFinalizeAsync(clientB, "same-name.pdf", "application/pdf", UploadPayloads.Pdf(64));
 
         var keyA = await StorageKeyOfAsync(_tenantA, a);
         var keyB = await StorageKeyOfAsync(_tenantB, b);
@@ -156,8 +155,8 @@ public sealed class StorageTenantIsolationTests : IAsyncLifetime
     [Fact]
     public async Task ReplacingAnAvatar_Should_Delete_The_Object_It_Replaced()
     {
-        // Before #78 this silently did nothing on path-style S3 (MinIO): the bucket segment of the
-        // persisted URL survived into the key, so the delete addressed an object that never existed.
+        // Previously, this silently did nothing on path-style S3 (MinIO): the bucket segment of the
+        // persisted URL would survive into the key, so the delete would address an object that never existed.
         using var clientB = await ClientForAsync(_tenantB, _tenantBAdmin);
         var first = await UploadAvatarAsync(clientB, "first.png");
         var firstKey = KeyFromPublicUrl(first);
@@ -200,7 +199,7 @@ public sealed class StorageTenantIsolationTests : IAsyncLifetime
         // composed key, finalize HEADs it, the download URL serves the same bytes, and the purge
         // job — which enters each tenant through ITenantScope — removes the object.
         using var clientB = await ClientForAsync(_tenantB, _tenantBAdmin);
-        var bytes = RandomBytes(1024);
+        var bytes = UploadPayloads.Pdf(1024);
         var fileId = await UploadAndFinalizeAsync(clientB, "round-trip.pdf", "application/pdf", bytes);
         var key = await StorageKeyOfAsync(_tenantB, fileId);
 
@@ -252,7 +251,7 @@ public sealed class StorageTenantIsolationTests : IAsyncLifetime
                 var asset = await db.FileAssets.AsNoTracking()
                     .FirstOrDefaultAsync(f => f.Id == fileAssetId, ct);
                 asset.ShouldNotBeNull();
-                return asset!.StorageKey;
+                return asset.StorageKey;
             },
             CancellationToken.None);
 
@@ -293,7 +292,7 @@ public sealed class StorageTenantIsolationTests : IAsyncLifetime
         using var profile = await client.GetAsync($"{TestConstants.IdentityBasePath}/profile");
         var dto = await profile.DeserializeAsync<UserDto>();
         dto.ImageUrl.ShouldNotBeNullOrWhiteSpace();
-        return dto.ImageUrl!;
+        return dto.ImageUrl;
     }
 
     private static async Task<string> UploadLogoAsync(HttpClient client, string fileName)
@@ -306,7 +305,7 @@ public sealed class StorageTenantIsolationTests : IAsyncLifetime
         var json = await theme.Content.ReadFromJsonAsync<JsonElement>();
         var logoUrl = json.GetProperty("brandAssets").GetProperty("logoUrl").GetString();
         logoUrl.ShouldNotBeNullOrWhiteSpace();
-        return logoUrl!;
+        return logoUrl;
     }
 
     private static object ThemeWithLogo(string fileName) => new
@@ -357,13 +356,6 @@ public sealed class StorageTenantIsolationTests : IAsyncLifetime
             defaultElevation = 1,
         },
     };
-
-    private static byte[] RandomBytes(int size)
-    {
-        byte[] bytes = new byte[size];
-        RandomNumberGenerator.Fill(bytes);
-        return bytes;
-    }
 
     private static async Task<Guid> UploadAndFinalizeAsync(
         HttpClient client, string fileName, string contentType, byte[] bytes)

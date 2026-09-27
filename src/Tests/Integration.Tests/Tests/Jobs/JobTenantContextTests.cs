@@ -10,7 +10,7 @@ namespace Integration.Tests.Tests.Jobs;
 
 /// <summary>
 /// ADR-0002, "Jobs and events", end to end through Hangfire's real client and perform pipeline
-/// (<c>AppJobFilter</c> + <c>AppJobActivator</c>, wired by <c>UseHeroJobPipeline</c> in the test host):
+/// (<c>AppJobFilter</c> + <c>AppJobActivator</c>, wired by <c>UseAppJobPipeline</c> in the test host):
 ///
 /// <list type="bullet">
 ///   <item>a job enqueued from a background context — no HttpContext anywhere — inside
@@ -130,6 +130,56 @@ public sealed class JobTenantContextTests
 
         observed.Value.ShouldBeNull(
             "a [SystemJob] must not inherit the enqueuing tenant — tenant-less is the declaration");
+    }
+
+    /// <summary>
+    /// ADR-0002: the job scope re-reads the tenant record when the job runs, so a tenant deactivated
+    /// <i>after</i> the job was enqueued stops its work. The job is created under an active tenant —
+    /// scheduled a day out so the worker cannot pick it up early — then the tenant is deactivated
+    /// through the root API, and only then is the job moved to the queue.
+    /// </summary>
+    [Fact]
+    public async Task A_Job_Bound_To_A_Tenant_Deactivated_After_Enqueue_Should_Fail()
+    {
+        var (tenantId, _) = await _tenants.CreateProvisionedTenantAsync("jobdeact");
+        var marker = Guid.CreateVersion7();
+
+        var tenantScope = _factory.Services.GetRequiredService<ITenantScope>();
+        string jobId = string.Empty;
+        await tenantScope.RunAsync(tenantId, (services, _) =>
+        {
+            jobId = services.GetRequiredService<IJobService>()
+                .Schedule<TenantProbeJob>(job => job.RunAsync(marker, CancellationToken.None), TimeSpan.FromDays(1));
+            return Task.CompletedTask;
+        });
+
+        using (var root = await new AuthHelper(_factory).CreateRootAdminClientAsync())
+        {
+            using var deactivate = await root.PostAsJsonAsync(
+                $"{TestConstants.TenantsBasePath}/{tenantId}/activation",
+                new { tenantId, isActive = false });
+            deactivate.StatusCode.ShouldBe(
+                HttpStatusCode.OK, await deactivate.Content.ReadAsStringAsync());
+        }
+
+        var storage = _factory.Services.GetRequiredService<JobStorage>();
+        new BackgroundJobClient(storage).ChangeState(jobId, new EnqueuedState(), ScheduledState.StateName)
+            .ShouldBeTrue("the scheduled job must still be waiting when it is moved to the queue");
+
+        var failed = await WaitForAsync(() =>
+        {
+            var history = storage.GetMonitoringApi().JobDetails(jobId)?.History;
+            var entry = history?.FirstOrDefault(h =>
+                string.Equals(h.StateName, FailedState.StateName, StringComparison.Ordinal) ||
+                string.Equals(h.StateName, SucceededState.StateName, StringComparison.Ordinal));
+            return entry is null ? null : new Box<string>(
+                $"{entry.StateName}: {string.Join("; ", entry.Data.Select(d => d.Key + "=" + d.Value))}");
+        }, jobId);
+
+        failed.Value.ShouldStartWith(FailedState.StateName, customMessage: failed.Value);
+        failed.Value.ShouldContain("deactivated", Case.Insensitive, failed.Value);
+        TenantProbeJob.Observations.ShouldNotContainKey(
+            marker, "the job body must not run for a tenant that was deactivated before it started");
     }
 
     // ─── helpers ─────────────────────────────────────────────────────

@@ -19,7 +19,7 @@ xUnit · Shouldly (`result.ShouldBe(...)`) · NSubstitute (`Substitute.For<IServ
 | `{Module}.Tests` | Unit: handlers, services, domain | no |
 | `Framework.Tests`, `Generic.Tests`, `Caching.Tests` | BuildingBlocks units | no |
 | `Architecture.Tests` | NetArchTest: module boundaries + tenant-isolation rules + handler↔validator pairing | no |
-| `Integration.Tests` | `WebApplicationFactory` over real PostgreSQL/Redis/MinIO | **yes** |
+| `Integration.Tests` | `WebApplicationFactory` over real PostgreSQL/Redis/RustFS | **yes** |
 | `Integration.Middleware.Tests` | Real middleware wiring | **yes** |
 
 ```bash
@@ -39,10 +39,12 @@ If Docker is down, integration tests fail fast with `DockerUnavailableException`
 ## Integration-test gotchas
 
 - Set the Finbuckle tenant context **inline** in the test method (AsyncLocal — an awaited helper loses it → NRE in the tenant filter).
-- `AddHeroStorage` reads config eagerly; rewire `IStorageService` **after** registration in the factory.
+- `AddAppStorage` reads config eagerly; rewire `IStorageService` **after** registration in the factory.
 
+<!--#if (frontend) -->
 ## Frontend tests
 
 Per client (ADR-0008 — there are two: `clients/dashboard` and `clients/console`): Vitest units
 (`cd clients/<app> && pnpm test`) plus a small route-mocked Playwright smoke suite
 (`pnpm exec playwright test --workers=1`) — see `frontend/clients.md`.
+<!--#endif -->

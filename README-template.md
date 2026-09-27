@@ -10,11 +10,25 @@ the shared code lives in `src/BuildingBlocks` and is yours to change.
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 <!--#if (frontend) -->
-- [Node.js 20+](https://nodejs.org) — for the two React clients
+- [Node.js 22.22+](https://nodejs.org) and [pnpm](https://pnpm.io) — for the two React clients
 <!--#endif -->
-- [Docker](https://www.docker.com/) — Postgres, Redis, MinIO
+<!--#if (!frontend && sandcastle) -->
+- [Node.js 22.22+](https://nodejs.org) and [pnpm](https://pnpm.io) — for the agent pipeline
+<!--#endif -->
+- [Docker](https://www.docker.com/) — PostgreSQL, Valkey, RustFS
 
 ## Quick start
+
+### First, once
+
+```bash
+git init -b develop                  # the scripts need a repository
+chmod +x scripts/*.sh deploy/dokploy/*.sh deploy/dokploy/tests/*.sh   # before the first commit
+git add -A && git commit -m "chore: scaffold"
+bash scripts/dev-secrets.sh          # the API refuses to start without a JWT signing key
+```
+
+`docs/new-project-guide.md` §2 explains each step. Work on `feature/<slug>` branches from here.
 
 <!--#if (aspire) -->
 ### Everything at once (recommended) — .NET Aspire
@@ -24,10 +38,11 @@ dotnet run --project src/Host/Boilerplate.AppHost
 ```
 
 <!--#if (frontend) -->
-Aspire starts Postgres, Redis, and MinIO, runs database migrations, then launches the API
-**and both React clients**.
+Aspire starts PostgreSQL, Valkey, RustFS and Mailpit, runs database migrations, then launches the
+API **and both React clients**.
 <!--#else -->
-Aspire starts Postgres, Redis, and MinIO, runs database migrations, then launches the API.
+Aspire starts PostgreSQL, Valkey, RustFS and Mailpit, runs database migrations, then launches the
+API.
 <!--#endif -->
 
 | Surface | URL |
@@ -43,7 +58,7 @@ Aspire starts Postgres, Redis, and MinIO, runs database migrations, then launche
 ### Backend only
 
 ```bash
-dotnet run --project src/Host/Boilerplate.Api      # needs external Postgres + Redis
+dotnet run --project src/Host/Boilerplate.Api      # needs external PostgreSQL + Valkey
 ```
 
 <!--#if (frontend) -->
@@ -57,8 +72,9 @@ cd clients/console   && pnpm install && pnpm dev     # → http://localhost:5174
 Each client reads its API URL at runtime from `public/config.json` — no rebuild to repoint. The dev
 server proxies `/api` to the API, so the browser only ever talks to one origin; keep it that way, or
 the `HttpOnly` refresh cookie can never be sent.
-Types come from the checked-in `clients/openapi/v1.json`; regenerate it with
-`bash scripts/export-openapi.sh` after changing an endpoint (ADR-0004).
+Types come from the checked-in `clients/openapi/v1.json`. After changing an endpoint, regenerate it
+with `bash scripts/export-openapi.sh`, then run `pnpm generate:api` in BOTH `clients/dashboard` and
+`clients/console`, and commit every artifact (ADR-0008).
 <!--#endif -->
 
 ## Project structure
@@ -105,8 +121,8 @@ dotnet run --project src/Host/Boilerplate.DbMigrator -- apply --seed
 This project shipped with sensible defaults. Before production:
 
 - [ ] **Shell scripts** — `dotnet new` copies file content but not the POSIX executable
-      bit, so run `chmod +x scripts/*.sh deploy/dokploy/*.sh deploy/dokploy/tests/*.sh`
-      once (everything here invokes them as `bash <script>` either way).
+      bit; the `chmod` in *First, once* restores it before the first commit, which the deploy
+      contract gate needs.
 - [ ] **Secrets** — the values `scripts/local-env.sh` writes into `.env` are local-only
       throwaways. Generate fresh ones for anything deployed, and never commit `.env`.
 <!--#if (frontend) -->
@@ -141,10 +157,10 @@ curl -fsS http://localhost:8080/health/ready
 
 <!--#if (frontend) -->
 This runs the same `api` / `migrator` / client images a deployment uses, against PostgreSQL,
-Valkey, MinIO and a Mailpit mail catcher.
+Valkey, RustFS and a Mailpit mail catcher.
 <!--#else -->
 This runs the same `api` / `migrator` images a deployment uses, against PostgreSQL, Valkey,
-MinIO and a Mailpit mail catcher.
+RustFS and a Mailpit mail catcher.
 <!--#endif -->
 The containers run as Production, so placeholder secrets and
 `AllowedHosts: *` are refused exactly as they would be on a server — hence the generated `.env`.
@@ -161,7 +177,7 @@ after the first sign-in.
 
 ## Adding a feature
 
-1. Contracts command/query in `src/Modules/{Module}.Contracts/v1/{Area}/{Feature}/`
+1. Contracts command/query in `src/Modules/{Module}.Contracts/v1/[{Area}/]{Feature}/`
 2. Handler + FluentValidation validator in `src/Modules/{Module}/Features/...`
 3. Endpoint, wired into the module's `MapEndpoints()`
 4. Tests

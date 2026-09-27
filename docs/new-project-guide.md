@@ -13,18 +13,20 @@ The template repository's root *is* the template. Nothing is published to NuGet.
 a local install is the whole distribution:
 
 ```bash
-git clone <this repo> Boilerplate && cd Boilerplate
+git clone <template repository> dotnet-saas-template && cd dotnet-saas-template
 dotnet new install .                 # installs from this working directory
-dotnet new saas -n Acme -o ../Acme
+dotnet new saas -n Contoso -o ../Contoso
 ```
 
-`-n Acme` renames everything: `Boilerplate` → `Acme` in namespaces, project and file names, and a
-derived lowercase form renames image names, database and bucket names, the compose project, npm
-scopes, the JWT issuer and audience and each client's `localStorage` prefixes.
+`-n` names the product: the template's placeholder name is replaced by `Contoso` in namespaces,
+project and file names, and a derived lowercase form (`contoso`) renames image names, database and
+bucket names, the compose project, npm scopes, the JWT issuer and audience and each client's
+`localStorage` prefixes. Pick a name that is not one of the demo tenants below (`acme`, `globex`),
+or seeded data and renamed output become hard to tell apart.
 
 | Parameter | Default | What `false` drops |
 |---|---|---|
-| `--frontend` | `true` | `clients/**` (BOTH clients), their services in `docker-compose.yml` and the app stack, both images, the client CI workflow, ADR-0004 + ADR-0008 |
+| `--frontend` | `true` | `clients/dashboard` and `clients/console` (BOTH clients), their services in `docker-compose.yml` and the app stack, both images, the client CI workflow, ADR-0004 + ADR-0008. The API contract (`clients/openapi/v1.json`) and its backend drift gate stay: the API still has consumers. |
 | `--aspire` | `true` | the AppHost project |
 | `--sandcastle` | `true` | `.sandcastle/`, `sandcastle.config.mts`, the root pnpm project that exists only for them, its workflow, ADR-0006 |
 
@@ -39,20 +41,27 @@ own scripts and its own runbook.
 
 It deliberately does **not** carry: `LICENSE` (pick your own), the template repository's `README.md`
 (`README-template.md` becomes yours), `GEMINI.md`, the vendored `.agents/skills/` and
-`.agents/workflows/` with `skills-lock.json`, the brand gate and the template smoke — those two are
-the template repository's own gates — and the placeholder-namespace ADR itself.
+`.agents/workflows/` with `skills-lock.json`, the template repository's own gates and research
+notes, and its record of how the placeholder name works.
 
-Uninstall with `dotnet new uninstall <path>` when you are done. To re-prove the whole path locally —
-scaffold, build, test, brand-grep — run `scripts/template-smoke.sh` in the template repository.
+Uninstall the template with `dotnet new uninstall <path>` when you are done.
 
 ## 2. First run
 
+A scaffold is not a git repository yet, and the scripts need one: they resolve paths from the
+repository root and refuse to run outside it. Do these three steps first, in this order:
+
 ```bash
+git init -b develop
 chmod +x scripts/*.sh deploy/dokploy/*.sh deploy/dokploy/tests/*.sh
+git add -A && git commit -m "chore: scaffold"
 ```
 
-`dotnet new` copies file content but not the POSIX executable bit. Everything here also works when
-invoked as `bash <script>`, which is how the docs spell it.
+`dotnet new` copies file content but not the POSIX executable bit, and the deploy contract gate
+(`deploy/dokploy/tests/run.sh`) asserts that bit — so `chmod` comes *before* the first commit, or the
+scripts land in git as `100644` and the gate fails in CI too. Every other script works when invoked
+as `bash <script>`, which is how the docs spell it. `develop` is the integration branch (ADR-0007);
+from here on, work on `feature/<slug>` branches.
 
 **Add a LICENSE.** The scaffold ships without one; pick the licence your product needs.
 
@@ -69,43 +78,44 @@ migrator. `--force` regenerates.
 ### Either: the whole stack under Aspire
 
 ```bash
-dotnet run --project src/Host/Acme.AppHost
+dotnet run --project src/Host/Boilerplate.AppHost
 ```
 
-Aspire starts PostgreSQL, Valkey, MinIO and Mailpit, runs the migrator to completion, then the API,
-then both clients. The Aspire dashboard is at <https://localhost:15888>; it also shows the generated
-MinIO, seeded-admin and demo passwords (Resources → Parameters).
+<!--#if (frontend) -->
+Aspire starts PostgreSQL, Valkey, RustFS and Mailpit, runs the migrator to completion, then the API,
+then both clients.
+<!--#else -->
+Aspire starts PostgreSQL, Valkey, RustFS and Mailpit, runs the migrator to completion, then the API.
+<!--#endif -->
+The Aspire dashboard is at <https://localhost:15888>; it also shows the generated
+object-store secret key, seeded-admin and demo passwords (Resources → Parameters).
 
 #### Running two AppHosts at once
 
-Every container the AppHost starts (PostgreSQL, Valkey, MinIO, Mailpit) lets Aspire allocate its
+Every container the AppHost starts (PostgreSQL, Valkey, RustFS, Mailpit) lets Aspire allocate its
 host port, so a second checkout or worktree can run its own stack alongside yours. Read the actual
 addresses off the dashboard; nothing in the stack hard-codes them, and everything that needs one —
-the API's `Storage__S3__*`, `minio-init`, the SMTP host — takes it from an endpoint reference.
-
-This was not always true. Until the fix in `AppHost.cs`, MinIO pinned host ports 9000/9001 and its
-container is `Persistent`, so the second instance's `minio` container failed to bind, came up
-attached to no network, and `minio-init` looped on `waiting for minio...` — which, through
-`.WaitForCompletion(minioInit)`, silently hung the API and every client behind it. If you ever see
-that loop (`docker logs <minio-init container>`), you are running an older revision.
+the API's `Storage__S3__*`, `storage-init`, the SMTP host — takes it from an endpoint reference.
 
 What is still pinned, deliberately: the API (`7030`/`5030`, from `launchSettings.json`, quoted by
-the `.http` request files and the devcontainer), the Aspire dashboard (`15888`) and the client dev
-server (`5173` — the Vite proxy origin is what makes the `SameSite=Strict` refresh cookie work).
+the `.http` request files and the devcontainer) and the Aspire dashboard (`15888`).
+<!--#if (frontend) -->
+So are the two client dev servers, `5173` (dashboard) and `5174` (console): the Vite proxy origin is
+what makes the `SameSite=Strict` refresh cookie work.
+<!--#endif -->
 Those clash loudly and instantly, not silently, so two *full* instances still need one of them to be
 stopped.
 
-**A separate note on the database.** The initial migrations were regenerated during this template's
-construction, so a database migrated before that is incompatible with the current code and needs a
-fresh volume: `docker volume rm <app-prefix>-postgres-data` — `boilerplate-postgres-data` here,
-`acme-postgres-data` in a project scaffolded as `Acme`. Destructive, and it is local development
-data.
+**Starting the database from empty.** The AppHost keeps PostgreSQL's data in the
+`boilerplate-postgres-data-v2` volume. Stop the AppHost, remove the PostgreSQL container (see
+*Known limits*: it outlives the AppHost), then `docker volume rm boilerplate-postgres-data-v2`.
+Destructive, and it is local development data.
 
 ### Or: the container images
 
 ```bash
 bash scripts/local-env.sh            # once — writes a gitignored .env with generated secrets
-docker compose up
+docker compose up --build
 curl -fsS http://localhost:8080/health/ready
 ```
 
@@ -117,6 +127,7 @@ The one exception is the `migrator` service, which runs as Development: it is as
 accounts below, and demo seeding is refused in a Production host. Remove `--demo` and that
 `DOTNET_ENVIRONMENT` line together if you want the migrator on Production too.
 
+<!--#if (frontend) -->
 ### A client on its own
 
 ```bash
@@ -129,10 +140,22 @@ The dev server proxies `/api`, `/openapi`, `/scalar` and `/health` to the API (t
 `HttpOnly; SameSite=Strict` cookie and CORS allows no credentials, so a client served from a
 different origin than the API can never refresh a session. The runtime `apiBase` is `""` — same
 origin — in every environment, and the nginx image proxies exactly like the dev server does. A CORS
-CORS error is a proxy misconfiguration, not a reason to point the client elsewhere.
+error is a proxy misconfiguration, not a reason to point the client elsewhere.
 
-Sign in as the seeded root admin (`admin@root.com`) with the password from the Aspire dashboard or
-`.env`, and rotate it.
+Sign in to the console as the seeded root admin (`admin@root.com`) with the password from the Aspire
+dashboard or `.env` (`SEED_ADMIN_PASSWORD`), and rotate it. Both clients sign in through
+`POST /api/v1/tenants/{tenant}/auth/token`; `src/Host/Boilerplate.Api/Requests/Identity/identity-token.http`
+calls it directly once you paste the password into its `@adminPassword` variable.
+<!--#else -->
+### Signing in
+
+This product ships no client, so sign in through the API: `POST /api/v1/tenants/root/auth/token`
+as the seeded root admin (`admin@root.com`) with the password from the Aspire dashboard or `.env`
+(`SEED_ADMIN_PASSWORD`), and rotate it.
+`src/Host/Boilerplate.Api/Requests/Identity/identity-token.http` makes that call once you paste the
+password into its `@adminPassword` variable. Mailed links (password reset, email confirmation) carry
+the API's own origin until you set `OriginOptions__OriginUrl` to the front end you build.
+<!--#endif -->
 
 ### Demo accounts
 
@@ -165,7 +188,7 @@ admin password, so handing someone the demo set does not hand over the platform.
 Production (exit code 1, before any database write). To stop seeding it locally, drop `--demo` from
 the migrator's args in `AppHost.cs` and from the `migrator` command in `docker-compose.yml`.
 
-**When you start a real product**, delete `src/Host/Acme.DbMigrator/DemoSeed/` along with the
+**When you start a real product**, delete `src/Host/Boilerplate.DbMigrator/DemoSeed/` along with the
 `--demo` flag and the `Seed__DemoPassword` wiring — or keep the seeder and replace `DemoDataset`
 with your own tenants and people. Nothing else depends on it: the framework's own seed (root tenant,
 default roles, system groups, tenant admin) is a separate step that runs with or without `--demo`.
@@ -187,22 +210,58 @@ nothing is denied for everyone.
   fails on any that declares none, or more than one.
 - The **endpoint sweep** seeds two tenants and asks tenant A for tenant B's ids: the answer must be
   404, never 403 or 200, and list endpoints must never return B's rows. New nouns need a registry
-  entry so the sweep knows how to seed one; the only way out is `[TenantSweepExempt("reason")]` at
-  the mapping site, and the reason is read by a human.
-- Permission constants live beside the module; register them with the permission registry. Don't
-  reach for a static constants class — there isn't one.
+  entry so the sweep knows how to seed one; the only way out is `.ExemptFromTenantSweep("reason")`
+  on the endpoint at its mapping site, and the reason is read by a human.
+- Permission constants live in the module's Contracts project, in
+  `Modules.{X}.Contracts/Authorization/{X}Permissions.cs`: a `public static class` with one nested
+  class per resource (a `Resource` string plus one `Permissions.{Resource}.{Action}` constant per
+  action) and an `All` list of `AppPermission`s, which the module registers with
+  `builder.Services.AddPermissions({X}Permissions.All)`. Prefix a new resource with the module
+  (`"Notifications.Inbox"`) so it cannot collide with another module's. `IsBasic: true` grants the
+  permission to the Basic role too; `IsRoot: true` reserves it for the root tenant's Admin. Everything
+  else goes to Admin only — the role-permission sync grants a newly registered permission to every
+  tenant's Admin role on the next start, so there is no migration or seed step to write.
 
-### A new module
+### A new product module
 
-Five modules exist and the sixth needs a reason (ADR-0003). If you add one: a runtime project plus a
-`.Contracts` project, `[AppModule]` at assembly level, and **four** registration lists to edit (API
-and migrator, mediator assemblies and module assemblies). Miss one and it fails silently.
+The five modules the template ships are **platform modules** (ADR-0003). Your product's own nouns go
+in **product modules** (ADR-0010). Add one for a new bounded context, not for a new feature: a
+tenant-scoped `Note` starts a `Notes` module, and the next Note feature is a slice inside it. A
+product module may use a platform module's `.Contracts`; a platform module never references a
+product module.
+
+A module is a runtime project plus a `.Contracts` project, with `[AppModule]` at assembly level.
+Product modules take order 1000 and up, in steps of 100 (`[assembly: AppModule(typeof(NotesModule),
+1000)]`), so they start after the platform modules. Then make seven edits:
+
+1. `src/Boilerplate.slnx`: the runtime project.
+2. `src/Boilerplate.slnx`: the `.Contracts` project.
+3. `src/Host/Boilerplate.Migrations.PostgreSQL/Boilerplate.Migrations.PostgreSQL.csproj`: a
+   `ProjectReference` to the runtime project, plus its `<Folder Include="{Module}\" />` for the
+   migrations. This reference is how both hosts reach the module.
+4. `src/Host/Boilerplate.Api/HostModules.cs`: `typeof({Module}Module).Assembly`.
+5. `src/Host/Boilerplate.Api/Program.cs`: two entries in the `o.Assemblies` list of `AddMediator`,
+   a type from the `.Contracts` assembly and one from the runtime assembly.
+6. `src/Host/Boilerplate.DbMigrator/HostModules.cs`: as in 4.
+7. `src/Host/Boilerplate.DbMigrator/Program.cs`: as in 5.
+
+The `o.Assemblies` lists stay literal because Mediator's source generator reads them as written.
+**`HostModuleListTests`** (Architecture.Tests) fails when an `[AppModule]` assembly is missing from
+any of the four host lists, and names the list and the file to edit. Give the module its own rule
+file, `.agents/rules/modules/<name>.md`, like the five platform modules have.
 
 - **Architecture tests** fail if a module references another module's runtime, if a module-level
-  cycle appears (including through Contracts), or if a command/paginated-query handler has no
-  validator.
+  cycle appears (including through Contracts), if a platform module references a product module
+  (`PlatformModuleDirectionTests`), or if a command/paginated-query handler has no validator.
 - Entities are tenant-isolated by default; opting out is `IGlobalEntity` and an architecture test
   watches the opt-outs. `IgnoreQueryFilters()` lives in a reviewed allow-list.
+- **Tests**: integration tests are a product module's default, in `src/Tests/Integration.Tests/Tests/{Module}/`.
+  Each new noun gets a tenant-sweep entry (a `ResourceKind` and a seeder in `TenantSweepSeeder`),
+  list-only nouns included; see `.agents/rules/integration-testing.md`. A unit-test project is
+  optional. If you want one: create `src/Tests/{Module}.Tests/Boilerplate.{Module}.Tests.csproj`
+  (copy `Files.Tests`' and point its references at your module), add it to `src/Boilerplate.slnx`
+  under `/Tests/`, and add `[assembly: InternalsVisibleTo("Boilerplate.{Module}.Tests")]` to the
+  module's `AssemblyInfo.cs`.
 
 ### A new job
 
@@ -222,6 +281,7 @@ Every event is published under a tenant; one that genuinely is not must implemen
 
 ### A change to the API surface
 
+<!--#if (frontend) -->
 Re-export the contract and regenerate BOTH clients' types, and commit every artifact:
 
 ```bash
@@ -233,14 +293,30 @@ cd clients/console   && pnpm generate:api
 The **drift gate** re-derives both sides in CI and fails when either differs from what is committed —
 including a regeneration that deletes a file. `bash scripts/check-openapi-drift.sh backend|frontend`
 asks the same question locally.
+<!--#else -->
+Re-export the contract and commit it:
+
+```bash
+bash scripts/export-openapi.sh
+```
+
+The **drift gate** re-derives `clients/openapi/v1.json` in CI and fails when it differs from what is
+committed. `bash scripts/check-openapi-drift.sh backend` asks the same question locally.
+<!--#endif -->
 
 ### Before you push
 
+Work on a branch, never on `develop` itself (ADR-0007): `git switch -c feature/<slug> develop`
+before the first change, and open the pull request into `develop`. Then run the gates:
+
 ```bash
-dotnet build src/Acme.slnx -warnaserror
-dotnet test src/Acme.slnx            # integration suites need Docker
+dotnet build src/Boilerplate.slnx -warnaserror
+dotnet test src/Boilerplate.slnx            # integration suites need Docker
+bash scripts/check-openapi-drift.sh backend
+<!--#if (frontend) -->
 cd clients/dashboard && pnpm test && pnpm build
 cd clients/console   && pnpm test && pnpm build
+<!--#endif -->
 ```
 
 The rule files under `.agents/rules/` are the long form of everything above, one file per area.
@@ -252,12 +328,18 @@ a `v*` tag publishes versioned images and deploys production; `workflow_dispatch
 hatch. Path filters mean a docs-only change skips the expensive jobs while the gate job still reports
 green, and every workflow cancels superseded runs and carries a timeout.
 
-Workflows: backend (build, unit, integration, migrator image smoke, coverage floor, image publish,
-optional deploy), frontend (Vitest, Playwright smoke, drift), deploy contract, gitleaks, CodeQL and
-sandcastle. The brand gate and the template smoke stay behind in the template repository — they
-prove the template, not your product.
+Workflows: backend (build, unit, integration, migrator image smoke, coverage floor, OpenAPI drift,
+image publish, optional deploy),
+<!--#if (frontend) -->
+frontend (Vitest, Playwright smoke, drift),
+<!--#endif -->
+deploy contract, gitleaks, CodeQL and sandcastle.
 
+<!--#if (frontend) -->
 Images go to GHCR as `<name>-api`, `<name>-db-migrator`, `<name>-dashboard` and `<name>-console`, tagged
+<!--#else -->
+Images go to GHCR as `<name>-api` and `<name>-db-migrator`, tagged
+<!--#endif -->
 `dev-<sha>` / `dev-latest` from `develop` and `<version>` from a `v*` tag. Never a bare `latest`.
 
 **GitHub settings the owner must set by hand** — CI is written for them and stays skipped or red
@@ -302,19 +384,66 @@ Scaffold with `--sandcastle false` if you don't want any of this.
 
 Stated plainly, because each is a deliberate trade rather than an oversight.
 
-- **`sid` is issued but not validated per request.** Revoking a session stops *refresh* immediately
-  and stops API access only when the current access token expires (default 30 minutes). A per-request
-  session lookup would put a database read on every call. Shorten the access-token lifetime if you
-  need a tighter bound.
+- **Session revocation reaches other API replicas within 30 seconds.** Every request checks its
+  token's session, so a revoked session is refused on its next request by the instance that revoked
+  it. Each instance caches the answer for 30 seconds (`SessionLiveness.CacheDuration`) to keep the
+  check off the database, and there is no cross-instance invalidation — so on a multi-replica
+  deployment another replica may keep accepting the token for up to that long.
 - **A public file URL outlives a visibility change.** Public Files assets are presigned per read
   (default 5 minutes, clamped 1–15), so flipping Public → Private stops issuance at once, but a link
   already handed out works until its signature expires. Hard revocation means deleting the object.
+- **Nothing scans uploads for malware.** `IFileScanner` ships as `NoOpFileScanner`, which reports
+  every file clean. What finalize does check is that the bytes are the declared type: their
+  signature must match the extension and content type, and no shipped category accepts SVG or HTML
+  (a category opts in with `AllowScriptCapableTypes`). That is not malware scanning. A product that
+  needs it registers its own `IFileScanner` (ClamAV, a cloud scanning service) after the Files
+  module, and the last registration wins; finalize calls it, and an `Infected` result leaves the
+  file `Quarantined` instead of `Available`.
+<!--#if (frontend) -->
 - **Three React Compiler lint rules sit at `warn`** in both clients (`set-state-in-effect`,
   `static-components`, `refs`). Each needs a real design change, not a mechanical fix; they are left
   visible rather than disabled, and no `eslint-disable` comment exists in `src/`.
+<!--#endif -->
+<!--#if (frontend) -->
 - **TypeScript is held below 7** (`^6.0.3`) across both clients and the root pnpm project. Bump
   deliberately, not with a dependency batch.
+<!--#else -->
+- **TypeScript is held below 7** (`^6.0.3`) in the root pnpm project. Bump deliberately, not with a
+  dependency batch.
+<!--#endif -->
 - **Production refuses the Local storage provider.** It defaults to `s3` and fails fast on `local`,
   which would serve files from `wwwroot` with no signing; overriding that needs an explicit
   `Storage:AllowLocalProviderInProduction=true`. Not a limit so much as a door that is locked from
   the inside — don't unlock it to get a deployment green.
+- **The idempotency lock is per process.** Two requests carrying the same `Idempotency-Key` are
+  serialised by an in-memory lock (`KeyedAsyncLock`), so on one API replica the second waits and
+  replays the first's result. Across replicas nothing coordinates them: duplicates that land on
+  different instances can both execute. Safe on the default single-replica stack; before scaling the
+  API out, replace the lock with a distributed lease (a Redis `SET NX`).
+- **Hangfire runs a fixed 5 workers per process**, not a count scaled to the machine's cores. Change
+  `WorkerCount` in `src/BuildingBlocks/Jobs/Extensions.cs` if a product's job load needs more.
+- **The API image is JIT-only** (no ReadyToRun), so each new container pays a one-time cold-start
+  cost while the hot paths compile. Nothing to fix for a long-running server; worth revisiting only
+  if you scale to zero.
+<!--#if (aspire) -->
+- **Aspire's data containers outlive the AppHost.** PostgreSQL, Valkey and object storage are
+  `ContainerLifetime.Persistent`, so stopping the AppHost (Ctrl+C) leaves them running, keeping
+  their ports and memory — deliberately, so the next run starts in seconds with its data intact. To
+  free them, `docker ps` shows them under their resource names with a generated suffix; remove them
+  with `docker rm -f <container>`. Their data volumes survive that; remove a volume only when you
+  want its data gone (see *Starting the database from empty* in §2).
+<!--#endif -->
+<!--#if (frontend) -->
+- **The first `docker compose up --build` is slow.** It pulls the .NET SDK and Node base images and
+  builds four images (migrator, API, dashboard, console) before anything starts — minutes on a fast
+  connection, much longer on a slow one. A network timeout there is the download, not the template;
+  re-run it, and later runs reuse the cache.
+<!--#else -->
+- **The first `docker compose up --build` is slow.** It pulls the .NET SDK base image and builds two
+  images (migrator, API) before anything starts — minutes on a fast connection, much longer on a
+  slow one. A network timeout there is the download, not the template; re-run it, and later runs
+  reuse the cache.
+<!--#endif -->
+- **The API container logs `Cannot load library libgssapi_krb5.so.2` at startup.** Harmless: the
+  chiseled runtime image carries no Kerberos library, and the PostgreSQL driver logs its absence
+  when it probes for GSS authentication, which this stack never uses. Health still reports Healthy.

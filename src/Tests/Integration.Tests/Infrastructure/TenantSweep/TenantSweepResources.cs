@@ -1,5 +1,8 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using Boilerplate.Modules.Auditing;
+using Boilerplate.Modules.Auditing.Contracts;
+using Boilerplate.Modules.Auditing.Persistence;
 using Boilerplate.Modules.Notifications.Data;
 using Boilerplate.Modules.Notifications.Domain;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
@@ -35,6 +38,18 @@ public enum ResourceKind
     /// <summary>A soft-deleted file: only <c>GET files/trash</c> and the restore route see it.</summary>
     TrashedFile,
 
+    /// <summary>
+    /// A finalized, public file owned by the admin: <c>GET files/mine</c> and <c>GET files/shared</c>
+    /// show only <c>Available</c> files, and the default <see cref="File"/> row is still pending.
+    /// </summary>
+    AvailableFile,
+
+    /// <summary>An exception audit record: only <c>GET audits/exceptions</c> lists that event type.</summary>
+    ExceptionAudit,
+
+    /// <summary>A security audit record carrying the marker: what <c>GET audits/security</c> lists.</summary>
+    SecurityAudit,
+
     /// <summary>A revoked session: only <c>GET identity/sessions?includeInactive=true</c> shows it.</summary>
     RevokedSession,
 
@@ -57,8 +72,9 @@ public enum ResourceKind
 ///
 /// <see cref="Marker"/> is a per-tenant nonsense string stamped into every seeded row's human-
 /// readable fields (user e-mail, role and group name, file name, notification title). The list half
-/// of the sweep looks for it in response bodies, so a leak is caught even on an endpoint nobody
-/// wrote a registry entry for — the marker, not the registry, is what proves a list is clean.
+/// of the sweep looks for it in response bodies, so a list needs no registry entry — but it does
+/// need a seeded row it would show, or there is nothing of the other tenant's for it to leak. The
+/// list pass's positive control fails any list that shows its own tenant no seeded row.
 /// </summary>
 public sealed class SeededTenant
 {
@@ -108,7 +124,7 @@ public sealed record SweptUser(string UserId, string Email, string Password, str
 /// name) onto the resource the sweep substitutes there.
 ///
 /// This is the registry the coverage test enforces: a route with a resource parameter whose key is
-/// absent here, and which carries no <c>[TenantSweepExempt]</c>, fails the sweep with a message
+/// absent here, and which is not exempted with <c>.ExemptFromTenantSweep(...)</c>, fails the sweep with a message
 /// naming the key to add. That is how "a newly added endpoint is covered automatically" is true
 /// rather than aspirational.
 /// </summary>
@@ -315,6 +331,30 @@ public static class TenantSweepExceptions
                 "400 for the missing userId/code, and reads no collection to leak",
         };
 
+    /// <summary>
+    /// Lists that show their own tenant none of the rows the sweep seeds, and why that is not a hole
+    /// in the list pass. Everything else the list pass asserts must show its own tenant a seeded row
+    /// — otherwise "no tenant-B row in tenant A's list" holds only because B has none.
+    ///
+    /// An entry belongs here only when the list holds no tenant-scoped rows of its own (a static
+    /// catalog, the caller's own record, a count). A list over a tenant's rows that the sweep does not
+    /// seed needs a <see cref="ResourceKind"/> and a seeder instead — that is the gap this closes.
+    /// </summary>
+    public static IReadOnlyDictionary<string, string> ListsWithNothingSeeded { get; } =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["GET api/v{version:apiVersion}/audits/summary"] =
+                "aggregate counts over the tenant's audit trail — no row, id or display field to carry a marker",
+            ["GET api/v{version:apiVersion}/identity/permissions"] =
+                "the caller's own effective permission names, drawn from the static permission registry",
+            ["GET api/v{version:apiVersion}/identity/permissions/catalog"] =
+                "the static permission registry; identical in every tenant",
+            ["GET api/v{version:apiVersion}/notifications/unread-count"] =
+                "a single number, not a list of rows",
+            ["GET api/v{version:apiVersion}/tenants/theme"] =
+                "one settings record for the caller's tenant, not a list of rows; the sweep sets no marker in it",
+        };
+
     public static IReadOnlySet<ResourceKind> PlatformWideKinds { get; } =
         new HashSet<ResourceKind> { ResourceKind.ImpersonationGrant };
 
@@ -390,6 +430,11 @@ internal static class TenantSweepSeeder
         ids[ResourceKind.UnconfirmedUser] = await SeedUnconfirmedUserAsync(adminClient, marker);
         ids[ResourceKind.ReadNotification] = await SeedReadNotificationAsync(
             factory, adminClient, tenantId, adminUserId, marker);
+        ids[ResourceKind.AvailableFile] = await SeedAvailableFileAsync(adminClient, marker);
+        ids[ResourceKind.ExceptionAudit] = await SeedAuditRecordAsync(
+            factory, tenantId, adminUserId, AuditEventType.Exception, marker);
+        ids[ResourceKind.SecurityAudit] = await SeedAuditRecordAsync(
+            factory, tenantId, adminUserId, AuditEventType.Security, marker);
 
         var audit = await AuditingProbeAsync(adminClient);
         ids[ResourceKind.Audit] = audit.Id;
@@ -591,6 +636,89 @@ internal static class TenantSweepSeeder
     }
 
     /// <summary>
+    /// A public <c>MyFiles</c> file in <c>Available</c> state — the only state <c>GET files/mine</c>
+    /// and <c>GET files/shared</c> list. Unlike <see cref="SeedFileAsync"/> this one does push bytes
+    /// to the presigned URL and finalize, because the finalize is what makes the row visible there.
+    /// </summary>
+    private static async Task<string> SeedAvailableFileAsync(HttpClient adminClient, string marker)
+    {
+        var bytes = UploadPayloads.Pdf(256);
+
+        using var requested = await adminClient.PostAsJsonAsync(
+            "/api/v1/files/upload-url",
+            new
+            {
+                ownerType = "MyFiles",
+                ownerId = (Guid?)null,
+                fileName = $"sweep-available-{marker}.pdf",
+                contentType = "application/pdf",
+                sizeBytes = bytes.Length,
+                visibility = 0,
+                category = "Document",
+            });
+        requested.StatusCode.ShouldBe(
+            HttpStatusCode.OK,
+            $"requesting the sweep's available file failed: {await requested.Content.ReadAsStringAsync()}");
+        var presigned = (await requested.Content.ReadFromJsonAsync<PresignedUploadDto>(Json))!;
+
+        using (var raw = new HttpClient())
+        using (var put = new HttpRequestMessage(HttpMethod.Put, presigned.UploadUrl)
+        {
+            Content = new ByteArrayContent(bytes)
+            {
+                Headers = { ContentType = new MediaTypeHeaderValue("application/pdf") },
+            },
+        })
+        {
+            using var uploaded = await raw.SendAsync(put);
+            uploaded.EnsureSuccessStatusCode();
+        }
+
+        using var finalized = await adminClient.PostAsync(
+            $"/api/v1/files/{presigned.FileAssetId}/finalize", content: null);
+        finalized.IsSuccessStatusCode.ShouldBeTrue(
+            $"finalizing the sweep's available file failed: {await finalized.Content.ReadAsStringAsync()}");
+
+        return presigned.FileAssetId.ToString();
+    }
+
+    /// <summary>
+    /// One audit record of <paramref name="eventType"/>, written through the tenant's own
+    /// <see cref="AuditDbContext"/> under <see cref="ITenantScope"/>. Audit rows are written by a
+    /// background drain, not by an endpoint, and no endpoint can be made to throw on demand for the
+    /// exception list — so, like the notification seed, the row goes in through the store's door.
+    /// The marker sits in <c>UserName</c>, which both audit lists return.
+    /// </summary>
+    private static async Task<string> SeedAuditRecordAsync(
+        AppWebApplicationFactory factory, string tenantId, string userId, AuditEventType eventType, string marker)
+    {
+        var scope = factory.Services.GetRequiredService<ITenantScope>();
+
+        return await scope.RunAsync(tenantId, async (services, ct) =>
+        {
+            var db = services.GetRequiredService<AuditDbContext>();
+            var now = DateTime.UtcNow;
+            var record = new AuditRecord
+            {
+                Id = Guid.CreateVersion7(),
+                OccurredAtUtc = now,
+                ReceivedAtUtc = now,
+                EventType = (int)eventType,
+                Severity = (byte)AuditSeverity.Information,
+                TenantId = tenantId,
+                UserId = userId,
+                UserName = $"sweep-{eventType}-{marker}",
+                Source = "TenantSweep",
+                PayloadJson = "{}",
+            };
+
+            db.AuditRecords.Add(record);
+            await db.SaveChangesAsync(ct);
+            return record.Id.ToString();
+        }, CancellationToken.None);
+    }
+
+    /// <summary>
     /// A revoked session. The tenant sessions list hides revoked rows unless asked for them
     /// (<c>includeInactive=true</c>), so without one seeded here that view is swept against an empty
     /// set — it cannot leak what the other tenant does not have.
@@ -741,6 +869,8 @@ internal static class TenantSweepSeeder
     private sealed record ProfileDto(string Id);
 
     private sealed record PresignedDto(Guid FileAssetId);
+
+    private sealed record PresignedUploadDto(Guid FileAssetId, Uri UploadUrl);
 
     private sealed record GrantRow(Guid Id, string? ImpersonatedUserId);
 

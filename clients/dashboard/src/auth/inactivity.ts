@@ -54,8 +54,28 @@ export const activityStore = {
   },
 };
 
+/**
+ * Why a session ended without the user asking for it. A deliberate sign-out has no reason:
+ * the login page says nothing, because nothing needs explaining.
+ *   - `inactivity` — the idle timer ran out (InactivityGuard).
+ *   - `expired` — the session could not be renewed: the refresh was refused (expired,
+ *     revoked, or signed out elsewhere), or boot could not restore it.
+ */
+export type SignedOutReason = "inactivity" | "expired";
+
+const SIGNED_OUT_NOTICES: Record<SignedOutReason, string> = {
+  inactivity: "You were signed out due to inactivity.",
+  expired: "Your session has ended. Please sign in again.",
+};
+
+/** The login page's notice for a stashed reason; null for none, or for one it does not know. */
+export function signedOutNotice(reason: string | null): string | null {
+  if (reason === null || !Object.hasOwn(SIGNED_OUT_NOTICES, reason)) return null;
+  return SIGNED_OUT_NOTICES[reason as SignedOutReason];
+}
+
 /** Stash why the session ended so the login page can explain it. */
-export function markSignedOut(reason: string): void {
+export function markSignedOut(reason: SignedOutReason): void {
   try {
     sessionStorage.setItem(SIGNED_OUT_REASON_KEY, reason);
   } catch {
@@ -63,13 +83,27 @@ export function markSignedOut(reason: string): void {
   }
 }
 
-/** Read-and-clear the sign-out reason (one-shot). */
-export function consumeSignedOutReason(): string | null {
+/** Read the sign-out reason without clearing it — safe to call during render. */
+export function peekSignedOutReason(): string | null {
   try {
-    const value = sessionStorage.getItem(SIGNED_OUT_REASON_KEY);
-    if (value) sessionStorage.removeItem(SIGNED_OUT_REASON_KEY);
-    return value;
+    return sessionStorage.getItem(SIGNED_OUT_REASON_KEY);
   } catch {
     return null;
   }
+}
+
+/** Forget the sign-out reason once it has been shown. */
+export function clearSignedOutReason(): void {
+  try {
+    sessionStorage.removeItem(SIGNED_OUT_REASON_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Read-and-clear the sign-out reason (one-shot). */
+export function consumeSignedOutReason(): string | null {
+  const value = peekSignedOutReason();
+  if (value) clearSignedOutReason();
+  return value;
 }

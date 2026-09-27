@@ -40,6 +40,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- HostModules.All, compared with every [AppModule] assembly by HostModuleListTests. Internal
+         + this, rather than public, because CA1515 is right that an application assembly has no
+         public API. -->
+    <InternalsVisibleTo Include="Boilerplate.Architecture.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="wwwroot\uploads\" />
   </ItemGroup>
 

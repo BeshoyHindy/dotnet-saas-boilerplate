@@ -4,7 +4,12 @@ import { AppShell } from "@/components/layout/app-shell";
 import { ProtectedRoute } from "@/auth/protected-route";
 import { RouteGuard } from "@/auth/route-guard";
 import { RouteError } from "@/components/route-error";
-import { IdentityPermissions, MultitenancyPermissions } from "@/lib/permissions";
+import {
+  AuditingPermissions,
+  IdentityPermissions,
+  MultitenancyPermissions,
+  SystemPermissions,
+} from "@/lib/permissions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
 
@@ -62,6 +67,7 @@ const AppearanceSettings = lazyNamed(
 const HealthPage = lazyNamed(() => import("@/pages/health"), "HealthPage");
 const AuditsPage = lazyNamed(() => import("@/pages/audits"), "AuditsPage");
 const SessionsPage = lazyNamed(() => import("@/pages/system/sessions"), "SessionsPage");
+const JobMonitorPage = lazyNamed(() => import("@/pages/system/job-monitor"), "JobMonitorPage");
 const UsersPage = lazyNamed(() => import("@/pages/identity/users"), "UsersPage");
 const UserDetailPage = lazyNamed(
   () => import("@/pages/identity/user-detail"),
@@ -160,15 +166,80 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: withSuspense(<OverviewPage />) },
           { path: "system/health", element: withSuspense(<HealthPage />) },
-          { path: "system/audits", element: withSuspense(<AuditsPage />) },
-          { path: "system/sessions", element: withSuspense(<SessionsPage />) },
+          {
+            path: "system/audits",
+            element: (
+              <RouteGuard perms={[AuditingPermissions.AuditTrails.View]}>
+                {withSuspense(<AuditsPage />)}
+              </RouteGuard>
+            ),
+          },
+          {
+            path: "system/sessions",
+            element: (
+              <RouteGuard perms={[IdentityPermissions.Sessions.ViewAll]}>
+                {withSuspense(<SessionsPage />)}
+              </RouteGuard>
+            ),
+          },
+          {
+            // Not `/jobs`: that path is the Job monitor itself, which nginx forwards to the API.
+            path: "system/job-monitor",
+            element: (
+              <RouteGuard perms={[SystemPermissions.Hangfire.View]}>
+                {withSuspense(<JobMonitorPage />)}
+              </RouteGuard>
+            ),
+          },
           { path: "identity", element: <Navigate to="/identity/users" replace /> },
-          { path: "identity/users", element: withSuspense(<UsersPage />) },
-          { path: "identity/users/:userId", element: withSuspense(<UserDetailPage />) },
-          { path: "identity/roles", element: withSuspense(<RolesPage />) },
-          { path: "identity/roles/:roleId", element: withSuspense(<RoleDetailPage />) },
-          { path: "identity/groups", element: withSuspense(<GroupsPage />) },
-          { path: "identity/groups/:groupId", element: withSuspense(<GroupDetailPage />) },
+          {
+            path: "identity/users",
+            element: (
+              <RouteGuard perms={[IdentityPermissions.Users.Update]}>
+                {withSuspense(<UsersPage />)}
+              </RouteGuard>
+            ),
+          },
+          {
+            path: "identity/users/:userId",
+            element: (
+              <RouteGuard perms={[IdentityPermissions.Users.Update]}>
+                {withSuspense(<UserDetailPage />)}
+              </RouteGuard>
+            ),
+          },
+          {
+            path: "identity/roles",
+            element: (
+              <RouteGuard perms={[IdentityPermissions.Roles.Update]}>
+                {withSuspense(<RolesPage />)}
+              </RouteGuard>
+            ),
+          },
+          {
+            path: "identity/roles/:roleId",
+            element: (
+              <RouteGuard perms={[IdentityPermissions.Roles.Update]}>
+                {withSuspense(<RoleDetailPage />)}
+              </RouteGuard>
+            ),
+          },
+          {
+            path: "identity/groups",
+            element: (
+              <RouteGuard perms={["Permissions.Groups.Update"]}>
+                {withSuspense(<GroupsPage />)}
+              </RouteGuard>
+            ),
+          },
+          {
+            path: "identity/groups/:groupId",
+            element: (
+              <RouteGuard perms={["Permissions.Groups.Update"]}>
+                {withSuspense(<GroupDetailPage />)}
+              </RouteGuard>
+            ),
+          },
 
           // ── Operator ────────────────────────────────────────────────────
           // Wrapped in RouteGuard with the same permission the server endpoint

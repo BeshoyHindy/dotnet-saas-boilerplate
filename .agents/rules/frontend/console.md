@@ -15,6 +15,11 @@ The console is the tool a root operator signs in to (ADR-0008). Dev port **5174*
 - **The impersonation list** — `src/pages/impersonation/list.tsx`, `src/api/impersonation-grants.ts`:
   the live acting grants and how to revoke one.
 - **The acting layer** — below.
+- **The Job monitor launcher** — `src/pages/system/job-monitor.tsx`, `src/api/job-monitor.ts`, nav
+  *System → Jobs* (`Permissions.Hangfire.View`). It asks `POST /identity/operator/job-monitor-access`
+  (`AS_OPERATOR`) for the `/jobs`-scoped cookie and opens `/jobs` in a new tab (ADR-0009). The tab is
+  opened synchronously on the click and navigated after the call, or popup blockers eat it. `/jobs`
+  belongs to nginx (and the Vite dev proxy), never to the SPA router.
 - **Identity, audits, health and sessions with an operator's reach**: the same screens the dashboard
   has, kept here because an operator needs them *while acting inside a tenant*. Audits here are the
   cross-tenant view.
@@ -50,7 +55,7 @@ account" — which **prefills the email only** (`APP_DEMO_OPERATOR_EMAIL`, defau
 It never signs in: that account's password is `Seed__DefaultAdminPassword`, not the demo tenants'
 shared secret, so this app has nothing to sign in with and must not pretend otherwise.
 
-## The acting token (`src/auth/acting-store.ts`, `src/api/operator.ts`, ADR-0002 + issue #9)
+## The acting token (`src/auth/acting-store.ts`, `src/api/operator.ts`, ADR-0002)
 
 Two ways in, one way out, one in-memory credential:
 
@@ -58,7 +63,7 @@ Two ways in, one way out, one in-memory credential:
   `POST /identity/operator/token-exchange`, root only (`SystemPermissions.Platform.CrossTenantImpersonate`).
   Pass `targetUserId` to act as a specific user rather than the tenant's admin.
 - `useAuth().impersonateInOwnTenant({ … })` — `POST /identity/impersonation/start`, **same tenant
-  only** since #9; a cross-tenant start is a 403 pointing at the exchange.
+  only**; a cross-tenant start is a 403 pointing at the exchange.
 - `useAuth().exitTenant()` — `POST /identity/impersonation/end`, which returns **no token**: your own
   session was never taken away.
 
@@ -101,4 +106,7 @@ operator gate above).
 `login()` additionally clears `actingStore` up front (before issuing the new token), since it is
 establishing a session rather than ending one. An acting session dropped **involuntarily**
 (revoked/expired, `acting-store`'s `drop()`) still calls `queryClient.clear()`, not
-`invalidateQueries()`: stale data must not be able to render before a refetch replaces it.
+`invalidateQueries()`: stale data must not be able to render before a refetch replaces it. Its
+reason stays in `acting-store` (`useAuth().actingEndedNotice`) and `ActingBanner` shows it in the
+acting session's place until the operator dismisses it — not a toast, which is gone before an
+operator who was looking elsewhere can read it. A new acting session or `clear()` retires it.

@@ -35,7 +35,7 @@
         "frontend": {
             "type": "parameter",
             "datatype": "bool",
-            "description": "Include BOTH React clients under clients/ — the dashboard (tenant app) and the console (operator tool) — and everything that serves them (their container images, client CI, Aspire client resources).",
+            "description": "Include BOTH React clients under clients/ — the dashboard (tenant app) and the console (operator tool) — and everything that serves them (their container images, client CI, Aspire client resources). The API contract, clients/openapi/v1.json, and its backend drift gate stay either way.",
             "defaultValue": "true"
         },
         "sandcastle": {
@@ -79,6 +79,36 @@
             },
             "replaces": "sendgrid@example.com"
         },
+        "mailLinkDomain": {
+            "type": "generated",
+            "generator": "switch",
+            "datatype": "string",
+            "description": "The public hostname mailed links carry in the deploy stack: the dashboard's, or the API's own when no client ships. A YAML map cannot hold the key twice, so this is a scoped rewrite of the one value rather than an #if/#else pair.",
+            "parameters": {
+                "evaluator": "C++",
+                "cases": [
+                    { "condition": "(frontend)", "value": "DASHBOARD_DOMAIN" },
+                    { "condition": "(!frontend)", "value": "API_DOMAIN" }
+                ]
+            },
+            "replaces": "DASHBOARD_DOMAIN",
+            "onlyIf": [ { "after": "OriginOptions__OriginUrl: https://${" } ]
+        },
+        "mailLinkLocalOrigin": {
+            "type": "generated",
+            "generator": "switch",
+            "datatype": "string",
+            "description": "The origin mailed links carry under docker compose: the dashboard's, or the API's own when no client ships. Scoped like mailLinkDomain, for the same reason.",
+            "parameters": {
+                "evaluator": "C++",
+                "cases": [
+                    { "condition": "(frontend)", "value": "${APP_DASHBOARD_URL:-http://localhost:8081}" },
+                    { "condition": "(!frontend)", "value": "http://localhost:${APP_API_PORT:-8080}" }
+                ]
+            },
+            "replaces": "${APP_DASHBOARD_URL:-http://localhost:8081}",
+            "onlyIf": [ { "after": "OriginOptions__OriginUrl: " } ]
+        },
         "lowerName": {
             "type": "derived",
             "valueSource": "name",
@@ -103,6 +133,23 @@
     },
     "specialCustomOperations": {
         "**/.env.example": {
+            "flagPrefix": "#",
+            "operations": [
+                {
+                    "type": "conditional",
+                    "configuration": {
+                        "if": ["#if"],
+                        "else": ["#else"],
+                        "elseif": ["#elseif"],
+                        "endif": ["#endif"],
+                        "trim": true,
+                        "wholeLine": true,
+                        "evaluator": "C++"
+                    }
+                }
+            ]
+        },
+        ".gitignore": {
             "flagPrefix": "#",
             "operations": [
                 {
@@ -170,11 +217,14 @@
                 "**/.env.*.local",
                 "LICENSE",
                 "README.md",
+                ".gitleaksignore",
                 "GEMINI.md",
                 ".agents/skills/**",
                 ".agents/workflows/**",
                 "skills-lock.json",
                 "docs/adr/0001-*",
+                "docs/research/**",
+                "CHANGELOG.md",
                 ".github/workflows/brand-gate.yml",
                 ".github/workflows/template-smoke.yml",
                 "scripts/brand-gate.sh",
@@ -193,10 +243,10 @@
                 {
                     "condition": "(!frontend)",
                     "exclude": [
-                        "clients/**",
+                        "clients/dashboard/**",
+                        "clients/console/**",
                         ".github/workflows/frontend.yml",
                         ".agents/rules/frontend/**",
-                        "scripts/export-openapi.sh",
                         "docs/adr/0004-*",
                         "docs/adr/0008-*"
                     ]

@@ -22,20 +22,22 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Testcontainers.Minio;
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Containers;
 using Testcontainers.PostgreSql;
 
 namespace Integration.Tests.Infrastructure;
 
 public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    private const string MinioImage = "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z";
-    private const string MinioAccessKey = "minioadmin";
-    private const string MinioSecretKey = "minioadmin";
-    private const string MinioBucket = "boilerplate-integration-test-uploads";
+    private const string StorageImage = "rustfs/rustfs:1.0.0@sha256:8cc9801755448b71a786705ce76692c77e14936cccd87cf2fc31842e58f4d1ff";
+    private const ushort StoragePort = 9000;
+    private const string StorageAccessKey = "integration-test-access";
+    private const string StorageSecretKey = "integration-test-secret";
+    private const string StorageBucket = "boilerplate-integration-test-uploads";
 
     private static readonly SemaphoreSlim _migrationLock = new(1, 1);
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine")
         .WithDatabase("boilerplate_integration_tests")
         .WithUsername("postgres")
         .WithPassword("integration_test_pwd")
@@ -43,19 +45,24 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
         .WithCleanUp(true)
         .Build();
 
-    // MinIO no longer publishes to Docker Hub, so `minio/minio:*` fails to pull on any machine
-    // without a cached layer. Pull from quay.io, pinned to the same release as docker-compose.yml.
-    private readonly MinioContainer _minio = new MinioBuilder(MinioImage)
-        .WithUsername(MinioAccessKey)
-        .WithPassword(MinioSecretKey)
+    // RustFS, the S3-compatible store every stack runs, pinned by the same tag and digest as the
+    // AppHost and both compose stacks. A generic container, not a store-specific module: Testcontainers
+    // dropped its MinIO module and has no RustFS one. No volume is mounted, so the image's own /data
+    // (owned by the image's non-root user) is writable as is.
+    private readonly IContainer _storage = new ContainerBuilder(StorageImage)
+        .WithPortBinding(StoragePort, assignRandomHostPort: true)
+        .WithEnvironment("RUSTFS_ACCESS_KEY", StorageAccessKey)
+        .WithEnvironment("RUSTFS_SECRET_KEY", StorageSecretKey)
+        .WithWaitStrategy(Wait.ForUnixContainer()
+            .UntilHttpRequestIsSucceeded(request => request.ForPort(StoragePort).ForPath("/health")))
         .WithAutoRemove(true)
         .WithCleanUp(true)
         .Build();
 
     public async Task InitializeAsync()
     {
-        await Task.WhenAll(_postgres.StartAsync(), _minio.StartAsync());
-        await CreateMinioBucketAsync();
+        await Task.WhenAll(_postgres.StartAsync(), _storage.StartAsync());
+        await CreateStorageBucketAsync();
 
         // Force host creation via the Server property (no leaked HttpClient)
         _ = Server;
@@ -77,43 +84,43 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
     {
         await base.DisposeAsync();
         await _postgres.DisposeAsync();
-        await _minio.DisposeAsync();
+        await _storage.DisposeAsync();
     }
 
-    /// <summary>The MinIO endpoint URL exposed to the host configuration; useful for tests that need to PUT bytes directly.</summary>
-    public string MinioServiceUrl => _minio.GetConnectionString();
+    /// <summary>The object store's endpoint URL exposed to the host configuration; useful for tests that need to PUT bytes directly.</summary>
+    public string StorageServiceUrl => $"http://{_storage.Hostname}:{_storage.GetMappedPublicPort(StoragePort)}";
 
-    private async Task CreateMinioBucketAsync()
+    private async Task CreateStorageBucketAsync()
     {
         var config = new AmazonS3Config
         {
-            ServiceURL = _minio.GetConnectionString(),
+            ServiceURL = StorageServiceUrl,
             ForcePathStyle = true,
             UseHttp = true,
             AuthenticationRegion = "us-east-1"
         };
 
         using var client = new AmazonS3Client(
-            new Amazon.Runtime.BasicAWSCredentials(MinioAccessKey, MinioSecretKey),
+            new Amazon.Runtime.BasicAWSCredentials(StorageAccessKey, StorageSecretKey),
             config);
 
         try
         {
-            await client.PutBucketAsync(new PutBucketRequest { BucketName = MinioBucket });
+            await client.PutBucketAsync(new PutBucketRequest { BucketName = StorageBucket });
         }
         catch (AmazonS3Exception ex) when (ex.ErrorCode == "BucketAlreadyOwnedByYou" || ex.ErrorCode == "BucketAlreadyExists")
         {
             // Idempotent across factory re-creations.
         }
 
-        // The same grant the deploy stacks apply (`mc anonymous set download …/uploads`, pinned by
+        // The same grant the deploy stacks apply (the `uploads/*` GetObject policy, pinned by
         // deploy/dokploy/tests/compose-contract.test.sh): anonymous GET on the `uploads/` prefix and
         // nowhere else. Without it the durable avatar and brand-asset URLs the API hands back would
         // 403 here, and a test could not tell a working link from a broken one. The `tenants/`
         // prefix staying closed is the other half — it is what the Files public-URL tests lean on.
         await client.PutBucketPolicyAsync(new PutBucketPolicyRequest
         {
-            BucketName = MinioBucket,
+            BucketName = StorageBucket,
             Policy = $$"""
                 {
                   "Version": "2012-10-17",
@@ -122,7 +129,7 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
                       "Effect": "Allow",
                       "Principal": { "AWS": ["*"] },
                       "Action": ["s3:GetObject"],
-                      "Resource": ["arn:aws:s3:::{{MinioBucket}}/uploads/*"]
+                      "Resource": ["arn:aws:s3:::{{StorageBucket}}/uploads/*"]
                     }
                   ]
                 }
@@ -162,7 +169,6 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
                 ["Serilog:MinimumLevel:Override:Npgsql"] = "Fatal",
                 ["Serilog:WriteTo:0:Name"] = "Console",
                 ["Serilog:WriteTo:0:Args:restrictedToMinimumLevel"] = "Warning",
-                ["Serilog:WriteTo:1:Name"] = "",
                 ["MailOptions:UseSendGrid"] = "false",
                 ["HangfireOptions:Route"] = "/jobs",
                 ["RateLimitingOptions:Enabled"] = "false",
@@ -172,10 +178,10 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
                 ["Seed:DemoPassword"] = TestConstants.DemoPassword,
                 ["SecurityHeadersOptions:Enabled"] = "false",
                 ["Storage:Provider"] = "s3",
-                ["Storage:S3:Bucket"] = MinioBucket,
-                ["Storage:S3:ServiceUrl"] = _minio.GetConnectionString(),
-                ["Storage:S3:AccessKey"] = MinioAccessKey,
-                ["Storage:S3:SecretKey"] = MinioSecretKey,
+                ["Storage:S3:Bucket"] = StorageBucket,
+                ["Storage:S3:ServiceUrl"] = StorageServiceUrl,
+                ["Storage:S3:AccessKey"] = StorageAccessKey,
+                ["Storage:S3:SecretKey"] = StorageSecretKey,
                 ["Storage:S3:ForcePathStyle"] = "true",
                 ["Storage:S3:PublicRead"] = "false",
                 ["Storage:S3:Region"] = "us-east-1",
@@ -205,7 +211,7 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
             services.AddHangfire((provider, config) =>
             {
                 config.UseInMemoryStorage();
-                config.UseHeroJobPipeline(provider);
+                config.UseAppJobPipeline(provider);
             });
             services.AddHangfireServer(options =>
             {
@@ -224,7 +230,7 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
             // tenant fails the real Migrations step; every other tenant sees a no-op.
             services.AddScoped<IDbInitializer, FaultInjectingDbInitializer>();
 
-            // Fault-injection seam for the registration-atomicity suite (#86): the real store, wrapped
+            // Fault-injection seam for the registration-atomicity suite: the real store, wrapped
             // so an armed registration's publish writes its row and then throws. IOutboxWriter is
             // registered as a forward to IOutboxStore, so decorating the one covers both, and every
             // unarmed publish — including the dispatcher's own reads and marks — is the production path.
@@ -258,8 +264,8 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
             foreach (var h in existingHandlers) services.Remove(h);
             services.AddExceptionHandler<DetailedTestExceptionHandler>();
 
-            // AddHeroStorage reads `Storage:Provider` eagerly (before the test config overlay applies), so it
-            // wires LocalStorageService. Replace it here with the S3 stack pointed at the MinIO testcontainer.
+            // AddAppStorage reads `Storage:Provider` eagerly (before the test config overlay applies), so it
+            // wires LocalStorageService. Replace it here with the S3 stack pointed at the object-store testcontainer.
             RewireStorageForS3(services);
         });
     }
@@ -276,10 +282,10 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
 
         services.Configure<Boilerplate.BuildingBlocks.Storage.S3.S3StorageOptions>(opts =>
         {
-            opts.Bucket = MinioBucket;
-            opts.ServiceUrl = _minio.GetConnectionString();
-            opts.AccessKey = MinioAccessKey;
-            opts.SecretKey = MinioSecretKey;
+            opts.Bucket = StorageBucket;
+            opts.ServiceUrl = StorageServiceUrl;
+            opts.AccessKey = StorageAccessKey;
+            opts.SecretKey = StorageSecretKey;
             opts.ForcePathStyle = true;
             opts.PublicRead = false;
             opts.Region = "us-east-1";
@@ -289,13 +295,13 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
         {
             var config = new AmazonS3Config
             {
-                ServiceURL = _minio.GetConnectionString(),
+                ServiceURL = StorageServiceUrl,
                 ForcePathStyle = true,
                 UseHttp = true,
                 AuthenticationRegion = "us-east-1"
             };
             return new AmazonS3Client(
-                new Amazon.Runtime.BasicAWSCredentials(MinioAccessKey, MinioSecretKey),
+                new Amazon.Runtime.BasicAWSCredentials(StorageAccessKey, StorageSecretKey),
                 config);
         });
         services.AddTransient<Boilerplate.BuildingBlocks.Storage.S3.S3StorageService>();

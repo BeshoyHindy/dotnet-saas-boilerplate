@@ -10,7 +10,7 @@ Thanks for helping out. The conventions below keep PRs reviewable.
 
 ## Dev setup
 
-Prerequisites: .NET 10 SDK, Docker, Node.js 20+.
+Prerequisites: .NET 10 SDK, Docker, Node.js 22.22+.
 
 ```bash
 dotnet build src/Boilerplate.slnx
@@ -27,7 +27,7 @@ The two clients live under `clients/dashboard` (tenant app, port 5173) and `clie
 ## Pull requests
 
 - Branch from and target `develop` as `feature/<slug>`; `main` only receives `release/*` and `hotfix/*` merges (ADR-0007).
-- Follow [Conventional Commits](https://www.conventionalcommits.org) — match the existing history (`feat(dashboard): ...`, `fix(identity): ...`).
+- Follow [Conventional Commits](https://www.conventionalcommits.org) — match the existing history (`feat(files): ...`, `fix(identity): ...`).
 - Add tests. The build runs with `TreatWarningsAsErrors=true`; analyzer warnings must be fixed.
 - Don't touch `src/BuildingBlocks/` without prior discussion — wide blast radius.
 - Architecture rules (module boundaries, file layout, coding style) are documented in [AGENTS.md](AGENTS.md), `.agents/rules/` and `docs/adr/`. Apply them. Name things the way [CONTEXT.md](CONTEXT.md) does.

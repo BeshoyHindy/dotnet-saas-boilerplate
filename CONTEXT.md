@@ -1,6 +1,11 @@
 # Boilerplate
 
-A multi-tenant SaaS product: one modular .NET monolith, one React console, one deployment shape.
+<!--#if (frontend) -->
+A multi-tenant SaaS product: one modular .NET monolith, two React clients (the Dashboard and the
+Console), one deployment shape.
+<!--#else -->
+A multi-tenant SaaS product: one modular .NET monolith and its API, one deployment shape.
+<!--#endif -->
 This is the glossary — the words this repository uses and the words it refuses. Decisions behind them
 live in `docs/adr/`.
 
@@ -61,7 +66,8 @@ static class is gone).
 **Authorization intent**:
 The single declaration every endpoint must carry about who may call it — a permission set,
 authenticated-only, or anonymous. There is no default: an endpoint that declares nothing is denied
-for everyone and fails the build.
+for everyone and fails `EndpointAuthorizationIntentTests` in Integration.Tests (the build and the
+architecture tests do not catch it).
 _Avoid_: auth attribute, endpoint policy, "unsecured endpoint" (there is no such endpoint).
 
 ### Work in the background
@@ -95,17 +101,37 @@ event-side counterpart of a system job. A blank tenant without the declaration i
 platform-wide event.
 _Avoid_: system event, broadcast event, untenanted event.
 
+**Job monitor**:
+Hangfire's dashboard as this product ships it: every tenant's jobs, at `/jobs`, for root operators
+only. `Hangfire.View` opens it read-only and `Hangfire.Manage` makes it writable. API clients reach
+it with a bearer token; a browser reaches it through the console, which hands out a short-lived
+cookie accepted on that route alone (ADR-0009).
+_Avoid_: Hangfire dashboard, jobs dashboard (*Dashboard* is the tenant client), job console, admin
+jobs page.
+
 ### Shape of the codebase
 
 **Module**:
 A bounded context: one runtime project plus one `.Contracts` project that is its entire public
-surface. There are five and only five — Identity, Multitenancy, Auditing, Files, Notifications
-(ADR-0003) — and a module never references another module's runtime.
+surface. A module never references another module's runtime. There are two kinds, and the same rules
+apply to both, plus one direction: a product module may use a platform module's `.Contracts`, and a
+platform module never references a product module (ADR-0010).
 _Avoid_: service, package, feature area, subsystem.
 
+**Platform module**:
+One of the modules the template ships: Identity, Multitenancy, Auditing, Files, Notifications
+(ADR-0003). A product keeps merging them from upstream, which is why they never depend on product
+code.
+_Avoid_: core module, built-in module, framework module.
+
+**Product module**:
+A module a product adds for a bounded context of its own, such as `Notes`. One per bounded context,
+not one per feature: a later Note feature is a slice inside `Notes` (ADR-0010).
+_Avoid_: custom module, app module, feature module, the `Product` module.
+
 **Reachability rule**:
-The rule that decides what else survives: a building block, package or feature stays only if one of
-the five modules or a host references it. Nothing is kept because it might be useful.
+The rule that decides what else survives: a building block, package or feature stays only if a
+module or a host references it. Nothing is kept because it might be useful.
 _Avoid_: dead code policy, pruning, tree-shaking.
 
 **Building block**:
@@ -113,6 +139,12 @@ Shared framework code under `src/BuildingBlocks/`, consumed by every module and 
 Changing one has the blast radius of the whole application.
 _Avoid_: common, shared library, infrastructure, core (Core is one building block among several).
 
+<!--#if (!frontend) -->
+_This product was scaffolded with `--frontend false`: neither the Dashboard nor the Console below
+ships in it, and nor does their drift-gate half. The entries stay so that a client added later takes
+the agreed name._
+
+<!--#endif -->
 **Dashboard**:
 The React application a tenant's own users sign in to (`clients/dashboard`) — the product (ADR-0008).
 It holds one credential, the signed-in user's own, and has no platform surface.
@@ -131,12 +163,12 @@ _Avoid_: the frontend, the SPA (there are two).
 
 **Contract**:
 The checked-in OpenAPI document `clients/openapi/v1.json` — the one agreed description of the API.
-The console's types are generated from it and nothing hand-writes an API type.
+Both clients' types are generated from it and nothing hand-writes an API type.
 _Avoid_: schema, spec, swagger, API docs.
 
 **Drift gate**:
 The CI check that re-derives both sides of the Contract — re-exporting the document from the API and
-regenerating the console's types — and fails when either differs from what is committed.
+regenerating both clients' types — and fails when either differs from what is committed.
 _Avoid_: codegen check, sync check, lint.
 
 ### Running and shipping it
@@ -156,8 +188,8 @@ admin, which are not demo accounts), fixture.
 
 **Stack**:
 One deployable compose unit. There are two: the data-services stack (database, cache, object storage)
-and the app stack (migrator, API, console). Staging and production run the same two stacks with
-different values (ADR-0005).
+and the app stack (migrator, API, dashboard, console). Staging and production run the same two
+stacks with different values (ADR-0005).
 _Avoid_: environment (an environment is staging or production), deployment, service, cluster.
 
 **Public file URL**:

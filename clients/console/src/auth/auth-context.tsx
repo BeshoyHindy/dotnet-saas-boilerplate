@@ -9,7 +9,6 @@ import {
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { tokenStore } from "@/auth/token-store";
 import { actingStore, type ActingSession } from "@/auth/acting-store";
 import { decodeJwt, isTokenExpired, type JwtClaims } from "@/auth/jwt";
@@ -92,6 +91,14 @@ export type AuthContextValue = {
   }) => Promise<ActingSession>;
   /** Stop acting: end the grant server-side (best effort) and drop the acting token. */
   exitTenant: () => Promise<void>;
+  /**
+   * Why the last acting session ended without being asked to (revoked, expired), or null.
+   * It outlives the session it describes until `dismissActingEndedNotice()`, a new acting
+   * session, or the operator's own sign-out — so an operator who missed the moment can
+   * still read why they are back in their own account.
+   */
+  actingEndedNotice: string | null;
+  dismissActingEndedNotice: () => void;
 };
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -158,6 +165,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isInitializing) return;
     let cancelled = false;
+    // An expired token still in storage means there was a session to lose. Without one
+    // (a deliberate sign-out keeps only the tenant), a failed restore has nothing to explain.
+    const hadSession = tokenStore.getAccessToken() !== null;
     void (async () => {
       try {
         await refreshAccessToken();
@@ -165,7 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Refresh token dead (expired, revoked, or DB reseeded) — end the session so
         // routing falls through to /login cleanly, and so a stray acting token or
         // cached query from before the reload cannot outlive it.
-        endSessionLocally();
+        endSessionLocally(hadSession ? "expired" : undefined);
       } finally {
         if (!cancelled) setIsInitializing(false);
       }
@@ -185,9 +195,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // for the user being acted as, and caching a stranger's grants as "my permissions"
   // would regate the operator's own chrome — hiding the very screens they entered from.
   useEffect(() => {
+    // Signed out: nothing to hydrate. The exposed flag reads true for a null
+    // user (see `value` below), so no state needs resetting here.
     if (!user) {
       lastHydratedSubject.current = null;
-      setPermissionsHydrated(true);
       return;
     }
     if (lastHydratedSubject.current === user.id && permissionsHydrated) {
@@ -305,14 +316,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const acting = useMemo(() => toActingView(rawActing), [rawActing]);
 
   // An acting session can end without being asked to (grant revoked, token expired). The
-  // API client drops it and leaves a notice; surface that rather than silently switching
-  // identity under the operator's feet.
+  // API client drops it and leaves a notice, which stays until the operator dismisses it:
+  // `ActingBanner` shows it where the acting session was, rather than a toast that is gone
+  // before an operator who was looking elsewhere can read it.
+  const actingEndedNotice = useSyncExternalStore(actingStore.subscribe, actingStore.getNotice);
+  const lastNotice = useRef<string | null>(actingStore.getNotice());
   useEffect(
     () =>
       actingStore.subscribe(() => {
-        const notice = actingStore.consumeNotice();
-        if (notice) {
-          toast.warning("Stopped acting", { description: notice });
+        const notice = actingStore.getNotice();
+        const dropped = notice !== null && notice !== lastNotice.current;
+        lastNotice.current = notice;
+        if (dropped) {
           // clear(), not invalidateQueries(): everything cached was fetched under the
           // dropped acting credential, in another tenant. Invalidating only marks it
           // stale — it can still render (and refetch-fail loudly) before the queries
@@ -420,7 +435,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isAuthenticated: user !== null,
       isInitializing,
-      permissionsHydrated,
+      permissionsHydrated: user === null || permissionsHydrated,
       login,
       logout,
       refreshPermissions,
@@ -428,6 +443,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       enterTenant,
       impersonateInOwnTenant,
       exitTenant,
+      actingEndedNotice,
+      dismissActingEndedNotice: actingStore.dismissNotice,
     }),
     [
       user,
@@ -440,6 +457,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       enterTenant,
       impersonateInOwnTenant,
       exitTenant,
+      actingEndedNotice,
     ],
   );
 

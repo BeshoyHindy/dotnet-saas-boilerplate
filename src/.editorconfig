@@ -269,3 +269,10 @@ dotnet_diagnostic.MSG0005.severity = none
 [**/Migrations.PostgreSQL/**/*.cs]
 dotnet_diagnostic.CA1062.severity = none
 dotnet_diagnostic.CA1861.severity = none
+
+# SonarAnalyzer 10.34's S8969 (redundant null-forgiving operator) fires once in each file below. The
+# fix is deleting the `!`, but neither file was the dependency bump's to edit: BuildingBlocks needs
+# explicit approval (.agents/rules/buildingblocks-protection.md), and Architecture.Tests was being
+# changed by a parallel ticket. Delete the `!` and this section together.
+[{BuildingBlocks/Storage/Local/LocalStorageService.cs,Tests/Architecture.Tests/NamespaceConventionsTests.cs}]
+dotnet_diagnostic.S8969.severity = none

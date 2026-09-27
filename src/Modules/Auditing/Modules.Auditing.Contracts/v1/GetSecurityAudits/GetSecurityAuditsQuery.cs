@@ -10,8 +10,6 @@ public sealed class GetSecurityAuditsQuery : IQuery<IReadOnlyList<AuditSummaryDt
 
     public string? UserId { get; init; }
 
-    public string? TenantId { get; init; }
-
     public DateTime? FromUtc { get; init; }
 
     public DateTime? ToUtc { get; init; }

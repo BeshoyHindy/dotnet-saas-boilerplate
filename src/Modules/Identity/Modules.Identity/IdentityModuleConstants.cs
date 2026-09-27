@@ -10,5 +10,5 @@ public sealed class IdentityModuleConstants : IModuleConstants
 
     public string ApiPrefix => "identity";
     public const string SchemaName = "identity";
-    public const int PasswordLength = 10;
+    public const int PasswordLength = Contracts.PasswordPolicy.MinimumLength;
 }

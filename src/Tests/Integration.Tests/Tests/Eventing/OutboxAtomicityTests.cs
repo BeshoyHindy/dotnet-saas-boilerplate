@@ -3,11 +3,13 @@ using Finbuckle.MultiTenant.Abstractions;
 using Boilerplate.BuildingBlocks.Eventing.Abstractions;
 using Boilerplate.BuildingBlocks.Eventing.Outbox;
 using Boilerplate.BuildingBlocks.Eventing.Persistence;
+using Boilerplate.BuildingBlocks.Persistence;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.Modules.Files.Contracts.Events;
 using Boilerplate.Modules.Notifications.Data;
 using Boilerplate.Modules.Notifications.Domain;
 using Integration.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace Integration.Tests.Tests.Eventing;
 
@@ -44,6 +46,37 @@ public sealed class OutboxAtomicityTests
 
         ReferenceEquals(notifications.Database.GetDbConnection(), eventing.Database.GetDbConnection())
             .ShouldBeTrue("a shared DbConnection is what lets the outbox write join the business transaction");
+    }
+
+    [Fact]
+    public async Task EnlistInAmbientTransactionAsync_Should_Find_The_Ambient_Transaction()
+    {
+        // Asserts that AmbientDbTransactionRegistry's hooks properly implement IDbTransactionInterceptor
+        // and record the transaction. This asserts the registry itself, not just the outcome Npgsql
+        // happens to produce anyway when every context shares one connection.
+        var (scope, tenant) = await NewScopeAsync();
+        using var scopeHandle = scope;
+        scope.ServiceProvider.GetRequiredService<IMultiTenantContextSetter>()
+            .MultiTenantContext = new MultiTenantContext<AppTenantInfo>(tenant);
+
+        var notifications = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
+        var eventing = scope.ServiceProvider.GetRequiredService<EventingDbContext>();
+        var ambientTransactions = scope.ServiceProvider.GetRequiredService<AmbientDbTransactionRegistry>();
+        var store = scope.ServiceProvider.GetRequiredService<IOutboxStore>();
+
+        await using var transaction = await notifications.Database.BeginTransactionAsync();
+
+        ambientTransactions.Find(notifications.Database.GetDbConnection())
+            .ShouldNotBeNull("the registry must record a transaction the moment it starts");
+
+        await store.AddAsync(NewEvent(Guid.CreateVersion7()));
+
+        eventing.Database.CurrentTransaction?.GetDbTransaction()
+            .ShouldBeSameAs(
+                ambientTransactions.Find(notifications.Database.GetDbConnection()),
+                "EnlistInAmbientTransactionAsync must join the exact transaction the registry found");
+
+        await transaction.RollbackAsync();
     }
 
     [Fact]

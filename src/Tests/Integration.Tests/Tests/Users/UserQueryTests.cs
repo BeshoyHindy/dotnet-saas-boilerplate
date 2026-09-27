@@ -1,3 +1,4 @@
+using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 using Integration.Tests.Tests.Sessions;
@@ -87,8 +88,9 @@ public sealed class UserQueryTests
 
         // Assert
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var groups = await response.DeserializeAsync<List<GroupDto>>();
-        groups.ShouldNotBeNull();
+        var page = await response.DeserializeAsync<PagedResponse<GroupDto>>();
+        page.ShouldNotBeNull();
+        page.Items.ShouldNotBeEmpty("a new user joins the tenant's default groups on registration");
     }
 
     [Fact]

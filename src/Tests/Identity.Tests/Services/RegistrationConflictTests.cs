@@ -6,7 +6,7 @@ using Npgsql;
 namespace Identity.Tests.Services;
 
 /// <summary>
-/// The 23505 → 400 mapping (#86). A unique violation on one of the user table's two indexes is the
+/// The 23505 (unique constraint violation) → 400 (bad request) mapping. A unique violation on one of the user table's two indexes is the
 /// caller's duplicate and must read exactly like the pre-insert check's refusal; a unique violation
 /// anywhere else is a bug, and answering "that e-mail is already taken" to it would be a confident
 /// lie that also hides the bug behind a 400.

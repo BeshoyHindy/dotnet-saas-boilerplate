@@ -7,7 +7,7 @@ using Xunit;
 namespace Architecture.Tests;
 
 /// <summary>
-/// ADR-0002, issue #77: cache keys are tenant-prefixed by the building block, not by caller
+/// ADR-0002: cache keys are tenant-prefixed by the building block, not by caller
 /// convention. Nineteen call sites across six files used to compose the tenant into the key
 /// themselves; once the block does it, a leftover hand-built prefix does not merely look untidy —
 /// it doubles up (<c>t:acme:theme:t:acme</c>) and re-opens the "pass someone else's id" hole the
@@ -158,7 +158,7 @@ public sealed partial class CacheTenantScopingTests
     [
         // The filter owns its replay entry end to end — it reads *and* writes it here. HybridCache
         // has no get-only read (dotnet/aspnetcore#57191) and frames its L2 payload, so a reader and a
-        // writer that are not both HybridCache cannot agree on the bytes (#82, see caching.md).
+        // writer that are not both HybridCache cannot agree on the bytes (see caching.md).
         // Tenant scoping is unchanged: it asks CacheKeyScope for the physical key rather than
         // rebuilding the format.
         "src/BuildingBlocks/Web/Idempotency/IdempotencyEndpointFilter.cs",

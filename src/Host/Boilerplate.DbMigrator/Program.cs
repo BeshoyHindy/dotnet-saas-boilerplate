@@ -1,14 +1,10 @@
 ﻿using System.Globalization;
-using System.Reflection;
 using Boilerplate.BuildingBlocks.Eventing;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.BuildingBlocks.Web;
 using Boilerplate.BuildingBlocks.Web.Modules;
-using Boilerplate.Modules.Auditing;
-using Boilerplate.Modules.Identity;
 using Boilerplate.Modules.Identity.Contracts.v1.Tokens.TokenGeneration;
 using Boilerplate.Modules.Identity.Features.v1.Tokens.TokenGeneration;
-using Boilerplate.Modules.Multitenancy;
 using Boilerplate.Modules.Multitenancy.Contracts;
 using Boilerplate.Modules.Multitenancy.Contracts.v1.GetTenantStatus;
 using Boilerplate.Modules.Multitenancy.Data;
@@ -96,18 +92,9 @@ builder.Services.AddMediator(o =>
     ];
 });
 
-var moduleAssemblies = new Assembly[]
-{
-    typeof(IdentityModule).Assembly,
-    typeof(MultitenancyModule).Assembly,
-    typeof(AuditingModule).Assembly,
-    typeof(Boilerplate.Modules.Files.FilesModule).Assembly,
-    typeof(Boilerplate.Modules.Notifications.NotificationsModule).Assembly,
-};
-
 // Disable runtime-only concerns; persistence + multitenancy stay on so DbInitializers resolve. Caching
 // stays on because some modules' ctor wiring touches IDistributedCache (in-memory fallback if no Redis).
-builder.AddHeroPlatform(o =>
+builder.AddAppPlatform(o =>
 {
     o.EnableOpenTelemetry = false;
     o.EnableCors = false;
@@ -122,10 +109,12 @@ builder.AddHeroPlatform(o =>
 });
 
 // Registers EventingDbContext + its IDbInitializer, so the schema pass below creates the framework
-// outbox/inbox schema alongside every module's (issue #1349).
+// outbox/inbox schema alongside every module's.
 builder.Services.AddEventingCore(builder.Configuration);
 
-builder.AddModules(moduleAssemblies);
+// The module list lives in HostModules.cs; HostModuleListTests fails when an [AppModule] assembly is
+// missing from it or from the mediator list above.
+builder.AddModules([.. HostModules.All]);
 
 // TenantProvisioningService needs IJobService, but Hangfire's is gated behind EnableJobs (off here).
 // Provide a throwing no-op so the DI graph resolves; the migration code paths don't enqueue jobs.
@@ -228,9 +217,9 @@ try
     }
 
     // ── Step 2 — the shared module schema, then per-tenant seeds ─────────
-    // Every tenant lives in the one shared database (#75), so schema is migrated ONCE, not once per
-    // tenant. Seeding is the part that is genuinely per tenant — tenant-scoped roles, groups and the
-    // tenant admin — so that pass still walks the catalog, and --tenant scopes it.
+    // All tenants live in one shared database, so schema is migrated ONCE, not once per tenant.
+    // Seeding is the part that is genuinely per tenant — tenant-scoped roles, groups and the tenant
+    // admin — so that pass still walks the catalog, and --tenant scopes it.
     if (!cli.CatalogOnly)
     {
         var tenantStore = host.Services.GetRequiredService<IMultiTenantStore<AppTenantInfo>>();
@@ -246,7 +235,7 @@ try
         {
             using var pendingScope = host.Services.CreateScope();
             foreach (var (name, pendingNames) in await ModuleSchema
-                .GetPendingAsync(pendingScope.ServiceProvider, moduleAssemblies, CancellationToken.None)
+                .GetPendingAsync(pendingScope.ServiceProvider, HostModules.All, CancellationToken.None)
                 .ConfigureAwait(false))
             {
                 await Console.Out.WriteLineAsync(string.Create(

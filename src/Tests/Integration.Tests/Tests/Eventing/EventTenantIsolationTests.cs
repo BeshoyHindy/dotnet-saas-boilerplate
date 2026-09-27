@@ -67,8 +67,7 @@ public sealed class EventTenantIsolationTests
     /// One dispatch pass delivers rows belonging to <b>different</b> tenants, each handler running
     /// under its own row's tenant.
     ///
-    /// This is the shape the per-tenant-database cut (#75) left behind: the dispatcher used to run
-    /// one pass per drain target, and now runs one pass, full stop, because outbox rows are
+    /// With per-tenant databases, the dispatcher now runs one pass, full stop, because outbox rows are
     /// <c>IGlobalEntity</c> with an explicit <c>TenantId</c> and there is one database. The failure
     /// it guards against is a claim narrowed to a single tenant — every other tenant's events
     /// strand, and the looping <see cref="OutboxDrain.DrainAsync"/> every other test uses would hide

@@ -152,7 +152,7 @@ public sealed class LocalStorageService : IStorageService
     /// Deletes an already-authorized key. Both public delete entry points route here instead of
     /// calling each other, so ownership is checked exactly once per call rather than
     /// <see cref="RemoveIfOwnedAsync"/> re-entering the public <see cref="RemoveAsync"/> and running
-    /// <see cref="AuthorizeHandle"/> a second time (#78 hardening item 3).
+    /// <see cref="AuthorizeHandle"/> a second time — a hardening fix.
     /// </summary>
     private Task RemoveAuthorizedAsync(string key)
     {

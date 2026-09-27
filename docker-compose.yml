@@ -28,7 +28,7 @@ services:
   # needs them, and not publishing them keeps this file from colliding with a
   # Postgres you already run locally.
   postgres:
-    image: postgres:18-alpine
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-boilerplate}
@@ -48,7 +48,7 @@ services:
   # Valkey (BSD-licensed Redis fork). No password: the port is compose-internal
   # only, and a fake one here would just be a credential-shaped literal to leak.
   valkey:
-    image: valkey/valkey:9.1.0-alpine
+    image: valkey/valkey:9.1.2-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11
     restart: unless-stopped
     command: ["valkey-server", "--appendonly", "yes"]
     volumes:
@@ -59,60 +59,82 @@ services:
       timeout: 3s
       retries: 20
 
-  # quay.io, not docker.io: MinIO no longer publishes to Docker Hub.
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+  # RustFS: the S3-compatible object store (Apache-2.0). It replaced MinIO, whose
+  # repository is archived and whose images no registry serves anonymously any
+  # more. Pinned by tag AND digest, the same pin as the AppHost, the Dokploy
+  # stack and both integration-test factories (Architecture.Tests keeps them
+  # identical).
+  #
+  # The image runs as uid 10001 and owns /data as that user, so a fresh named
+  # volume is writable as is: no volume-owner step. The volume is `storage_data`,
+  # not the old `minio_data`, because a volume the MinIO images wrote belongs to
+  # another uid; `docker volume rm boilerplate_minio_data` once you no longer
+  # want what was in it.
+  storage:
+    image: rustfs/rustfs:1.0.0@sha256:8cc9801755448b71a786705ce76692c77e14936cccd87cf2fc31842e58f4d1ff
     restart: unless-stopped
-    command: ["server", "/data", "--console-address", ":9001"]
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-boilerplate}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?run scripts/local-env.sh to generate .env}
+      RUSTFS_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-boilerplate}
+      RUSTFS_SECRET_KEY: ${STORAGE_SECRET_KEY:?run scripts/local-env.sh to generate .env}
+      RUSTFS_CONSOLE_ENABLE: "true"
+      #if (frontend)
+      # The browser PUTs presigned uploads straight to the store, so it has to answer
+      # CORS for every origin a client is served from: the two compose clients, and
+      # the Vite dev servers for a `pnpm dev` pointed at this stack.
+      RUSTFS_CORS_ALLOWED_ORIGINS: ${APP_DASHBOARD_URL:-http://localhost:8081},${APP_CONSOLE_URL:-http://localhost:8082},http://localhost:5173,http://localhost:5174
+      #endif
     volumes:
-      - minio_data:/data
+      - storage_data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      # /health/ready, not /health: the liveness endpoint answers a moment before
+      # the S3 API does, and storage-init must not race that window.
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/health/ready"]
       interval: 5s
       timeout: 3s
       retries: 20
     # Published because the browser follows Storage__S3__PublicBaseUrl straight to
-    # the S3 API. Aspire binds the same two ports for its own persistent MinIO, so
-    # override MINIO_API_PORT / MINIO_CONSOLE_PORT if you run both stacks at once.
+    # the S3 API. 9001 is the RustFS console, at
+    # http://localhost:9001/rustfs/console/ (its root answers 403). Override STORAGE_API_PORT /
+    # STORAGE_CONSOLE_PORT if something else on the host holds them.
     ports:
-      - "${MINIO_API_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "${STORAGE_API_PORT:-9000}:9000"
+      - "${STORAGE_CONSOLE_PORT:-9001}:9001"
 
-  # One-shot: create the bucket the Files module writes to. The app never
-  # auto-creates it, so without this the first upload fails with NoSuchBucket.
-  minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
-    restart: "no"
-    depends_on:
-      minio: { condition: service_healthy }
-    environment:
-      MC_HOST_local: http://${MINIO_ROOT_USER:-boilerplate}:${MINIO_ROOT_PASSWORD:?run scripts/local-env.sh to generate .env}@minio:9000
-    entrypoint: ["mc"]
-    command: ["mb", "--ignore-existing", "local/${STORAGE_BUCKET:-boilerplate}"]
-
-  # One-shot: allow anonymous GET under `uploads/` — and nowhere else. Avatars
-  # and tenant branding are served as unsigned URLs (IStorageService.UploadAsync
-  # returns BuildPublicUrl), and a MinIO bucket is private by default, so they
-  # 403 in the browser without this. Files-module objects live under `tenants/`
+  # One-shot: create the bucket the Files module writes to, then allow anonymous
+  # GET under `uploads/` — and nowhere else. The app never auto-creates the
+  # bucket, so without this the first upload fails with NoSuchBucket. Avatars and
+  # tenant branding are served as unsigned URLs (IStorageService.UploadAsync
+  # returns BuildPublicUrl), and a bucket is private by default, so they 403 in
+  # the browser without the policy. Files-module objects live under `tenants/`
   # where public and private share a key space and visibility is a database
   # column, so that prefix must stay closed.
-  minio-public-prefix:
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+  #
+  # Idempotent: head-bucket skips the create on a rerun, and put-bucket-policy
+  # replaces the policy with the same one. Dollar signs meant for the container's
+  # shell are doubled so compose leaves them alone.
+  storage-init:
+    image: amazon/aws-cli:2.37.4@sha256:fdd8d1fcbea9c371678dee5a40df8b178c7a781b4586605756ee28114c97ead6
     restart: "no"
     depends_on:
-      minio-init: { condition: service_completed_successfully }
+      storage: { condition: service_healthy }
     environment:
-      MC_HOST_local: http://${MINIO_ROOT_USER:-boilerplate}:${MINIO_ROOT_PASSWORD:?run scripts/local-env.sh to generate .env}@minio:9000
-    entrypoint: ["mc"]
-    command: ["anonymous", "set", "download", "local/${STORAGE_BUCKET:-boilerplate}/uploads"]
+      AWS_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY:-boilerplate}
+      AWS_SECRET_ACCESS_KEY: ${STORAGE_SECRET_KEY:?run scripts/local-env.sh to generate .env}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ENDPOINT_URL: http://storage:9000
+      BUCKET: ${STORAGE_BUCKET:-boilerplate}
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -euo pipefail
+        aws s3api head-bucket --bucket "$$BUCKET" 2>/dev/null || aws s3api create-bucket --bucket "$$BUCKET"
+        aws s3api put-bucket-policy --bucket "$$BUCKET" --policy "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Action\":[\"s3:GetObject\"],\"Resource\":[\"arn:aws:s3:::$$BUCKET/uploads/*\"]}]}"
+        echo "bucket $$BUCKET ready; anonymous GET open on uploads/ only"
 
   # Mail catcher: every message the API sends is trapped here instead of being
   # delivered. Web UI on http://localhost:8025.
   mailpit:
-    image: axllent/mailpit:v1.31
+    image: axllent/mailpit:v1.31@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
     restart: unless-stopped
     environment:
       MP_MAX_MESSAGES: "500"
@@ -120,6 +142,27 @@ services:
       MP_SMTP_AUTH_ALLOW_INSECURE: "true"
     ports:
       - "${MAILPIT_UI_PORT:-8025}:8025"
+
+  # ── Observability (opt-in) ────────────────────────────────────────
+  # Off by default — the API ships full OpenTelemetry instrumentation (traces,
+  # metrics, and OTLP log export via Serilog) but nothing to export it to.
+  # This is a disposable local OTLP receiver + viewer, pinned by tag and
+  # digest, not anything meant to run in production:
+  #   OTEL_EXPORTER_OTLP_ENDPOINT=http://otlp-receiver:18889 docker compose --profile otel up --build
+  # Traces, logs and metrics then show up at http://localhost:${OTEL_UI_PORT:-18888}.
+  # To keep it set without repeating it on the command line, put the same
+  # OTEL_EXPORTER_OTLP_ENDPOINT line in .env instead (see .env.example).
+  otlp-receiver:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.5.2@sha256:0ef531119b8073aed12b0db2b4e4ab02866c6c69b7a52264269abd00cfb48a34
+    restart: unless-stopped
+    profiles: ["otel"]
+    environment:
+      # No login token to copy locally: this container only ever exists on a
+      # developer's own machine, reachable from the compose network plus the
+      # one published UI port.
+      DASHBOARD__FRONTEND__AUTHMODE: Unsecured
+    ports:
+      - "${OTEL_UI_PORT:-18888}:18888"
 
   # ── Application ───────────────────────────────────────────────────
   # One-shot migrator. Applies every pending migration under a Postgres advisory
@@ -163,10 +206,9 @@ services:
     depends_on:
       postgres:   { condition: service_healthy }
       valkey:     { condition: service_healthy }
-      minio:      { condition: service_healthy }
+      storage:    { condition: service_healthy }
       mailpit:    { condition: service_started }
-      minio-init: { condition: service_completed_successfully }
-      minio-public-prefix: { condition: service_completed_successfully }
+      storage-init: { condition: service_completed_successfully }
       migrator:   { condition: service_completed_successfully }
     environment:
       DOTNET_ENVIRONMENT: Production
@@ -178,23 +220,34 @@ services:
       CachingOptions__Redis: valkey:6379
       CachingOptions__EnableSsl: "false"
       JwtOptions__SigningKey: ${JWT_SIGNING_KEY:?run scripts/local-env.sh to generate .env}
+      #if (frontend)
       # Mailed links (password reset, email confirmation) go to a tenant's users, so the
-      # origin the API writes into them is the DASHBOARD's, never the operator console's.
+      # origin the API writes into them defaults to the DASHBOARD's. MailLinkOrigin swaps in
+      # the console's for the root tenant's own users (operators) — see ConsoleOriginUrl below.
+      #else
+      # No client ships with this product, so mailed links (password reset, email
+      # confirmation) carry the API's own origin until you point this at the front end
+      # you build. Unset, the API refuses to send those mails at all. There is no CORS
+      # allow-list either: nothing browser-based calls this API yet.
+      #endif
       OriginOptions__OriginUrl: ${APP_DASHBOARD_URL:-http://localhost:8081}
+      #if (frontend)
+      MailLinkOrigin__ConsoleOriginUrl: ${APP_CONSOLE_URL:-http://localhost:8082}
       CorsOptions__AllowedOrigins__0: ${APP_DASHBOARD_URL:-http://localhost:8081}
       CorsOptions__AllowedOrigins__1: ${APP_CONSOLE_URL:-http://localhost:8082}
+      #endif
       AllowedHosts: ${ALLOWED_HOSTS:-localhost;127.0.0.1;api}
       # Nothing fronts the API here — it is published straight onto a host port — so forwarded
       # headers must not be honoured. appsettings.Production.json enables them for a Traefik
       # deployment and trusts nobody by default, which is a hard failure until a proxy is named.
       ProxyOptions__Enabled: "false"
       Storage__Provider: s3
-      Storage__S3__ServiceUrl: http://minio:9000
-      Storage__S3__PublicBaseUrl: http://localhost:${MINIO_API_PORT:-9000}/${STORAGE_BUCKET:-boilerplate}
+      Storage__S3__ServiceUrl: http://storage:9000
+      Storage__S3__PublicBaseUrl: http://localhost:${STORAGE_API_PORT:-9000}/${STORAGE_BUCKET:-boilerplate}
       Storage__S3__Region: us-east-1
       Storage__S3__Bucket: ${STORAGE_BUCKET:-boilerplate}
-      Storage__S3__AccessKey: ${MINIO_ROOT_USER:-boilerplate}
-      Storage__S3__SecretKey: ${MINIO_ROOT_PASSWORD:?run scripts/local-env.sh to generate .env}
+      Storage__S3__AccessKey: ${STORAGE_ACCESS_KEY:-boilerplate}
+      Storage__S3__SecretKey: ${STORAGE_SECRET_KEY:?run scripts/local-env.sh to generate .env}
       Storage__S3__ForcePathStyle: "true"
       MailOptions__UseSendGrid: "false"
       MailOptions__From: no-reply@localhost
@@ -204,7 +257,12 @@ services:
       # Mailpit speaks plain SMTP on the compose network and never advertises STARTTLS, which the
       # default (StartTls) requires. A real relay keeps the default.
       MailOptions__Smtp__SecureSocket: None
-      OpenTelemetryOptions__Exporter__Otlp__Endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      # The literal OTEL_EXPORTER_OTLP_ENDPOINT name matters: AddAppOpenTelemetry / AddAppLogging
+      # auto-detect that exact env var (the same convention Aspire uses to inject its own dashboard)
+      # and export to it even though Exporter.Otlp.Enabled stays false in appsettings.Production.json —
+      # no other wiring needed. Blank by default (nothing exported); point it at the otlp-receiver
+      # service below, e.g. OTEL_EXPORTER_OTLP_ENDPOINT=http://otlp-receiver:18889 in .env.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     ports:
       - "${APP_API_PORT:-8080}:8080"
     # No container HEALTHCHECK: the runtime image is chiseled, so there is no
@@ -228,9 +286,9 @@ services:
       api: { condition: service_started }
     environment:
       APP_API_URL: http://api:8080
-      # The browser fetches presigned URLs straight from MinIO, so the client's
+      # The browser fetches presigned URLs straight from the object store, so the client's
       # Content-Security-Policy has to name that origin.
-      APP_STORAGE_URL: http://localhost:${MINIO_API_PORT:-9000}
+      APP_STORAGE_URL: http://localhost:${STORAGE_API_PORT:-9000}
       APP_DEFAULT_TENANT: ${APP_DEFAULT_TENANT:-root}
     # 8080 in the container: the images run nginx as an unprivileged user, which
     # cannot bind a privileged port.
@@ -247,7 +305,7 @@ services:
       api: { condition: service_started }
     environment:
       APP_API_URL: http://api:8080
-      APP_STORAGE_URL: http://localhost:${MINIO_API_PORT:-9000}
+      APP_STORAGE_URL: http://localhost:${STORAGE_API_PORT:-9000}
       # Operators live in the root tenant; the console's sign-in form has no tenant field.
       APP_DEFAULT_TENANT: ${APP_DEFAULT_TENANT:-root}
       # Only so a tenant user who lands here can be pointed at the app that is theirs.
@@ -259,4 +317,4 @@ services:
 volumes:
   pg_data:
   valkey_data:
-  minio_data:
+  storage_data:

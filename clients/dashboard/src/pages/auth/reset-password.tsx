@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -36,7 +36,7 @@ type Strength = "weak" | "fair" | "strong";
 
 function scorePassword(value: string): Strength | null {
   if (value.length === 0) return null;
-  if (value.length < 8) return "weak";
+  if (value.length < 10) return "weak";
 
   let score = 0;
   if (/[a-z]/.test(value)) score++;
@@ -106,11 +106,6 @@ export function ResetPasswordPage() {
     },
   });
 
-  // Keep the error in sync with the form: typing after an error should
-  // clear it rather than persist a stale message under the new input.
-  useEffect(() => {
-    setError(null);
-  }, [password, confirm]);
 
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
@@ -124,8 +119,8 @@ export function ResetPasswordPage() {
       setError("Passwords don't match.");
       return;
     }
-    if (password.length < 8) {
-      setError("Use at least 8 characters.");
+    if (password.length < 10) {
+      setError("Use at least 10 characters.");
       return;
     }
     mutation.mutate();
@@ -195,12 +190,17 @@ export function ResetPasswordPage() {
                   id="new-password"
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 8 characters"
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    // Typing after an error clears it rather than leaving a
+                    // stale message under the new input.
+                    setError(null);
+                  }}
+                  placeholder="At least 10 characters"
                   required
                   autoComplete="new-password"
                   autoFocus
-                  minLength={8}
+                  minLength={10}
                   aria-invalid={error ? true : undefined}
                   aria-describedby={error ? "reset-error" : undefined}
                   className="h-11 pr-11 text-[14px]"
@@ -245,11 +245,14 @@ export function ResetPasswordPage() {
                   id="confirm-password"
                   type={showConfirm ? "text" : "password"}
                   value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
+                  onChange={(e) => {
+                    setConfirm(e.target.value);
+                    setError(null);
+                  }}
                   placeholder="Re-enter password"
                   required
                   autoComplete="new-password"
-                  minLength={8}
+                  minLength={10}
                   aria-invalid={error ? true : undefined}
                   aria-describedby={error ? "reset-error" : undefined}
                   className="h-11 pr-11 text-[14px]"
@@ -303,7 +306,7 @@ export function ResetPasswordPage() {
             <div className="pt-1.5">
               <Button
                 type="submit"
-                disabled={mutation.isPending || !matches || password.length < 8}
+                disabled={mutation.isPending || !matches || password.length < 10}
                 className="group h-11 w-full text-[14px] font-semibold"
               >
                 {mutation.isPending ? (

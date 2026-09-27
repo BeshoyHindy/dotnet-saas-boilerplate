@@ -1,4 +1,6 @@
 ﻿using FluentValidation;
+using Boilerplate.Modules.Identity.Contracts;
+using Boilerplate.Modules.Identity.Contracts.Services;
 using Boilerplate.Modules.Multitenancy.Contracts;
 using Boilerplate.Modules.Multitenancy.Contracts.v1.CreateTenant;
 using System.Text.RegularExpressions;
@@ -21,8 +23,10 @@ public sealed partial class CreateTenantCommandValidator : AbstractValidator<Cre
 
     public CreateTenantCommandValidator(
         ITenantService tenantService,
+        ICommonPasswordList commonPasswords,
         TimeProvider timeProvider)
     {
+        ArgumentNullException.ThrowIfNull(commonPasswords);
         ArgumentNullException.ThrowIfNull(timeProvider);
 
         RuleFor(t => t.Id).Cascade(CascadeMode.Stop)
@@ -34,19 +38,23 @@ public sealed partial class CreateTenantCommandValidator : AbstractValidator<Cre
 
         RuleFor(t => t.Name).Cascade(CascadeMode.Stop)
             .NotEmpty()
-            .MustAsync(async (name, ct) => !await tenantService.ExistsWithNameAsync(name!, ct).ConfigureAwait(false))
+            .MustAsync(async (name, ct) => !await tenantService.ExistsWithNameAsync(name, ct).ConfigureAwait(false))
             .WithMessage((_, name) => $"Tenant {name} already exists.");
 
         RuleFor(t => t.AdminEmail).Cascade(CascadeMode.Stop)
             .NotEmpty()
             .EmailAddress();
 
-        // Admin password is operator-supplied. The 8-char floor matches the Identity policy; mixed-character
-        // rules (digit/upper/non-alpha) are enforced later by Identity's PasswordValidators at seed time.
+        // Admin password is operator-supplied, and the admin is only created later, by the provisioning
+        // seed step — where Identity's UserManager would refuse it as a Failed provisioning, not a 400.
+        // So Identity's whole policy is repeated here from its contracts: the same length floor and the
+        // same common-password list. There are no composition rules to repeat (ASVS V6.2.5).
         RuleFor(t => t.AdminPassword).Cascade(CascadeMode.Stop)
             .NotEmpty()
-            .MinimumLength(8)
-            .WithMessage("Admin password must be at least 8 characters.");
+            .MinimumLength(PasswordPolicy.MinimumLength)
+            .WithMessage("Admin password must be at least {MinLength} characters.")
+            .Must(password => !commonPasswords.Contains(password))
+            .WithMessage(PasswordPolicy.CommonPasswordMessage);
 
         // Optional — null falls back to the configured default validity term. When supplied it must
         // grant the tenant a window that is still open.

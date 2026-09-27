@@ -1,4 +1,4 @@
-import { api, unwrap, unwrapVoid, type Paged, type Schemas } from "@/lib/api-client";
+import { api, ApiRequestError, unwrap, unwrapVoid, type Paged, type Schemas } from "@/lib/api-client";
 
 // -----------------------------
 // Types — every one of them is the generated contract type (ADR-0004).
@@ -96,11 +96,11 @@ export async function resendUserConfirmationEmail(userId: string): Promise<void>
   );
 }
 
-// There is no `setProfileImage(url)` any more (#83). PUT /identity/profile/image accepted any
-// string, so a user could point their avatar at another user's — and the next replace deleted that
-// other user's object, which the tenant legitimately owned. An avatar is now uploaded with
-// `updateMyProfile({ image })` and cleared with `updateMyProfile({ deleteCurrentImage: true })`;
-// the URL is the server's answer, never the client's request.
+// There is no `setProfileImage(url)` any more. The API stopped accepting URLs from the client
+// because a URL the client names may belong to another user, and replacing or removing the asset
+// would then delete their bytes. An avatar is now uploaded with `updateMyProfile({ image })` and
+// cleared with `updateMyProfile({ deleteCurrentImage: true })`; the URL is always the server's
+// answer, never the client's request.
 
 /**
  * The signed-in user's effective permissions. The JWT carries only role names;
@@ -111,9 +111,19 @@ export async function getMyPermissions(): Promise<string[]> {
   return unwrap(await api.GET("/api/v1/identity/permissions", {})) ?? [];
 }
 
-/** The authenticated user's full profile (name, email, phone, imageUrl, …). */
-export async function getMyProfile(): Promise<UserDto> {
-  return unwrap(await api.GET("/api/v1/identity/profile", {}));
+/**
+ * The authenticated user's profile plus its version: the strong `ETag` the server sends with it.
+ * The `etag` is what `updateMyProfile` echoes in `If-Match`, so the version travels with the
+ * representation the user is looking at, enabling optimistic concurrency control. Null only if
+ * the header did not reach script.
+ */
+export type MyProfile = UserDto & { etag: string | null };
+
+/** The authenticated user's full profile (name, email, phone, imageUrl, …) and its version. */
+export async function getMyProfile(): Promise<MyProfile> {
+  const result = await api.GET("/api/v1/identity/profile", {});
+  const profile = unwrap(result);
+  return { ...profile, etag: result.response.headers.get("ETag") };
 }
 
 export async function registerUser(input: RegisterUserInput): Promise<RegisterUserResponse> {
@@ -197,8 +207,24 @@ export async function adminRevokeAllUserSessions(
 // Groups
 // -----------------------------
 
-export async function listGroups(search?: string): Promise<GroupDto[]> {
-  return unwrap(await api.GET("/api/v1/identity/groups", { params: { query: { search } } }));
+export type ListGroupsParams = {
+  pageNumber?: number;
+  pageSize?: number;
+  search?: string;
+};
+
+export async function listGroups(params: ListGroupsParams = {}): Promise<Paged<GroupDto>> {
+  return unwrap(
+    await api.GET("/api/v1/identity/groups", {
+      params: {
+        query: {
+          PageNumber: params.pageNumber ?? 1,
+          PageSize: params.pageSize ?? 20,
+          Search: params.search,
+        },
+      },
+    }),
+  );
 }
 
 export async function getGroupById(id: string): Promise<GroupDto> {
@@ -219,9 +245,17 @@ export async function deleteGroup(id: string): Promise<void> {
   unwrapVoid(await api.DELETE("/api/v1/identity/groups/{id}", { params: { path: { id } } }));
 }
 
-export async function getGroupMembers(groupId: string): Promise<GroupMemberDto[]> {
+export async function getGroupMembers(
+  groupId: string,
+  params: { pageNumber?: number; pageSize?: number } = {},
+): Promise<Paged<GroupMemberDto>> {
   return unwrap(
-    await api.GET("/api/v1/identity/groups/{groupId}/members", { params: { path: { groupId } } }),
+    await api.GET("/api/v1/identity/groups/{groupId}/members", {
+      params: {
+        path: { groupId },
+        query: { PageNumber: params.pageNumber ?? 1, PageSize: params.pageSize ?? 20 },
+      },
+    }),
   );
 }
 
@@ -256,8 +290,8 @@ export type UpdateProfileInput = {
   /**
    * A new avatar, as raw bytes. The server uploads it with `IStorageService.UploadAsync` into the
    * `uploads/` prefix and persists the durable unsigned URL that comes back. This is the ONE way
-   * the dashboard uploads an avatar: a Files-module `publicUrl` is a presigned GET that expires in
-   * minutes, so storing one on the column stores a dead link (issue #72).
+   * the dashboard uploads an avatar: presigned URLs expire in minutes, so storing one on the
+   * column would result in a dead link.
    */
   image?: Schemas["FileUploadRequest"] | null;
   /** Delete the current avatar — clears the column AND removes the stored object. */
@@ -266,24 +300,39 @@ export type UpdateProfileInput = {
 
 /**
  * Updates the authenticated user's profile. Email changes go through their own dedicated
- * endpoint. Reads the current profile first so unset optional fields keep their existing
- * values instead of being nulled.
+ * endpoint.
+ *
+ * `current` is the profile the user was shown — not a fresh read. Its fields fill whatever
+ * `input` leaves unset in this full-representation PUT, and its `etag` rides in `If-Match`, so a
+ * profile changed elsewhere since then is refused with 412 (`isProfileConflict`) instead of
+ * overwritten. This prevents lost updates from concurrent modifications. On a 412 the caller
+ * refetches and shows the conflict; it never resends.
  */
-export async function updateMyProfile(input: UpdateProfileInput): Promise<void> {
-  const profile = await getMyProfile();
+export async function updateMyProfile(current: MyProfile, input: UpdateProfileInput): Promise<void> {
+  if (!current.etag) {
+    throw new Error(
+      "Your profile's version is unknown, so it cannot be saved safely. Reload the page and try again.",
+    );
+  }
   unwrapVoid(
     await api.PUT("/api/v1/identity/profile", {
+      params: { header: { "If-Match": current.etag } },
       body: {
-        id: profile.id ?? "",
-        firstName: input.firstName ?? profile.firstName ?? null,
-        lastName: input.lastName ?? profile.lastName ?? null,
-        phoneNumber: input.phoneNumber ?? profile.phoneNumber ?? null,
-        email: profile.email,
+        id: current.id ?? "",
+        firstName: input.firstName ?? current.firstName ?? null,
+        lastName: input.lastName ?? current.lastName ?? null,
+        phoneNumber: input.phoneNumber ?? current.phoneNumber ?? null,
+        email: current.email,
         image: input.image ?? null,
         deleteCurrentImage: input.deleteCurrentImage ?? false,
       },
     }),
   );
+}
+
+/** True for the 412 a profile update gets when the profile changed since it was read. */
+export function isProfileConflict(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.status === 412;
 }
 
 // -----------------------------
@@ -326,7 +375,7 @@ export async function resetPassword(input: {
 /**
  * Confirm-email landing. The tenant is a path segment; (userId, code) come as query
  * parameters from the mailed link, which points at the dashboard's own `/confirm-email`
- * page (issue #46). Returns the server's confirmation message.
+ * page. Returns the server's confirmation message.
  */
 export async function confirmEmail(input: {
   userId: string;

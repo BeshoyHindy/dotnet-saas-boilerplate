@@ -14,7 +14,9 @@ public static class TestConstants
 
     public const string JwtIssuer = "boilerplate";
     public const string JwtAudience = "boilerplate.clients";
-    public const string JwtSigningKey = "integration-test-signing-key-that-is-at-least-32-chars-long!!";
+    // At least 64 bytes: long enough for HS512, which HmacSha512 keyed-hash creation requires
+    // even though only HmacSha256 is ever an allowed algorithm (JwtAlgorithmPinningTests).
+    public const string JwtSigningKey = "integration-test-signing-key-that-is-at-least-64-bytes-long-for-hs512!!";
 
     /// <summary>
     /// Ceiling the test host configures for acting tokens (operator exchange + impersonation).

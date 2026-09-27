@@ -1,5 +1,6 @@
 using Boilerplate.BuildingBlocks.Shared.Constants;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
+using Boilerplate.Modules.Identity.Contracts.Services;
 using Boilerplate.Modules.Identity.Data;
 using Boilerplate.Modules.Identity.Domain;
 using Boilerplate.Modules.Multitenancy.Contracts;
@@ -66,7 +67,8 @@ internal sealed class DemoSeeder
 
         var password = DemoSeedGuard.ResolveDemoPassword(
             _services.GetRequiredService<IConfiguration>(),
-            _services.GetRequiredService<IOptions<IdentityOptions>>().Value.Password);
+            _services.GetRequiredService<IOptions<IdentityOptions>>().Value.Password,
+            _services.GetRequiredService<ICommonPasswordList>());
 
         foreach (var demo in DemoDataset.Tenants)
         {

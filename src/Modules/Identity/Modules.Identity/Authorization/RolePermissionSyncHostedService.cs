@@ -91,7 +91,7 @@ internal sealed class RolePermissionSyncHostedService(
         try
         {
             await tenantScope.RunAsync(
-                tenant.Id!,
+                tenant.Id,
                 (services, ct) => services.GetRequiredService<RolePermissionSyncer>().SyncAsync(ct),
                 stoppingToken).ConfigureAwait(false);
         }

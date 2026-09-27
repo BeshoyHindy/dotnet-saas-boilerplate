@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   useMutation,
@@ -119,9 +119,11 @@ export function UserDetailPage() {
   // every `roles` array identity change. `roles` is `rolesQuery.data ?? []`,
   // so an incidental background refetch would otherwise wipe unsaved edits.
   // The deterministic post-save clear lives in saveRoles.onSuccess.
-  useEffect(() => {
+  const [pendingFor, setPendingFor] = useState(userId);
+  if (userId !== pendingFor) {
+    setPendingFor(userId);
     setPending(new Map());
-  }, [userId]);
+  }
 
   const effective = (role: UserRoleDto) => {
     if (!role.roleId) return role.enabled;
@@ -264,7 +266,7 @@ export function UserDetailPage() {
       if (!user?.id) throw new Error("Missing user id");
       if (!actor?.tenant) throw new Error("No tenant on current session");
       // Same tenant by construction — this page only ever lists the caller's own users,
-      // and since #9 the server refuses a cross-tenant start outright (that is the
+      // and the server refuses a cross-tenant start outright (that is the
       // operator token exchange, driven from the tenant registry).
       return impersonateInOwnTenant({
         targetUserId: user.id,

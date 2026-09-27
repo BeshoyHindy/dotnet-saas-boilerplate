@@ -12,8 +12,8 @@ namespace Boilerplate.BuildingBlocks.Eventing.Outbox;
 /// EF Core outbox store over the framework-owned <see cref="EventingDbContext"/>.
 ///
 /// Non-generic on purpose: a per-DbContext generic store meant one
-/// <c>IOutboxStore</c> registration per module, and .NET DI resolved the last
-/// one registered for the entire application (issue #1349).
+/// <c>IOutboxStore</c> registration per module, and .NET DI would resolve the last
+/// one registered for the entire application.
 /// </summary>
 public sealed partial class EfCoreOutboxStore : IOutboxStore
 {
@@ -125,6 +125,10 @@ public sealed partial class EfCoreOutboxStore : IOutboxStore
         _dbContext.Set<OutboxMessage>().Update(message);
         await _dbContext.SaveChangesAsync(ct).ConfigureAwait(false);
     }
+
+    public Task<int> CountPendingAsync(CancellationToken ct = default) =>
+        _dbContext.Set<OutboxMessage>()
+            .CountAsync(m => !m.IsDead && m.ProcessedOnUtc == null, ct);
 
     public async Task MarkAsFailedAsync(OutboxMessage message, string error, bool isDead, CancellationToken ct = default)
     {

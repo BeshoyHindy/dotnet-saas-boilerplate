@@ -29,6 +29,7 @@ using Boilerplate.Modules.Identity.Features.v1.Impersonation.GetImpersonationGra
 using Boilerplate.Modules.Identity.Features.v1.Impersonation.RevokeImpersonationGrant;
 using Boilerplate.Modules.Identity.Features.v1.Impersonation.StartImpersonation;
 using Boilerplate.Modules.Identity.Features.v1.Operators.ExchangeOperatorToken;
+using Boilerplate.Modules.Identity.Features.v1.Operators.IssueJobMonitorAccess;
 using Boilerplate.Modules.Identity.Features.v1.Permissions.GetPermissionCatalog;
 using Boilerplate.Modules.Identity.Features.v1.Roles;
 using Boilerplate.Modules.Identity.Features.v1.Roles.DeleteRole;
@@ -62,13 +63,13 @@ using Boilerplate.Modules.Identity.Features.v1.Users.GetUserGroups;
 using Boilerplate.Modules.Identity.Features.v1.Users.GetUserPermissions;
 using Boilerplate.Modules.Identity.Features.v1.Users.GetUserProfile;
 using Boilerplate.Modules.Identity.Features.v1.Users.GetUserRoles;
-using Boilerplate.Modules.Identity.Features.v1.Users.GetUsers;
 using Boilerplate.Modules.Identity.Features.v1.Users.RegisterUser;
 using Boilerplate.Modules.Identity.Features.v1.Users.ResetPassword;
 using Boilerplate.Modules.Identity.Features.v1.Users.SearchUsers;
 using Boilerplate.Modules.Identity.Features.v1.Users.SelfRegistration;
 using Boilerplate.Modules.Identity.Features.v1.Users.ToggleUserStatus;
 using Boilerplate.Modules.Identity.Features.v1.Users.UpdateUser;
+using Boilerplate.Modules.Identity.Passwords;
 using Boilerplate.Modules.Identity.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -108,7 +109,7 @@ public class IdentityModule : IModule
         // User services - focused single-responsibility services
         services.AddTransient<IUserRegistrationService, UserRegistrationService>();
         // One definition of the "confirm your e-mail" message, shared by the registration event
-        // handler and the resend endpoint so the two links cannot drift apart (#86).
+        // handler and the resend endpoint so the two links stay synchronized.
         services.AddTransient<ConfirmationMailBuilder>();
         services.AddTransient<IUserProfileService, UserProfileService>();
         services.AddTransient<IUserStatusService, UserStatusService>();
@@ -121,9 +122,9 @@ public class IdentityModule : IModule
         services.AddTransient<IUserService, UserService>();
 
         services.AddTransient<IRoleService, RoleService>();
-        services.AddHeroStorage(builder.Configuration);
+        services.AddAppStorage(builder.Configuration);
         services.AddScoped<IIdentityService, IdentityService>();
-        services.AddHeroDbContext<IdentityDbContext>();
+        services.AddAppDbContext<IdentityDbContext>();
         // Eventing itself is bootstrapped by the host (AddEventingCore) — the outbox is framework
         // infrastructure, not Identity's. Handler registration stays per module.
         services.AddIntegrationEventHandlers(typeof(IdentityModule).Assembly);
@@ -139,12 +140,20 @@ public class IdentityModule : IModule
         // Tenant validity grace period (shared "TenantValidity" section) — used by the login expiry check.
         services.Configure<TenantGraceOptions>(builder.Configuration.GetSection(TenantGraceOptions.SectionName));
 
+        // The console's origin for the root tenant's own mailed links (see MailLinkOrigin). Optional —
+        // a `--frontend false` scaffold never sets it, and every mail keeps using OriginOptions.OriginUrl.
+        services.Configure<MailLinkOriginOptions>(builder.Configuration.GetSection(MailLinkOriginOptions.SectionName));
+
         // Lifetime ceiling for every acting token (operator exchange + impersonation). Validated on
         // start so a misconfigured Default/Max pair fails the host, not the first exchange.
         services.AddOptions<OperatorExchangeOptions>()
             .BindConfiguration(OperatorExchangeOptions.SectionName)
             .ValidateDataAnnotations()
             .ValidateOnStart();
+
+        // The bundled common-password list: read once, shared. Also consumed outside Identity
+        // (CreateTenant's admin password, the Migrator's demo password) through the contract.
+        services.AddSingleton<ICommonPasswordList, CommonPasswordList>();
 
         // Register password history service
         services.AddScoped<IPasswordHistoryService, PasswordHistoryService>();
@@ -155,17 +164,25 @@ public class IdentityModule : IModule
         // Register session service and background cleanup
         services.AddScoped<ISessionService, SessionService>();
         services.AddHostedService<SessionCleanupHostedService>();
+        // Singleton: it owns the per-instance cache the JwtBearer hook reads on every request and
+        // SessionService marks on every revoke — one instance, or revocation is not immediate here.
+        services.AddSingleton<SessionLiveness>();
+
+        // Mints the Job monitor cookie's token (ADR-0009).
+        services.AddSingleton<JobMonitorTokenIssuer>();
 
         // Register group role service for group-derived permissions
         services.AddScoped<IGroupRoleService, GroupRoleService>();
 
         services.AddIdentity<AppUser, AppRole>(options =>
         {
+            // ASVS 5.0 L1: length (V6.2.1) and the common-password list below (V6.2.4), and no
+            // composition rules (V6.2.5) — a long all-lowercase passphrase is a good password.
             options.Password.RequiredLength = IdentityModuleConstants.PasswordLength;
-            options.Password.RequireDigit = true;
-            options.Password.RequireLowercase = true;
+            options.Password.RequireDigit = false;
+            options.Password.RequireLowercase = false;
             options.Password.RequireNonAlphanumeric = false;
-            options.Password.RequireUppercase = true;
+            options.Password.RequireUppercase = false;
             options.User.RequireUniqueEmail = true;
 
             // Account lockout: 5 consecutive failed logins → 15-minute lockout (applies to new users by default).
@@ -175,14 +192,16 @@ public class IdentityModule : IModule
             options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
         })
            .AddEntityFrameworkStores<IdentityDbContext>()
-           .AddDefaultTokenProviders();
+           .AddDefaultTokenProviders()
+           // On the builder, so UserManager runs it on every path that sets a password.
+           .AddPasswordValidator<CommonPasswordValidator>();
 
         //metrics
         services.AddSingleton<IdentityMetrics>();
 
         // Skipped only by hosts that never authenticate a caller (the DbMigrator), which would
         // otherwise need a signing key purely to satisfy JwtOptions.ValidateOnStart().
-        if (builder.GetHeroPlatformOptions().EnableAuthentication)
+        if (builder.GetAppPlatformOptions().EnableAuthentication)
         {
             services.ConfigureJwtAuth();
         }
@@ -272,12 +291,11 @@ public class IdentityModule : IModule
         group.MapGetCurrentUserPermissionsEndpoint();
         group.MapGetMeEndpoint();
         group.MapGetUserRolesEndpoint();
-        group.MapGetUsersListEndpoint();
         group.MapSearchUsersEndpoint();
         group.MapRegisterUserEndpoint();
         group.MapToggleUserStatusEndpoint();
         // No "set my avatar URL" endpoint: an avatar is uploaded on MapUpdateUserEndpoint (bytes in,
-        // server-issued URL out) and removed with its `deleteCurrentImage` flag (#83).
+        // server-issued URL out) and removed with its `deleteCurrentImage` flag.
         group.MapUpdateUserEndpoint();
 
         // sessions - user endpoints
@@ -307,6 +325,9 @@ public class IdentityModule : IModule
         // operator — cross-tenant token exchange (ADR-0002). Root-only; NOT in the anonymous
         // tenants/{tenant}/auth group: the caller already holds a signed root token.
         group.MapExchangeOperatorTokenEndpoint();
+
+        // operator — the Job monitor cookie (ADR-0009). Root-only, refused while acting.
+        group.MapIssueJobMonitorAccessEndpoint();
 
         // impersonation
         group.MapStartImpersonationEndpoint();

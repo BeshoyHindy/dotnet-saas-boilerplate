@@ -135,7 +135,7 @@ export async function refreshAccessToken(): Promise<void> {
     // The refresh cookie is dead (expired, revoked, or rotated by another tab) — end the
     // session locally rather than leaving a stray acting token or stale cache behind for
     // whoever signs in next in this tab.
-    endSessionLocally();
+    endSessionLocally("expired");
     throw new ApiRequestError(response.status, "Refresh failed");
   }
 

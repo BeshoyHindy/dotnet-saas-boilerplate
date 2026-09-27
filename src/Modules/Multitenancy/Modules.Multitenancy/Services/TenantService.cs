@@ -92,7 +92,7 @@ public sealed class TenantService : ITenantService
         ArgumentNullException.ThrowIfNull(tenant);
 
         await _tenantScope.RunAsync(
-            tenant.Id!,
+            tenant.Id,
             async (services, ct) =>
             {
                 foreach (var initializer in services.GetServices<IDbInitializer>())
@@ -108,7 +108,7 @@ public sealed class TenantService : ITenantService
         ArgumentNullException.ThrowIfNull(tenant);
 
         await _tenantScope.RunAsync(
-            tenant.Id!,
+            tenant.Id,
             async (services, ct) =>
             {
                 foreach (var initializer in services.GetServices<IDbInitializer>())
@@ -127,8 +127,11 @@ public sealed class TenantService : ITenantService
             throw new CustomException($"tenant {id} is already deactivated");
         }
 
-        int tenantCount = (await _tenantStore.GetAllAsync().ConfigureAwait(false)).Count(t => t.IsActive);
-        if (tenantCount <= 1)
+        // Counted in SQL, not by loading the whole catalog through the store.
+        int activeTenantCount = await _dbContext.TenantInfo
+            .CountAsync(t => t.IsActive, cancellationToken)
+            .ConfigureAwait(false);
+        if (activeTenantCount <= 1)
         {
             throw new CustomException("At least one active tenant is required.");
         }
@@ -148,7 +151,9 @@ public sealed class TenantService : ITenantService
         await _tenantStore.GetAsync(id).ConfigureAwait(false) is not null;
 
     public async Task<bool> ExistsWithNameAsync(string name, CancellationToken cancellationToken = default) =>
-        (await _tenantStore.GetAllAsync().ConfigureAwait(false)).Any(t => t.Name == name);
+        await _dbContext.TenantInfo
+            .AnyAsync(t => t.Name == name, cancellationToken)
+            .ConfigureAwait(false);
 
     public async Task<PagedResponse<TenantDto>> GetAllAsync(GetTenantsQuery query, CancellationToken cancellationToken)
     {
@@ -185,11 +190,11 @@ public sealed class TenantService : ITenantService
 
         return new TenantStatusDto
         {
-            Id = tenant.Id!,
+            Id = tenant.Id,
             Name = tenant.Name!,
             IsActive = tenant.IsActive,
             ValidUpto = tenant.ValidUpto,
-            AdminEmail = tenant.AdminEmail!,
+            AdminEmail = tenant.AdminEmail,
             Issuer = tenant.Issuer,
             ExpiryState = expiryState,
             GraceEndsUtc = graceEnds

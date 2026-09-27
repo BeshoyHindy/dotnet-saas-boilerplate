@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
+  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
@@ -40,6 +41,7 @@ import {
   EntityListRow,
   EntityMobileCard,
   EntityPageHeader,
+  EntityPager,
   EntitySearch,
   EntityStatusBadge,
   Field,
@@ -48,23 +50,32 @@ import { cn } from "@/lib/cn";
 import { describe } from "@/lib/list-helpers";
 
 const DESKTOP_COLUMNS = "grid-cols-[1fr_160px_120px_24px]";
+const PAGE_SIZE = 20;
 
 export function GroupsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
+  const [pageNumber, setPageNumber] = useState(1);
 
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(search.trim()), 250);
+    const t = setTimeout(() => {
+      setDebounced(search.trim());
+      setPageNumber(1);
+    }, 250);
     return () => clearTimeout(t);
   }, [search]);
 
   const query = useQuery({
-    queryKey: ["identity", "groups", { search: debounced }],
-    queryFn: () => listGroups(debounced || undefined),
+    queryKey: ["identity", "groups", { search: debounced, pageNumber }],
+    queryFn: () =>
+      listGroups({ pageNumber, pageSize: PAGE_SIZE, search: debounced || undefined }),
+    placeholderData: keepPreviousData,
   });
 
-  const groups = useMemo(() => query.data ?? [], [query.data]);
+  const data = query.data;
+  const groups = useMemo(() => data?.items ?? [], [data]);
+  const totalCount = data?.totalCount ?? 0;
 
   const searchActive = debounced.length > 0;
 
@@ -73,7 +84,7 @@ export function GroupsPage() {
       <EntityPageHeader
         icon={UsersRound}
         title="Groups"
-        total={query.data ? groups.length : null}
+        total={data ? totalCount : null}
         unit="group"
         description="Groups bundle members and roles into reusable cohorts. Add a user to a group to grant every role attached to that group."
       >
@@ -122,7 +133,7 @@ export function GroupsPage() {
         <div>
           <div className="mb-3 flex items-center justify-between">
             <p className="text-[12px] font-medium text-[var(--color-muted-foreground)]">
-              {groups.length} group{groups.length === 1 ? "" : "s"} found
+              {totalCount} group{totalCount === 1 ? "" : "s"} found
             </p>
           </div>
 
@@ -149,6 +160,15 @@ export function GroupsPage() {
               />
             ))}
           </EntityListCard>
+
+          <EntityPager
+            page={data?.pageNumber ?? 1}
+            totalPages={Math.max(data?.totalPages ?? 1, 1)}
+            hasPrev={data?.hasPrevious ?? false}
+            hasNext={data?.hasNext ?? false}
+            onPrev={() => setPageNumber((p) => Math.max(1, p - 1))}
+            onNext={() => setPageNumber((p) => p + 1)}
+          />
         </div>
       )}
 
@@ -296,13 +316,15 @@ function CreateGroupDialog({ open, onClose }: { open: boolean; onClose: () => vo
   const [description, setDescription] = useState("");
   const [isDefault, setIsDefault] = useState(false);
 
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (!open) {
       setName("");
       setDescription("");
       setIsDefault(false);
     }
-  }, [open]);
+  }
 
   const mutation = useMutation({
     mutationFn: () =>

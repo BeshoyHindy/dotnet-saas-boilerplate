@@ -37,7 +37,7 @@ jobs:
       actions: read # the analyze step reads the run's own metadata
     steps:
       - uses: actions/checkout@v7
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           languages: csharp
       - uses: actions/setup-dotnet@v6
@@ -46,4 +46,4 @@ jobs:
       # Not -warnaserror: backend.yml owns that gate, and CodeQL must still be
       # able to analyse a build that only warns.
       - run: dotnet build src/Boilerplate.slnx -c Release
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4

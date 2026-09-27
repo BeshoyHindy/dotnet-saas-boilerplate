@@ -9,6 +9,11 @@
 		<FrameworkReference Include="Microsoft.AspNetCore.App" />
 	</ItemGroup>
 	<ItemGroup>
+		<!-- Common-password list (ASVS V6.2.4): top 100,000 of Pwdb-Public via SecLists, both MIT licence,
+		     filtered to the policy's 10-character floor. Source, commit and derivation: Passwords/CommonPasswordList.cs. -->
+		<EmbeddedResource Include="Passwords\common-passwords.txt" LogicalName="Boilerplate.Modules.Identity.Passwords.common-passwords.txt" />
+	</ItemGroup>
+	<ItemGroup>
 	  <PackageReference Include="Mediator.Abstractions" />
 	  <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
 	  <PackageReference Include="Finbuckle.MultiTenant.Identity.EntityFrameworkCore" />

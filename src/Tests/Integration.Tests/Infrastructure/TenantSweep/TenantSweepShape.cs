@@ -90,7 +90,6 @@ public static class TenantSweepShape
         "GET api/v{version:apiVersion}/identity/roles",
         "GET api/v{version:apiVersion}/identity/sessions",
         "GET api/v{version:apiVersion}/identity/sessions/me",
-        "GET api/v{version:apiVersion}/identity/users",
         "GET api/v{version:apiVersion}/identity/users/search",
         "GET api/v{version:apiVersion}/notifications/",
         "GET api/v{version:apiVersion}/notifications/unread-count",
@@ -101,7 +100,7 @@ public static class TenantSweepShape
     };
 
     /// <summary>
-    /// Every route carrying <c>[TenantSweepExempt]</c>. A group-level exemption would show up here as
+    /// Every route exempted with <c>.ExemptFromTenantSweep(...)</c>. A group-level exemption would show up here as
     /// a burst of new names at once — which is the whole point of pinning it.
     /// </summary>
     public static IReadOnlySet<string> ExemptRoutes { get; } = new HashSet<string>(StringComparer.Ordinal)

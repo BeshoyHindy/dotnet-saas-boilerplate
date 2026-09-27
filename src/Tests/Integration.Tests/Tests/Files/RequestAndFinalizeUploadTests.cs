@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Boilerplate.Modules.Files.Contracts.v1.DTOs;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
@@ -20,8 +19,7 @@ public sealed class RequestAndFinalizeUploadTests
     public async Task UploadUrl_Then_Finalize_Should_TransitionToAvailable()
     {
         using var client = await _auth.CreateRootAdminClientAsync();
-        byte[] bytes = new byte[1024];
-        RandomNumberGenerator.Fill(bytes);
+        byte[] bytes = UploadPayloads.Pdf(1024);
 
         var presigned = await RequestPresignedUploadAsync(client, "doc.pdf", "application/pdf", bytes.Length, "Document");
 
@@ -126,8 +124,7 @@ public sealed class RequestAndFinalizeUploadTests
         int sizeBytes,
         string category)
     {
-        byte[] bytes = new byte[sizeBytes];
-        RandomNumberGenerator.Fill(bytes);
+        byte[] bytes = UploadPayloads.Pdf(sizeBytes);
 
         var presigned = await RequestPresignedUploadAsync(client, fileName, contentType, sizeBytes, category);
 

@@ -10,10 +10,10 @@ type DraftAssets = TenantThemeDraft["brandAssets"];
  * A picked file is staged on the draft as raw bytes (`logo` / `logoDark` / `favicon`) and uploaded
  * by the theme PUT itself: `TenantThemeService` writes it with `IStorageService.UploadAsync` into
  * the `uploads/` prefix, under that asset's own owner segment, and stores the durable unsigned URL.
- * The Files module is deliberately not involved — its `publicUrl` is a presigned GET that expires in
- * minutes, so persisting one on the theme row persists a dead link (issue #72).
+ * The Files module is deliberately not involved — presigned URLs expire in minutes, so persisting
+ * one on the theme row would result in a dead link.
  *
- * **A URL cannot be typed in here, and the API would not take one (#83).** What is shown is the URL
+ * **A URL cannot be typed in here, and the API no longer accepts them.** What is shown is the URL
  * the server issued; removing an asset is a flag, so the object deleted is always the one this slot
  * uploaded rather than whatever address happened to be sitting in the column.
  *

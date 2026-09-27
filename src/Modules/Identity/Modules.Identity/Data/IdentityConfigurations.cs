@@ -20,7 +20,7 @@ public class ApplicationUserConfig : IEntityTypeConfiguration<AppUser>
             .Property(u => u.ObjectId)
                 .HasMaxLength(256);
 
-        // E-mail uniqueness is the database's answer, not a validator's read (#86). ASP.NET Identity
+        // E-mail uniqueness is enforced by the database, not by a validator's read. ASP.NET Identity
         // maps NormalizedEmail as a plain lookup index and enforces `RequireUniqueEmail` with a query
         // before the insert, so two concurrent sign-ups with the same address both passed. The index
         // is widened with TenantId by hand because Finbuckle only adjusts indexes that are ALREADY
@@ -41,7 +41,20 @@ public class ApplicationUserConfig : IEntityTypeConfiguration<AppUser>
             .HasIndex(nameof(AppUser.NormalizedEmail), "TenantId")
             .HasDatabaseName("EmailIndex")
             .IsUnique();
+
+        // SearchUsers matches ILIKE '%term%' on these four columns. pg_trgm GIN indexes turn that
+        // from a scan of the tenant's users into a probe (mirrors AuditRecordConfiguration). Named,
+        // so they never merge with an Identity-defined index on the same column.
+        HasTrigramIndex(builder, nameof(AppUser.FirstName), "IX_Users_FirstName_trgm");
+        HasTrigramIndex(builder, nameof(AppUser.LastName), "IX_Users_LastName_trgm");
+        HasTrigramIndex(builder, nameof(AppUser.Email), "IX_Users_Email_trgm");
+        HasTrigramIndex(builder, nameof(AppUser.UserName), "IX_Users_UserName_trgm");
     }
+
+    private static void HasTrigramIndex(EntityTypeBuilder<AppUser> builder, string property, string name) =>
+        builder.HasIndex([property], name)
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops");
 }
 
 public class ApplicationRoleConfig : IEntityTypeConfiguration<AppRole>

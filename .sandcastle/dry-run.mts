@@ -13,7 +13,10 @@
 import {
   formatGateCommands,
   gateCommand,
+  PHASE_NAMES,
+  type FallbackAccountSetting,
   type ResolvedLimits,
+  type ResolvedModels,
   type SandcastleConfig,
 } from "./config.mts";
 
@@ -196,7 +199,9 @@ export function listAgentIssues(
 export function renderDryRun(
   config: SandcastleConfig,
   limits: ResolvedLimits,
+  models: ResolvedModels,
   query: IssueQuery,
+  fallback: FallbackAccountSetting = { enabled: false },
 ): string {
   const lines: string[] = [
     "",
@@ -213,14 +218,30 @@ export function renderDryRun(
     `  idle timeout         ${limits.idleTimeoutSeconds}s`,
     `  healing attempts     ${limits.healAttempts}` +
       (limits.healAttempts === 0 ? " (healing is OFF)" : ""),
+    // The dry run spends no probe, so the startup self-check (which can still
+    // turn the wait off for a run) is only named here, never performed.
+    `  usage-limit wait     ` +
+      (limits.usageMaxWaitHours === 0
+        ? "OFF (SANDCASTLE_USAGE_MAX_WAIT_HOURS is 0)"
+        : `probe every ${limits.usagePollMinutes} min, give up after ` +
+          `${limits.usageMaxWaitHours} h (a run confirms it with one ` +
+          `startup probe of ${config.usageProbeModel})`),
+    `  fallback account     ` +
+      (fallback.enabled
+        ? "ON (a run probes its token once at startup and drops it if broken)"
+        : "OFF (SANDCASTLE_FALLBACK_ACCOUNT is not on)"),
     "",
     "Models",
   ];
 
-  for (const [phase, model] of Object.entries(config.models)) {
+  // The RESOLVED models, so an `.env` override is visible before a round runs
+  // on it; the marker says which fields did not come from the config file.
+  for (const phase of PHASE_NAMES) {
+    const model = models[phase];
+    const marker =
+      model.overridden.length === 0 ? "" : `  [.env: ${model.overridden.join(", ")}]`;
     lines.push(
-      `  ${phase.padEnd(20)} ${model.model}` +
-        (model.effort === undefined ? "" : ` (effort: ${model.effort})`),
+      `  ${phase.padEnd(20)} ${model.model} (effort: ${model.effort})${marker}`,
     );
   }
 

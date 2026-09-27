@@ -1,3 +1,5 @@
+using Boilerplate.Modules.Identity.Contracts;
+using Boilerplate.Modules.Identity.Contracts.Services;
 using Boilerplate.Modules.Multitenancy.Contracts;
 using Boilerplate.Modules.Multitenancy.Contracts.v1.CreateTenant;
 using Boilerplate.Modules.Multitenancy.Features.v1.CreateTenant;
@@ -13,6 +15,7 @@ namespace Multitenancy.Tests.Validators;
 public sealed class CreateTenantCommandValidatorTests
 {
     private readonly ITenantService _tenantService = Substitute.For<ITenantService>();
+    private readonly ICommonPasswordList _commonPasswords = Substitute.For<ICommonPasswordList>();
     private readonly CreateTenantCommandValidator _sut;
 
     public CreateTenantCommandValidatorTests()
@@ -20,7 +23,9 @@ public sealed class CreateTenantCommandValidatorTests
         _tenantService.ExistsWithIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(false);
         _tenantService.ExistsWithNameAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(false);
 
-        _sut = new CreateTenantCommandValidator(_tenantService, TimeProvider.System);
+        _commonPasswords.Contains("password123").Returns(true);
+
+        _sut = new CreateTenantCommandValidator(_tenantService, _commonPasswords, TimeProvider.System);
     }
 
     private static CreateTenantCommand CommandWithId(string id) => new(
@@ -30,6 +35,9 @@ public sealed class CreateTenantCommandValidatorTests
         AdminPassword: "123Pa$$word!",
         Issuer: null,
         ValidUpto: null);
+
+    private static CreateTenantCommand CommandWithAdminPassword(string password) =>
+        CommandWithId("acme") with { AdminPassword = password };
 
     [Theory]
     [InlineData("root")]           // the seeded tenant must stay valid
@@ -80,4 +88,42 @@ public sealed class CreateTenantCommandValidatorTests
         result.IsValid.ShouldBeFalse();
         result.Errors.ShouldContain(e => e.ErrorMessage.Contains("already exists", StringComparison.Ordinal));
     }
+
+    #region Admin password
+
+    // The tenant admin is created later, by the provisioning seed step, so Identity's own policy can
+    // only fail in the background. The validator is the one place the operator hears it as a 400.
+
+    [Fact]
+    public async Task Validate_Should_Reject_AnAdminPasswordShorterThanIdentitysPolicy_NamingTheRealMinimum()
+    {
+        var result = await _sut.ValidateAsync(CommandWithAdminPassword(new string('x', PasswordPolicy.MinimumLength - 1)));
+
+        result.IsValid.ShouldBeFalse();
+        var error = result.Errors.ShouldHaveSingleItem();
+        error.PropertyName.ShouldBe(nameof(CreateTenantCommand.AdminPassword));
+        error.ErrorMessage.ShouldContain($"{PasswordPolicy.MinimumLength} characters");
+    }
+
+    [Fact]
+    public async Task Validate_Should_Reject_ACommonAdminPassword_WithTheGenericMessage()
+    {
+        var result = await _sut.ValidateAsync(CommandWithAdminPassword("password123"));
+
+        result.IsValid.ShouldBeFalse();
+        var error = result.Errors.ShouldHaveSingleItem();
+        error.PropertyName.ShouldBe(nameof(CreateTenantCommand.AdminPassword));
+        error.ErrorMessage.ShouldBe(PasswordPolicy.CommonPasswordMessage);
+    }
+
+    [Fact]
+    public async Task Validate_Should_Accept_AnAllLowercaseAdminPassphrase_AtTheMinimumLength()
+    {
+        // No composition rules (ASVS V6.2.5): length and the common-password list are the whole policy.
+        var result = await _sut.ValidateAsync(CommandWithAdminPassword(new string('q', PasswordPolicy.MinimumLength)));
+
+        result.IsValid.ShouldBeTrue(string.Join("; ", result.Errors.Select(e => e.ErrorMessage)));
+    }
+
+    #endregion
 }

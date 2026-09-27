@@ -4,12 +4,12 @@
 # start. One image promotes across environments — nothing environment-specific is
 # baked in (ADR-0004).
 
-FROM node:25-alpine AS build
+FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS build
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-# Node 25 ships without corepack, and corepack does not support Node 25 yet, so pnpm is
-# installed directly — at the version pinned in package.json#packageManager, which stays
-# the one source of truth for it.
+# Node 24 is the active LTS line. pnpm is installed with npm rather than corepack, because
+# Node 25 and later no longer ship corepack and the next LTS bump should need no change here.
+# The version comes from package.json#packageManager, the one source of truth for it.
 RUN npm install --global "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
 RUN pnpm install --frozen-lockfile
 COPY . .
@@ -18,7 +18,7 @@ RUN pnpm build
 # nginx-unprivileged, not nginx: the master process runs as uid 101 rather than root.
 # The stock image needs root purely to bind :80, so this one listens on 8080 instead —
 # see docker/default.conf.template, and every compose/Traefik port that names it.
-FROM nginxinc/nginx-unprivileged:1.31-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.31-alpine@sha256:6a23acdfca2b9cfbcec61419e3f1426bcbedb91362f2f19306a8567423bb4612 AS runtime
 
 # Package installation and the file layout need root; the image drops back to 101 below.
 USER root

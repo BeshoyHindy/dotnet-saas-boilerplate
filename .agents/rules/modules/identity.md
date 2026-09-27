@@ -9,7 +9,7 @@ Auth (JWT + ASP.NET Identity), users, roles, permissions, sessions, impersonatio
 | Interface | Concern |
 |---|---|
 | `IUserRegistrationService` | register, external-principal create, email/phone confirm |
-| `IUserProfileService` | get/list/count, update profile, image, existence checks |
+| `IUserProfileService` | get/count, update profile, image, existence checks |
 | `IUserStatusService` | activate/deactivate (`DeleteAsync` == deactivate), audited toggles |
 | `IUserRoleService` | role assignment, admin-role guards |
 | `IUserPasswordService` | forgot/reset/change password, history + expiry |
@@ -17,7 +17,7 @@ Auth (JWT + ASP.NET Identity), users, roles, permissions, sessions, impersonatio
 
 `ChangePassword`/`Update`/`Delete` etc. flow facade → service → EF/UserManager. `CancellationToken` is `= default` on these interfaces and propagated into EF sinks (note: `UserManager`/`RoleManager` have no CT overloads, so private helpers that only call them don't take one).
 
-## Registration is one transaction (#86)
+## Registration is one transaction
 
 `UserRegistrationService.RegisterAsync` wraps the whole sign-up in a single
 `IdentityDbContext` transaction: the user row, the `Basic` role, the tenant's default groups,
@@ -71,15 +71,37 @@ name (bounded, `MaxUserNameAttempts`), and the fallback name always carries its 
 (`UniqueUserNameFor`; the old `$"{name}_{guid}"[..20]` truncated the randomness off for any name ≥20
 characters and handed two different people the same fallback).
 
-## Avatars: the client never names one (#83)
+## Password policy (ASVS 5.0 L1)
+
+Length and a common-password list, and **no composition rules** (V6.2.5 — `RequireDigit`,
+`RequireLowercase`, `RequireUppercase` and `RequireNonAlphanumeric` are all `false`; don't turn them
+back on). The floor is `PasswordPolicy.MinimumLength` (10) in `Identity.Contracts`, which
+`IdentityModuleConstants.PasswordLength` reads. `CommonPasswordValidator` is registered on the
+Identity builder, so every `UserManager` path that sets a password runs it — registration, reset,
+change, and the tenant admin seed, which now goes through `CreateAsync(user, password)` rather than
+hashing by hand. It checks the embedded `Passwords/common-passwords.txt` (source, licence and how it
+was derived: `CommonPasswordList.cs`) case-insensitively, never calls out, and answers with the one
+generic `PasswordPolicy.CommonPasswordMessage`. **If you lower the length floor, regenerate the list
+at the new floor.**
+
+A password taken before `UserManager` sees it repeats the policy through the contract
+(`PasswordPolicy`, `ICommonPasswordList`): `CreateTenantCommandValidator` does, because the tenant
+admin is only created later by the provisioning seed, where a refusal is a Failed provisioning rather
+than a 400; `DemoSeedGuard` does for the demo password.
+
+## Avatars: the client never names one
 
 `AppUser.ImageUrl` holds **only a URL this server issued for this user**. `PUT /identity/profile` takes the bytes (`image`) or the removal flag (`deleteCurrentImage`) and writes the column from what `IStorageService.UploadAsync<AppUser>(…, owner: user.Id, …)` returns; the old `PUT /identity/profile/image`, which accepted any string up to 2048 characters, is **gone**, and so is `IUserProfileService.SetImageUrlAsync`. Don't add either back — a column a client can name is a column that can name another user's avatar.
 
 The avatar's object key carries the user id (`uploads/tenants/{t}/appuser/{userId}/…`) and the replace/remove path calls the owner-scoped `RemoveIfOwnedAsync<AppUser>(old, user.Id, ct)`, so one user's avatar change can never delete another's object — the tenant owns both keys, which is exactly why tenant scoping was not enough. A row still holding an arbitrary URL is skipped and logged on that first delete, then overwritten. See `storage.md`.
 
+## Profile updates are conditional
+
+`PUT /identity/profile` replaces the whole profile, so two editors would silently overwrite each other. `GET /identity/profile` sends `AppUser.ConcurrencyStamp` as a strong `ETag` (`ProfileETag`; `UserDto.ConcurrencyStamp` is `[JsonIgnore]`, so no body carries it). The PUT takes an **optional** `If-Match`, checked straight after the user is loaded and **before any storage call**, so a stale request never uploads or deletes an avatar. A mismatch, and Identity's `ConcurrencyFailure` from either save (`SetPhoneNumberAsync` saves too), is `ProfileChangedException` → **412**. `RefreshSignInAsync` runs only after the save succeeded. Both clients always send `If-Match` with the version the user was shown (never a fresh read), and on 412 refetch and show the conflict — **never resend automatically**, which would overwrite the change the 412 protected.
+
 ## Permission gating footgun
 
-`RequiredPermissionAttribute` implements `Boilerplate.BuildingBlocks.Shared.Identity.Authorization.IRequiredPermissionMetadata`. **Never let a second/duplicate `IRequiredPermissionMetadata` appear** — it silently disables **all** `.RequirePermission()` gates across the app. Permission constants live in `Shared/Identity/*Permissions.cs`.
+`RequiredPermissionAttribute` implements `Boilerplate.BuildingBlocks.Shared.Identity.Authorization.IRequiredPermissionMetadata`. **Never let a second/duplicate `IRequiredPermissionMetadata` appear** — it silently disables **all** `.RequirePermission()` gates across the app. Permission constants live in `Modules.{X}.Contracts/Authorization/{X}Permissions.cs` (here: `IdentityPermissions`).
 
 ## Hosted services (background)
 
@@ -97,7 +119,7 @@ Login `POST /api/v1/tenants/{tenant}/auth/token` (no client-app header: the oper
 - `ITokenService` mints **access tokens only**. `ISessionService.CreateSessionAsync` mints the refresh token, so login creates the session *before* the access token — its id becomes the `sid` claim. **A session-creation failure fails the login** (no try/catch): a login with no session row can neither refresh nor be revoked.
 - The token is `"{tenantId}.{32 CSPRNG bytes, base64url}"` (`RefreshTokenValue`), stored only as SHA-256. The prefix is routing metadata, never a credential — it must equal the resolved tenant, and the hash lookup runs inside the tenant query filter. **No `IgnoreQueryFilters()` anywhere on the token path.**
 - `RotateRefreshTokenAsync` is one compare-and-set `ExecuteUpdate`, so N concurrent refreshes yield exactly one winner (losers get `Superseded`). A `PreviousTokenHash` hit is reuse → the session is revoked. A `SecurityStamp` change (password reset, credential change) kills the session. `sid` survives rotation.
-- Browsers also get the token as `HttpOnly; Secure; SameSite=Strict` cookie (`RefreshTokenCookie`) pinned by `Path` to the tenant's refresh route; the refresh endpoint falls back to it when the body omits the token. CORS still allows no credentials (#13), so the cookie is same-site only and body delivery remains the client path.
+- Browsers also get the token as `HttpOnly; Secure; SameSite=Strict` cookie (`RefreshTokenCookie`) pinned by `Path` to the tenant's refresh route; the refresh endpoint falls back to it when the body omits the token. CORS policy never allows credentials, so the cookie is same-site only and body delivery remains the client path.
 - **Every response that is not a successful rotation clears the cookie**, via `DeleteWhenResponseStarts` — an `OnStarting` callback, because `UseExceptionHandler` wipes headers before re-running the pipeline and an eager `Set-Cookie` would vanish from exactly the 401s that need it (same reason as the security headers; see `security.md`). `Delete` must keep every attribute identical to `Append`, `Path` above all: a browser matches a deletion by name + Path, so a mismatch silently leaves the credential in place.
 - **End-impersonation returns no token.** The actor's own session is never taken away while they act as someone else, so End just marks the grant ended (which kills the acting token on its next request). The old access-only token it used to mint had no refresh counterpart — a credential nothing could renew.
 
@@ -107,9 +129,34 @@ Login `POST /api/v1/tenants/{tenant}/auth/token` (no client-app header: the oper
 
 Clearing localStorage alone is **not** a logout: the SPA cannot delete an HttpOnly cookie and `/auth/refresh` accepts that cookie on its own. Note the cookie's `Path` is the refresh route, so a browser does not send it to `/logout` — identification comes from the `sid` claim or the body token, while the deletion works regardless (a `Set-Cookie` may name any `Path`).
 
-### `sid` is issued, not enforced
+### `sid` is enforced per request
 
-`sid` names the session row, but **nothing validates it per request** — there is no session lookup in the auth pipeline, by design (it would put a database read on every call). So revoking a session stops *refresh* immediately and stops API access only once the current access token expires (`JwtOptions.AccessTokenMinutes`, default 30). Revocation is eventually consistent for API access, and that window is the deliberate price of stateless JWT validation. Shorten `AccessTokenMinutes` if an application needs a tighter bound; don't add a per-request `sid` check without deciding how to pay for it.
+The JwtBearer `OnTokenValidated` hook (`Authorization/Jwt/ConfigureJwtBearerOptions.cs`) checks every non-acting token's `sid` against `UserSession` in the token's tenant and fails authentication — **401** — when the session is revoked, expired or unknown. Revoking a session therefore ends API access on the next request, not when the access token expires. On an `AllowAnonymous` route (logout) a dead token simply leaves the caller anonymous.
+
+- **The lookup is cached, not a database read per request.** `SessionLiveness` (singleton, `Services/SessionLiveness.cs`) caches each answer — live or dead — for `SessionLiveness.CacheDuration` (30 s) in a private, size-bounded `MemoryCache` keyed by (tenant, session). A miss enters the token's tenant through `ITenantScope.RunAsync` and reads with the tenant filter on — **no `IgnoreQueryFilters()`**. It is not `HybridCache`: the hook runs before tenant resolution, so the tenant-scoped cache has no tenant, and a session is not global data.
+- **Revocation is immediate on the instance that revoked, and within 30 s everywhere else.** Every revoke path in `SessionService` calls `SessionLiveness.MarkRevoked` *after* `SaveChangesAsync`; the marker cannot be overwritten by a lookup that was already in flight. Other replicas refuse the session once their cached answer lapses. **A new revoke path must mark the session too**, or it only takes effect at that bound.
+- **A token with no `sid` is refused**, explicitly. Login and refresh always mint one; the only issuer that omits it is `IImpersonationTokenIssuer`, whose acting tokens (`act_sub` present) skip the session check and are governed by their grant instead (below).
+- The tenant's *activation* is not checked here — the deactivated-tenant guard still answers 403 after resolution. A `SecurityStamp` change still kills a session only at its next refresh, not per request.
+
+### Deactivating or deleting a user ends their sessions
+
+`UserStatusService`'s deactivate path — which `DeleteAsync` is — revokes every `UserSession` of the
+user and bumps their `SecurityStamp` **in the same save as the status change**:
+`ISessionService.RevokeAllSessionsWithinSaveAsync` stages the revocations on the scoped
+`IdentityDbContext`, and the save it is handed is `UserManager.UpdateSecurityStampAsync`, whose one
+`SaveChanges` carries the status, the stamp and the rows. A failed save throws (a failed
+`IdentityResult` is turned into an exception) and the staged rows are put back, so neither half
+lands; the sessions are marked in `SessionLiveness` only after it succeeds. With the `sid` check
+above, the user's live access token is refused on its next request. **Reactivation revokes nothing
+and restores nothing** — the user signs in again. Don't split this into a revoke followed by an
+update: two saves are two commits.
+
+### The one cookie that authenticates: the Job monitor (ADR-0009)
+
+The default authenticate scheme is `JobMonitorCookieAuthentication.SelectorScheme`, a forwarding scheme: **bearer** for every request, except one whose matched endpoint carries `JobMonitorEndpointMetadata`, has no `Authorization` header and carries `__Secure-job_monitor` — that goes to `JobMonitor.CookieScheme` (a second JWT handler reading the cookie). The `RequiredPermission` policy names the selector too; naming `Bearer` there would re-authenticate the Job monitor request with a scheme that ignores the cookie. It must be the default scheme rather than an endpoint scheme because tenant resolution reads `HttpContext.User` before authorization runs.
+
+- `POST /identity/operator/job-monitor-access` (`IssueJobMonitorAccess`): `Hangfire.View`, root-tenant check in the handler, `.DenyWhenActing()`, audited as `TokenIssued` with client `job-monitor`. `JobMonitorTokenIssuer` re-signs the caller's claims (incl. `sid`) for the audience `{Audience}/job-monitor`, 15 minutes fixed; the endpoint sets `JobMonitorCookie` (`HttpOnly; Secure; SameSite=Strict`, host-only, `Path` = the Job monitor route) and never returns the token.
+- The cookie scheme runs the same `sid` check as bearer (`RejectUnlessSessionIsLiveAsync`) and refuses a token carrying `act_sub`. The two audiences keep either credential from working as the other. **Never** let the cookie scheme answer on another endpoint, and never mark the issuing endpoint idempotent.
 
 ## Acting as someone else (impersonation + operator token exchange)
 

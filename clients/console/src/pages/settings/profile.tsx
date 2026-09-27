@@ -1,9 +1,14 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, Fingerprint, UserCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/auth/use-auth";
-import { getMyProfile, updateMyProfile } from "@/api/identity";
+import {
+  getMyProfile,
+  isProfileConflict,
+  updateMyProfile,
+  type MyProfile,
+} from "@/api/identity";
 import { ApiRequestError } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,40 +29,73 @@ export function ProfileSettings() {
 
   const profile = profileQuery.data;
   const loading = profileQuery.isLoading;
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
+  // Before the profile arrives, the JWT-derived `user` gives an immediate
+  // non-empty paint.
+  const provisional = !profile && user && loading ? user.name?.split(" ") : undefined;
+  const [firstName, setFirstName] = useState(
+    () => (profile ? profile.firstName : provisional?.[0]) ?? "",
+  );
+  const [lastName, setLastName] = useState(
+    () => (profile ? profile.lastName : provisional?.slice(1).join(" ")) ?? "",
+  );
+  const [phone, setPhone] = useState(() => profile?.phoneNumber ?? "");
+  // Set when a save was refused because the profile changed elsewhere (412). Cleared by the next
+  // successful save.
+  const [conflict, setConflict] = useState(false);
 
-  // Seed the form from the fetched profile exactly once. The JWT-derived
-  // `user` provides an immediate non-empty paint; the authoritative profile
-  // then seeds and locks. Seeding once means a later background refetch
-  // can't clobber edits the user has already made.
-  const seededRef = useRef(false);
-  useEffect(() => {
-    if (seededRef.current) return;
-    if (profile) {
-      setFirstName(profile.firstName ?? "");
-      setLastName(profile.lastName ?? "");
-      setPhone(profile.phoneNumber ?? "");
-      seededRef.current = true;
-    } else if (user && loading) {
-      setFirstName(user.name?.split(" ")[0] ?? "");
-      setLastName(user.name?.split(" ").slice(1).join(" ") ?? "");
+  // Seed the form from the fetched profile exactly once, during render; the
+  // authoritative profile then locks. Seeding once means a later background
+  // refetch can't clobber edits the user has already made.
+  const [seeded, setSeeded] = useState(profile !== undefined);
+  if (!seeded && profile) {
+    setSeeded(true);
+    setFirstName(profile.firstName ?? "");
+    setLastName(profile.lastName ?? "");
+    setPhone(profile.phoneNumber ?? "");
+  }
+
+  /**
+   * A save refused with 412: someone else changed the profile concurrently. Refetch it, put the
+   * latest values in the form and say so. Never resend: the form's values for every field the user
+   * did not touch are the old ones, and sending them again would overwrite exactly the change the
+   * 412 protected.
+   */
+  const showConflict = async () => {
+    setConflict(true);
+    try {
+      const latest = await queryClient.fetchQuery({
+        queryKey: PROFILE_KEY,
+        queryFn: getMyProfile,
+        staleTime: 0,
+      });
+      setFirstName(latest.firstName ?? "");
+      setLastName(latest.lastName ?? "");
+      setPhone(latest.phoneNumber ?? "");
+    } catch {
+      toast.error("Couldn't load the latest profile", { description: "Reload the page to see it." });
     }
-  }, [profile, user, loading]);
+  };
 
+  // Every save carries the profile the user was shown (and so its version), passed through
+  // `mutate(arg)` rather than read from a closure.
   const saveMutation = useMutation({
-    mutationFn: () =>
-      updateMyProfile({
+    mutationFn: (base: MyProfile) =>
+      updateMyProfile(base, {
         firstName: firstName.trim() || null,
         lastName: lastName.trim() || null,
         phoneNumber: phone.trim() || null,
       }),
+    retry: false,
     onSuccess: () => {
+      setConflict(false);
       toast.success("Profile saved");
       queryClient.invalidateQueries({ queryKey: PROFILE_KEY });
     },
     onError: (err: unknown) => {
+      if (isProfileConflict(err)) {
+        void showConflict();
+        return;
+      }
       const message =
         err instanceof ApiRequestError
           ? err.problem?.detail ?? err.problem?.title ?? err.message
@@ -68,7 +106,7 @@ export function ProfileSettings() {
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    saveMutation.mutate();
+    if (profile) saveMutation.mutate(profile);
   };
 
   const onReset = () => {
@@ -81,11 +119,16 @@ export function ProfileSettings() {
 
   const saving = saveMutation.isPending;
   const dirty =
-    (profile?.firstName ?? "") !== firstName ||
-    (profile?.lastName ?? "") !== lastName ||
-    (profile?.phoneNumber ?? "") !== phone;
+    !!profile &&
+    ((profile.firstName ?? "") !== firstName ||
+      (profile.lastName ?? "") !== lastName ||
+      (profile.phoneNumber ?? "") !== phone);
 
   const imageError = (e: unknown) => {
+    if (isProfileConflict(e)) {
+      void showConflict();
+      return;
+    }
     const message =
       e instanceof ApiRequestError
         ? (e.problem?.detail ?? e.problem?.title ?? e.message)
@@ -97,11 +140,14 @@ export function ProfileSettings() {
    * The avatar rides on the profile PUT as raw bytes. The server writes it with
    * `IStorageService.UploadAsync` into the `uploads/` prefix — public-read by design — and stores
    * the durable unsigned URL it returns. It deliberately does NOT go through the Files module,
-   * whose `publicUrl` is a presigned GET that expires in minutes (issue #72).
+   * which uses presigned URLs that expire in minutes.
    */
   const uploadMutation = useMutation({
-    mutationFn: (image: ImageUpload) => updateMyProfile({ image }),
+    mutationFn: ({ base, image }: { base: MyProfile; image: ImageUpload }) =>
+      updateMyProfile(base, { image }),
+    retry: false,
     onSuccess: () => {
+      setConflict(false);
       toast.success("Profile image updated");
       queryClient.invalidateQueries({ queryKey: PROFILE_KEY });
     },
@@ -110,8 +156,10 @@ export function ProfileSettings() {
 
   /** Clearing also deletes the stored object, so an orphan does not linger in the bucket. */
   const clearMutation = useMutation({
-    mutationFn: () => updateMyProfile({ deleteCurrentImage: true }),
+    mutationFn: (base: MyProfile) => updateMyProfile(base, { deleteCurrentImage: true }),
+    retry: false,
     onSuccess: () => {
+      setConflict(false);
       toast.success("Profile image removed");
       queryClient.invalidateQueries({ queryKey: PROFILE_KEY });
     },
@@ -126,8 +174,20 @@ export function ProfileSettings() {
           className="flex items-start gap-2 rounded-lg border border-[oklch(from_var(--color-destructive)_l_c_h_/_0.30)] bg-[oklch(from_var(--color-destructive)_l_c_h_/_0.06)] px-3 py-2 text-[13px] text-[var(--color-destructive)]"
         >
           <span>
-            Couldn't load your profile. Showing details from your session;
-            saved changes may not reflect the latest server state.
+            Couldn't load your profile, so it can't be saved right now. Showing
+            details from your session; reload the page to try again.
+          </span>
+        </div>
+      )}
+      {conflict && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-lg border border-[oklch(from_var(--color-destructive)_l_c_h_/_0.30)] bg-[oklch(from_var(--color-destructive)_l_c_h_/_0.06)] px-3 py-2 text-[13px] text-[var(--color-destructive)]"
+        >
+          <span>
+            Your profile was changed somewhere else — another tab or device — after this page
+            loaded it, so your change was not saved. The latest version is shown below; make your
+            change again if you still want it.
           </span>
         </div>
       )}
@@ -138,9 +198,13 @@ export function ProfileSettings() {
       >
         <ImageInput
           value={profile?.imageUrl ?? ""}
-          onUpload={(image) => uploadMutation.mutate(image)}
-          onRemove={() => clearMutation.mutate()}
-          busy={uploadMutation.isPending || clearMutation.isPending}
+          onUpload={(image) => {
+            if (profile) uploadMutation.mutate({ base: profile, image });
+          }}
+          onRemove={() => {
+            if (profile) clearMutation.mutate(profile);
+          }}
+          busy={!profile || uploadMutation.isPending || clearMutation.isPending}
           shape="circle"
         />
       </SettingsSection>

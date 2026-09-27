@@ -1,0 +1,13 @@
+# These three `generic-api-key` findings are all in d431072, the commit that
+# tree-imported the upstream snapshot: upstream's own dev-only values, already
+# public in the upstream repo, and never used here.
+#
+# Ignored by exact fingerprint, not by disabling the rule, so a new finding
+# anywhere else still fails the gate.
+#
+# Repo-only: this history has an upstream-import commit to fingerprint against;
+# a product scaffolded from the template has no such commit, so this file is
+# excluded from the scaffold (.template.config/template.json).
+d431072132a196ef808e37383d257702a4e76391:src/Host/FSH.Starter.Api/appsettings.Development.json:generic-api-key:41
+d431072132a196ef808e37383d257702a4e76391:src/Host/FSH.Starter.AppHost/AppHost.cs:generic-api-key:130
+d431072132a196ef808e37383d257702a4e76391:src/Tests/Webhooks.Tests/Services/WebhookSecretProtectorTests.cs:generic-api-key:33

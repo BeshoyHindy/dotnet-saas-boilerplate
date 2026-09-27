@@ -13,8 +13,8 @@ namespace Boilerplate.Modules.Identity;
 /// <c>HttpOnly; Secure; SameSite=Strict</c>, scoped by <c>Path</c> to the one endpoint that
 /// consumes it, so no other request ever carries it.
 ///
-/// Non-browser clients keep using the response body — the cookie is additive, and since CORS
-/// no longer allows credentials (#13) a cross-origin SPA simply never receives or sends it.
+/// Non-browser clients keep using the response body — the cookie is additive, and CORS does not
+/// allow credentials, so a cross-origin SPA simply never receives or sends it.
 ///
 /// <c>Secure</c> means browsers drop the cookie on plain http from anything but localhost, so a
 /// Development host reached by LAN address or hostname never stores it; body delivery covers that
@@ -22,7 +22,7 @@ namespace Boilerplate.Modules.Identity;
 /// </summary>
 internal static partial class RefreshTokenCookie
 {
-    public const string Name = "refresh_token";
+    public const string Name = "__Secure-refresh_token";
 
     /// <summary>
     /// The refresh path for a tenant, matching <see cref="TenantRoute.AnonymousAuthGroup"/> with the

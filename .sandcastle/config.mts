@@ -10,25 +10,38 @@
 // This file deliberately holds NO values — only types, defaults-free helpers
 // and the `defineConfig` identity that gives the root file its type checking.
 
+import { FALLBACK_ACCOUNT } from "./accounts.mts";
 import type { LogParserName } from "./log-parsers.mts";
 
-/** The agent phases, in the order a round runs them. */
-export type PhaseName =
-  | "planner"
-  | "implementer"
-  | "reviewer"
-  | "merger"
-  | "healer";
+/**
+ * The agent phases, in the order a round runs them. A runtime list, so code
+ * that must visit every phase (the environment overrides) iterates it and a
+ * new phase cannot be missed.
+ */
+export const PHASE_NAMES = [
+  "planner",
+  "implementer",
+  "reviewer",
+  "merger",
+  "healer",
+] as const;
+
+export type PhaseName = (typeof PHASE_NAMES)[number];
+
+/** The reasoning-effort levels the agent CLI accepts, lowest first. */
+export const EFFORT_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const;
+
+export type EffortLevel = (typeof EFFORT_LEVELS)[number];
 
 export interface PhaseModel {
-  /** A model id the agent CLI understands, e.g. `claude-opus-5`. */
+  /** A model id the agent CLI understands, e.g. `claude-opus-5-5`. */
   readonly model: string;
   /**
-   * Reasoning effort. Unset means the CLI default (high) — the level for
-   * long-horizon agentic work with the spec given up front, which is what
-   * every phase here is.
+   * Reasoning effort. REQUIRED: each model has its own default (Opus 5.5
+   * defaults to `medium`, the others to `high`), so an unset effort would
+   * silently differ per model. Name the level explicitly per phase instead.
    */
-  readonly effort?: "low" | "medium" | "high";
+  readonly effort: EffortLevel;
 }
 
 export interface GateConfig {
@@ -74,7 +87,10 @@ export interface GitConfig {
 }
 
 export interface LimitsConfig {
-  /** Maximum plan → execute → merge cycles before the run stops. */
+  /**
+   * Maximum plan → execute → merge cycles before the run stops. Overridden
+   * per run by `SANDCASTLE_MAX_ITERATIONS`.
+   */
   readonly maxIterations: number;
   /**
    * Hard cap on simultaneously running issue sandboxes. A RAM budget, not a
@@ -85,6 +101,7 @@ export interface LimitsConfig {
    * How many issues the planner queues per round — deliberately MORE than can
    * run at once, so a pipeline that finishes early starts the next issue
    * instead of idling its slot. Clamped up to `maxConcurrentAgents`.
+   * Overridden per run by `PLANNER_QUEUE_DEPTH`.
    */
   readonly plannerQueueDepth: number;
   /**
@@ -99,6 +116,18 @@ export interface LimitsConfig {
    * per run by `SANDCASTLE_HEAL_ATTEMPTS`.
    */
   readonly healAttempts: number;
+  /**
+   * How often, in minutes, a model that stopped answering is probed while a
+   * phase waits out a usage limit (see usage-limit.mts). Overridden per run by
+   * `SANDCASTLE_USAGE_POLL_MINUTES`.
+   */
+  readonly usagePollMinutes: number;
+  /**
+   * How long, in hours, one phase call may wait for its model to answer again,
+   * counted from its first limit hit. 0 turns the wait off. Overridden per run
+   * by `SANDCASTLE_USAGE_MAX_WAIT_HOURS`.
+   */
+  readonly usageMaxWaitHours: number;
 }
 
 export interface CacheMount {
@@ -145,7 +174,17 @@ export interface SandcastleConfig {
   /** Run in order on the merged HEAD; the first failure stops the rest. */
   readonly gates: readonly GateConfig[];
   readonly limits: LimitsConfig;
+  /**
+   * Which model each phase runs on, and at what effort. Overridden per machine
+   * or per run by `SANDCASTLE_<PHASE>_MODEL` / `SANDCASTLE_<PHASE>_EFFORT`.
+   */
   readonly models: Readonly<Record<PhaseName, PhaseModel>>;
+  /**
+   * The model the startup self-check probes to learn whether the host CLI can
+   * probe at all (see usage-limit.mts). Any model the account can reach will
+   * do, so pick a cheap one. Mid-run, a failed phase probes its OWN model.
+   */
+  readonly usageProbeModel: string;
   readonly sandbox: SandboxConfig;
   readonly prompts: PromptsConfig;
 }
@@ -231,9 +270,19 @@ export function resolveLimits(
     return parsed;
   };
 
+  const maxIterations = readInt(
+    "SANDCASTLE_MAX_ITERATIONS",
+    limits.maxIterations,
+    1,
+  );
   const maxConcurrentAgents = readInt(
     "MAX_CONCURRENT_AGENTS",
     limits.maxConcurrentAgents,
+    1,
+  );
+  const plannerQueueDepth = readInt(
+    "PLANNER_QUEUE_DEPTH",
+    limits.plannerQueueDepth,
     1,
   );
   const healAttempts = readInt(
@@ -241,13 +290,181 @@ export function resolveLimits(
     limits.healAttempts,
     0,
   );
+  const usagePollMinutes = readInt(
+    "SANDCASTLE_USAGE_POLL_MINUTES",
+    limits.usagePollMinutes,
+    1,
+  );
+  // 0 is legal: it is how the wait is turned off.
+  const usageMaxWaitHours = readInt(
+    "SANDCASTLE_USAGE_MAX_WAIT_HOURS",
+    limits.usageMaxWaitHours,
+    0,
+  );
 
   return {
     ...limits,
+    maxIterations,
     maxConcurrentAgents,
     healAttempts,
-    plannerQueueDepth: Math.max(limits.plannerQueueDepth, maxConcurrentAgents),
+    usagePollMinutes,
+    usageMaxWaitHours,
+    plannerQueueDepth: Math.max(plannerQueueDepth, maxConcurrentAgents),
   };
+}
+
+export interface ResolvedPhaseModel extends PhaseModel {
+  /** Which fields came from the environment rather than the config. */
+  readonly overridden: readonly ("model" | "effort")[];
+}
+
+export type ResolvedModels = Readonly<Record<PhaseName, ResolvedPhaseModel>>;
+
+/**
+ * Apply the per-machine / per-run environment overrides to the configured
+ * models: `SANDCASTLE_<PHASE>_MODEL` and `SANDCASTLE_<PHASE>_EFFORT`, with the
+ * phase upper-cased (`SANDCASTLE_REVIEWER_EFFORT`). Trying a new model is then
+ * an `.env` edit, never a code edit.
+ *
+ * THROWS on a malformed override rather than silently falling back: a typo in
+ * `SANDCASTLE_IMPLEMENTER_MODEL` that quietly restored the config default would
+ * run a whole round on the wrong model or effort, and nothing on screen would
+ * say so.
+ */
+export function resolveModels(
+  models: Readonly<Record<PhaseName, PhaseModel>>,
+  env: Readonly<Record<string, string | undefined>>,
+): ResolvedModels {
+  const read = (name: string): string | undefined => {
+    const raw = env[name]?.trim();
+    return raw === undefined || raw === "" ? undefined : raw;
+  };
+
+  const resolved = {} as Record<PhaseName, ResolvedPhaseModel>;
+  for (const phase of PHASE_NAMES) {
+    const prefix = `SANDCASTLE_${phase.toUpperCase()}`;
+    const overridden: ("model" | "effort")[] = [];
+
+    const modelName = `${prefix}_MODEL`;
+    const model = read(modelName);
+    if (model !== undefined) {
+      // Claude Code is the only provider `agentFor` in main.mts routes to.
+      if (/\s/.test(model) || !model.startsWith("claude-")) {
+        throw new Error(
+          `${modelName} must be a Claude model id starting with "claude-" and ` +
+            `containing no whitespace (Claude Code is the only agent provider ` +
+            `configured), got ${JSON.stringify(model)}`,
+        );
+      }
+      overridden.push("model");
+    }
+
+    const effortName = `${prefix}_EFFORT`;
+    const effort = read(effortName);
+    if (effort !== undefined) {
+      if (!(EFFORT_LEVELS as readonly string[]).includes(effort)) {
+        throw new Error(
+          `${effortName} must be one of ${EFFORT_LEVELS.join(", ")}, got ` +
+            JSON.stringify(effort),
+        );
+      }
+      overridden.push("effort");
+    }
+
+    resolved[phase] = {
+      model: model ?? models[phase].model,
+      effort: (effort as EffortLevel | undefined) ?? models[phase].effort,
+      overridden,
+    };
+  }
+  return resolved;
+}
+
+/** Whether the run may move phases onto the fallback Claude account. */
+export interface FallbackAccountSetting {
+  readonly enabled: boolean;
+}
+
+/** The on/off switch for the fallback account. */
+export const FALLBACK_SWITCH = "SANDCASTLE_FALLBACK_ACCOUNT";
+
+/**
+ * Read the fallback-account switch, `SANDCASTLE_FALLBACK_ACCOUNT=on|off`. OFF
+ * when blank or unset, so a fallback token can sit in `.sandcastle/.env`
+ * unused.
+ *
+ * THROWS, before anything starts, on every mistake that would otherwise only
+ * show on the night the main account runs out:
+ *
+ * - a switch value other than `on` or `off`;
+ * - `on` with no fallback token;
+ * - `on` with the token not listed in `.sandcastle/.env` itself
+ *   (`envFileKeys`), since the library forwards into the sandboxes only the
+ *   keys named in that file, so a token exported from the shell alone never
+ *   reaches a phase;
+ * - `on` while `ANTHROPIC_API_KEY` is set, since `claude` prefers the API key
+ *   and would ignore the swapped token.
+ *
+ * Whether the token WORKS is a probe's question, asked once at startup
+ * (usage-limit.mts, `checkFallbackAccount`).
+ */
+export function resolveFallbackAccount(
+  env: Readonly<Record<string, string | undefined>>,
+  envFileKeys: ReadonlySet<string>,
+): FallbackAccountSetting {
+  const raw = env[FALLBACK_SWITCH]?.trim().toLowerCase();
+  if (raw === undefined || raw === "" || raw === "off") {
+    return { enabled: false };
+  }
+  if (raw !== "on") {
+    throw new Error(
+      `${FALLBACK_SWITCH} must be "on" or "off", got ${JSON.stringify(env[FALLBACK_SWITCH])}`,
+    );
+  }
+
+  const tokenVar = FALLBACK_ACCOUNT.tokenVar;
+  if ((env[tokenVar]?.trim() ?? "") === "") {
+    throw new Error(
+      `${FALLBACK_SWITCH} is on, but ${tokenVar} is blank. Put the second ` +
+        `account's token (from \`claude setup-token\`) in .sandcastle/.env, or ` +
+        `set ${FALLBACK_SWITCH}=off.`,
+    );
+  }
+  if (!envFileKeys.has(tokenVar)) {
+    throw new Error(
+      `${FALLBACK_SWITCH} is on, but ${tokenVar} is not listed in ` +
+        ".sandcastle/.env. Only keys listed there reach a sandbox, so a " +
+        "token exported from the shell alone would never reach a phase.",
+    );
+  }
+  if ((env.ANTHROPIC_API_KEY?.trim() ?? "") !== "") {
+    throw new Error(
+      `${FALLBACK_SWITCH} is on while ANTHROPIC_API_KEY is set. Claude Code ` +
+        "prefers the API key and would ignore the fallback token. Unset one " +
+        "of them.",
+    );
+  }
+  return { enabled: true };
+}
+
+/**
+ * The keys a `.sandcastle/.env` file lists, read the way the library reads
+ * them when it decides what to forward into a sandbox: one `KEY=value` per
+ * line, `#` comments and lines without `=` skipped.
+ */
+export function envFileKeys(content: string): Set<string> {
+  const keys = new Set<string>();
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed === "" || trimmed.startsWith("#")) {
+      continue;
+    }
+    const eq = trimmed.indexOf("=");
+    if (eq !== -1) {
+      keys.add(trimmed.slice(0, eq).trim());
+    }
+  }
+  return keys;
 }
 
 /** The branch an issue is worked on. Re-planning an issue must reproduce it exactly. */

@@ -1,4 +1,6 @@
-﻿namespace Boilerplate.Modules.Identity.Contracts.DTOs;
+﻿using System.Text.Json.Serialization;
+
+namespace Boilerplate.Modules.Identity.Contracts.DTOs;
 
 public class UserDto
 {
@@ -22,4 +24,12 @@ public class UserDto
 
     /// <summary>Whether the user has enrolled in TOTP-based two-factor authentication.</summary>
     public bool TwoFactorEnabled { get; set; }
+
+    /// <summary>
+    /// The row's version (<c>AppUser.ConcurrencyStamp</c>). Never serialized: <c>GET /identity/profile</c>
+    /// sends it as the <c>ETag</c> header instead for optimistic concurrency, and other endpoints
+    /// returning this DTO do not expose it at all.
+    /// </summary>
+    [JsonIgnore]
+    public string? ConcurrencyStamp { get; set; }
 }

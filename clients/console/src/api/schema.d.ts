@@ -392,8 +392,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List all groups
-         * @description Retrieve all groups for the current tenant with optional search filter.
+         * List groups (paged)
+         * @description Retrieve the current tenant's groups, ordered by name. Pageable via PageNumber/PageSize (at most 100); filterable via Search (case-insensitive substring against name and description).
          */
         get: operations["ListGroups"];
         put?: never;
@@ -416,8 +416,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get members of a group
-         * @description Retrieve all users that belong to a specific group.
+         * Get members of a group (paged)
+         * @description Retrieve the users that belong to a specific group, ordered by user name. Pageable via PageNumber/PageSize (at most 100).
          */
         get: operations["GetGroupMembers"];
         put?: never;
@@ -560,6 +560,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/identity/operator/job-monitor-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open the Job monitor from a browser
+         * @description ADR-0009. Sets a short-lived cookie that opens the Job monitor (the Hangfire dashboard) in this browser: HttpOnly, Secure, SameSite=Strict, host-only, Path set to the Job monitor route, a fixed 15-minute life, bound to the caller's session — logging out or revoking the session ends it. The cookie is accepted on the Job monitor route only. Root operators only; refused while acting. Every issue is recorded as a security audit event. The body names the path to open and when the cookie expires; it never contains the credential.
+         */
+        post: operations["IssueJobMonitorAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/identity/operator/token-exchange": {
         parameters: {
             query?: never;
@@ -629,12 +649,12 @@ export interface paths {
         };
         /**
          * Get current user profile
-         * @description Retrieve the authenticated user's profile from the access token.
+         * @description Retrieve the authenticated user's profile from the access token. The strong ETag response header is the profile's version; send it back in If-Match on PUT /profile.
          */
         get: operations["GetCurrentUserProfile"];
         /**
          * Update user profile
-         * @description Update profile details for the authenticated user. Any signed-in user may edit their own profile; no admin permission required.
+         * @description Update profile details for the authenticated user. Any signed-in user may edit their own profile; no admin permission required. Send the ETag from GET /profile in If-Match to refuse the update with 412 if the profile changed since it was read.
          */
         put: operations["UpdateUserProfile"];
         post?: never;
@@ -792,26 +812,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/identity/users": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List users
-         * @description Retrieve a list of users for the current tenant.
-         */
-        get: operations["ListUsers"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/identity/users/search": {
         parameters: {
             query?: never;
@@ -932,8 +932,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get groups for a user
-         * @description Retrieve all groups that a specific user belongs to.
+         * Get groups for a user (paged)
+         * @description Retrieve the groups a specific user belongs to, ordered by name. Pageable via PageNumber/PageSize (at most 100).
          */
         get: operations["GetUserGroups"];
         put?: never;
@@ -1699,6 +1699,11 @@ export interface components {
             impersonatedTenantId: string;
             impersonatedUserId: string;
         };
+        JobMonitorAccessResponse: {
+            /** Format: date-time */
+            expiresAt: string;
+            path: string;
+        };
         JsonElement: unknown;
         LayoutDto: {
             borderRadius: string;
@@ -1749,6 +1754,45 @@ export interface components {
             hasNext: boolean;
             hasPrevious: boolean;
             items: components["schemas"]["FileAssetDto"][];
+            /** Format: int32 */
+            pageNumber: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int64 */
+            totalCount: number;
+            /** Format: int32 */
+            totalPages: number;
+        };
+        PagedResponseOfGroupDto: {
+            hasNext: boolean;
+            hasPrevious: boolean;
+            items: components["schemas"]["GroupDto"][];
+            /** Format: int32 */
+            pageNumber: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int64 */
+            totalCount: number;
+            /** Format: int32 */
+            totalPages: number;
+        };
+        PagedResponseOfGroupMemberDto: {
+            hasNext: boolean;
+            hasPrevious: boolean;
+            items: components["schemas"]["GroupMemberDto"][];
+            /** Format: int32 */
+            pageNumber: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int64 */
+            totalCount: number;
+            /** Format: int32 */
+            totalPages: number;
+        };
+        PagedResponseOfNotificationDto: {
+            hasNext: boolean;
+            hasPrevious: boolean;
+            items: components["schemas"]["NotificationDto"][];
             /** Format: int32 */
             pageNumber: number;
             /** Format: int32 */
@@ -2263,7 +2307,6 @@ export interface operations {
             query?: {
                 Action?: components["schemas"]["SecurityAction"];
                 UserId?: string;
-                TenantId?: string;
                 FromUtc?: string;
                 ToUtc?: string;
                 Skip?: number;
@@ -2799,7 +2842,10 @@ export interface operations {
     ListGroups: {
         parameters: {
             query?: {
-                search?: string;
+                PageNumber?: number;
+                PageSize?: number;
+                Sort?: string;
+                Search?: string;
             };
             header?: never;
             path?: never;
@@ -2813,8 +2859,22 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["GroupDto"][];
+                    "application/json": components["schemas"]["PagedResponseOfGroupDto"];
                 };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -2865,7 +2925,11 @@ export interface operations {
     };
     GetGroupMembers: {
         parameters: {
-            query?: never;
+            query?: {
+                PageNumber?: number;
+                PageSize?: number;
+                Sort?: string;
+            };
             header?: never;
             path: {
                 groupId: string;
@@ -2880,7 +2944,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["GroupMemberDto"][];
+                    "application/json": components["schemas"]["PagedResponseOfGroupMemberDto"];
                 };
             };
             /** @description Unauthorized */
@@ -3277,6 +3341,40 @@ export interface operations {
             };
         };
     };
+    IssueJobMonitorAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobMonitorAccessResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     ExchangeOperatorToken: {
         parameters: {
             query?: never;
@@ -3427,7 +3525,9 @@ export interface operations {
     UpdateUserProfile: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "If-Match"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -3453,6 +3553,13 @@ export interface operations {
             };
             /** @description Unauthorized */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Precondition Failed */
+            412: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3811,40 +3918,6 @@ export interface operations {
             };
         };
     };
-    ListUsers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UserDto"][];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     SearchUsers: {
         parameters: {
             query?: {
@@ -4183,7 +4256,11 @@ export interface operations {
     };
     GetUserGroups: {
         parameters: {
-            query?: never;
+            query?: {
+                PageNumber?: number;
+                PageSize?: number;
+                Sort?: string;
+            };
             header?: never;
             path: {
                 userId: string;
@@ -4198,7 +4275,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["GroupDto"][];
+                    "application/json": components["schemas"]["PagedResponseOfGroupDto"];
                 };
             };
             /** @description Unauthorized */
@@ -4210,6 +4287,13 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4442,9 +4526,10 @@ export interface operations {
     ListNotifications: {
         parameters: {
             query?: {
-                unreadOnly?: boolean;
-                page?: number;
-                pageSize?: number;
+                PageNumber?: number;
+                PageSize?: number;
+                Sort?: string;
+                UnreadOnly?: boolean;
             };
             header?: never;
             path?: never;
@@ -4458,8 +4543,22 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["NotificationDto"][];
+                    "application/json": components["schemas"]["PagedResponseOfNotificationDto"];
                 };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

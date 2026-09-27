@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ShieldOff } from "lucide-react";
 import { toast } from "sonner";
@@ -39,9 +39,12 @@ export function RevokeGrantDialog({ grant, onOpenChange, onRevoked }: Props) {
   const open = grant !== null;
 
   // Reset reason whenever a new grant is targeted (or the dialog closes).
-  useEffect(() => {
+  const grantId = grant?.id;
+  const [seeded, setSeeded] = useState({ open, grantId });
+  if (open !== seeded.open || grantId !== seeded.grantId) {
+    setSeeded({ open, grantId });
     if (open) setReason("");
-  }, [open, grant?.id]);
+  }
 
   const mutation = useMutation<ImpersonationGrantDto, Error, void>({
     mutationFn: () => revokeImpersonationGrant(grant!.id, reason.trim() || undefined),

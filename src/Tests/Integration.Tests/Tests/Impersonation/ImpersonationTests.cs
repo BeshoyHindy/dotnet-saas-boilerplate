@@ -15,7 +15,7 @@ namespace Integration.Tests.Tests.Impersonation;
 /// End-to-end coverage of impersonation: start, end, the JWT revocation hook, per-grant
 /// persistence and the duration cap.
 ///
-/// Since #9 impersonation is SAME-TENANT only — an admin acting as one of their own tenant's
+/// Impersonation is SAME-TENANT only — an admin acting as one of their own tenant's
 /// users. Crossing a tenant boundary is the operator token exchange
 /// (<c>POST /identity/operator/token-exchange</c>, covered by OperatorTokenExchangeTests), which
 /// mints through the same issuer into the same grant table. Tests here that need a cross-tenant
@@ -177,7 +177,7 @@ public sealed class ImpersonationTests : IAsyncLifetime
     [Fact]
     public async Task Start_Should_RejectCrossTenant_When_CallerIsRootOperator()
     {
-        // Arrange — since #9 there is exactly one cross-tenant door, and this is not it.
+        // Arrange — there is exactly one cross-tenant door, and this is not it.
         using var rootClient = await _auth.CreateRootAdminClientAsync();
 
         // Act
@@ -808,7 +808,7 @@ public sealed class ImpersonationTests : IAsyncLifetime
     }
 
     /// <summary>
-    /// The only way to obtain a cross-tenant grant since #9: the root operator token exchange.
+    /// The only way to obtain a cross-tenant grant: the root operator token exchange.
     /// Same issuer, same grant table, same revocation list — which is what these tests assert on.
     /// </summary>
     private static async Task<ExchangePayload> ExchangeAsync(HttpClient rootClient, string targetTenantId)

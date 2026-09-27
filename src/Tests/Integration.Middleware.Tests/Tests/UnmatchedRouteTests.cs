@@ -3,9 +3,9 @@ using Integration.Middleware.Tests.Infrastructure;
 namespace Integration.Middleware.Tests.Tests;
 
 /// <summary>
-/// Issue #47: the global <c>FallbackPolicy</c> (see <c>JwtAuthenticationExtensions</c>) is applied by
+/// The global <c>FallbackPolicy</c> (see <c>JwtAuthenticationExtensions</c>) is applied by
 /// the authorization middleware both to endpoints that decline to declare an intent AND to requests
-/// that match no endpoint at all — before this fix both cases answered 401, so an unknown path was
+/// that match no endpoint at all — previously both cases answered 401, so an unknown path was
 /// indistinguishable from an auth failure. A catch-all endpoint now intercepts truly unmatched
 /// requests and answers 404, while a matched endpoint that still forgets to declare an intent keeps
 /// hitting FallbackPolicy (401) unchanged.

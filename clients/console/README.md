@@ -23,7 +23,7 @@ the refresh token is an `HttpOnly; SameSite=Strict` cookie and CORS allows no cr
 (ADR-0002), so the browser must see one origin.
 
 Easiest full stack: `dotnet run --project src/Host/Boilerplate.AppHost` from the repository root,
-which starts PostgreSQL, Valkey, MinIO, Mailpit, the migrator, the API and this console.
+which starts PostgreSQL, Valkey, RustFS, Mailpit, the migrator, the API and this console.
 
 ## The API contract
 
@@ -45,7 +45,7 @@ const user = unwrap(await api.GET("/api/v1/identity/users/{id}", { params: { pat
 
 ## Acting as someone else
 
-Two ways in (ADR-0002, issue #9), one credential, and it is **never stored**:
+Two ways in (ADR-0002), one credential, and it is **never stored**:
 
 | | Endpoint | Who |
 |---|---|---|
@@ -65,7 +65,8 @@ password) are disabled — the API refuses them from an actor anyway.
 |---|---|
 | `pnpm dev` | Vite dev server on port 5174 |
 | `pnpm build` | `tsc -b && vite build` — the typecheck + bundle gate |
-| `pnpm test` | Vitest units (jsdom), beside the source |
+| `pnpm test` | Vitest units (jsdom), beside the source, plus page tests for the tenant registry and tenant detail |
+| `pnpm size` | Bundle budget (size-limit, `.size-limit.json`) — run after `pnpm build` |
 | `pnpm test:e2e` | Playwright smoke suite: sign-in, user CRUD, operator enters a tenant |
 | `pnpm lint` | ESLint |
 | `pnpm generate:api` | Regenerate `src/api/schema.d.ts` from the checked-in contract |

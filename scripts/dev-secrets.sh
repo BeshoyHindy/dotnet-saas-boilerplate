@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bootstrap the local development secrets (issue #13). The repository ships no credentials, so a
+# Bootstrap the local development secrets. The repository ships no credentials, so a
 # fresh clone needs this once — after that, `dotnet run --project src/Host/Boilerplate.AppHost`
 # works as before. Values live in the .NET user-secrets store (outside the repo), never in
 # appsettings.Development.json.
@@ -9,7 +9,13 @@
 #   bash scripts/dev-secrets.sh --force              # regenerate even if already set
 set -euo pipefail
 
-cd "$(git rev-parse --show-toplevel)"
+# Resolve the repository root, and refuse to run outside one: `cd ""` is a no-op, so without this
+# check a fresh, not-yet-initialised scaffold would carry on in whatever directory it was run from.
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  echo "$(basename "$0"): not inside a git repository. Run 'git init -b develop' at the project root first (docs/new-project-guide.md §2)." >&2
+  exit 1
+}
+cd "$ROOT"
 
 API_PROJECT="src/Host/Boilerplate.Api/Boilerplate.Api.csproj"
 MIGRATOR_PROJECT="src/Host/Boilerplate.DbMigrator/Boilerplate.DbMigrator.csproj"

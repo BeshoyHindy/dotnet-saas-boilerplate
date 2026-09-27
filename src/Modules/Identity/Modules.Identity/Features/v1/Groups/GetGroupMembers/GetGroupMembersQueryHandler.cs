@@ -1,4 +1,6 @@
 using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Boilerplate.Modules.Identity.Contracts.DTOs;
 using Boilerplate.Modules.Identity.Contracts.v1.Groups.GetGroupMembers;
 using Boilerplate.Modules.Identity.Data;
@@ -7,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Boilerplate.Modules.Identity.Features.v1.Groups.GetGroupMembers;
 
-public sealed class GetGroupMembersQueryHandler : IQueryHandler<GetGroupMembersQuery, IEnumerable<GroupMemberDto>>
+public sealed class GetGroupMembersQueryHandler : IQueryHandler<GetGroupMembersQuery, PagedResponse<GroupMemberDto>>
 {
     private readonly IdentityDbContext _dbContext;
 
@@ -16,20 +18,21 @@ public sealed class GetGroupMembersQueryHandler : IQueryHandler<GetGroupMembersQ
         _dbContext = dbContext;
     }
 
-    public async ValueTask<IEnumerable<GroupMemberDto>> Handle(GetGroupMembersQuery query, CancellationToken cancellationToken)
+    public async ValueTask<PagedResponse<GroupMemberDto>> Handle(GetGroupMembersQuery query, CancellationToken cancellationToken)
     {
-        // Validate group exists
+        ArgumentNullException.ThrowIfNull(query);
+
         var groupExists = await _dbContext.Groups
-            .AsNoTracking()
-            .AnyAsync(g => g.Id == query.GroupId, cancellationToken);
+            .AnyAsync(g => g.Id == query.GroupId, cancellationToken)
+            .ConfigureAwait(false);
 
         if (!groupExists)
         {
             throw new NotFoundException($"Group with ID '{query.GroupId}' not found.");
         }
 
-        // Get memberships with user info
-        var memberships = await _dbContext.UserGroups
+        // UserId breaks ties so a page boundary never repeats or skips a member.
+        return await _dbContext.UserGroups
             .AsNoTracking()
             .Where(ug => ug.GroupId == query.GroupId)
             .Join(
@@ -47,8 +50,8 @@ public sealed class GetGroupMembersQueryHandler : IQueryHandler<GetGroupMembersQ
                     AddedBy = ug.AddedBy
                 })
             .OrderBy(m => m.UserName)
-            .ToListAsync(cancellationToken);
-
-        return memberships;
+            .ThenBy(m => m.UserId)
+            .ToPagedResponseAsync(query, cancellationToken)
+            .ConfigureAwait(false);
     }
 }

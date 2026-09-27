@@ -29,8 +29,8 @@ public static class CacheKeys
         public const string Themes = "themes";
 
         // There is deliberately no Idempotency tag. Replay entries are written straight to
-        // IDistributedCache by IdempotencyEndpointFilter — HybridCache has no get-only probe, and the
-        // framed L2 payload it writes is unreadable to a direct reader (#82) — so nothing carries a
+        // IDistributedCache by IdempotencyEndpointFilter, which cannot use HybridCache because it
+        // frames its L2 payload in a way that is unreadable to a direct reader — so nothing carries a
         // tag and a tag nobody sets is a bulk invalidation that silently evicts nothing.
 
         /// <summary>Per-user tag — invalidates all entries scoped to a user within the tenant.</summary>

@@ -1,12 +1,15 @@
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Boilerplate.Modules.Identity.Contracts.DTOs;
 using Boilerplate.Modules.Identity.Contracts.v1.Groups.GetGroups;
 using Boilerplate.Modules.Identity.Data;
+using Boilerplate.Modules.Identity.Domain;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Boilerplate.Modules.Identity.Features.v1.Groups.GetGroups;
 
-public sealed class GetGroupsQueryHandler : IQueryHandler<GetGroupsQuery, IEnumerable<GroupDto>>
+public sealed class GetGroupsQueryHandler : IQueryHandler<GetGroupsQuery, PagedResponse<GroupDto>>
 {
     private readonly IdentityDbContext _dbContext;
 
@@ -15,60 +18,40 @@ public sealed class GetGroupsQueryHandler : IQueryHandler<GetGroupsQuery, IEnume
         _dbContext = dbContext;
     }
 
-    public async ValueTask<IEnumerable<GroupDto>> Handle(GetGroupsQuery query, CancellationToken cancellationToken)
+    public async ValueTask<PagedResponse<GroupDto>> Handle(GetGroupsQuery query, CancellationToken cancellationToken)
     {
-        var groupsQuery = _dbContext.Groups
-            .AsNoTracking()
-            .Include(g => g.GroupRoles)
-            .AsQueryable();
+        ArgumentNullException.ThrowIfNull(query);
 
-        // Apply search filter
-        if (!string.IsNullOrWhiteSpace(query.SearchTerm))
+        IQueryable<Group> groupsQuery = _dbContext.Groups
+            .AsNoTracking()
+            .Include(g => g.GroupRoles);
+
+        // ILIKE on the raw columns, which their pg_trgm GIN indexes serve (see ContainsPattern).
+        if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var searchTerm = query.SearchTerm.ToLowerInvariant();
+            string pattern = ContainsPattern.For(query.Search);
+            const string escape = ContainsPattern.EscapeCharacter;
             groupsQuery = groupsQuery.Where(g =>
-                g.Name.ToLower().Contains(searchTerm) ||
-                (g.Description != null && g.Description.ToLower().Contains(searchTerm)));
+                EF.Functions.ILike(g.Name, pattern, escape) ||
+                (g.Description != null && EF.Functions.ILike(g.Description, pattern, escape)));
         }
 
-        var groups = await groupsQuery
+        // Id breaks ties so a page boundary never repeats or skips a group.
+        var page = await groupsQuery
             .OrderBy(g => g.Name)
-            .ToListAsync(cancellationToken);
+            .ThenBy(g => g.Id)
+            .ToPagedResponseAsync(query, cancellationToken)
+            .ConfigureAwait(false);
 
-        // Get member counts in one query
-        var groupIds = groups.Select(g => g.Id).ToList();
-        var memberCounts = await _dbContext.UserGroups
-            .AsNoTracking()
-            .Where(ug => groupIds.Contains(ug.GroupId))
-            .GroupBy(ug => ug.GroupId)
-            .Select(g => new { GroupId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.GroupId, x => x.Count, cancellationToken);
+        var items = await GroupDtoMapper.ToDtosAsync(_dbContext, page.Items, cancellationToken).ConfigureAwait(false);
 
-        // Get all role IDs from groups
-        var allRoleIds = groups
-            .SelectMany(g => g.GroupRoles.Select(gr => gr.RoleId))
-            .Distinct()
-            .ToList();
-
-        var roleNames = await _dbContext.Roles
-            .AsNoTracking()
-            .Where(r => allRoleIds.Contains(r.Id))
-            .ToDictionaryAsync(r => r.Id, r => r.Name!, cancellationToken);
-
-        return groups.Select(g => new GroupDto
+        return new PagedResponse<GroupDto>
         {
-            Id = g.Id,
-            Name = g.Name,
-            Description = g.Description,
-            IsDefault = g.IsDefault,
-            IsSystemGroup = g.IsSystemGroup,
-            MemberCount = memberCounts.GetValueOrDefault(g.Id, 0),
-            RoleIds = g.GroupRoles.Select(gr => gr.RoleId).ToList().AsReadOnly(),
-            RoleNames = g.GroupRoles
-                .Select(gr => roleNames.GetValueOrDefault(gr.RoleId, gr.RoleId))
-                .ToList()
-                .AsReadOnly(),
-            CreatedAt = g.CreatedOnUtc
-        });
+            Items = items,
+            PageNumber = page.PageNumber,
+            PageSize = page.PageSize,
+            TotalCount = page.TotalCount,
+            TotalPages = page.TotalPages
+        };
     }
 }

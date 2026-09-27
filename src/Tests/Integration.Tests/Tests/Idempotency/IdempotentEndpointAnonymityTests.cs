@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Routing;
 namespace Integration.Tests.Tests.Idempotency;
 
 /// <summary>
-/// The authority on "no anonymous route is idempotent" (#84), and the reason it exists rather than
+/// The authority on "no anonymous route is idempotent", and the reason it exists rather than
 /// relying on <c>AnonymousRoutesAreNeverIdempotentTests</c> (Architecture.Tests) alone: this repository
 /// declares anonymity three ways — a route-group <c>.AllowAnonymous()</c>
 /// (<c>TenantRoute.AnonymousAuthGroup</c> in <c>IdentityModule.MapEndpoints</c>), a handler-level

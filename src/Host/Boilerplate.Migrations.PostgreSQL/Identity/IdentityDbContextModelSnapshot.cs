@@ -20,6 +20,7 @@ namespace Boilerplate.Migrations.PostgreSQL.Identity
                 .HasAnnotation("ProductVersion", "10.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Boilerplate.Modules.Identity.Domain.AppRole", b =>
@@ -179,6 +180,26 @@ namespace Boilerplate.Migrations.PostgreSQL.Identity
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
 
+                    b.HasIndex(new[] { "Email" }, "IX_Users_Email_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "Email" }, "IX_Users_Email_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "Email" }, "IX_Users_Email_trgm"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex(new[] { "FirstName" }, "IX_Users_FirstName_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "FirstName" }, "IX_Users_FirstName_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "FirstName" }, "IX_Users_FirstName_trgm"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex(new[] { "LastName" }, "IX_Users_LastName_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "LastName" }, "IX_Users_LastName_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "LastName" }, "IX_Users_LastName_trgm"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex(new[] { "UserName" }, "IX_Users_UserName_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "UserName" }, "IX_Users_UserName_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "UserName" }, "IX_Users_UserName_trgm"), new[] { "gin_trgm_ops" });
+
                     b.ToTable("Users", "identity");
 
                     b.HasAnnotation("Finbuckle:MultiTenant", true);
@@ -245,6 +266,16 @@ namespace Boilerplate.Migrations.PostgreSQL.Identity
                     b.HasIndex("IsDeleted");
 
                     b.HasIndex("Name");
+
+                    b.HasIndex(new[] { "Description" }, "IX_Groups_Description_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "Description" }, "IX_Groups_Description_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "Description" }, "IX_Groups_Description_trgm"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex(new[] { "Name" }, "IX_Groups_Name_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "Name" }, "IX_Groups_Name_trgm"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "Name" }, "IX_Groups_Name_trgm"), new[] { "gin_trgm_ops" });
 
                     b.ToTable("Groups", "identity");
 

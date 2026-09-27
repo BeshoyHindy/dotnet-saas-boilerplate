@@ -4,9 +4,10 @@ Read before touching entities, DbContexts, migrations, or query filters.
 
 ## Entities
 
-- `BaseEntity` — `Id`, `CreatedAt`, `UpdatedAt`, `TenantId`.
-- `AggregateRoot` — `BaseEntity` + domain events (`IHasDomainEvents`, `_domainEvents` list).
-- Marker interfaces: `IHasTenant`, `IAuditableEntity`, `ISoftDeletable`, `IGlobalEntity`.
+- `BaseEntity<TId>` — `Id` and domain events (`IHasDomainEvents`: `DomainEvents`, `AddDomainEvent`, `ClearDomainEvents`). Nothing else: no timestamps, no `TenantId`.
+- `AggregateRoot<TId>` — a `BaseEntity<TId>` that marks an aggregate root; it adds no members.
+- **Don't declare a `TenantId` property.** Tenant isolation adds `TenantId` as a *shadow* column to every entity that is not `IGlobalEntity`, and the default-on filter reads it (next section). `IHasTenant` (an explicit `TenantId`) is the rare exception — one entity, `TenantTheme`, uses it.
+- Audit timestamps come from `IAuditableEntity` (`CreatedOnUtc`, `CreatedBy`, `LastModifiedOnUtc`, `LastModifiedBy`); soft delete from `ISoftDeletable` (`IsDeleted`, `DeletedOnUtc`, `DeletedBy`). Opt out of tenant isolation with `IGlobalEntity`.
 - Domain events inherit `DomainEvent` (record: `EventId`, `OccurredOnUtc`, `CorrelationId`, `TenantId`). Integration events implement `IIntegrationEvent`; handlers `IIntegrationEventHandler<T>`.
 
 ## Tenant isolation (default-ON)
@@ -42,12 +43,14 @@ All migrations live in **one** project, `src/Host/Boilerplate.Migrations.Postgre
 dotnet ef migrations add {Name} \
   --project src/Host/Boilerplate.Migrations.PostgreSQL \
   --startup-project src/Host/Boilerplate.Api \
-  --context {Module}DbContext
+  --context {Module}DbContext \
+  --output-dir {Module}
 ```
 
 - **`migrations remove` operates on the snapshot** — run a full build *before* `migrations add` so the snapshot is current, or you can lose the previous migration.
 - The DB is **not** migrated at API startup. The `DbMigrator` host is a separate step: `apply` (default), `seed`, `list-pending`; flags `--tenant <id>`, `--catalog-only`, `--seed`. It migrates the tenant catalog first, then the shared module schema once, then seeds per tenant — all serialized by a Postgres advisory lock.
 - `dotnet-ef` is pinned in `.config/dotnet-tools.json` — run `dotnet tool restore` first.
+- **The command needs no running database.** `AddAppPlatform` validates `DatabaseOptions.ConnectionString` strictly at runtime, which would otherwise fail the command at design time (it never touches a real database). Each `{Module}DbContext` has an `IDesignTimeDbContextFactory<{Module}DbContext>` that `dotnet ef` picks up instead of building the app host, so the runtime validation stays untouched. `dotnet ef` only discovers that factory in the assembly that declares the DbContext, or in `--startup-project`'s assembly (`Boilerplate.Api`) — never in the migrations project itself. Put the factory beside the DbContext (e.g. `TenantDbContextFactory`); if the DbContext lives in BuildingBlocks (e.g. `EventingDbContext`), put the factory in `Boilerplate.Api` instead — touching BuildingBlocks needs explicit approval (buildingblocks-protection.md). A new `{Module}DbContext` needs the same factory, or the command fails the same way.
 
 ## Tests + EF
 

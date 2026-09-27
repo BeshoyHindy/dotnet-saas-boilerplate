@@ -64,8 +64,8 @@ public sealed partial class OutboxDispatcherHostedService : BackgroundService
     }
 
     /// <summary>
-    /// Drains one cycle. There is one database (#75), and outbox rows are <c>IGlobalEntity</c> with
-    /// an explicit <c>TenantId</c> column, so a single pass sees every tenant's rows.
+    /// Drains one cycle. All tenants live in a shared database, and outbox rows are <c>IGlobalEntity</c>
+    /// with an explicit <c>TenantId</c> column, so a single pass sees every tenant's rows.
     /// </summary>
     /// <remarks>Internal rather than private so the per-cycle behaviour is testable without timing.</remarks>
     internal async Task DispatchOutboxAsync(CancellationToken ct)

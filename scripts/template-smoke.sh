@@ -71,6 +71,16 @@ echo "template-smoke: name=$NAME frontend=$FRONTEND aspire=$ASPIRE sandcastle=$S
 echo "template-smoke: workspace $WORK"
 
 # ── Scaffold ─────────────────────────────────────────────────────────
+# `dotnet new install <dir>` scans the whole tree for .template.config, and when it
+# finds several with the same identity (e.g. agent worktrees under .claude/worktrees,
+# each a full checkout of some older branch) it silently picks one — so the smoke
+# would test a stale copy of the template, not this one. Refuse instead.
+nested="$(find "$REPO" -mindepth 2 -type d -name .template.config -not -path '*/node_modules/*' 2>/dev/null || true)"
+if [ -n "$nested" ]; then
+  echo "$nested"
+  fail "nested .template.config directories under $REPO would shadow this template; run from a clean worktree or remove them (e.g. .claude/worktrees)"
+fi
+
 step "Installing the template from $REPO into a throwaway hive"
 dotnet new install "$REPO" --debug:custom-hive "$HIVE"
 
@@ -93,6 +103,16 @@ if hits="$(grep -ri boilerplate "$OUT" || true)" && [ -n "$hits" ]; then
   fail "the scaffold still contains the placeholder name"
 fi
 echo "No 'boilerplate' in $OUT."
+
+# The template repository's own gates, research and history must not leak into a product's
+# docs: a scaffold's guide that tells its owner to run a script it does not have is wrong.
+step "grep for template-maintainer text over the scaffold (must be empty)"
+if hits="$(grep -rniE 'template-smoke|brand gate|brand-gate|docs/research|ADR-0001|starter kit' "$OUT" || true)" \
+    && [ -n "$hits" ]; then
+  echo "$hits" | head -50
+  fail "the scaffold still carries template-maintainer text"
+fi
+echo "No template-maintainer text in $OUT."
 
 step "Brand gate over the scaffold"
 # scripts/brand-gate.sh answers about tracked files, so the scaffold needs a git
@@ -129,6 +149,10 @@ exists "SECURITY.md"
 # Repo-only files the product must not inherit.
 not_exists ".git"
 not_exists "LICENSE"
+not_exists "docs/research"
+! grep -q '/.claude/worktrees/' "$OUT/.gitignore" \
+  || fail "the scaffold's .gitignore still carries the template repository's worktree line"
+not_exists ".gitleaksignore"
 not_exists ".template.config"
 not_exists ".agents/skills"
 not_exists ".agents/workflows"
@@ -155,7 +179,6 @@ if [ "$FRONTEND" = true ]; then
   exists "clients/console"
   exists ".github/workflows/frontend.yml"
   exists ".agents/rules/frontend"
-  exists "scripts/export-openapi.sh"
   for client in dashboard console; do
     grep -q "^  ${client}:" "$OUT/docker-compose.yml" \
       || fail "docker-compose lost the ${client} service"
@@ -163,10 +186,14 @@ if [ "$FRONTEND" = true ]; then
       || fail "the deploy stack lost the ${client} service"
   done
 else
-  not_exists "clients"
+  # The clients go; the API contract they were typed from stays, with its backend drift
+  # gate — an API-only product still has consumers, and the contract is the one agreed
+  # description of what they can call.
+  not_exists "clients/dashboard"
+  not_exists "clients/console"
   not_exists ".github/workflows/frontend.yml"
   not_exists ".agents/rules/frontend"
-  not_exists "scripts/export-openapi.sh"
+  [ "$(ls -A "$OUT/clients")" = "openapi" ] || fail "clients/ holds more than the API contract"
   for client in dashboard console; do
     ! grep -q "^  ${client}:" "$OUT/docker-compose.yml" \
       || fail "docker-compose still has a ${client} service"
@@ -176,6 +203,11 @@ else
   ! grep -q 'AddJavaScriptApp' "$OUT/src/Host/$NAME.AppHost/AppHost.cs" 2>/dev/null \
     || fail "the AppHost still starts a client app"
 fi
+
+# In every variant: the contract and the gate that keeps it honest.
+exists "clients/openapi/v1.json"
+exists "scripts/export-openapi.sh"
+exists "scripts/check-openapi-drift.sh"
 
 if [ "$SANDCASTLE" = true ]; then
   exists ".sandcastle"
@@ -209,6 +241,26 @@ for proj in Architecture Auditing Caching Generic Identity Multitenancy Files Fr
   dotnet test "$OUT/src/Tests/${proj}.Tests" -c Release --no-build
 done
 
+# ── OpenAPI drift ────────────────────────────────────────────────────
+# The gate CI's `openapi-drift` job runs on every PR that touches src/**: the renamed
+# API must re-export exactly the renamed contract the scaffold ships. The script asks
+# `git status`, so the scaffold gets a throwaway repository with one commit (an
+# uncommitted file would read as drift), removed again straight after.
+step "OpenAPI drift check (backend)"
+git -C "$OUT" init -q
+git -C "$OUT" add -A
+git -C "$OUT" -c user.name=template-smoke -c user.email=template-smoke@localhost \
+  -c commit.gpgsign=false commit -q -m scaffold
+(cd "$OUT" && bash scripts/check-openapi-drift.sh backend)
+rm -rf "$OUT/.git"
+
+# The scaffold's AGENTS.md lists `gitleaks dir .` as a gate; run it when the tool is
+# here (the CI runner has no gitleaks — the product's own gitleaks workflow owns it).
+if command -v gitleaks >/dev/null; then
+  step "gitleaks over the scaffold"
+  gitleaks dir "$OUT" --no-banner
+fi
+
 # ── Deploy contract ──────────────────────────────────────────────────
 # Pure bash assertions over the compose stacks and the env contract — no Docker,
 # a few seconds, and the one gate that notices when a conditioned-out service
@@ -224,8 +276,8 @@ if [ "$SKIP_NODE" = true ]; then
 fi
 
 # Every client app is discovered by glob, and its package manager by lockfile, so
-# nothing here names a client directory — the loop was unchanged when the clients
-# went from two to one (issue #14) and back to two (ADR-0008).
+# nothing here names a client directory — the loop adapts to changes in client count
+# and app locations across template revisions (ADR-0008).
 if [ "$FRONTEND" = true ]; then
   found_client=false
   for pkg in "$OUT"/clients/*/package.json; do

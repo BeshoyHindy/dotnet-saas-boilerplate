@@ -206,6 +206,7 @@ public sealed class ProductionConfigurationGuardTests
         PlaceholderSecret.Looks("8Kq2f1nT0xVb9aMw3hLp6ZcR5yGdE7jU4sNiOo1v").ShouldBeFalse();
         PlaceholderSecret.Looks("   ").ShouldBeTrue();
         PlaceholderSecret.Looks("replace-with-your-own-key").ShouldBeTrue();
+        PlaceholderSecret.Looks("rustfsadmin").ShouldBeTrue();
     }
 
     [Theory]

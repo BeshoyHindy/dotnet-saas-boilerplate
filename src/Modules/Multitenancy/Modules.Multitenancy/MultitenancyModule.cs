@@ -68,7 +68,7 @@ public sealed class MultitenancyModule : IModule
             Boilerplate.BuildingBlocks.Shared.Multitenancy.ITenantInitialPasswordBuffer,
             Services.TenantInitialPasswordBuffer>();
 
-        builder.Services.AddHeroDbContext<TenantDbContext>();
+        builder.Services.AddAppDbContext<TenantDbContext>();
 
         // The one way to enter a tenant outside a request (ADR-0002, "Jobs and events"). Singletons:
         // both are stateless and reach the scoped tenant store through IServiceScopeFactory. Registered
@@ -83,7 +83,7 @@ public sealed class MultitenancyModule : IModule
 
         // Same seam for the cache: the Caching block prefixes every key and tag with the ambient
         // tenant (ADR-0002) and asks this module who that is. Replace, so composing multitenancy
-        // always wins over a host that also passed AddHeroCaching(..., singleTenant: true).
+        // always wins over a host that also passed AddAppCaching(..., singleTenant: true).
         builder.Services.Replace(
             ServiceDescriptor.Singleton<ICacheTenantAccessor, FinbuckleCacheTenantAccessor>());
 
@@ -95,7 +95,7 @@ public sealed class MultitenancyModule : IModule
                     if (context.MultiTenantContext.StoreInfo is null) return;
                     if (context.MultiTenantContext.StoreInfo.StoreType != typeof(DistributedCacheStore<AppTenantInfo>))
                     {
-                        var sp = ((HttpContext)context.Context!).RequestServices;
+                        var sp = ((HttpContext)context.Context).RequestServices;
                         var distributedStore = sp
                             .GetRequiredService<IEnumerable<IMultiTenantStore<AppTenantInfo>>>()
                             .FirstOrDefault(s => s.GetType() == typeof(DistributedCacheStore<AppTenantInfo>));

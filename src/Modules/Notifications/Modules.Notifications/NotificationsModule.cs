@@ -32,7 +32,7 @@ public sealed class NotificationsModule : IModule
 
         builder.Services.AddPermissions(NotificationPermissions.All);
 
-        builder.Services.AddHeroDbContext<NotificationsDbContext>();
+        builder.Services.AddAppDbContext<NotificationsDbContext>();
         builder.Services.AddScoped<IDbInitializer, NotificationsDbInitializer>();
         builder.Services.AddValidatorsFromAssembly(typeof(NotificationsModule).Assembly);
 

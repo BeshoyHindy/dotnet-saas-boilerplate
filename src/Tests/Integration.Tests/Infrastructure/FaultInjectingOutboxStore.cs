@@ -7,7 +7,7 @@ namespace Integration.Tests.Infrastructure;
 
 /// <summary>
 /// A test-only <see cref="IOutboxStore"/> decorator that fails the publish step of a registration,
-/// on demand — the fault-injection seam for the registration-atomicity suite (#86).
+/// on demand — the fault-injection seam for the registration-atomicity suite.
 ///
 /// It is the last step of <c>UserRegistrationService.RegisterAsync</c>, so a throw here stands in
 /// for "anything after the user row is created blew up": the user, the role, the default groups and
@@ -77,6 +77,9 @@ internal sealed class FaultInjectingOutboxStore : IOutboxStore
 
     public Task MarkAsProcessedAsync(OutboxMessage message, CancellationToken ct = default)
         => _inner.MarkAsProcessedAsync(message, ct);
+
+    public Task<int> CountPendingAsync(CancellationToken ct = default)
+        => _inner.CountPendingAsync(ct);
 
     public Task MarkAsFailedAsync(OutboxMessage message, string error, bool isDead, CancellationToken ct = default)
         => _inner.MarkAsFailedAsync(message, error, isDead, ct);

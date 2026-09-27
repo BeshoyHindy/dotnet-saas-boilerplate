@@ -36,7 +36,7 @@ namespace Boilerplate.BuildingBlocks.Web;
 
 public static class Extensions
 {
-    public static IHostApplicationBuilder AddHeroPlatform(this IHostApplicationBuilder builder, Action<AppPlatformOptions>? configure = null)
+    public static IHostApplicationBuilder AddAppPlatform(this IHostApplicationBuilder builder, Action<AppPlatformOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
@@ -46,7 +46,7 @@ public static class Extensions
         // Publish the resolved options so modules configured later in the same build can honour them.
         // IHostApplicationBuilder.Properties exists for exactly this — passing state between builder
         // extensions — and keeps the flags out of DI, where a module would have to scan descriptors.
-        builder.SetHeroPlatformOptions(options);
+        builder.SetAppPlatformOptions(options);
 
         builder.Services.AddPermissions(SystemPermissions.All);
 
@@ -63,29 +63,29 @@ public static class Extensions
             options.Level = System.IO.Compression.CompressionLevel.Fastest;
         });
 
-        builder.AddHeroLogging();
+        builder.AddAppLogging();
         if (options.EnableOpenTelemetry)
         {
-            builder.AddHeroOpenTelemetry();
+            builder.AddAppOpenTelemetry();
         }
 
         builder.Services.AddHttpContextAccessor();
-        builder.Services.AddHeroDatabaseOptions(builder.Configuration);
-        builder.Services.AddHeroRateLimiting(builder.Configuration);
+        builder.Services.AddAppDatabaseOptions(builder.Configuration);
+        builder.Services.AddAppRateLimiting(builder.Configuration);
 
         var corsEnabled = options.EnableCors && IsCorsEnabled(builder.Configuration);
         var openApiEnabled = options.EnableOpenApi && IsOpenApiEnabled(builder.Configuration);
 
         if (corsEnabled)
         {
-            builder.Services.AddHeroCors(builder.Configuration);
+            builder.Services.AddAppCors(builder.Configuration);
         }
 
-        builder.Services.AddHeroVersioning();
+        builder.Services.AddAppVersioning();
 
         if (openApiEnabled)
         {
-            builder.Services.AddHeroOpenApi(builder.Configuration);
+            builder.Services.AddAppOpenApi(builder.Configuration);
         }
 
         builder.Services.AddHealthChecks()
@@ -93,7 +93,7 @@ public static class Extensions
 
         if (options.EnableJobs)
         {
-            builder.Services.AddHeroJobs();
+            builder.Services.AddAppJobs();
             // Not a readiness dependency: background processing can be down while the API still
             // answers requests, and the check queries Hangfire storage.
             builder.Services.AddHealthChecks().AddCheck<HangfireHealthCheck>("hangfire");
@@ -101,12 +101,12 @@ public static class Extensions
 
         if (options.EnableMailing)
         {
-            builder.Services.AddHeroMailing();
+            builder.Services.AddAppMailing();
         }
 
         if (options.EnableCaching)
         {
-            builder.Services.AddHeroCaching(builder.Configuration);
+            builder.Services.AddAppCaching(builder.Configuration);
             var cacheConfig = builder.Configuration.GetSection(nameof(CachingOptions)).Get<CachingOptions>();
             if (cacheConfig is not null && !string.IsNullOrEmpty(cacheConfig.Redis))
             {
@@ -116,7 +116,7 @@ public static class Extensions
 
         if (options.EnableIdempotency)
         {
-            builder.Services.AddHeroIdempotency(builder.Configuration);
+            builder.Services.AddAppIdempotency(builder.Configuration);
         }
 
         builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -145,7 +145,7 @@ public static class Extensions
     }
 
 
-    public static WebApplication UseHeroPlatform(this WebApplication app, Action<AppPipelineOptions>? configure = null)
+    public static WebApplication UseAppPlatform(this WebApplication app, Action<AppPipelineOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(app);
 
@@ -170,12 +170,12 @@ public static class Extensions
         // the browser would block the call. Safe before routing because we use one global policy (no [EnableCors]).
         if (corsEnabled)
         {
-            app.UseHeroCors();
+            app.UseAppCors();
         }
 
         app.UseHttpsRedirection();
 
-        app.UseHeroSecurityHeaders();
+        app.UseAppSecurityHeaders();
 
         // Serve static files as early as possible to short-circuit pipeline
         if (options.ServeStaticFiles)
@@ -193,7 +193,7 @@ public static class Extensions
 
         if (openApiEnabled)
         {
-            app.UseHeroOpenApi();
+            app.UseAppOpenApi();
         }
 
         app.UseAuthentication();
@@ -201,7 +201,7 @@ public static class Extensions
         // Let each module register its own middleware (e.g. Auditing registers AuditHttpMiddleware)
         app.UseModuleMiddlewares();
 
-        app.UseHeroRateLimiting();
+        app.UseAppRateLimiting();
 
         app.UseAuthorization();
 
@@ -211,12 +211,12 @@ public static class Extensions
         }
 
         // Always expose health endpoints
-        app.MapHeroHealthEndpoints();
+        app.MapAppHealthEndpoints();
 
         // A request matching no mapped endpoint reaches AuthorizationMiddleware with Endpoint == null
         // and empty metadata. ASP.NET Core's AuthorizationPolicy.CombineAsync treats "no auth metadata
         // at all" the same whether that's because nothing matched or because a real endpoint forgot to
-        // declare an intent: it falls back to FallbackPolicy (issue #47), so unmapped routes returned
+        // declare an intent: it falls back to FallbackPolicy, which caused unmapped routes to return
         // 401 instead of 404. Map an explicit catch-all so unmatched requests get an endpoint whose
         // AllowAnonymous metadata makes CombineAsync return null (no policy at all, per the framework's
         // "if there is an IAllowAnonymous, don't authorize" short-circuit) — the request then reaches
@@ -231,7 +231,7 @@ public static class Extensions
 
         // Mapped here (not as pre-routing middleware) so the dashboard runs behind UseAuthentication
         // and UseAuthorization and is gated by SystemPermissions.Hangfire.View like any other endpoint.
-        app.MapHeroJobDashboard(app.Configuration);
+        app.MapAppJobDashboard(app.Configuration);
 
         app.UseMiddleware<CurrentUserMiddleware>();
         return app;
@@ -271,7 +271,7 @@ public sealed class AppPlatformOptions
 
 /// <summary>
 /// Lets a module read the <see cref="AppPlatformOptions"/> the host chose in
-/// <c>AddHeroPlatform</c>. Modules only receive the <see cref="IHostApplicationBuilder"/>, so the
+/// <c>AddAppPlatform</c>. Modules only receive the <see cref="IHostApplicationBuilder"/>, so the
 /// options travel in its <see cref="IHostApplicationBuilder.Properties"/> bag.
 /// </summary>
 public static class AppPlatformOptionsExtensions
@@ -279,10 +279,10 @@ public static class AppPlatformOptionsExtensions
     private const string PropertyKey = "Boilerplate.BuildingBlocks.Web.AppPlatformOptions";
 
     /// <summary>
-    /// Publishes the options for modules configured later in the same build. <c>AddHeroPlatform</c>
+    /// Publishes the options for modules configured later in the same build. <c>AddAppPlatform</c>
     /// calls this; a host that composes modules without the full platform can call it directly.
     /// </summary>
-    public static IHostApplicationBuilder SetHeroPlatformOptions(this IHostApplicationBuilder builder, AppPlatformOptions options)
+    public static IHostApplicationBuilder SetAppPlatformOptions(this IHostApplicationBuilder builder, AppPlatformOptions options)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(options);
@@ -293,10 +293,10 @@ public static class AppPlatformOptionsExtensions
 
     /// <summary>
     /// The options the host configured, or the defaults when a host wires modules without calling
-    /// <c>AddHeroPlatform</c> — defaults leave every feature in the state it had before the flag
+    /// <c>AddAppPlatform</c> — defaults leave every feature in the state it had before the flag
     /// existed, so a module that asks is never worse off than one that does not.
     /// </summary>
-    public static AppPlatformOptions GetHeroPlatformOptions(this IHostApplicationBuilder builder)
+    public static AppPlatformOptions GetAppPlatformOptions(this IHostApplicationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
 

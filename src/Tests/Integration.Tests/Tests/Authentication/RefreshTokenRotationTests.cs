@@ -192,7 +192,7 @@ public sealed class RefreshTokenRotationTests
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
         var cookie = response.Headers.TryGetValues("Set-Cookie", out var values)
-            ? values.FirstOrDefault(v => v.StartsWith("refresh_token=", StringComparison.Ordinal))
+            ? values.FirstOrDefault(v => v.StartsWith("__Secure-refresh_token=", StringComparison.Ordinal))
             : null;
 
         cookie.ShouldNotBeNull();
@@ -209,7 +209,7 @@ public sealed class RefreshTokenRotationTests
 
         using var client = _factory.CreateClient();
         var request = new HttpRequestMessage(HttpMethod.Post, $"{TestConstants.RootAuthBasePath}/refresh");
-        request.Headers.Add("Cookie", $"refresh_token={token.RefreshToken}");
+        request.Headers.Add("Cookie", $"__Secure-refresh_token={token.RefreshToken}");
         request.Content = JsonContent.Create(new { token = token.AccessToken });
 
         using var response = await client.SendAsync(request);

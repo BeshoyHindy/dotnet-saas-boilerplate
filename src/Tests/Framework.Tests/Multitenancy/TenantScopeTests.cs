@@ -31,7 +31,7 @@ public sealed class TenantScopeTests
         });
 
         seen.ShouldNotBeNull();
-        seen!.Id.ShouldBe(TenantId);
+        seen.Id.ShouldBe(TenantId);
         seen.AdminEmail.ShouldBe(
             "admin@acme.test",
             "an id-only stub would leave the work with no way to tell who the tenant admin is");
@@ -135,7 +135,7 @@ public sealed class TenantScopeTests
             handle.Services.GetRequiredService<TenantCapturingService>().TenantAtConstruction.ShouldBe(TenantId);
         }
 
-        harness.Ambient.Current!.Id.ShouldBe("root");
+        harness.Ambient.Current.Id.ShouldBe("root");
     }
 
     /// <summary>
@@ -158,7 +158,7 @@ public sealed class TenantScopeTests
 
         harness.Ambient.Current.ShouldNotBeNull(
             "the ambient tenant must survive into the caller's frame, not stay inside an async method");
-        harness.Ambient.Current!.Id.ShouldBe(TenantId);
+        harness.Ambient.Current.Id.ShouldBe(TenantId);
     }
 
     /// <summary>The same hazard from the other side: the work callback runs inside RunAsync, so it
@@ -187,7 +187,7 @@ public sealed class TenantScopeTests
         var visited = new List<string>();
         await harness.Sut.RunForEachTenantAsync((tenant, _, _) =>
         {
-            visited.Add(tenant.Id!);
+            visited.Add(tenant.Id);
             harness.Ambient.Current!.Id.ShouldBe(tenant.Id);
             return Task.CompletedTask;
         });
@@ -219,7 +219,7 @@ public sealed class TenantScopeTests
         await Should.ThrowAsync<InvalidOperationException>(() =>
             harness.Sut.RunForEachTenantAsync((tenant, _, _) =>
             {
-                visited.Add(tenant.Id!);
+                visited.Add(tenant.Id);
                 if (tenant.Id == "tenant-1")
                 {
                     throw new InvalidOperationException("boom");

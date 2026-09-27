@@ -1,8 +1,9 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
-using Serilog.Events;
 using Serilog.Filters;
 using Serilog.Sinks.OpenTelemetry;
 
@@ -10,10 +11,15 @@ namespace Boilerplate.BuildingBlocks.Web.Observability.Logging.Serilog;
 
 public static class Extensions
 {
-    public static IHostApplicationBuilder AddHeroLogging(this IHostApplicationBuilder builder)
+    public static IHostApplicationBuilder AddAppLogging(this IHostApplicationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddSingleton<HttpRequestContextEnricher>();
+
+        // One access-log line per request. Registered as a startup filter so it wraps the whole
+        // pipeline, outside UseExceptionHandler: the line then records the status the caller actually
+        // received (a handled NotFoundException logs 404, not the 500 it would see from inside).
+        builder.Services.AddTransient<IStartupFilter, RequestLoggingStartupFilter>();
 
         // Resolve OTLP log export once (env-var/config), so the sink is only added when an endpoint is available.
         var otlp = ResolveOtlpLogExport(builder);
@@ -23,18 +29,17 @@ public static class Extensions
             var httpEnricher = context.GetRequiredService<HttpRequestContextEnricher>();
             logger.ReadFrom.Configuration(builder.Configuration);
             logger.Enrich.With(httpEnricher);
-            logger
-                .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-                .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
-                .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Error)
-                .MinimumLevel.Override("Hangfire", LogEventLevel.Warning)
-                .MinimumLevel.Override("Finbuckle.MultiTenant", LogEventLevel.Warning)
-                .Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware"));
+
+            // Category levels (Microsoft, EF Core, Hangfire, Finbuckle) live in Serilog:MinimumLevel:Override
+            // in appsettings, not here: an override set in code would silently beat whatever the deployment
+            // configures. The one rule that stays in code is structural — the global handler logs every
+            // exception itself, so the framework's own copy of the same exception is dropped.
+            logger.Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware"));
 
             // Ship structured logs over OTLP (e.g. the .NET Aspire dashboard / compose collector) when an endpoint is
             // available. Serilog owns the logging pipeline and does NOT forward to other ILogger providers, so the
             // OpenTelemetry SDK's log exporter can't see these events — we export from inside Serilog instead. Mirrors
-            // the traces/metrics auto-detect in AddHeroOpenTelemetry: an injected OTEL_EXPORTER_OTLP_ENDPOINT (Aspire)
+            // the traces/metrics auto-detect in AddAppOpenTelemetry: an injected OTEL_EXPORTER_OTLP_ENDPOINT (Aspire)
             // wins, otherwise the configured exporter endpoint is used when Exporter.Otlp.Enabled is true.
             if (otlp is not null)
             {
@@ -42,7 +47,7 @@ public static class Extensions
                 {
                     sink.Endpoint = otlp.Endpoint;
                     sink.Protocol = otlp.Protocol;
-                    // service.name must match the traces/metrics resource (AddHeroOpenTelemetry resolves the same
+                    // service.name must match the traces/metrics resource (AddAppOpenTelemetry resolves the same
                     // OTEL_SERVICE_NAME ?? ApplicationName) so the dashboard groups logs under the same resource as
                     // the spans they belong to — and adopts the orchestrator's resource name (e.g. Aspire's
                     // "boilerplate-api") rather than the entry-assembly name, which would list the process twice.

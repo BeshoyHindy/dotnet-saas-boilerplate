@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Caching.Tests;
 
 /// <summary>
-/// The tenant prefix is the building block's job (ADR-0002, issue #77). These tests pin the three
+/// The tenant prefix is the building block's job (ADR-0002). These tests pin the three
 /// promises that makes: the same logical key in two tenants is two physical entries; a tag
 /// invalidation in one tenant cannot reach another's; and a cache call with no tenant at all fails
 /// loudly rather than quietly landing somewhere shared.
@@ -90,9 +90,9 @@ public sealed class TenantScopedHybridCacheTests
         var l2 = new RecordingDistributedCache();
         services.AddSingleton<IConfiguration>(config);
         services.AddSingleton<ICacheTenantAccessor>(accessor);
-        // Registered first: AddHeroCaching's in-memory fallback is a TryAdd, so this wins.
+        // Registered first: AddAppCaching's in-memory fallback is a TryAdd, so this wins.
         services.AddSingleton<IDistributedCache>(l2);
-        services.AddHeroCaching(config);
+        services.AddAppCaching(config);
 
         var provider = services.BuildServiceProvider();
         return new Harness(
@@ -217,7 +217,7 @@ public sealed class TenantScopedHybridCacheTests
     [Fact]
     public async Task RemoveByTagAsync_Should_Not_Reach_AnotherTenants_Entries()
     {
-        // The cheap cross-tenant eviction this issue closes: before #77, RemoveByTagAsync("permissions")
+        // The cheap cross-tenant eviction this test prevents: previously, RemoveByTagAsync("permissions")
         // from any tenant cleared every tenant's permission entries.
         using var h = Build();
 
@@ -429,7 +429,7 @@ public sealed class TenantScopedHybridCacheTests
         var services = new ServiceCollection();
         var config = new ConfigurationBuilder().Build();
         services.AddSingleton<IConfiguration>(config);
-        services.AddHeroCaching(config);
+        services.AddAppCaching(config);
 
         using var provider = services.BuildServiceProvider();
 
@@ -446,7 +446,7 @@ public sealed class TenantScopedHybridCacheTests
         var l2 = new RecordingDistributedCache();
         services.AddSingleton<IConfiguration>(config);
         services.AddSingleton<IDistributedCache>(l2);
-        services.AddHeroCaching(config, singleTenant: true);
+        services.AddAppCaching(config, singleTenant: true);
 
         using var provider = services.BuildServiceProvider();
         var cache = provider.GetRequiredService<HybridCache>();

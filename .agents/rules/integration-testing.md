@@ -4,14 +4,14 @@
 
 ## Harness
 
-`WebApplicationFactory` over **real** infra via Testcontainers — PostgreSQL + Redis + MinIO. **Docker must be running**; if it isn't, tests fail fast with `DockerUnavailableException` (environmental, not a regression — run the unit projects instead).
+`WebApplicationFactory` over **real** infra via Testcontainers — PostgreSQL + Redis + RustFS. **Docker must be running**; if it isn't, tests fail fast with `DockerUnavailableException` (environmental, not a regression — run the unit projects instead).
 
-`AppWebApplicationFactory` (`Integration.Tests/Infrastructure/`) boots the containers, overlays in-memory config, swaps `IMailService` → `NoOpMailService`, and rewires storage to MinIO.
+`AppWebApplicationFactory` (`Integration.Tests/Infrastructure/`) boots the containers, overlays in-memory config, swaps `IMailService` → `NoOpMailService`, and rewires storage to the object store.
 
 ## Must-know gotchas
 
 - **Tenant context is AsyncLocal — set it inline.** Set the Finbuckle tenant context **in the same method** as the `UserManager`/`DbContext` call. Setting it in an awaited helper loses it across the async boundary → NRE in the tenant query filter.
-- **Storage is wired eagerly.** `AddHeroStorage` reads `Storage:Provider` before the test config overlay, so it picks `LocalStorageService`. The factory **removes the `IStorageService`/`LocalStorageService`/`S3StorageService` descriptors post-registration and re-registers the S3 stack** at MinIO. Follow that when a test needs real object storage. (See `storage.md`.)
+- **Storage is wired eagerly.** `AddAppStorage` reads `Storage:Provider` before the test config overlay, so it picks `LocalStorageService`. The factory **removes the `IStorageService`/`LocalStorageService`/`S3StorageService` descriptors post-registration and re-registers the S3 stack** at RustFS. Follow that when a test needs real object storage. (See `storage.md`.)
 - **Rate limiting is read eagerly** — `Integration.Middleware.Tests` sets `RateLimitingOptions:Enabled` via env var **before** host build, since flipping it after has no effect.
 
 ## The cross-tenant sweep — read this before adding an endpoint
@@ -25,11 +25,13 @@ Because it enumerates, **your new endpoint is swept the day you map it**. Two th
 
 ### The swept surface is pinned route by route
 
-`TenantSweepShape` lists every route in each class — swept, root-only, collection, exempt — and the report test asserts set equality. **Adding or removing an endpoint means updating that set in the same commit**; the failure names exactly which route appeared or disappeared. This is deliberate friction: a floor ("more than twenty routes swept") is equally satisfied by a sweep that has quietly lost eight of them. `ExemptFromTenantSweep` is generic over `IEndpointConventionBuilder`, so one call on a `MapGroup` would exempt every endpoint in the group — and every endpoint added to it later. The pinned exempt set is what makes that show up as a burst of new names instead of silence.
+`TenantSweepShape` lists every route in each class — swept, root-only, collection, exempt — and the report test asserts set equality. **Adding or removing a pinned endpoint means updating that set in the same commit**; the failure names exactly which route appeared or disappeared. Pinned means a route with a resource id (any verb), a GET collection, or an exemption; a write or RPC-style POST that names no resource (`POST notes/`) lands in none of the sets, so it needs no entry and produces no message. This is deliberate friction: a floor ("more than twenty routes swept") is equally satisfied by a sweep that has quietly lost eight of them. `ExemptFromTenantSweep` is generic over `IEndpointConventionBuilder`, so one call on a `MapGroup` would exempt every endpoint in the group — and every endpoint added to it later. The pinned exempt set is what makes that show up as a burst of new names instead of silence.
 
 **Opting out is explicit and costs a sentence:** `.ExemptFromTenantSweep("why this id is not a tenant-scoped resource")` at the mapping site (`Boilerplate.BuildingBlocks.Shared.Multitenancy`). The reason is mandatory and the sweep prints the exempt list on every run. It is not a way to silence a leak — an endpoint that answers 200 or 403 for another tenant's id is a bug in the endpoint.
 
-The sweep also runs a **positive control** (the same request with the caller's own id must not 404), a **root-token pass** (root has no override — ADR-0002 — so it must 404 too, except for the declared platform-wide kinds), and a **list pass**: every seeded row carries a per-tenant marker, and no collection endpoint called with A's token may contain it. The list pass needs no registration at all.
+The sweep also runs a **positive control** (the same request with the caller's own id must not 404), a **root-token pass** (root has no override — ADR-0002 — so it must 404 too, except for the declared platform-wide kinds), and a **list pass**: every seeded row carries a per-tenant marker, and no collection endpoint called with A's token may contain it.
+
+The list pass needs no registry entry, but it does need **a seeded row the list would show** — otherwise "no tenant-B row in A's list" holds only because B has none, and keeps holding the day the list loses its tenant filter. So every swept list is also called with its own tenant's token and must show one of that tenant's seeded rows (marker, admin e-mail or user id, or a seeded id). A new list-only noun (`GET notes/`) fails `Every_Swept_List_Shows_Its_Own_Tenant_A_Seeded_Row` with the route and the fix: add a `ResourceKind` and a seeder in `TenantSweepSeeder` that creates a row carrying the marker in a field the list returns — or, if the list holds no tenant rows at all (a static catalog, a count), name it in `TenantSweepExceptions.ListsWithNothingSeeded` with the reason.
 
 ### The sweep covers route ids only
 

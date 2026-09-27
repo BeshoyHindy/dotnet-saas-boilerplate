@@ -9,7 +9,7 @@ import { installShellMocks, OPERATOR_PERMISSIONS, paged } from "../helpers/shell
  * This is what the console exists for, so it exercises the whole seam:
  * the permission-gated /tenants route resolves for an operator, the tenant page offers
  * "Enter tenant", and confirming exchanges the operator's token for a short-lived one
- * that names the target tenant (ADR-0002, issue #9).
+ * that names the target tenant (ADR-0002).
  *
  * The exchanged token is held in memory only — never localStorage — so the assertions
  * are about what the UI does with it (the acting banner, the exit), not about storage.

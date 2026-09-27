@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { mockJsonResponse, mockProblemDetails } from "../helpers/api-mocks";
 
-// The console login page: Boilerplate logo lockup + ".NET 10 Starter Kit" caption, and an
+// The console login page: Boilerplate logo lockup + "Multi-tenant SaaS" caption, and an
 // email/password card. There is NO TENANT FIELD (ADR-0008): operators live in the root
 // tenant, so this app always signs in to `defaultTenant`.
 
@@ -34,7 +34,7 @@ test.describe("login — page chrome", () => {
   test("renders the Boilerplate wordmark lockup with the .NET 10 caption", async ({ page }) => {
     await page.goto("/login");
     await expect(page.getByText("Boilerplate").first()).toBeVisible();
-    await expect(page.getByText(/\.NET 10 Starter Kit/i)).toBeVisible();
+    await expect(page.getByText(/multi-tenant saas/i)).toBeVisible();
     await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
     await expect(page.getByText(/sign in to your account/i)).toBeVisible();
   });

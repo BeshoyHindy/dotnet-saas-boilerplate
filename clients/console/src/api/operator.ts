@@ -58,7 +58,7 @@ export type StartImpersonationInput = {
 };
 
 /**
- * Impersonate a user **in the caller's own tenant**. Since #9 a cross-tenant start is a
+ * Impersonate a user **in the caller's own tenant**. A cross-tenant start is a
  * 403 that points at the exchange above, so this is the tenant-admin path only (the user
  * detail page's "Impersonate" action).
  *

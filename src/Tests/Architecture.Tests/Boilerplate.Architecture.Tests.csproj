@@ -39,6 +39,7 @@
     <ProjectReference Include="..\..\Modules\Files\Modules.Files\Boilerplate.Modules.Files.csproj" />
     <ProjectReference Include="..\..\Modules\Files\Modules.Files.Contracts\Boilerplate.Modules.Files.Contracts.csproj" />
     <ProjectReference Include="..\..\Host\Boilerplate.Api\Boilerplate.Api.csproj" />
+    <ProjectReference Include="..\..\Host\Boilerplate.DbMigrator\Boilerplate.DbMigrator.csproj" />
     <ProjectReference Include="..\..\Host\Boilerplate.Migrations.PostgreSQL\Boilerplate.Migrations.PostgreSQL.csproj" />
   </ItemGroup>
 </Project>

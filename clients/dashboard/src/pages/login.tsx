@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, Sparkles, TimerOff } from "lucide-react";
 import { useAuth } from "@/auth/use-auth";
-import { consumeSignedOutReason } from "@/auth/inactivity";
+import { clearSignedOutReason, peekSignedOutReason, signedOutNotice } from "@/auth/inactivity";
 import {
   readRememberedTenant,
   rememberTenant,
@@ -27,7 +27,7 @@ type LocationState = { from?: { pathname: string } };
 // Boilerplate stays multi-tenant, but NOBODY TYPES A TENANT. It is resolved from
 // the URL, the subdomain, this device's last sign-in, or the configured default
 // (src/auth/tenant-resolution.ts). When the arrival named it, the field is not
-// rendered at all; otherwise it sits BELOW email and password, as "Workspace",
+// rendered at all; otherwise it sits BELOW email and password, as "Tenant",
 // prefilled — a detail to correct, not a question to answer first.
 // ────────────────────────────────────────────────────────────────────────
 
@@ -51,22 +51,21 @@ export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [tenant, setTenant] = useState(resolved.tenant);
-  // The field is hidden when the arrival itself named the tenant; "Not your workspace?"
+  // The field is hidden when the arrival itself named the tenant; "Not your tenant?"
   // reveals it, because a certain answer can still be the wrong one (a forwarded link).
   const [tenantFieldShown, setTenantFieldShown] = useState(!resolved.certain);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  // Why the previous session ended: read during render (so the banner is there on
+  // the first paint), and cleared after commit so it shows once.
+  const [notice, setNotice] = useState<string | null>(() =>
+    signedOutNotice(peekSignedOutReason()),
+  );
   const [demoOpen, setDemoOpen] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
 
-  // Surface why the previous session ended (read-and-clear, one-shot).
-  useEffect(() => {
-    if (consumeSignedOutReason() === "inactivity") {
-      setNotice("You were signed out due to inactivity.");
-    }
-  }, []);
+  useEffect(() => clearSignedOutReason(), []);
 
   if (isAuthenticated) {
     return <Navigate to={from} replace />;
@@ -155,7 +154,7 @@ export function LoginPage() {
         aria-describedby={error ? "login-error" : undefined}
       >
         {/* The arrival named the tenant (a mailed link, or their own subdomain), so there
-            is nothing to ask — just say which workspace this is, with a way out. */}
+            is nothing to ask — just say which tenant this is, with a way out. */}
         {!tenantFieldShown && (
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-muted)] px-3 py-2.5">
             <span className="text-[12.5px] text-[var(--color-muted-foreground)]">
@@ -169,7 +168,7 @@ export function LoginPage() {
               onClick={() => setTenantFieldShown(true)}
               className="ml-auto cursor-pointer text-[11px] font-medium text-[var(--color-muted-foreground)] underline-offset-4 transition-colors hover:text-[var(--color-primary)] hover:underline"
             >
-              Not your workspace?
+              Not your tenant?
             </button>
           </div>
         )}
@@ -233,7 +232,7 @@ export function LoginPage() {
           </div>
         </div>
 
-        {/* Workspace — BELOW the credentials on purpose. It is prefilled and usually right,
+        {/* Tenant — BELOW the credentials on purpose. It is prefilled and usually right,
             so it is a correction, not the first question. */}
         {tenantFieldShown && (
           <div className="space-y-1.5">
@@ -241,7 +240,7 @@ export function LoginPage() {
               htmlFor="tenant"
               className="block text-[11.5px] font-semibold uppercase tracking-wider text-[var(--color-muted-foreground)]"
             >
-              Workspace
+              Tenant
             </Label>
             <Input
               id="tenant"

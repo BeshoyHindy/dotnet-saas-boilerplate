@@ -72,7 +72,7 @@ public sealed class DemoSeedTests : IAsyncLifetime
         {
             var tenant = await store.GetAsync(id);
             tenant.ShouldNotBeNull($"demo tenant '{id}' should exist after demo seeding");
-            tenant!.IsActive.ShouldBeTrue();
+            tenant.IsActive.ShouldBeTrue();
             tenant.ValidUpto.ShouldBeGreaterThan(DateTime.UtcNow);
         }
     }
@@ -137,7 +137,7 @@ public sealed class DemoSeedTests : IAsyncLifetime
         var expected = _factory.Services.GetRequiredService<IPermissionRegistry>()
             .Basic.Select(p => p.Name);
         permissions.ShouldNotBeNull();
-        permissions!.OrderBy(p => p, StringComparer.Ordinal)
+        permissions.OrderBy(p => p, StringComparer.Ordinal)
             .ShouldBe(expected.OrderBy(p => p, StringComparer.Ordinal));
     }
 
@@ -154,7 +154,7 @@ public sealed class DemoSeedTests : IAsyncLifetime
         var permissions = await client.GetFromJsonAsync<List<string>>(PermissionsPath);
 
         permissions.ShouldNotBeNull();
-        permissions!.ShouldContain(IdentityPermissions.Users.Update);
+        permissions.ShouldContain(IdentityPermissions.Users.Update);
         permissions.ShouldContain(IdentityPermissions.Groups.ManageMembers);
         // Not an administrator: the role grants no user deletion and no role editing.
         permissions.ShouldNotContain(IdentityPermissions.Users.Delete);
@@ -262,7 +262,7 @@ public sealed class DemoSeedTests : IAsyncLifetime
             group.ShouldNotBeNull($"group '{groupName}' should exist in '{tenantId}'");
 
             return await context.UserGroups
-                .Where(ug => ug.GroupId == group!.Id)
+                .Where(ug => ug.GroupId == group.Id)
                 .Join(context.Users, ug => ug.UserId, u => u.Id, (_, u) => u.Email!)
                 .ToListAsync(ct);
         });
@@ -278,8 +278,8 @@ public sealed class DemoSeedTests : IAsyncLifetime
             var user = await userManager.FindByEmailAsync(email);
             user.ShouldNotBeNull();
 
-            var token = await userManager.GeneratePasswordResetTokenAsync(user!);
-            (await userManager.ResetPasswordAsync(user!, token, password)).Succeeded.ShouldBeTrue();
+            var token = await userManager.GeneratePasswordResetTokenAsync(user);
+            (await userManager.ResetPasswordAsync(user, token, password)).Succeeded.ShouldBeTrue();
         });
     }
 

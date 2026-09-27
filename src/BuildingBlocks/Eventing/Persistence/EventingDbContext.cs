@@ -18,8 +18,7 @@ namespace Boilerplate.BuildingBlocks.Eventing.Persistence;
 /// That is what makes the outbox transactional.
 ///
 /// Owning these tables here — rather than once per module DbContext — is what
-/// keeps <c>IOutboxStore</c>/<c>IInboxStore</c> to a single, unambiguous DI
-/// registration (issue #1349).
+/// keeps <c>IOutboxStore</c>/<c>IInboxStore</c> to a single, unambiguous DI registration.
 /// </summary>
 public class EventingDbContext : BaseDbContext
 {

@@ -232,7 +232,7 @@ internal sealed class UserRegistrationService(
 
     /// <summary>
     /// Runs the whole of a registration in one database transaction: the user row, the role, the
-    /// default groups and the outbox row either all exist or none of them do (#86). Before this,
+    /// default groups and the outbox row either all exist or none of them do. Before this,
     /// each was its own commit, and a failure after the first left a user with no role, no groups
     /// and no event — a row every retry was then refused on, with no way for the caller to recover.
     ///
@@ -488,7 +488,8 @@ internal sealed class UserRegistrationService(
             Id: Guid.NewGuid(),
             OccurredOnUtc: TimeProvider.System.GetUtcNow().UtcDateTime,
             TenantId: tenantId,
-            CorrelationId: Guid.NewGuid().ToString(),
+            // The current trace id, so the event joins back to the request's spans, logs and audit rows.
+            CorrelationId: Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString(),
             Source: source,
             UserId: user.Id,
             Email: user.Email ?? string.Empty,

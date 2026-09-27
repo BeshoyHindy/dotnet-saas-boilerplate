@@ -1,5 +1,8 @@
 @baseUrl = https://localhost:7030
 @tenant = root
+# The seeded root admin's password is generated, never a literal in the repository: paste it from
+# the Aspire dashboard (Resources → Parameters) or SEED_ADMIN_PASSWORD in .env. Don't commit it.
+@adminPassword =
 
 ### Issue JWT token
 POST {{baseUrl}}/api/v1/tenants/{{tenant}}/auth/token
@@ -7,7 +10,7 @@ Content-Type: application/json
 
 {
   "email": "admin@root.com",
-  "password": "Password123!"
+  "password": "{{adminPassword}}"
 }
 
 ### Refresh JWT token

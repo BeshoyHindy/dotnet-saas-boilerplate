@@ -1,5 +1,5 @@
 /**
- * The "acting" layer (ADR-0002, issue #9).
+ * The "acting" layer (ADR-0002).
  *
  * While someone is acting as another user they hold TWO credentials: their own session
  * (localStorage, refreshable — untouched) and a short-lived token naming the subject
@@ -37,7 +37,7 @@ export type ActingSession = {
 type Listener = () => void;
 
 let session: ActingSession | null = null;
-/** Set when the acting session ended involuntarily, so the UI can say why. */
+/** Set when the acting session ended involuntarily, so the UI can say why — until dismissed. */
 let notice: string | null = null;
 
 const listeners = new Set<Listener>();
@@ -80,10 +80,16 @@ export const actingStore = {
     emit();
   },
 
-  consumeNotice(): string | null {
-    const value = notice;
+  /**
+   * The operator has read why the session ended. Until then the notice stays — it is what
+   * `ActingBanner` shows in the acting session's place, because a toast is gone before an
+   * operator who was looking elsewhere can read it. Starting a new session, a deliberate
+   * exit, or ending the operator's own session (`clear()`) retires it too.
+   */
+  dismissNotice() {
+    if (notice === null) return;
     notice = null;
-    return value;
+    emit();
   },
 
   subscribe(listener: Listener) {

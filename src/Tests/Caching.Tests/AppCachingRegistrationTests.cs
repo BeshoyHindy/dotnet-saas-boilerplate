@@ -7,21 +7,21 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Caching.Tests;
 
 /// <summary>
-/// Verifies that <see cref="Extensions.AddHeroCaching"/> wires HybridCache on top of an
+/// Verifies that <see cref="Extensions.AddAppCaching"/> wires HybridCache on top of an
 /// <see cref="IDistributedCache"/> in both the in-memory fallback and the (configured) Redis path.
 /// These tests exercise the registration wiring only — they do not require a running Redis.
 /// </summary>
-public sealed class HeroCachingRegistrationTests
+public sealed class AppCachingRegistrationTests
 {
     [Fact]
-    public void AddHeroCaching_Should_RegisterInMemoryDistributedCache_When_RedisIsEmpty()
+    public void AddAppCaching_Should_RegisterInMemoryDistributedCache_When_RedisIsEmpty()
     {
         // Arrange
         var services = new ServiceCollection();
         var config = new ConfigurationBuilder().Build(); // empty — no Redis
 
         // Act
-        services.AddHeroCaching(config, singleTenant: true);
+        services.AddAppCaching(config, singleTenant: true);
         using var provider = services.BuildServiceProvider();
 
         // Assert
@@ -30,7 +30,7 @@ public sealed class HeroCachingRegistrationTests
     }
 
     [Fact]
-    public void AddHeroCaching_Should_BindCachingOptions_From_Configuration()
+    public void AddAppCaching_Should_BindCachingOptions_From_Configuration()
     {
         // Arrange
         var services = new ServiceCollection();
@@ -46,7 +46,7 @@ public sealed class HeroCachingRegistrationTests
         services.AddSingleton<IConfiguration>(config);
 
         // Act
-        services.AddHeroCaching(config, singleTenant: true);
+        services.AddAppCaching(config, singleTenant: true);
         using var provider = services.BuildServiceProvider();
 
         // Assert
@@ -58,10 +58,10 @@ public sealed class HeroCachingRegistrationTests
     }
 
     [Fact]
-    public void AddHeroCaching_Should_Throw_When_ConfigurationIsNull()
+    public void AddAppCaching_Should_Throw_When_ConfigurationIsNull()
     {
         var services = new ServiceCollection();
 
-        Should.Throw<ArgumentNullException>(() => services.AddHeroCaching(null!));
+        Should.Throw<ArgumentNullException>(() => services.AddAppCaching(null!));
     }
 }

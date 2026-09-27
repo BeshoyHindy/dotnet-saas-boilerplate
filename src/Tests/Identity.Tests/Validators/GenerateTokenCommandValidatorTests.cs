@@ -16,7 +16,7 @@ public sealed class GenerateTokenCommandValidatorTests
     public void Email_Should_Pass_When_Valid()
     {
         // Arrange
-        var command = new GenerateTokenCommand("user@example.com", "password123");
+        var command = new GenerateTokenCommand("user@example.com", "quietmeadowlantern");
 
         // Act
         var result = _sut.Validate(command);
@@ -32,7 +32,7 @@ public sealed class GenerateTokenCommandValidatorTests
     public void Email_Should_Fail_When_Empty(string? email)
     {
         // Arrange
-        var command = new GenerateTokenCommand(email!, "password123");
+        var command = new GenerateTokenCommand(email!, "quietmeadowlantern");
 
         // Act
         var result = _sut.Validate(command);
@@ -51,7 +51,7 @@ public sealed class GenerateTokenCommandValidatorTests
     public void Email_Should_Fail_When_InvalidFormat(string email)
     {
         // Arrange
-        var command = new GenerateTokenCommand(email, "password123");
+        var command = new GenerateTokenCommand(email, "quietmeadowlantern");
 
         // Act
         var result = _sut.Validate(command);
@@ -69,7 +69,7 @@ public sealed class GenerateTokenCommandValidatorTests
     public void Email_Should_Pass_When_ValidFormat(string email)
     {
         // Arrange
-        var command = new GenerateTokenCommand(email, "password123");
+        var command = new GenerateTokenCommand(email, "quietmeadowlantern");
 
         // Act
         var result = _sut.Validate(command);
@@ -86,7 +86,7 @@ public sealed class GenerateTokenCommandValidatorTests
     public void Password_Should_Pass_When_Valid()
     {
         // Arrange
-        var command = new GenerateTokenCommand("user@example.com", "password123");
+        var command = new GenerateTokenCommand("user@example.com", "quietmeadowlantern");
 
         // Act
         var result = _sut.Validate(command);

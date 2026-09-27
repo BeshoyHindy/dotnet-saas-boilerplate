@@ -40,7 +40,7 @@ public sealed class DetailedTestExceptionHandler : IExceptionHandler
         else if (exception is CustomException customEx)
         {
             statusCode = (int)customEx.StatusCode;
-            problemDetails.Title = customEx.GetType().Name;
+            problemDetails.Title = Microsoft.AspNetCore.WebUtilities.ReasonPhrases.GetReasonPhrase(statusCode) is { Length: > 0 } phrase ? phrase : "Error";
             problemDetails.Detail = customEx.Message;
 
             if (customEx.ErrorMessages is { Count: > 0 })
@@ -64,6 +64,15 @@ public sealed class DetailedTestExceptionHandler : IExceptionHandler
             statusCode = badRequest.StatusCode;
             problemDetails.Title = "Bad Request";
             problemDetails.Detail = badRequest.Message;
+        }
+        else if (exception is Finbuckle.MultiTenant.Abstractions.MultiTenantException)
+        {
+            // Mirror GlobalExceptionHandler: a tenant mismatch is the caller's error (ADR-0002), and
+            // its message stays out of the response in tests too, so a test asserting on the
+            // production answer gets it.
+            statusCode = StatusCodes.Status400BadRequest;
+            problemDetails.Title = "Bad Request";
+            problemDetails.Detail = "The request cannot be carried out in the caller's tenant.";
         }
         else
         {

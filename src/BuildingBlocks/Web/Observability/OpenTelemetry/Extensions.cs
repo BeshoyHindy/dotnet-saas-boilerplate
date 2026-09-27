@@ -20,7 +20,7 @@ public static class Extensions
 {
     private const string HealthEndpointPath = "/health";
     private const string AlivenessEndpointPath = "/alive";
-    public static IHostApplicationBuilder AddHeroOpenTelemetry(this IHostApplicationBuilder builder)
+    public static IHostApplicationBuilder AddAppOpenTelemetry(this IHostApplicationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
@@ -152,6 +152,8 @@ public static class Extensions
                     .AddNpgsql()
                     .AddSource(builder.Environment.ApplicationName)
                     .AddSource("Boilerplate.Hangfire")
+                    // EventingTelemetry.ActivitySourceName; Web does not reference the Eventing project.
+                    .AddSource("Boilerplate.Eventing")
                     .AddSource(CachingTelemetry.ActivitySourceName);
 
                 if (exportOtlp)
@@ -169,7 +171,7 @@ public static class Extensions
             builder.Services.AddScoped(typeof(IPipelineBehavior<,>), typeof(MediatorTracingBehavior<,>));
         }
 
-        // Hangfire/job instrumentation placeholder: currently enabled via Jobs.Enabled; wire hooks in jobs building block.
+        // Job spans come from HangfireTelemetryFilter (source "Boilerplate.Hangfire", added above), parented on the enqueuing trace.
     }
 
     private static double[] GetHistogramBuckets(OpenTelemetryOptions options)

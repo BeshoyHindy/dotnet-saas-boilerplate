@@ -1,6 +1,8 @@
 # Dokploy stack 1 of 2 — the data plane (ADR-0005).
 #
-# PostgreSQL, Valkey and MinIO, plus a one-shot bucket creator. Kept in its own
+# PostgreSQL, Valkey and RustFS (the object store), plus the storage-init
+# one-shot (bucket creator and public-prefix grant) and the Postgres backup pair.
+# Kept in its own
 # Dokploy Compose service so that redeploying the application (app.compose.yml)
 # can never recreate, restart or wipe the database: the two stacks are separate
 # docker compose projects with separate lifecycles and separate volumes.
@@ -11,16 +13,36 @@
 # aliases. STACK_NAME is what keeps staging and production apart on one server.
 #
 # Nothing here publishes a host port. The only service the outside world may
-# reach is MinIO, and it is reached through Traefik on STORAGE_DOMAIN.
+# reach is the object store, and it is reached through Traefik on STORAGE_DOMAIN.
 #
 # Deploy this stack FIRST and only again when a data-service version changes.
 # See docs/deploy-dokploy.md.
+#
+# Every service below carries a memory limit and log rotation:
+#   - Memory (`mem_limit`) is the one operator-tunable resource cap: an
+#     `${..._MEM_LIMIT:-default}` so the 4 GB VPS the guide recommends gets
+#     isolation between "one service misbehaves" and "the whole box goes down"
+#     out of the box, but a bigger box can raise it without editing this file.
+#     The long-running defaults here sum to ~2.3 GB, leaving room for the app stack
+#     (app.compose.yml) and Traefik/Dokploy's own processes on the same host.
+#   - Logging (`logging: *default-logging`) rotates the default unbounded
+#     `json-file` driver so container stdout cannot fill the disk that also
+#     holds `pg_data` and `storage_data`. Fixed, not env-overridable — there is
+#     no per-environment reason to want unbounded logs.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   # ── PostgreSQL ──────────────────────────────────────────────────────
   postgres:
-    image: postgres:18-alpine
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     restart: unless-stopped
+    mem_limit: ${POSTGRES_MEM_LIMIT:-1g}
+    logging: *default-logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -46,8 +68,10 @@ services:
   # credential here would be one more secret to rotate for no added boundary.
   # CachingOptions__Redis in app.compose.yml matches this (no auth, no TLS).
   valkey:
-    image: valkey/valkey:9.1.0-alpine
+    image: valkey/valkey:9.1.2-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11
     restart: unless-stopped
+    mem_limit: ${VALKEY_MEM_LIMIT:-256m}
+    logging: *default-logging
     command: ["valkey-server", "--appendonly", "yes"]
     volumes:
       - valkey_data:/data
@@ -62,28 +86,43 @@ services:
         aliases:
           - ${STACK_NAME}-valkey
 
-  # ── MinIO (S3-compatible object storage) ────────────────────────────
-  # quay.io, not docker.io: MinIO no longer publishes to Docker Hub.
+  # ── RustFS (S3-compatible object storage) ───────────────────────────
+  # RustFS (Apache-2.0) replaced MinIO, whose repository is archived and whose
+  # images no registry serves anonymously any more. Pinned by tag AND digest —
+  # the data plane must come back byte-identical after a host reboot — and the
+  # same pin as the AppHost, the local compose file and both integration-test
+  # factories (Architecture.Tests keeps them identical).
+  #
+  # The image runs as uid 10001 and owns /data as that user, so a fresh named
+  # volume is writable without a volume-owner step. The volume is
+  # `storage_data`: no product has deployed the MinIO stack this replaced, so
+  # there is no `minio_data` to carry over and no migration ships.
   #
   # Routed through Traefik on STORAGE_DOMAIN because the API signs presigned
   # upload/download URLs against Storage__S3__ServiceUrl and hands them to the
   # browser — the signature covers the host, so the host the API signs with has
   # to be the host the browser resolves. app.compose.yml therefore points
-  # ServiceUrl at https://${STORAGE_DOMAIN}, not at the internal alias.
-  minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+  # ServiceUrl at https://${STORAGE_DOMAIN}, not at the internal alias. Path-style
+  # addressing only (the API sets ForcePathStyle), so no RUSTFS_SERVER_DOMAINS.
+  storage:
+    image: rustfs/rustfs:1.0.0@sha256:8cc9801755448b71a786705ce76692c77e14936cccd87cf2fc31842e58f4d1ff
     restart: unless-stopped
-    command: ["server", "/data", "--console-address", ":9001"]
+    mem_limit: ${STORAGE_MEM_LIMIT:-512m}
+    logging: *default-logging
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      # Presigned URLs and redirects must carry the public host, not the
-      # container's.
-      MINIO_SERVER_URL: https://${STORAGE_DOMAIN}
+      RUSTFS_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${STORAGE_SECRET_KEY}
+      #if (frontend)
+      # Both clients PUT presigned uploads straight to the store from the browser,
+      # so it answers CORS for exactly their two origins.
+      RUSTFS_CORS_ALLOWED_ORIGINS: https://${DASHBOARD_DOMAIN},https://${CONSOLE_DOMAIN}
+      #endif
     volumes:
-      - minio_data:/data
+      - storage_data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      # /health/ready, not /health: the liveness endpoint answers a moment before
+      # the S3 API does, and storage-init must not race that window.
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/health/ready"]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -93,7 +132,7 @@ services:
     networks:
       dokploy-network:
         aliases:
-          - ${STACK_NAME}-minio
+          - ${STACK_NAME}-storage
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=dokploy-network"
@@ -114,69 +153,177 @@ services:
       # client signed. (It is Traefik's default; stated so a future edit has to
       # delete it on purpose.)
       - "traefik.http.services.${STACK_NAME}-storage.loadbalancer.passhostheader=true"
-      - "traefik.http.services.${STACK_NAME}-storage.loadbalancer.healthcheck.path=/minio/health/live"
+      - "traefik.http.services.${STACK_NAME}-storage.loadbalancer.healthcheck.path=/health"
       - "traefik.http.services.${STACK_NAME}-storage.loadbalancer.healthcheck.interval=10s"
       - "traefik.http.services.${STACK_NAME}-storage.loadbalancer.healthcheck.timeout=5s"
       - "traefik.http.services.${STACK_NAME}-storage.loadbalancer.healthcheck.hostname=${STORAGE_DOMAIN}"
 
-  # ── One-shot: create the bucket the Files module writes to ──────────
-  # The application never auto-creates it, so without this the first upload
-  # fails with NoSuchBucket. Idempotent (--ignore-existing), so it is safe on
-  # every redeploy.
-  minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
-    restart: "no"
-    depends_on:
-      minio:
-        condition: service_healthy
-    environment:
-      MC_HOST_local: http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000
-    entrypoint: ["mc"]
-    command: ["mb", "--ignore-existing", "local/${STORAGE_BUCKET}"]
-    networks:
-      - dokploy-network
-
-  # ── One-shot: open anonymous reads on the `uploads/` prefix ONLY ────
-  # Avatars and tenant branding go through IStorageService.UploadAsync, which
-  # returns BuildPublicUrl(key) — an unsigned URL under `uploads/` that the
-  # browser fetches straight from MinIO in an <img src>. MinIO buckets are
-  # private by default, so without this grant every avatar and logo 403s.
+  # ── One-shot: create the buckets, open `uploads/` to anonymous reads ─
+  # The application never auto-creates the Files bucket, so without this the
+  # first upload fails with NoSuchBucket; the backup bucket is created here too
+  # so postgres-backup-upload never races bucket creation.
   #
-  # The prefix is deliberately `uploads/` and NOT the bucket. Files-module
-  # objects live under `tenants/…` where public and private files share one key
-  # space and visibility is a database column (FileAsset.Visibility), so opening
-  # that prefix would make ChangeFileVisibility meaningless: a file flipped back
-  # to Private would stay fetchable at its known URL forever. Widening this to
-  # `local/${STORAGE_BUCKET}` is a data leak, not a convenience — the contract
-  # test asserts the prefix for that reason.
+  # Then the grant. Avatars and tenant branding go through
+  # IStorageService.UploadAsync, which returns BuildPublicUrl(key) — an unsigned
+  # URL under `uploads/` that the browser fetches straight from the store in an
+  # <img src>. Buckets are private by default, so without this policy every
+  # avatar and logo 403s.
+  #
+  # The policy's resource is `${STORAGE_BUCKET}/uploads/*` and NOT the bucket.
+  # Files-module objects live under `tenants/…` where public and private files
+  # share one key space and visibility is a database column
+  # (FileAsset.Visibility), so opening that prefix would make
+  # ChangeFileVisibility meaningless: a file flipped back to Private would stay
+  # fetchable at its known URL forever. Widening this to the whole bucket is a
+  # data leak, not a convenience — the contract test asserts the prefix for that
+  # reason. BACKUP_BUCKET gets no policy at all: a database dump must never be
+  # reachable unsigned.
   #
   # Within `uploads/` the objects are themselves tenant-prefixed —
-  # `uploads/tenants/{tenantId}/…`, composed by the Storage block (ADR-0002,
-  # issue #78). That is a property of the keys, not of this grant: it stays at
+  # `uploads/tenants/{tenantId}/…`, composed by the Storage block (ADR-0002).
+  # That is a property of the keys, not of this grant: it stays at
   # the `uploads/` top level so one one-shot covers every tenant, including the
   # ones provisioned after the stack was deployed. Narrowing it to a single
   # tenant would 403 every other tenant's branding.
   #
-  # A separate one-shot rather than `mb && anonymous set` in one: the mc image is
-  # not guaranteed to ship a shell, and `entrypoint: ["mc"]` keeps both steps
-  # shell-free. Both are idempotent.
-  minio-public-prefix:
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+  # Idempotent, so safe on every redeploy: head-bucket skips a create that has
+  # already happened, and put-bucket-policy replaces the policy with the same
+  # one. Dollar signs meant for the container's shell are doubled and brace-free
+  # (see postgres-backup below for why).
+  storage-init:
+    image: amazon/aws-cli:2.37.4@sha256:fdd8d1fcbea9c371678dee5a40df8b178c7a781b4586605756ee28114c97ead6
     restart: "no"
+    mem_limit: ${STORAGE_ONESHOT_MEM_LIMIT:-128m}
+    logging: *default-logging
     depends_on:
-      minio-init:
+      storage:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${STORAGE_SECRET_KEY}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ENDPOINT_URL: http://storage:9000
+      FILES_BUCKET: ${STORAGE_BUCKET}
+      DUMPS_BUCKET: ${BACKUP_BUCKET}
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -euo pipefail
+        for b in "$$FILES_BUCKET" "$$DUMPS_BUCKET"; do
+          aws s3api head-bucket --bucket "$$b" 2>/dev/null || aws s3api create-bucket --bucket "$$b"
+        done
+        aws s3api put-bucket-policy --bucket "$$FILES_BUCKET" --policy "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Action\":[\"s3:GetObject\"],\"Resource\":[\"arn:aws:s3:::$$FILES_BUCKET/uploads/*\"]}]}"
+        echo "buckets ready; anonymous GET open on $$FILES_BUCKET/uploads/ only"
+    networks:
+      - dokploy-network
+
+  # ── Postgres backup: pg_dump on a schedule, kept for N days ──────────
+  # D1 (deploy-operability research): pg_data was a plain named volume with no
+  # snapshot, replication or export step, so a host disk failure, `docker
+  # volume rm`, or a destructive migration had no recovery path but "there is
+  # no backup". This runs pg_dump on a cron schedule into its own volume, and
+  # postgres-backup-upload (below) mirrors that volume to the object store.
+  #
+  # Image is the SAME postgres:18-alpine as the `postgres` service, pinned by
+  # tag AND digest (the ticket's requirement, and the only way to guarantee
+  # pg_dump's major version never drifts ahead of or behind the server it
+  # dumps — pg_dump refuses a server whose major version is newer than its
+  # own). The one commonly used third-party "pg_dump + S3 upload" image
+  # (eeshugerman/postgres-backup-s3) ships only a `:16` tag — its pg_dump
+  # would refuse this stack's PostgreSQL 18 server outright — which is why
+  # this is a pair of services instead of one: this one only ever needs to
+  # speak the same protocol version as `postgres`, and mirroring to the
+  # object store is a separate concern the aws-cli image storage-init already
+  # uses (below) knows how to do.
+  #
+  # BACKUP_SCHEDULE is a standard 5-field cron expression (default: daily at
+  # 03:00). BACKUP_KEEP_DAYS bounds the volume itself — a dump older than this
+  # is deleted locally, and postgres-backup-upload's `sync --delete` follows
+  # that deletion to the bucket, so retention only has to be declared once.
+  postgres-backup:
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    restart: unless-stopped
+    mem_limit: ${POSTGRES_BACKUP_MEM_LIMIT:-256m}
+    logging: *default-logging
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_SCHEDULE: "${BACKUP_SCHEDULE:-0 3 * * *}"
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-7}
+    volumes:
+      - pg_backups:/backups
+    # entrypoint/command below is compose-interpolated like the rest of this
+    # file (docker compose substitutes a variable reference anywhere in the
+    # YAML, this string included), so every dollar sign meant for the
+    # CONTAINER's shell at runtime — not for compose's own .env substitution —
+    # is doubled to survive as a literal dollar sign, and written without
+    # curly braces so it can never be mistaken for a brace-delimited
+    # reference compose is actually substituting elsewhere in this file. Only
+    # BACKUP_SCHEDULE below is a deliberate compose-time substitution
+    # (matches the `environment:` block above).
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        cat > /usr/local/bin/run-backup.sh <<'SCRIPT'
+        #!/bin/sh
+        set -eu
+        ts=$$(date -u +%Y%m%dT%H%M%SZ)
+        out=/backups/$$POSTGRES_DB-$$ts.dump
+        pg_dump -Fc -h "$$PGHOST" -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" -f "$$out"
+        find /backups -name '*.dump' -mtime "+$$BACKUP_KEEP_DAYS" -delete
+        SCRIPT
+        chmod +x /usr/local/bin/run-backup.sh
+        echo "${BACKUP_SCHEDULE} /usr/local/bin/run-backup.sh >>/proc/1/fd/1 2>&1" > /etc/crontabs/root
+        exec crond -f -d 8
+    networks:
+      - dokploy-network
+
+  # ── Postgres backup: mirror the dump volume to the object store ─────
+  # The same pinned aws-cli image as storage-init. `aws s3 sync` has no watch
+  # mode, so it runs in a loop: a dump written by postgres-backup's cron job
+  # reaches the bucket within about a minute. `--delete` follows
+  # postgres-backup's own retention deletes to the bucket, so BACKUP_KEEP_DAYS
+  # is the only retention knob. A failed pass (the store briefly down) is logged
+  # and retried on the next one rather than killing the container.
+  # aws-cli is a Python program, not a small Go binary like the `mc` it
+  # replaced: a multipart upload of a large dump is OOM-killed at 64m, hence 256m.
+  postgres-backup-upload:
+    image: amazon/aws-cli:2.37.4@sha256:fdd8d1fcbea9c371678dee5a40df8b178c7a781b4586605756ee28114c97ead6
+    restart: unless-stopped
+    mem_limit: ${POSTGRES_BACKUP_UPLOAD_MEM_LIMIT:-256m}
+    logging: *default-logging
+    depends_on:
+      storage-init:
         condition: service_completed_successfully
     environment:
-      MC_HOST_local: http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000
-    entrypoint: ["mc"]
-    command: ["anonymous", "set", "download", "local/${STORAGE_BUCKET}/uploads"]
+      AWS_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${STORAGE_SECRET_KEY}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ENDPOINT_URL: http://storage:9000
+      DUMPS_BUCKET: ${BACKUP_BUCKET}
+    volumes:
+      - pg_backups:/backups:ro
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        while true; do
+          aws s3 sync --delete --no-progress /backups "s3://$$DUMPS_BUCKET" || echo "sync failed; retrying in 60s" >&2
+          sleep 60
+        done
     networks:
       - dokploy-network
 
 volumes:
   pg_data:
+  pg_backups:
   valkey_data:
-  minio_data:
+  storage_data:
 
 networks:
   # Created by the Dokploy installer; every stack on the server shares it and

@@ -125,7 +125,7 @@ whole round. So when you add or change one:
 - **Set the Finbuckle tenant context in the SAME method that calls the code under test.** It is an
   `AsyncLocal`: a context set inside an awaited helper is gone by the time the caller resumes, the
   tenant filter then sees no tenant, and tenant-filtered queries quietly return nothing.
-- **Remember the harness's eager wiring** — storage is re-registered after `AddHeroStorage` and rate
+- **Remember the harness's eager wiring** — storage is re-registered after `AddAppStorage` and rate
   limiting is read before host build. See `.agents/rules/integration-testing.md`.
 
 ### Browser suites are scoped, never full

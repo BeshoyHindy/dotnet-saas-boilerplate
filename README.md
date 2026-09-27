@@ -4,8 +4,10 @@ A production-ready starter for multi-tenant SaaS: a modular .NET 10 monolith (ve
 CQRS via a source-generated mediator, EF Core 10 on PostgreSQL) plus two React 19 clients, wired
 for local orchestration with .NET Aspire.
 
+Derived from [fullstackhero/dotnet-starter-kit](https://github.com/fullstackhero/dotnet-starter-kit) (MIT), trimmed to a brand-free template with stricter tenancy and a Dokploy deploy path.
+
 `Boilerplate` is the placeholder root name. A new product renames it in one command
-(`dotnet new saas -n Acme`) — see [`docs/adr/0001-placeholder-namespace-and-dotnet-new-rename.md`](docs/adr/0001-placeholder-namespace-and-dotnet-new-rename.md).
+(`dotnet new saas -n Contoso`) — see [`docs/adr/0001-placeholder-namespace-and-dotnet-new-rename.md`](docs/adr/0001-placeholder-namespace-and-dotnet-new-rename.md).
 
 Three docs carry the rest:
 
@@ -17,10 +19,23 @@ Three docs carry the rest:
 ## Start a new product from it
 
 ```bash
-git clone https://github.com/BeshoyHindy/dotnet-saas-boilerplate Acme && cd Acme
+git clone https://github.com/BeshoyHindy/dotnet-saas-boilerplate && cd dotnet-saas-boilerplate
+dotnet new uninstall             # lists what is installed: remove any older `saas` first
 dotnet new install .            # the repository root IS the template
-dotnet new saas -n Acme -o ../Acme.App
+dotnet new saas -n Contoso -o ../Contoso
 ```
+
+Then follow the scaffold's own `docs/new-project-guide.md` from §2 (`git init -b develop` first).
+
+**Check for a stale install first.** `dotnet new` resolves `saas` to whichever install of the
+`Boilerplate.Saas` identity it has — an older clone installed months ago wins silently. Run
+`dotnet new uninstall` with no arguments, and `dotnet new uninstall <that path>` for any other clone
+listing `saas`.
+
+**Install from a clean clone.** `dotnet new install .` scans the whole tree. In a working checkout
+where `pnpm install` has run, or that has agent worktrees under `.claude/worktrees/`, it prints
+`Failed to load template from …/node_modules/…` errors and duplicate-identity warnings. The install
+still succeeds and the root template wins, but a fresh `git clone` is quiet and unambiguous.
 
 Nothing is published to NuGet.org: `dotnet new install <path>` on a clone is the supported
 install route, so there is no package version to keep in step with the source.
@@ -34,8 +49,8 @@ install route, so there is no package version to keep in step with the source.
 `--skipRestore`, `--contactEmail`, `--contactUrl` and `--mailFrom` are also accepted
 (`dotnet new saas --help` lists them all).
 
-`Boilerplate` → `Acme` is a plain text replacement across every file type, and a second derived
-symbol renames the lowercase/kebab form (`boilerplate` → `acme`: image names, database and bucket
+`Boilerplate` → `Contoso` is a plain text replacement across every file type, and a second derived
+symbol renames the lowercase/kebab form (`boilerplate` → `contoso`: image names, database and bucket
 names, the compose project, npm scopes, JWT issuer and audience, `localStorage` key prefixes).
 The two `UserSecretsId` GUIDs are regenerated per scaffold, and the API and DbMigrator keep
 sharing one. A scaffold carries `AGENTS.md`, `CLAUDE.md`, `.agents/rules/`, `CONTRIBUTING.md`
@@ -55,7 +70,7 @@ Run the whole thing locally — scaffold, build, test, brand-grep — with
 - **Modules** (bounded contexts, each with a `.Contracts` project as its only public surface):
   Identity, Multitenancy, Files, Auditing, Notifications.
 - **BuildingBlocks**: core domain primitives, persistence, web pipeline, caching (HybridCache on
-  Valkey), eventing (outbox/inbox), jobs (Hangfire), storage (S3/MinIO), mailing.
+  Valkey), eventing (outbox/inbox), jobs (Hangfire), storage (S3/RustFS), mailing.
 - **Hosts**: `Boilerplate.Api` (composition root), `Boilerplate.DbMigrator` (one-shot migrate/seed —
   the API never migrates at startup), `Boilerplate.AppHost` (Aspire orchestrator).
 - **Clients**: two React 19 apps (ADR-0008) — `clients/dashboard`, what a tenant's users sign in to,
@@ -68,9 +83,9 @@ Run the whole thing locally — scaffold, build, test, brand-grep — with
 ## Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download) (pinned in `global.json`)
-- [Docker](https://www.docker.com/) — Postgres, Valkey and MinIO are started by Aspire, and the
+- [Docker](https://www.docker.com/) — Postgres, Valkey and RustFS are started by Aspire, and the
   integration tests use Testcontainers
-- [Node 20+](https://nodejs.org/) for the React clients
+- [Node 22.22+](https://nodejs.org/) and [pnpm](https://pnpm.io) for the React clients and the agent pipeline
 
 ## Run
 
@@ -87,23 +102,23 @@ parameters, environment variables or that same store, never from `appsettings*.j
 
 The Aspire dashboard is at <https://localhost:15888>; the API and its Scalar reference at
 <https://localhost:7030/scalar>; the dashboard at <http://localhost:5173> and the console at
-<http://localhost:5174>. MinIO and Mailpit get host
+<http://localhost:5174>. RustFS and Mailpit get host
 ports allocated by Aspire — open them from the dashboard's resource list rather than a remembered
-port. Aspire starts PostgreSQL, Valkey, MinIO and Mailpit, runs the migrator to completion, then the
+port. Aspire starts PostgreSQL, Valkey, RustFS and Mailpit, runs the migrator to completion, then the
 API, then both clients.
 
 **Container host ports are not pinned**, so a second checkout or worktree can run its own AppHost
-while yours is up: MinIO and Mailpit take whatever host port is free. (The API's `7030`/`5030`, the
+while yours is up: RustFS and Mailpit take whatever host port is free. (The API's `7030`/`5030`, the
 Aspire dashboard's `15888` and the clients' `5173`/`5174` *are* fixed — they are part of the documented
 developer contract, and unlike a container they fail loudly and immediately when taken.) If you see
-`minio-init` looping on `waiting for minio...`, you are on an older revision where 9000/9001 were
-pinned; the fix is in `AppHost.cs`.
+`minio-init` looping on `waiting for minio...`, you are on an older revision (the MinIO era) where
+9000/9001 were pinned; the fix is in `AppHost.cs`.
 
 Separately: the initial migrations were regenerated while this template was built, so a database
 migrated before that is incompatible and needs a fresh volume —
-`docker volume rm boilerplate-postgres-data` (destructive; local development data).
+`docker volume rm boilerplate-postgres-data-v2` (destructive; local development data).
 
-The MinIO password, the seeded root admin password and the demo password are Aspire parameters,
+The object store's secret key, the seeded root admin password and the demo password are Aspire parameters,
 generated on first run and persisted to the AppHost's user-secrets; read the current values from the
 Aspire dashboard (Resources → Parameters).
 
@@ -134,7 +149,7 @@ docker compose down -v
 ```
 
 This builds and runs the same `api`, `migrator` and client images a deployment uses, against
-PostgreSQL, Valkey, MinIO and a Mailpit mail catcher. The containers run as **Production**, so the
+PostgreSQL, Valkey, RustFS and a Mailpit mail catcher. The containers run as **Production**, so the
 same fail-fast guards apply as on a server: no placeholder secrets, no `AllowedHosts: *`. That is
 why the secrets have no default in `docker-compose.yml` and `scripts/local-env.sh` generates them
 instead — including `SEED_DEMO_PASSWORD`, the one password the demo accounts above share. The
@@ -144,6 +159,19 @@ seeding is refused in a Production host. Every other setting has a local default
 Dokploy environment variables (ADR-0005)
 — see [`docs/deploy-dokploy.md`](docs/deploy-dokploy.md), which takes a blank server to a healthy
 HTTPS deployment.
+
+Telemetry is fully instrumented but exported nowhere by default. To see it locally:
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=http://otlp-receiver:18889 docker compose --profile otel up --build
+```
+
+Traces, logs and metrics then show up at <http://localhost:18888> (the standalone .NET Aspire
+Dashboard, unauthenticated, local-only) — no other setup needed. To keep the endpoint set without
+repeating it on the command line, put the same `OTEL_EXPORTER_OTLP_ENDPOINT` line in `.env` instead
+(see [`.env.example`](.env.example)). Point it at any other OTLP-compatible receiver instead to skip
+this container entirely. See [`docs/deploy-dokploy.md`](docs/deploy-dokploy.md#9-wire-an-otlp-backend)
+for wiring a real backend behind a deployment.
 
 | Symptom | Likely cause |
 |---|---|

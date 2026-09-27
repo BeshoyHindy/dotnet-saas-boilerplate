@@ -16,7 +16,7 @@ namespace Architecture.Tests;
 ///
 /// <para>It exists because that is exactly what happened: <c>CreateTenantCommand</c> once bound a
 /// <c>ConnectionString</c> — a database credential — the name list did not know the word, and
-/// nothing failed. That field is gone with per-tenant databases (#75), but the rule it earned is
+/// nothing failed. That field is no longer needed with per-tenant databases, but the rule it earned is
 /// not. The probe below is deliberately <i>wider</i> than the production rule — it flags
 /// "connection", "salt", "private" and friends that <see cref="SensitiveFieldNames"/> does not — so
 /// a new command has to be looked at rather than silently accepted.</para>
@@ -76,7 +76,7 @@ public sealed partial class IdempotentCommandSecretsTests
     [Fact]
     public void The_Probe_Should_Recognise_The_Field_That_Got_Through()
     {
-        // The field that got through is gone (#75), but the word must stay known to both halves:
+        // The field that got through is no longer needed with per-tenant databases, but the word must stay known to both halves:
         // a consumer of this template that adds its own connection-string-bearing command gets the
         // protection for free.
         LooksSecret("ConnectionString").ShouldBeTrue();
@@ -163,7 +163,7 @@ public sealed partial class IdempotentCommandSecretsTests
     /// <c>ModuleAssemblyDiscovery</c> does — "whatever happens to be loaded already" depends on which
     /// test ran first, which is not a thing to build a guarantee on.
     /// </summary>
-    private static IEnumerable<Assembly> ContractsAssemblies()
+    internal static IEnumerable<Assembly> ContractsAssemblies()
     {
         foreach (var file in Directory.GetFiles(AppContext.BaseDirectory, "Boilerplate.Modules.*.Contracts.dll"))
         {

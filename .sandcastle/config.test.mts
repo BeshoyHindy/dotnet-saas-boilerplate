@@ -3,14 +3,19 @@ import test from "node:test";
 
 import {
   defineConfig,
+  envFileKeys,
   formatGateCommands,
   gateCommand,
   gateNames,
   issueBranch,
   joinGateCommands,
+  resolveFallbackAccount,
   resolveLimits,
+  resolveModels,
   type GateConfig,
   type LimitsConfig,
+  type PhaseModel,
+  type PhaseName,
   type SandcastleConfig,
 } from "./config.mts";
 
@@ -31,6 +36,16 @@ const limits: LimitsConfig = {
   plannerQueueDepth: 10,
   idleTimeoutSeconds: 3900,
   healAttempts: 0,
+  usagePollMinutes: 5,
+  usageMaxWaitHours: 6,
+};
+
+const models: Readonly<Record<PhaseName, PhaseModel>> = {
+  planner: { model: "model-plan", effort: "medium" },
+  implementer: { model: "model-impl", effort: "high" },
+  reviewer: { model: "model-review", effort: "high" },
+  merger: { model: "model-merge", effort: "xhigh" },
+  healer: { model: "model-heal", effort: "xhigh" },
 };
 
 // --- gate command rendering ------------------------------------------------
@@ -142,6 +157,49 @@ test("a malformed override throws instead of falling back silently", () => {
   );
 });
 
+test("the usage-limit wait's poll interval and budget take env overrides", () => {
+  const resolved = resolveLimits(limits, {
+    SANDCASTLE_USAGE_POLL_MINUTES: "10",
+    SANDCASTLE_USAGE_MAX_WAIT_HOURS: "12",
+  });
+
+  assert.equal(resolved.usagePollMinutes, 10);
+  assert.equal(resolved.usageMaxWaitHours, 12);
+  // Zero hours is legal: it is how the wait is turned off.
+  assert.equal(
+    resolveLimits(limits, { SANDCASTLE_USAGE_MAX_WAIT_HOURS: "0" }).usageMaxWaitHours,
+    0,
+  );
+  // Blank falls back to the config.
+  const blank = resolveLimits(limits, {
+    SANDCASTLE_USAGE_POLL_MINUTES: " ",
+    SANDCASTLE_USAGE_MAX_WAIT_HOURS: "",
+  });
+  assert.equal(blank.usagePollMinutes, 5);
+  assert.equal(blank.usageMaxWaitHours, 6);
+});
+
+// A poll of 0 would probe in a tight loop; a typo'd budget that quietly
+// restored the default would wait hours the operator did not ask for.
+test("a malformed usage-limit override throws instead of falling back", () => {
+  assert.throws(
+    () => resolveLimits(limits, { SANDCASTLE_USAGE_POLL_MINUTES: "0" }),
+    /SANDCASTLE_USAGE_POLL_MINUTES must be an integer >= 1/,
+  );
+  assert.throws(
+    () => resolveLimits(limits, { SANDCASTLE_USAGE_POLL_MINUTES: "5m" }),
+    /SANDCASTLE_USAGE_POLL_MINUTES/,
+  );
+  assert.throws(
+    () => resolveLimits(limits, { SANDCASTLE_USAGE_MAX_WAIT_HOURS: "-1" }),
+    /SANDCASTLE_USAGE_MAX_WAIT_HOURS must be an integer >= 0/,
+  );
+  assert.throws(
+    () => resolveLimits(limits, { SANDCASTLE_USAGE_MAX_WAIT_HOURS: "5.5" }),
+    /SANDCASTLE_USAGE_MAX_WAIT_HOURS/,
+  );
+});
+
 // A queue no deeper than the cap is empty by construction: the pool it feeds
 // would idle every freed slot until the slowest sibling ended.
 test("the planner queue is clamped up to the concurrency cap, never below it", () => {
@@ -154,6 +212,212 @@ test("the planner queue is clamped up to the concurrency cap, never below it", (
   );
   // A queue already deeper than the cap is left alone.
   assert.equal(resolveLimits(limits, { MAX_CONCURRENT_AGENTS: "2" }).plannerQueueDepth, 10);
+});
+
+test("SANDCASTLE_MAX_ITERATIONS overrides the round cap, and absent or blank keeps it", () => {
+  assert.equal(resolveLimits(limits, { SANDCASTLE_MAX_ITERATIONS: "250" }).maxIterations, 250);
+  assert.equal(resolveLimits(limits, {}).maxIterations, limits.maxIterations);
+  assert.equal(
+    resolveLimits(limits, { SANDCASTLE_MAX_ITERATIONS: " " }).maxIterations,
+    limits.maxIterations,
+  );
+});
+
+test("a malformed SANDCASTLE_MAX_ITERATIONS throws instead of falling back", () => {
+  for (const raw of ["0", "-3", "1.5", "lots"]) {
+    assert.throws(
+      () => resolveLimits(limits, { SANDCASTLE_MAX_ITERATIONS: raw }),
+      new RegExp(`SANDCASTLE_MAX_ITERATIONS must be an integer >= 1, got "${raw}"`),
+    );
+  }
+});
+
+test("PLANNER_QUEUE_DEPTH overrides the queue depth, and absent or blank keeps it", () => {
+  assert.equal(resolveLimits(limits, { PLANNER_QUEUE_DEPTH: "15" }).plannerQueueDepth, 15);
+  assert.equal(resolveLimits(limits, {}).plannerQueueDepth, limits.plannerQueueDepth);
+  assert.equal(
+    resolveLimits(limits, { PLANNER_QUEUE_DEPTH: "" }).plannerQueueDepth,
+    limits.plannerQueueDepth,
+  );
+});
+
+test("a malformed PLANNER_QUEUE_DEPTH throws instead of falling back", () => {
+  for (const raw of ["0", "-1", "2.5", "deep"]) {
+    assert.throws(
+      () => resolveLimits(limits, { PLANNER_QUEUE_DEPTH: raw }),
+      new RegExp(`PLANNER_QUEUE_DEPTH must be an integer >= 1, got "${raw}"`),
+    );
+  }
+});
+
+test("an overridden queue depth is still clamped up to the concurrency cap", () => {
+  assert.equal(
+    resolveLimits(limits, { PLANNER_QUEUE_DEPTH: "2", MAX_CONCURRENT_AGENTS: "4" })
+      .plannerQueueDepth,
+    4,
+  );
+});
+
+// --- models ----------------------------------------------------------------
+
+test("resolveModels keeps the configured models when nothing is overridden", () => {
+  const resolved = resolveModels(models, {});
+
+  for (const [phase, configured] of Object.entries(models)) {
+    assert.deepEqual(resolved[phase as PhaseName], { ...configured, overridden: [] });
+  }
+});
+
+test("resolveModels treats a blank override as unset", () => {
+  const resolved = resolveModels(models, {
+    SANDCASTLE_PLANNER_MODEL: "   ",
+    SANDCASTLE_PLANNER_EFFORT: "",
+  });
+
+  assert.deepEqual(resolved.planner, { ...models.planner, overridden: [] });
+});
+
+test("SANDCASTLE_<PHASE>_MODEL overrides that phase's model", () => {
+  const resolved = resolveModels(models, { SANDCASTLE_IMPLEMENTER_MODEL: " claude-test-model " });
+
+  assert.equal(resolved.implementer.model, "claude-test-model");
+  assert.equal(resolved.implementer.effort, "high");
+  assert.deepEqual(resolved.implementer.overridden, ["model"]);
+});
+
+test("SANDCASTLE_<PHASE>_EFFORT overrides that phase's effort", () => {
+  const resolved = resolveModels(models, { SANDCASTLE_HEALER_EFFORT: "low" });
+
+  assert.equal(resolved.healer.model, "model-heal");
+  assert.equal(resolved.healer.effort, "low");
+  assert.deepEqual(resolved.healer.overridden, ["effort"]);
+});
+
+test("the [1m] context selector is accepted as part of a model id", () => {
+  const resolved = resolveModels(models, { SANDCASTLE_REVIEWER_MODEL: "claude-test-model[1m]" });
+  assert.equal(resolved.reviewer.model, "claude-test-model[1m]");
+});
+
+test("the overridden list names every field that came from the environment", () => {
+  const resolved = resolveModels(models, {
+    SANDCASTLE_MERGER_MODEL: "claude-test-model",
+    SANDCASTLE_MERGER_EFFORT: "max",
+  });
+
+  assert.deepEqual(resolved.merger, {
+    model: "claude-test-model",
+    effort: "max",
+    overridden: ["model", "effort"],
+  });
+});
+
+test("one phase's override leaves every other phase on its configured model", () => {
+  const resolved = resolveModels(models, {
+    SANDCASTLE_REVIEWER_MODEL: "claude-test-model",
+    SANDCASTLE_REVIEWER_EFFORT: "low",
+  });
+
+  for (const phase of ["planner", "implementer", "merger", "healer"] as const) {
+    assert.deepEqual(resolved[phase], { ...models[phase], overridden: [] });
+  }
+});
+
+// A typo that quietly restored the config default would run a whole round on
+// the wrong model or effort, with nothing on screen saying so.
+test("a malformed effort throws, naming the variable and the allowed levels", () => {
+  assert.throws(
+    () => resolveModels(models, { SANDCASTLE_REVIEWER_EFFORT: "extreme" }),
+    /SANDCASTLE_REVIEWER_EFFORT must be one of low, medium, high, xhigh, max/,
+  );
+  // Exact match only: the level reaches the agent CLI verbatim, so it is
+  // checked verbatim — no case folding.
+  assert.throws(
+    () => resolveModels(models, { SANDCASTLE_REVIEWER_EFFORT: "HIGH" }),
+    /SANDCASTLE_REVIEWER_EFFORT/,
+  );
+});
+
+test("a model the agent CLI cannot route throws instead of falling back", () => {
+  assert.throws(
+    () => resolveModels(models, { SANDCASTLE_PLANNER_MODEL: "gpt-test-model" }),
+    /SANDCASTLE_PLANNER_MODEL must be a Claude model id starting with "claude-"/,
+  );
+  assert.throws(
+    () => resolveModels(models, { SANDCASTLE_PLANNER_MODEL: "claude-test model" }),
+    /SANDCASTLE_PLANNER_MODEL.*no whitespace/,
+  );
+});
+
+// --- fallback account ------------------------------------------------------
+
+const TOKEN = "CLAUDE_CODE_OAUTH_TOKEN_FALLBACK";
+const listed = new Set(["CLAUDE_CODE_OAUTH_TOKEN", TOKEN]);
+
+test("the fallback account is off when its switch is absent, blank or off", () => {
+  // A token sitting in .env stays unused.
+  for (const value of [undefined, "", "  ", "off", "OFF"]) {
+    assert.deepEqual(
+      resolveFallbackAccount({ SANDCASTLE_FALLBACK_ACCOUNT: value, [TOKEN]: "t" }, listed),
+      { enabled: false },
+    );
+  }
+});
+
+test("the fallback account is on when switched on with a listed token", () => {
+  assert.deepEqual(
+    resolveFallbackAccount({ SANDCASTLE_FALLBACK_ACCOUNT: "on", [TOKEN]: "t" }, listed),
+    { enabled: true },
+  );
+});
+
+test("a malformed fallback switch throws instead of falling back", () => {
+  assert.throws(
+    () => resolveFallbackAccount({ SANDCASTLE_FALLBACK_ACCOUNT: "yes", [TOKEN]: "t" }, listed),
+    /SANDCASTLE_FALLBACK_ACCOUNT must be "on" or "off", got "yes"/,
+  );
+});
+
+test("the fallback switched on without a token throws at startup", () => {
+  assert.throws(
+    () => resolveFallbackAccount({ SANDCASTLE_FALLBACK_ACCOUNT: "on", [TOKEN]: " " }, listed),
+    /CLAUDE_CODE_OAUTH_TOKEN_FALLBACK is blank/,
+  );
+});
+
+test("a fallback token exported from the shell but not listed in .sandcastle/.env throws", () => {
+  assert.throws(
+    () =>
+      resolveFallbackAccount(
+        { SANDCASTLE_FALLBACK_ACCOUNT: "on", [TOKEN]: "t" },
+        new Set(["CLAUDE_CODE_OAUTH_TOKEN"]),
+      ),
+    /not listed in \.sandcastle\/\.env/,
+  );
+});
+
+test("the fallback switched on alongside an API key throws", () => {
+  assert.throws(
+    () =>
+      resolveFallbackAccount(
+        { SANDCASTLE_FALLBACK_ACCOUNT: "on", [TOKEN]: "t", ANTHROPIC_API_KEY: "k" },
+        listed,
+      ),
+    /ANTHROPIC_API_KEY is set/,
+  );
+});
+
+test("envFileKeys reads the keys the library forwards, skipping comments", () => {
+  const keys = envFileKeys(
+    [
+      "# a comment",
+      `CLAUDE_CODE_OAUTH_TOKEN=abc`,
+      `  ${TOKEN}=`,
+      "# ANTHROPIC_API_KEY=",
+      "not a pair",
+      "",
+    ].join("\n"),
+  );
+  assert.deepEqual([...keys].sort(), ["CLAUDE_CODE_OAUTH_TOKEN", TOKEN]);
 });
 
 // --- branches --------------------------------------------------------------
@@ -177,12 +441,13 @@ test("defineConfig returns the config unchanged", () => {
     gates: [gate()],
     limits,
     models: {
-      planner: { model: "m" },
-      implementer: { model: "m" },
-      reviewer: { model: "m" },
-      merger: { model: "m" },
-      healer: { model: "m" },
+      planner: { model: "m", effort: "medium" },
+      implementer: { model: "m", effort: "high" },
+      reviewer: { model: "m", effort: "medium" },
+      merger: { model: "m", effort: "xhigh" },
+      healer: { model: "m", effort: "xhigh" },
     },
+    usageProbeModel: "m",
     sandbox: {
       cacheRoot: "~/.cache",
       caches: [],

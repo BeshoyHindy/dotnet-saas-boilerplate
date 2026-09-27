@@ -27,9 +27,19 @@ Any exception to publishing via the outbox needs a strong reason, documented in 
 
 ## One store, owned by the framework
 
-`OutboxMessages`/`InboxMessages` live in schema `framework`, owned by `EventingDbContext` (`src/BuildingBlocks/Eventing/Persistence/`) — **not** by any module's context. That is what keeps `IOutboxStore`/`IInboxStore` to a single, non-keyed DI registration: registering them per module DbContext made .NET DI resolve whichever module registered last for the whole application, so a second module publishing broke every module's outbox (issue #1349). `EventingRegistrationTests` guards the registration count; don't add a second one.
+`OutboxMessages`/`InboxMessages` live in schema `framework`, owned by `EventingDbContext` (`src/BuildingBlocks/Eventing/Persistence/`) — **not** by any module's context. That is what keeps `IOutboxStore`/`IInboxStore` to a single, non-keyed DI registration: registering them per module DbContext made .NET DI resolve whichever module registered last for the whole application, so a second module publishing broke every module's outbox. `EventingRegistrationTests` guards the registration count; don't add a second one.
 
 `EventingDbContext` derives from `BaseDbContext`, so its rows sit in the one shared database next to the business data they accompany, and one dispatcher pass per cycle sees every tenant's rows.
+
+## Retention
+
+`EventingRetentionJob` (`Eventing/Retention/`), a daily `[SystemJob]` (`eventing-retention`, `RetentionCron`, default `45 3 * * *` UTC), deletes processed outbox rows and inbox rows older than `ProcessedRetentionDays` (default 7; zero or less turns it off), `RetentionDeleteBatchSize` rows per statement. Pending and dead-lettered outbox rows are never deleted. The tables are global, so it is one pass, not a tenant sweep. An inbox row is what deduplicates a redelivery, so an event redelivered after the window is handled again — keep the window longer than any redelivery you expect.
+
+## Telemetry
+
+`EventingTelemetry` (`Eventing/Telemetry/`): every dispatch attempt is an `Outbox.Dispatch` span on the `Boilerplate.Eventing` source, tagged with the event type, tenant, message id, retry count and `boilerplate.correlation_id`. The `Boilerplate.Eventing` meter counts `outbox.dispatched`, `outbox.deadlettered` and `outbox.redriven`, and the `outbox.pending` gauge reports the rows not yet processed nor dead-lettered, sampled each dispatch pass — a rising value is a backlog before anything dead-letters.
+
+Set an event's `CorrelationId` to the current trace id, `Activity.Current?.TraceId.ToString() ?? Guid.NewGuid().ToString()`, never a fresh GUID alone: that is what joins the event to its request's spans, logs and audit rows (`TraceId`).
 
 ## Multi-instance safety
 
@@ -37,7 +47,7 @@ Any exception to publishing via the outbox needs a strong reason, documented in 
 
 ## Atomicity
 
-`IScopedDbConnectionProvider` gives every DbContext in a DI scope the same `DbConnection`, which is the only way EF Core can enlist a second context in a transaction another one opened (Npgsql has no distributed-transaction promotion). `AmbientDbTransactionRegistry` — an `IDbTransactionInterceptor` on every Hero context — records open transactions, since `DbConnection` can't be asked. `AddAsync` joins the ambient transaction when there is one, so the outbox row commits or rolls back with the business data; with none, it commits on its own exactly as before.
+`IScopedDbConnectionProvider` gives every DbContext in a DI scope the same `DbConnection`, which is the only way EF Core can enlist a second context in a transaction another one opened (Npgsql has no distributed-transaction promotion). `AmbientDbTransactionRegistry` — an `IDbTransactionInterceptor` on every `AddAppDbContext`-registered context — records open transactions, since `DbConnection` can't be asked. `AddAsync` joins the ambient transaction when there is one, so the outbox row commits or rolls back with the business data; with none, it commits on its own exactly as before.
 
 ## Idempotency is free (in-memory bus)
 
@@ -57,7 +67,7 @@ A **module** only registers its handlers:
 services.AddIntegrationEventHandlers(typeof(MyModule).Assembly);        // scans IIntegrationEventHandler<>
 ```
 
-There is no per-module store registration — `AddEventingForDbContext<T>` was removed in #1349. A module publishes by injecting `IOutboxWriter`; nothing else is needed.
+There is no per-module store registration — `AddEventingForDbContext<T>` was removed (see the single-registration note above). A module publishes by injecting `IOutboxWriter`; nothing else is needed.
 
 Bus = `InMemoryEventBus`, always. ADR-0003 dropped the RabbitMQ provider (and `EventingOptions.Provider` with it): the monolith runs handlers in-process and the outbox/inbox pair provides the durability a broker would.
 

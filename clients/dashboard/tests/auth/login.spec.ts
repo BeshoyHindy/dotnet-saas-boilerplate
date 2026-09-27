@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { mockJsonResponse, mockProblemDetails } from "../helpers/api-mocks";
 
-// The dashboard login page: Boilerplate logo lockup + ".NET 10 Starter Kit" caption, and
+// The dashboard login page: Boilerplate logo lockup + "Multi-tenant SaaS" caption, and
 // an email/password card. NOBODY TYPES A TENANT (ADR-0008) — it is resolved from the URL,
 // the hostname, the last sign-in on this device, or the configured default, and the
-// "Workspace" field only appears when the arrival did not name one.
+// "Tenant" field only appears when the arrival did not name one.
 
 const TOKEN_RESPONSE = {
   accessToken: "header.payload.sig",
@@ -35,18 +35,17 @@ test.describe("login — page chrome", () => {
   test("renders the Boilerplate wordmark lockup with the .NET 10 caption", async ({ page }) => {
     await page.goto("/login");
     await expect(page.getByText("Boilerplate").first()).toBeVisible();
-    await expect(page.getByText(/\.NET 10 Starter Kit/i)).toBeVisible();
+    await expect(page.getByText(/multi-tenant saas/i)).toBeVisible();
     await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
     await expect(page.getByText(/sign in to your account/i)).toBeVisible();
   });
 
-  test("renders email + password, with Workspace below them and no Tenant field", async ({
+  test("renders email + password, with the Tenant field below them", async ({
     page,
   }) => {
     await page.goto("/login");
-    await expect(page.getByLabel("Tenant")).toHaveCount(0);
     await expect(page.getByLabel("Email")).toBeVisible();
-    await expect(page.getByLabel("Workspace")).toBeVisible();
+    await expect(page.getByLabel("Tenant")).toBeVisible();
     await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: /forgot/i })).toHaveAttribute("href", "/forgot-password");
   });
@@ -64,7 +63,7 @@ test.describe("login — page chrome", () => {
   test("submit is disabled until email + password are filled", async ({ page }) => {
     await page.goto("/login");
     const submit = page.getByRole("button", { name: /^sign in$/i });
-    // The workspace is already resolved; only the credentials are missing.
+    // The tenant is already resolved; only the credentials are missing.
     await expect(submit).toBeDisabled();
     await page.getByLabel("Email").fill("alice@acme.com");
     await page.getByLabel("Password", { exact: true }).fill("secret123");
@@ -80,7 +79,7 @@ test.describe("login — manual sign in", () => {
 
   test("POSTs credentials to the tenant auth route", async ({ page }) => {
     await page.goto("/login");
-    await page.getByLabel("Workspace").fill("acme");
+    await page.getByLabel("Tenant").fill("acme");
     await page.getByLabel("Email").fill("alice@acme.com");
     await page.getByLabel("Password", { exact: true }).fill("Password123!");
 
@@ -113,7 +112,7 @@ test.describe("login — manual sign in", () => {
   });
 });
 
-test.describe("login — the workspace is resolved, never typed", () => {
+test.describe("login — the tenant is resolved, never typed", () => {
   test.beforeEach(async ({ page }) => {
     await setConfig(page);
     await mockJsonResponse(page, "**/api/v1/tenants/*/auth/token", TOKEN_RESPONSE);
@@ -124,7 +123,7 @@ test.describe("login — the workspace is resolved, never typed", () => {
     await page.goto("/login?tenant=acme");
 
     await expect(page.getByTestId("resolved-tenant")).toHaveText("acme");
-    await expect(page.getByLabel("Workspace")).toHaveCount(0);
+    await expect(page.getByLabel("Tenant")).toHaveCount(0);
 
     await page.getByLabel("Email").fill("alice@acme.com");
     await page.getByLabel("Password", { exact: true }).fill("Password123!");
@@ -136,18 +135,18 @@ test.describe("login — the workspace is resolved, never typed", () => {
     expect((await reqPromise).url()).toContain("/api/v1/tenants/acme/auth/token");
   });
 
-  test("\"Not your workspace?\" reveals the field", async ({ page }) => {
+  test("\"Not your tenant?\" reveals the field", async ({ page }) => {
     await page.goto("/login?tenant=acme");
-    await expect(page.getByLabel("Workspace")).toHaveCount(0);
+    await expect(page.getByLabel("Tenant")).toHaveCount(0);
 
-    await page.getByRole("button", { name: /not your workspace/i }).click();
+    await page.getByRole("button", { name: /not your tenant/i }).click();
 
-    await expect(page.getByLabel("Workspace")).toHaveValue("acme");
+    await expect(page.getByLabel("Tenant")).toHaveValue("acme");
   });
 
   test("the tenant used last is remembered for the next visit", async ({ page }) => {
     await page.goto("/login");
-    await page.getByLabel("Workspace").fill("globex");
+    await page.getByLabel("Tenant").fill("globex");
     await page.getByLabel("Email").fill("dave@globex.com");
     await page.getByLabel("Password", { exact: true }).fill("Password123!");
     await page.getByRole("button", { name: /^sign in$/i }).click();

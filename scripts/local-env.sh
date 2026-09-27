@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate the .env that the local docker-compose stack needs (issue #17). The containers run as
+# Generate the .env that the local docker-compose stack needs. The containers run as
 # Production, so ProductionConfigurationGuard rejects any secret that looks like a template
 # placeholder — which is why docker-compose.yml ships no default for these five and this script
 # makes real ones instead. .env is gitignored; nothing generated here is ever committed.
@@ -10,7 +10,13 @@
 # Sibling of scripts/dev-secrets.sh, which does the same job for `dotnet run` via user-secrets.
 set -euo pipefail
 
-cd "$(git rev-parse --show-toplevel)"
+# Resolve the repository root, and refuse to run outside one: `cd ""` is a no-op, so without this
+# check a fresh, not-yet-initialised scaffold would carry on in whatever directory it was run from.
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  echo "$(basename "$0"): not inside a git repository. Run 'git init -b develop' at the project root first (docs/new-project-guide.md §2)." >&2
+  exit 1
+}
+cd "$ROOT"
 
 ENV_FILE=".env"
 
@@ -19,14 +25,15 @@ if [ -f "$ENV_FILE" ] && [ "${1:-}" != "--force" ]; then
   exit 0
 fi
 
-# Alphanumeric-only output: these values land in a Postgres connection string and a MinIO URL,
+# Alphanumeric-only output: these values land in a Postgres connection string and an object-store URL,
 # where '/', '+', '=' and ':' would need escaping.
 rand() {
   LC_ALL=C openssl rand -base64 "$1" | LC_ALL=C tr -dc 'A-Za-z0-9' | cut -c "1-$2"
 }
 
-# The seeded admin password must satisfy the Identity policy: 10+ characters with an upper, a
-# lower and a digit. The suffix guarantees all three regardless of what the random core drew.
+# The seeded admin password must satisfy the Identity policy: 10+ characters and not on the
+# bundled common-password list, which the random core clears. The suffix dates from the old
+# composition rules (upper, lower, digit — dropped for ASVS V6.2.5) and is harmless.
 SEED_ADMIN_PASSWORD="$(rand 24 20)Aa1"
 
 # Same policy, same trick: the single password every demo account (acme, globex) signs in with.
@@ -42,7 +49,7 @@ cat > "$ENV_FILE" <<EOF
 # default in docker-compose.yml; see .env.example for the full list and override what you like.
 
 POSTGRES_PASSWORD=$(rand 24 32)
-MINIO_ROOT_PASSWORD=$(rand 24 32)
+STORAGE_SECRET_KEY=$(rand 24 32)
 JWT_SIGNING_KEY=$(rand 48 64)
 SEED_ADMIN_PASSWORD=${SEED_ADMIN_PASSWORD}
 SEED_DEMO_PASSWORD=${SEED_DEMO_PASSWORD}
@@ -55,6 +62,7 @@ echo
 echo "  docker compose up --build"
 echo "  curl -fsS http://localhost:8080/health/ready"
 echo
+#if (frontend)
 echo "Two clients (ADR-0008):"
 echo "  dashboard (tenant app)  http://localhost:8081"
 echo "  console (operators)     http://localhost:8082"
@@ -65,4 +73,12 @@ echo
 echo "Demo accounts come up too, and belong in the DASHBOARD: admin@acme.com /"
 echo "manager@acme.com / alice@acme.com (tenant 'acme') and admin@globex.com /"
 echo "dave@globex.com (tenant 'globex'). They all share SEED_DEMO_PASSWORD in $ENV_FILE."
+#else
+echo "admin@root.com is the operator; its password is SEED_ADMIN_PASSWORD in $ENV_FILE."
+echo "Get a token from POST http://localhost:8080/api/v1/tenants/root/auth/token."
+echo
+echo "Demo accounts come up too: admin@acme.com / manager@acme.com / alice@acme.com"
+echo "(tenant 'acme') and admin@globex.com / dave@globex.com (tenant 'globex'), signing in"
+echo "at /api/v1/tenants/<tenant>/auth/token. They all share SEED_DEMO_PASSWORD in $ENV_FILE."
+#endif
 echo "Drop '--demo' from the migrator command in docker-compose.yml to stop seeding them."

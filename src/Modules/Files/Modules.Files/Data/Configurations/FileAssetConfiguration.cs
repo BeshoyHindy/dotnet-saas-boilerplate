@@ -1,3 +1,4 @@
+using Finbuckle.MultiTenant.EntityFrameworkCore.Extensions;
 using Boilerplate.Modules.Files.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -30,8 +31,9 @@ public sealed class FileAssetConfiguration : IEntityTypeConfiguration<FileAsset>
         builder.Property(x => x.DeletedOnUtc);
         builder.Property(x => x.DeletedBy).HasMaxLength(64);
 
-        // Schema-per-tenant (BaseDbContext) makes per-tenant narrowing implicit, so only an
-        // Owner index is needed (not the row-level (TenantId, OwnerType, OwnerId)).
+        // Every tenant shares these tables; isolation is the TenantId column Finbuckle adds and the
+        // default-on query filter. A lookup index leads with TenantId only where its own columns are
+        // not selective without it (IX_FileAsset_Shared below).
         builder.HasIndex(x => new { x.OwnerType, x.OwnerId })
             .HasDatabaseName("IX_FileAsset_Owner");
         builder.HasIndex(x => x.Status)
@@ -44,6 +46,20 @@ public sealed class FileAssetConfiguration : IEntityTypeConfiguration<FileAsset>
             .IsUnique()
             .HasFilter("\"IsDeleted\" = FALSE")
             .HasDatabaseName("UX_FileAsset_StorageKey");
+
+        // Declared here rather than left to BaseDbContext's default so the TenantId column exists
+        // for IX_FileAsset_Shared. Same result as the default: filtered, unique indexes widened.
+        builder.IsMultiTenant().AdjustUniqueIndexes();
+
+        // ListMyFiles: WHERE CreatedByUserId = @me AND Status = Available ORDER BY CreatedAtUtc DESC.
+        // A user id is already selective (and unique across tenants), so it leads.
+        builder.HasIndex(x => new { x.CreatedByUserId, x.Status, x.CreatedAtUtc })
+            .HasDatabaseName("IX_FileAsset_CreatedBy");
+
+        // ListSharedFiles: WHERE Visibility = Public AND Status = Available AND OwnerType IN (…)
+        // ORDER BY CreatedAtUtc DESC. None of those columns is selective alone; the tenant is.
+        builder.HasIndex("TenantId", nameof(FileAsset.Visibility), nameof(FileAsset.Status), nameof(FileAsset.OwnerType), nameof(FileAsset.CreatedAtUtc))
+            .HasDatabaseName("IX_FileAsset_Shared");
 
         builder.Ignore(x => x.DomainEvents);
     }

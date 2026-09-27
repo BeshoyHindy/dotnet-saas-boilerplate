@@ -109,6 +109,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isInitializing) return;
     let cancelled = false;
+    // An expired token still in storage means there was a session to lose. Without one
+    // (a deliberate sign-out keeps only the tenant), a failed restore has nothing to explain.
+    const hadSession = tokenStore.getAccessToken() !== null;
     void (async () => {
       try {
         await refreshAccessToken();
@@ -116,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Refresh token dead (expired, revoked, or DB reseeded) — end the session so
         // routing falls through to /login cleanly, and so a cached query from before
         // the reload cannot outlive it.
-        endSessionLocally();
+        endSessionLocally(hadSession ? "expired" : undefined);
       } finally {
         if (!cancelled) setIsInitializing(false);
       }
@@ -132,9 +135,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // signed-in subject changes — cold-start and login. Permissions live server-side
   // per role, not in the JWT.
   useEffect(() => {
+    // Signed out: nothing to hydrate. The exposed flag reads true for a null
+    // user (see `value` below), so no state needs resetting here.
     if (!user) {
       lastHydratedSubject.current = null;
-      setPermissionsHydrated(true);
       return;
     }
     if (lastHydratedSubject.current === user.id && permissionsHydrated) {
@@ -249,7 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isAuthenticated: user !== null,
       isInitializing,
-      permissionsHydrated,
+      permissionsHydrated: user === null || permissionsHydrated,
       login,
       logout,
       refreshPermissions,

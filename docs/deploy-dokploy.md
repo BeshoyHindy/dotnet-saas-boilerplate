@@ -14,7 +14,7 @@ has no shell to run a container `HEALTHCHECK` with.
 
 | File | What it is |
 |---|---|
-| [`deploy/dokploy/data-services.compose.yml`](../deploy/dokploy/data-services.compose.yml) | PostgreSQL, Valkey, MinIO, bucket creator |
+| [`deploy/dokploy/data-services.compose.yml`](../deploy/dokploy/data-services.compose.yml) | PostgreSQL, Valkey, RustFS, bucket creator, scheduled Postgres backup |
 | [`deploy/dokploy/app.compose.yml`](../deploy/dokploy/app.compose.yml) | the application services, in order, all pulled from GHCR |
 | [`deploy/dokploy/.env.example`](../deploy/dokploy/.env.example) | the variable contract, key names only |
 | [`deploy/dokploy/dokploy-deploy.sh`](../deploy/dokploy/dokploy-deploy.sh) | trigger a deploy from CI and wait for it |
@@ -26,13 +26,23 @@ has no shell to run a container `HEALTHCHECK` with.
 - A domain you control, with DNS you can edit.
 - The container images published to GHCR (see [Images](#images)).
 
-Three hostnames point at the server. Create one `A` record each:
+<!--#if (frontend) -->
+Four hostnames point at the server. Create one `A` record each:
 
 | Record | Example | Serves |
 |---|---|---|
 | API | `api.example.com` | the .NET API |
-| Console | `app.example.com` | the web front end, and the API's CORS origin |
-| Storage | `storage.example.com` | MinIO's S3 endpoint |
+| Dashboard | `app.example.com` | the tenant app a product's own users sign in to |
+| Console | `console.example.com` | the operator tool root operators sign in to |
+| Storage | `storage.example.com` | RustFS S3 endpoint |
+<!--#else -->
+Two hostnames point at the server. Create one `A` record each:
+
+| Record | Example | Serves |
+|---|---|---|
+| API | `api.example.com` | the .NET API |
+| Storage | `storage.example.com` | RustFS S3 endpoint |
+<!--#endif -->
 
 Storage needs its own public name because the API hands the browser **presigned**
 upload and download URLs. An S3 signature covers the host it was signed for, so
@@ -131,14 +141,15 @@ placeholder — `changeme`, `secret`, `dev-only` and friends:
 
 ```bash
 openssl rand -base64 24 | tr -dc 'A-Za-z0-9'        # POSTGRES_PASSWORD
-openssl rand -base64 24 | tr -dc 'A-Za-z0-9'        # MINIO_ROOT_PASSWORD
+openssl rand -base64 24 | tr -dc 'A-Za-z0-9'        # STORAGE_SECRET_KEY
 openssl rand -base64 48 | tr -dc 'A-Za-z0-9'        # JWT_SIGNING_KEY (32+ chars)
 echo "$(openssl rand -base64 18 | tr -dc 'A-Za-z0-9')Aa1"   # SEED_ADMIN_PASSWORD
 ```
 
-`SEED_ADMIN_PASSWORD` must satisfy the Identity policy: 10+ characters with an
-upper, a lower and a digit — hence the suffix. It is used once, by the migrator,
-to seed the root tenant's admin. Change it at first sign-in.
+`SEED_ADMIN_PASSWORD` must satisfy the Identity policy: 10+ characters and not on
+the bundled common-password list, which a random value clears. (The `Aa1` suffix
+dates from the old composition rules and is harmless.) It is used once, by the
+migrator, to seed the root tenant's admin. Change it at first sign-in.
 
 ### Find `PROXY_KNOWN_NETWORK`
 
@@ -169,18 +180,23 @@ in both.
 | `IMAGE_OWNER` | app | your GHCR owner, lowercase | same |
 | `IMAGE_TAG` | app | `dev-latest` | `1.4.0` |
 | `API_DOMAIN` | app | `api.staging.example.com` | `api.example.com` |
+<!--#if (frontend) -->
 | `DASHBOARD_DOMAIN` | app | `app.staging.example.com` | `app.example.com` |
 | `CONSOLE_DOMAIN` | app | `console.staging.example.com` | `console.example.com` |
+<!--#endif -->
 | `STORAGE_DOMAIN` | both | `storage.staging.example.com` | `storage.example.com` |
 | `TRAEFIK_CERT_RESOLVER` | both | `letsencrypt` | `letsencrypt` |
 | `ALLOWED_HOSTS` | app | `api.staging.example.com` | `api.example.com` |
 | `PROXY_KNOWN_NETWORK` | app | from `docker network inspect` | same server, same value |
 | `POSTGRES_DB` / `POSTGRES_USER` | both | `boilerplate` | `boilerplate` |
 | `POSTGRES_PASSWORD` | both | generated | generated, different |
-| `MINIO_ROOT_USER` | both | `boilerplate` | `boilerplate` |
-| `MINIO_ROOT_PASSWORD` | both | generated | generated, different |
+| `STORAGE_ACCESS_KEY` | both | `boilerplate` | `boilerplate` |
+| `STORAGE_SECRET_KEY` | both | generated | generated, different |
 | `STORAGE_BUCKET` | both | `boilerplate` | `boilerplate` |
 | `STORAGE_REGION` | app | `us-east-1` | `us-east-1` |
+| `BACKUP_BUCKET` | data | `boilerplate-backups` | `boilerplate-backups` |
+| `BACKUP_SCHEDULE` | data | blank (daily at 03:00) | same, or a quieter hour |
+| `BACKUP_KEEP_DAYS` | data | blank (7) | same, or longer |
 | `JWT_SIGNING_KEY` | app | generated | generated, different |
 | `SEED_ADMIN_PASSWORD` | app | generated | generated, different |
 | `MAIL_FROM` | app | `no-reply@example.com` | `no-reply@example.com` |
@@ -199,6 +215,13 @@ name. Two environments sharing a `STACK_NAME` will fight over both.
 Telemetry needs **both** OTLP keys or neither: Production ships the exporter
 disabled, so an endpoint with `OTEL_EXPORTER_ENABLED=false` is dead
 configuration that looks live.
+
+`BACKUP_SCHEDULE` and `BACKUP_KEEP_DAYS` are, like the `*_MEM_LIMIT` keys, the
+one other class of variable allowed to stay blank — leaving them empty means
+"daily at 03:00, keep 7 days", not "never back up". `BACKUP_BUCKET` is a plain
+required key like `STORAGE_BUCKET`, and must **not** be the same bucket:
+`STORAGE_BUCKET` carries the anonymous `uploads/` read grant (§0), and a
+database dump must never be reachable unsigned.
 
 `ALLOWED_HOSTS` is a semicolon-separated list and must contain `API_DOMAIN`.
 `*` is rejected outright. It is also the `Host` that Traefik's readiness probe
@@ -227,10 +250,13 @@ container-level `labels` and has no `depends_on` conditions, so both the Traefik
 routing and the migrator gate would silently stop working.
 
 Paste the `[data]` and `[both]` variables into **Environment**, then **Deploy**.
-Watch the deployment log until it settles; `postgres`, `valkey` and `minio`
-should be running, and `minio-init` and `minio-public-prefix` should each have
-exited 0 — the first creating the bucket, the second opening anonymous reads on
-the `uploads/` prefix that avatars and tenant branding are served from.
+Watch the deployment log until it settles; `postgres`, `valkey` and `storage`
+should be running, and `storage-init` should have exited 0 — creating the
+buckets idempotently and opening anonymous reads on the `uploads/` prefix that avatars
+and tenant branding are served from.
+
+The object store is RustFS; it replaced MinIO before any product deployed this stack, so no
+MinIO-to-RustFS data migration ships.
 
 Deploy this stack again only when a data-service image version changes. That is
 the whole point of the split: an application redeploy can never recreate,
@@ -286,7 +312,7 @@ curl -fsS https://app.example.com/config.json     # dashboard got its runtime co
 curl -fsSI https://console.example.com/ | head -1 # console serves
 curl -fsS https://console.example.com/config.json # console got its runtime config
 <!--#endif -->
-curl -fsSI https://storage.example.com/minio/health/live | head -1
+curl -fsSI https://storage.example.com/health | head -1
 ```
 
 `/health/live` runs no checks and answers as soon as the process is listening.
@@ -295,8 +321,39 @@ one Traefik gates traffic on. `GET /health` returns the full report of every
 check, which is the one to read when `ready` is failing and you want to know
 which dependency.
 
-Then sign in at `https://app.example.com` as `admin@root.com` with
-`SEED_ADMIN_PASSWORD`, and change that password.
+<!--#if (frontend) -->
+Then sign in at `https://console.example.com` as `admin@root.com` with
+`SEED_ADMIN_PASSWORD`, and change that password. The seeded root admin is a
+root-tenant operator, so the Console — never the Dashboard, which is the
+tenant app a product's own users sign in to — is where that account signs in.
+<!--#else -->
+Then authenticate as `admin@root.com` with `SEED_ADMIN_PASSWORD` against the
+API's own sign-in endpoint, and change that password.
+<!--#endif -->
+
+### Opening the Job monitor
+
+The Job monitor — Hangfire's view of every tenant's queued, scheduled, failed and retrying jobs —
+lives at `/jobs` on the API and is root-only (`Permissions.Hangfire.View`; add
+`Permissions.Hangfire.Manage` to retry, delete or trigger jobs, otherwise it is read-only). It is
+deployed in every environment, Production included (ADR-0009).
+
+<!--#if (frontend) -->
+From a browser: sign in to the console (`https://console.example.com`) as an operator and choose
+**System → Jobs → Open Job monitor**. The console asks the API for a 15-minute cookie scoped to
+`/jobs` on the console's own origin and opens `https://console.example.com/jobs` in a new tab; the
+console's nginx forwards `/jobs` to the API. Signing out ends it, and it cannot be opened while you
+are acting inside a tenant. Opening `https://api.example.com/jobs` directly in a browser gets a 401 —
+that is expected.
+
+<!--#endif -->
+From a script or API client, send the operator's access token:
+
+```bash
+curl -fsS -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $ACCESS_TOKEN" https://api.example.com/jobs   # 200
+```
+
+A scaffold made with `--frontend false` has no console, so this bearer route is its only way in.
 
 ## 6. Deploy from CI
 
@@ -414,8 +471,8 @@ Bumping the branch alone changes nothing about the running code, and bumping
 
 **Rollback** is the previous tag: set `IMAGE_TAG` back and deploy. The data
 stack is untouched — but a migration that has already run is *not* rolled back
-by this, so a rollback across a destructive migration needs a restore, not a
-redeploy.
+by this, so a rollback across a destructive migration needs a restore
+([§11](#11-back-up-and-restore-postgres)), not a redeploy.
 
 ## 8. Tests
 
@@ -432,13 +489,20 @@ deploy script itself. Two suites:
   `:latest`, the migrator gate, the external network, the `/health/ready`
   load-balancer probe with `passhostheader`, no host port published, no literal
   credential, anonymous storage reads scoped to `uploads/` and never widened to
-  the bucket or to `tenants/`, and `.env.example` matching the interpolated
-  variables in both directions.
+  the bucket or to `tenants/`, `.env.example` matching the interpolated
+  variables in both directions, and the backup pair — `postgres-backup` pinned
+  to the same Postgres major version by tag *and* digest, its schedule and
+  retention window env-configurable with the ticket's own defaults (daily,
+  keep 7), and `postgres-backup-upload` mirroring to a `BACKUP_BUCKET` that
+  never gets the anonymous read grant `STORAGE_BUCKET` does.
 - **`dokploy-deploy.test.sh`** — the deploy script against a stubbed `curl`:
   success, failure, cancellation, timeout, an unregistered deployment, a
   malformed body, a JSON object where an array was documented, an unknown
   status, HTTP errors, a refused `--api-key`, and *somebody else's* deployment
   going green while ours is still running.
+- **`docs-deploy.test.sh`** — pins prose in this file: the DNS/sign-in fixes
+  from D6, and the *Back up and restore* section's heading and `pg_restore`
+  command.
 
 Also useful directly:
 
@@ -450,18 +514,55 @@ docker compose -f deploy/dokploy/app.compose.yml config -q
 (with an env file supplying the keys — the contract test generates a throwaway
 one for exactly this).
 
-## 9. Hardening follow-up
+## 9. Wire an OTLP backend
+
+Both compose stacks build the API's full OpenTelemetry instrumentation —
+traces, metrics, and OTLP log export via Serilog — whether or not anything
+receives it. Neither Dokploy stack ships a collector, and that is a product's
+choice stated here, not an oversight: which backend to send telemetry to (a
+hosted SaaS, a self-managed collector, whatever the operator already runs) is
+for each product to decide, not this template.
+
+Two variables from the worksheet in §3 drive it, and `app.compose.yml` passes
+both straight through to the API container unchanged:
+
+| Variable | Effect |
+|---|---|
+| `OTEL_EXPORTER_ENABLED` | `false` (the default) computes every span, log line and metric point and discards it. `true` turns export on. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Where to send it — any OTLP-compatible receiver reachable from the server. The protocol is fixed to gRPC (`appsettings.Production.json`), so the URL must carry a gRPC port explicitly, e.g. `http://collector:4317` — `http://collector` alone resolves to port 80 and export fails. |
+
+To wire a backend: set both `OTEL_EXPORTER_ENABLED=true` and
+`OTEL_EXPORTER_OTLP_ENDPOINT=<your receiver's URL:port>` in the application
+stack's Environment tab, then redeploy. The two keys are read together — an
+endpoint left in place with the flag still `false` is dead configuration that
+looks live (§3 above says the same thing from the worksheet's side).
+
+This is enough for any backend that accepts OTLP over gRPC without extra
+headers — a self-hosted OpenTelemetry Collector in front of whatever you
+actually use, or a managed endpoint that embeds its credential in the URL
+itself. Neither `app.compose.yml` nor `.env.example` passes through
+`OTEL_EXPORTER_OTLP_PROTOCOL` or `OTEL_EXPORTER_OTLP_HEADERS`, so an
+`http/protobuf`-only backend or one that authenticates over an OTLP header
+(an API-key header, a per-vendor auth header) is not reachable straight from
+either compose file today — that is a known limit of this template, not of
+your backend; put your own collector in front of it if you need one.
+
+For local development instead of a real backend, `docker compose --profile
+otel up` in the repo root (not this Dokploy stack) runs a disposable OTLP
+receiver + viewer — see [`README.md`](../README.md).
+
+## 10. Hardening follow-up
 
 Two things this stack does are correct-but-broad, and worth tightening once a
 deployment is real:
 
-- **The API signs with the MinIO root credentials.** `Storage__S3__AccessKey` /
-  `SecretKey` are `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`, so the application
-  can create and delete buckets, not only objects in its own. The tighter shape
-  is a MinIO service account (`mc admin user svcacct add`) carrying a policy
-  scoped to `arn:aws:s3:::<bucket>/*` with just the object verbs the app uses —
-  `GetObject`, `PutObject`, `DeleteObject`, `ListBucket` — and those keys in the
-  app stack instead. Nothing in the compose files changes but the two values.
+- **The API signs with the object store root credentials.** `Storage__S3__AccessKey` /
+  `SecretKey` are `STORAGE_ACCESS_KEY` / `STORAGE_SECRET_KEY`, the root credentials.
+  The tighter shape is a RustFS access key carrying a policy scoped to
+  `arn:aws:s3:::<bucket>/*` with just the object verbs the app uses — `GetObject`,
+  `PutObject`, `DeleteObject`, `ListBucket` — which you can create via the RustFS
+  console's access-key page or its MinIO-compatible admin API (`/rustfs/admin/v3/add-service-account`).
+  Nothing in the compose files changes but the two values in the app stack.
 - **Anonymous reads are open on `uploads/`.** That prefix holds avatars and
   tenant branding, which are unsigned URLs by design. It is as narrow as the
   code currently allows, but it is still public-by-prefix rather than
@@ -477,7 +578,91 @@ signature carries the access, so `publicUrl` must never be persisted: un-sharing
 a file stops issuance immediately, but a signature already handed out stays
 usable until it expires.
 
-## 10. When it does not work
+## 11. Back up and restore Postgres
+
+D1 (deploy-operability research): `pg_data` was a plain named Docker volume
+with no snapshot, replication or export step — a host disk failure, an
+operator `docker volume rm`, or a destructive migration had no recovery path
+other than "there is no backup". The data stack now runs two more services:
+
+- **`postgres-backup`** — the same `postgres:18-alpine` image as `postgres`
+  (pinned by tag *and* digest, so its `pg_dump` can never drift ahead of or
+  behind the server it dumps), running `pg_dump -Fc` on a cron schedule
+  (`BACKUP_SCHEDULE`, default `0 3 * * *` — daily at 03:00) into its own
+  `pg_backups` volume, then deleting dumps older than `BACKUP_KEEP_DAYS`
+  (default 7) from that volume.
+- **`postgres-backup-upload`** — `aws s3 sync --delete` from the same
+  volume to `BACKUP_BUCKET` in the object store, running every 60 seconds.
+  A dump reaches the bucket within about a minute of being written, and a
+  local retention delete is mirrored as a delete in the bucket, so `BACKUP_KEEP_DAYS`
+  is the only retention setting to reason about.
+
+`BACKUP_BUCKET` is a separate bucket from `STORAGE_BUCKET` on purpose:
+`STORAGE_BUCKET` carries the anonymous `uploads/` read grant (§0), and a
+database dump must never be reachable unsigned.
+
+`BACKUP_KEEP_DAYS` bounds dump *age*, not dump *count* — with the daily
+default they come to the same thing, but a `BACKUP_SCHEDULE` set to run more
+than once a day keeps every dump from every run within the window, not just
+the last 7.
+
+### Restore
+
+Stop the app stack first, in the Dokploy UI (or scale `api` to 0) — a
+`--clean` restore drops and recreates every object in the target database, and
+the API holding open connections against it will error mid-restore.
+
+Then, from a machine that can reach `dokploy-network` (the Dokploy host
+itself, or any container joined to it):
+
+```bash
+# 1. List the available dumps and pick one. Filenames are
+#    ${POSTGRES_DB}-<UTC timestamp>.dump (e.g. boilerplate-20260115T030001Z.dump),
+#    so a plain `sort` on the listing puts them in chronological order.
+docker run --rm --network dokploy-network \
+  -e AWS_ACCESS_KEY_ID="${STORAGE_ACCESS_KEY}" \
+  -e AWS_SECRET_ACCESS_KEY="${STORAGE_SECRET_KEY}" \
+  -e AWS_DEFAULT_REGION=us-east-1 \
+  -e AWS_ENDPOINT_URL="http://${STACK_NAME}-storage:9000" \
+  amazon/aws-cli:2.37.4@sha256:fdd8d1fcbea9c371678dee5a40df8b178c7a781b4586605756ee28114c97ead6 \
+  s3 ls "s3://${BACKUP_BUCKET}" | sort
+
+# 2. Copy the chosen dump into a throwaway volume. The aws-cli image runs as
+#    root, so the fresh volume needs no chown first.
+docker volume create restore-scratch
+docker run --rm --network dokploy-network -v restore-scratch:/restore \
+  -e AWS_ACCESS_KEY_ID="${STORAGE_ACCESS_KEY}" \
+  -e AWS_SECRET_ACCESS_KEY="${STORAGE_SECRET_KEY}" \
+  -e AWS_DEFAULT_REGION=us-east-1 \
+  -e AWS_ENDPOINT_URL="http://${STACK_NAME}-storage:9000" \
+  amazon/aws-cli:2.37.4@sha256:fdd8d1fcbea9c371678dee5a40df8b178c7a781b4586605756ee28114c97ead6 \
+  s3 cp "s3://${BACKUP_BUCKET}/<POSTGRES_DB>-<timestamp>.dump" /restore/restore.dump
+
+# 3. Restore. --clean --if-exists drops existing objects first (safe against a
+#    partially-migrated or corrupted database); --no-owner because the role
+#    names in the dump may not match ${POSTGRES_USER} in this environment.
+docker run --rm --network dokploy-network -v restore-scratch:/restore \
+  -e PGPASSWORD="${POSTGRES_PASSWORD}" \
+  postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873 \
+  pg_restore --clean --if-exists --no-owner \
+    -h "${STACK_NAME}-postgres" -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" /restore/restore.dump
+
+# 4. Clean up the scratch volume, then redeploy (start) the app stack.
+docker volume rm restore-scratch
+```
+
+This is the exact shape verified locally for this ticket: seed a table, run
+`postgres-backup`'s dump script, confirm `postgres-backup-upload` mirrors it
+into the bucket within seconds, then run steps 1–3 above against a fresh
+database and confirm the seeded rows come back.
+
+A migration that ran *after* the dump was taken is not restored by this — the
+schema in the dump is whatever it was at dump time. Restoring across a
+destructive migration means restoring the dump taken before that migration
+ran, then re-applying migrations up to the target version, not the other way
+around.
+
+## 12. When it does not work
 
 | Symptom | Cause |
 |---|---|
@@ -485,18 +670,27 @@ usable until it expires.
 | `… 'AllowedHosts' contains '*'` | Name the hostnames. `*` is rejected in Production because a poisoned `Host` reaches password-reset links. |
 | `… still holds a template placeholder` | A secret looks like a sample (`changeme`, `secret`, `dev-only`). Regenerate it with the commands in §3. |
 | `ProxyOptions: Enabled is true but nothing is trusted` | `PROXY_KNOWN_NETWORK` is unset. Run the `docker network inspect` command in §3. |
+<!--#if (frontend) -->
 | 404 from Traefik on a domain | The stack deployed before the DNS record existed, or `API_DOMAIN`/`DASHBOARD_DOMAIN`/`CONSOLE_DOMAIN` does not match the record. Compose domains are label-driven and **not** hot-reloaded: redeploy after changing one. |
+<!--#else -->
+| 404 from Traefik on a domain | The stack deployed before the DNS record existed, or `API_DOMAIN` does not match the record. Compose domains are label-driven and **not** hot-reloaded: redeploy after changing one. |
+<!--#endif -->
 | 502/503 from Traefik, API container running | The readiness probe is failing. `curl` the API container directly from the host, or read `GET /health` for the full report. A missing `API_DOMAIN` in `ALLOWED_HOSTS` does this — the probe sends that Host and host filtering answers 400. |
 | Certificate never issued | The `A` record did not resolve when Traefik asked, or port 80 is blocked. Fix DNS, then redeploy. |
+<!--#if (frontend) -->
 | A client loads but every call is a CORS error | `DASHBOARD_DOMAIN`/`CONSOLE_DOMAIN` is not the origin the browser actually uses; both are what the API puts in its allow-list. Mailed links use `DASHBOARD_DOMAIN`. |
+<!--#endif -->
 | Password-reset links point at a container IP | Traefik is not passing the original `Host`. `passhostheader=true` must stay on the API's load-balancer labels — `X-Forwarded-Host` is deliberately never honoured, so that label is the only path for the real host. |
 | Uploads fail with a signature error | `STORAGE_DOMAIN` differs between the two stacks, or `Storage__S3__ServiceUrl` was pointed at an internal alias. The signature covers the host. |
-| `NoSuchBucket` on first upload | The data stack's `minio-init` did not run, or `STORAGE_BUCKET` differs between the two stacks. |
-| Avatars and tenant logos 403 | `minio-public-prefix` did not run. Redeploy the data stack; it is idempotent. Buckets are private by default and those URLs are unsigned. |
+| `NoSuchBucket` on first upload | The data stack's `storage-init` did not run, or `STORAGE_BUCKET` differs between the two stacks. |
+| `storage` restarts with a permission error on `/data` | The volume was not created by this image. RustFS runs as uid 10001 and a fresh `storage_data` volume inherits that owner from the image; a volume created some other way (restored from elsewhere, or written by another image) may belong to a different uid. `chown -R 10001:10001` it from a one-off root container, then redeploy. Never rename the volume to get past this — that strands every upload. |
+| Avatars and tenant logos 403 | The `storage-init` one-shot did not complete or the anonymous read policy was not applied. Redeploy the data stack; it is idempotent. Buckets are private by default and those URLs are unsigned. |
 | Traces and metrics never arrive | `OTEL_EXPORTER_ENABLED` is not `true`. The endpoint alone does nothing — Production ships the exporter disabled. |
 | `migrator` retries PostgreSQL and then fails | The data stack is not up, or `POSTGRES_PASSWORD` was changed against an existing volume. |
 | `api` never starts, no error of its own | The migrator exited non-zero. Read the migrator's log — the API is gated on it and is behaving correctly by not starting. |
 | Deploy script reports `timed out` while the UI shows success | The successful deployment is not the one the script started (another deploy of the same service). Check the deployment titles; the script's carries its `dpl-…` token. |
+| No dumps appear in `BACKUP_BUCKET` | Read `postgres-backup`'s log for a `pg_dump` error (often a `PGPASSWORD`/`POSTGRES_USER` mismatch after a password rotation), or `postgres-backup-upload`'s log if a dump exists on the `pg_backups` volume but never reaches the bucket. |
+| `postgres-backup-upload` never starts | `storage-init` did not complete — it creates `BACKUP_BUCKET` alongside `STORAGE_BUCKET`. Same fix as the `NoSuchBucket` row above: redeploy the data stack. |
 
 ## See also
 

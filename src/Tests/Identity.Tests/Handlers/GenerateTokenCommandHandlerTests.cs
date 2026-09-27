@@ -81,7 +81,7 @@ public sealed class GenerateTokenCommandHandlerTests
     public async Task Handle_Should_ReturnTokenResponse_When_CredentialsAreValid()
     {
         // Arrange
-        var command = new GenerateTokenCommand("user@example.com", "password123");
+        var command = new GenerateTokenCommand("user@example.com", "quietmeadowlantern");
         var userId = _fixture.Create<string>();
         var claims = new List<Claim>
         {
@@ -115,7 +115,7 @@ public sealed class GenerateTokenCommandHandlerTests
     public async Task Handle_Should_StampAccessTokenWithTheSessionId()
     {
         // Arrange
-        var command = new GenerateTokenCommand("user@example.com", "password123");
+        var command = new GenerateTokenCommand("user@example.com", "quietmeadowlantern");
         var userId = _fixture.Create<string>();
         var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, userId) };
 
@@ -145,7 +145,7 @@ public sealed class GenerateTokenCommandHandlerTests
     public async Task Handle_Should_CallAllServicesWithCorrectParameters_When_CredentialsAreValid()
     {
         // Arrange
-        var command = new GenerateTokenCommand("user@example.com", "password123");
+        var command = new GenerateTokenCommand("user@example.com", "quietmeadowlantern");
         var userId = _fixture.Create<string>();
         var claims = new List<Claim>
         {
@@ -242,7 +242,7 @@ public sealed class GenerateTokenCommandHandlerTests
     public async Task Handle_Should_PassCancellationToken_ToAllServices()
     {
         // Arrange
-        var command = new GenerateTokenCommand("user@example.com", "password123");
+        var command = new GenerateTokenCommand("user@example.com", "quietmeadowlantern");
         var userId = _fixture.Create<string>();
         var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, userId) };
         using var cts = new CancellationTokenSource();
@@ -276,7 +276,7 @@ public sealed class GenerateTokenCommandHandlerTests
     public async Task Handle_Should_FailTheLogin_When_SessionCreationFails()
     {
         // Arrange
-        var command = new GenerateTokenCommand("user@example.com", "password123");
+        var command = new GenerateTokenCommand("user@example.com", "quietmeadowlantern");
         var userId = _fixture.Create<string>();
         var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, userId) };
 
@@ -308,7 +308,7 @@ public sealed class GenerateTokenCommandHandlerTests
     public async Task Handle_Should_HandleMissingRequestContextValues()
     {
         // Arrange
-        var command = new GenerateTokenCommand("user@example.com", "password123");
+        var command = new GenerateTokenCommand("user@example.com", "quietmeadowlantern");
         var userId = _fixture.Create<string>();
         var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, userId) };
 

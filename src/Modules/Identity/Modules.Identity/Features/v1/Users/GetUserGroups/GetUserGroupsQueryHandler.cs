@@ -1,13 +1,16 @@
 using Boilerplate.BuildingBlocks.Core.Exceptions;
+using Boilerplate.BuildingBlocks.Persistence;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Boilerplate.Modules.Identity.Contracts.DTOs;
 using Boilerplate.Modules.Identity.Contracts.v1.Users.GetUserGroups;
 using Boilerplate.Modules.Identity.Data;
+using Boilerplate.Modules.Identity.Features.v1.Groups;
 using Mediator;
 using Microsoft.EntityFrameworkCore;
 
 namespace Boilerplate.Modules.Identity.Features.v1.Users.GetUserGroups;
 
-public sealed class GetUserGroupsQueryHandler : IQueryHandler<GetUserGroupsQuery, IEnumerable<GroupDto>>
+public sealed class GetUserGroupsQueryHandler : IQueryHandler<GetUserGroupsQuery, PagedResponse<GroupDto>>
 {
     private readonly IdentityDbContext _dbContext;
 
@@ -16,71 +19,38 @@ public sealed class GetUserGroupsQueryHandler : IQueryHandler<GetUserGroupsQuery
         _dbContext = dbContext;
     }
 
-    public async ValueTask<IEnumerable<GroupDto>> Handle(GetUserGroupsQuery query, CancellationToken cancellationToken)
+    public async ValueTask<PagedResponse<GroupDto>> Handle(GetUserGroupsQuery query, CancellationToken cancellationToken)
     {
-        // Validate user exists
+        ArgumentNullException.ThrowIfNull(query);
+
         var userExists = await _dbContext.Users
-            .AsNoTracking()
-            .AnyAsync(u => u.Id == query.UserId, cancellationToken);
+            .AnyAsync(u => u.Id == query.UserId, cancellationToken)
+            .ConfigureAwait(false);
 
         if (!userExists)
         {
             throw new NotFoundException($"User with ID '{query.UserId}' not found.");
         }
 
-        // Get user's groups
-        var groupIds = await _dbContext.UserGroups
-            .AsNoTracking()
-            .Where(ug => ug.UserId == query.UserId)
-            .Select(ug => ug.GroupId)
-            .ToListAsync(cancellationToken);
-
-        if (groupIds.Count == 0)
-        {
-            return [];
-        }
-
-        var groups = await _dbContext.Groups
+        // Id breaks ties so a page boundary never repeats or skips a group.
+        var page = await _dbContext.Groups
             .AsNoTracking()
             .Include(g => g.GroupRoles)
-            .Where(g => groupIds.Contains(g.Id))
-            .ToListAsync(cancellationToken);
+            .Where(g => _dbContext.UserGroups.Any(ug => ug.UserId == query.UserId && ug.GroupId == g.Id))
+            .OrderBy(g => g.Name)
+            .ThenBy(g => g.Id)
+            .ToPagedResponseAsync(query, cancellationToken)
+            .ConfigureAwait(false);
 
-        // Get member counts
-        var memberCounts = await _dbContext.UserGroups
-            .AsNoTracking()
-            .Where(ug => groupIds.Contains(ug.GroupId))
-            .GroupBy(ug => ug.GroupId)
-            .Select(g => new { GroupId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.GroupId, x => x.Count, cancellationToken);
+        var items = await GroupDtoMapper.ToDtosAsync(_dbContext, page.Items, cancellationToken).ConfigureAwait(false);
 
-        // Get role names
-        var allRoleIds = groups
-            .SelectMany(g => g.GroupRoles.Select(gr => gr.RoleId))
-            .Distinct()
-            .ToList();
-
-        var roleNames = allRoleIds.Count > 0
-            ? await _dbContext.Roles
-                .AsNoTracking()
-                .Where(r => allRoleIds.Contains(r.Id))
-                .ToDictionaryAsync(r => r.Id, r => r.Name!, cancellationToken)
-            : new Dictionary<string, string>();
-
-        return groups.Select(g => new GroupDto
+        return new PagedResponse<GroupDto>
         {
-            Id = g.Id,
-            Name = g.Name,
-            Description = g.Description,
-            IsDefault = g.IsDefault,
-            IsSystemGroup = g.IsSystemGroup,
-            MemberCount = memberCounts.GetValueOrDefault(g.Id, 0),
-            RoleIds = g.GroupRoles.Select(gr => gr.RoleId).ToList().AsReadOnly(),
-            RoleNames = g.GroupRoles
-                .Select(gr => roleNames.GetValueOrDefault(gr.RoleId, gr.RoleId))
-                .ToList()
-                .AsReadOnly(),
-            CreatedAt = g.CreatedOnUtc
-        });
+            Items = items,
+            PageNumber = page.PageNumber,
+            PageSize = page.PageSize,
+            TotalCount = page.TotalCount,
+            TotalPages = page.TotalPages
+        };
     }
 }

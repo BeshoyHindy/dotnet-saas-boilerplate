@@ -1,4 +1,5 @@
 using FluentValidation;
+using Boilerplate.Modules.Identity.Contracts;
 using Boilerplate.Modules.Identity.Contracts.v1.Users.RegisterUser;
 
 namespace Boilerplate.Modules.Identity.Features.v1.Users.RegisterUser;
@@ -26,7 +27,8 @@ public sealed class RegisterUserCommandValidator : AbstractValidator<RegisterUse
 
         RuleFor(x => x.Password)
             .NotEmpty().WithMessage("Password is required.")
-            .MinimumLength(6).WithMessage("Password must be at least 6 characters.");
+            .MinimumLength(PasswordPolicy.MinimumLength)
+            .WithMessage($"Password must be at least {PasswordPolicy.MinimumLength} characters.");
 
         RuleFor(x => x.ConfirmPassword)
             .NotEmpty().WithMessage("Password confirmation is required.")

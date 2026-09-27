@@ -5,7 +5,7 @@ namespace Boilerplate.BuildingBlocks.Web.Versioning;
 
 public static class Extensions
 {
-    public static IServiceCollection AddHeroVersioning(this IServiceCollection services)
+    public static IServiceCollection AddAppVersioning(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
         services

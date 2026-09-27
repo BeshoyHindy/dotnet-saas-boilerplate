@@ -13,8 +13,8 @@ using Testcontainers.Redis;
 namespace Integration.Tests.Tests.Idempotency;
 
 /// <summary>
-/// Idempotent replay against a <b>real</b> distributed cache — the thing issue #82 says was never
-/// true. The filter used to write through HybridCache and probe with <c>IDistributedCache</c>, so
+/// Idempotent replay against a <b>real</b> distributed cache — validating that the replay works correctly.
+/// The filter used to write through HybridCache and probe with <c>IDistributedCache</c>, so
 /// the probe read HybridCache's framed L2 payload as if it were JSON: 500 on the first replay
 /// against Redis, and nothing at all with the in-memory fallback, which HybridCache refuses to use
 /// as an L2. Neither failure is observable without an actual Redis behind the filter, which is what
@@ -24,7 +24,7 @@ namespace Integration.Tests.Tests.Idempotency;
 /// A purpose-built host rather than <c>AppWebApplicationFactory</c>: that host runs without Redis on
 /// purpose, and pointing it at one would put a Valkey container in front of every integration test
 /// for the sake of this file. What is real here is what matters — the real filter, the real
-/// <c>AddHeroCaching</c> registrations, real tenant scoping, and a real Valkey container (the same
+/// <c>AddAppCaching</c> registrations, real tenant scoping, and a real Valkey container (the same
 /// image <see cref="Caching.HybridCacheRedisTests"/> uses).
 /// </remarks>
 public sealed class IdempotencyRedisReplayTests : IAsyncLifetime
@@ -33,7 +33,7 @@ public sealed class IdempotencyRedisReplayTests : IAsyncLifetime
     private const string IdempotencyHeader = "Idempotency-Key";
     private const string ReplayedHeader = "Idempotency-Replayed";
 
-    private readonly RedisContainer _redis = new RedisBuilder("valkey/valkey:9.1.0-alpine").Build();
+    private readonly RedisContainer _redis = new RedisBuilder("valkey/valkey:9.1.2-alpine").Build();
     private int _runs;
 
     public Task InitializeAsync() => _redis.StartAsync();
@@ -150,8 +150,8 @@ public sealed class IdempotencyRedisReplayTests : IAsyncLifetime
 
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddSingleton<ICacheTenantAccessor, HeaderTenantAccessor>();
-        builder.Services.AddHeroCaching(builder.Configuration);
-        builder.Services.AddHeroIdempotency(builder.Configuration);
+        builder.Services.AddAppCaching(builder.Configuration);
+        builder.Services.AddAppIdempotency(builder.Configuration);
 
         var app = builder.Build();
         app.MapPost("/things", (ThingRequest request) =>

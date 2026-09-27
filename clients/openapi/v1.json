@@ -967,6 +967,22 @@
         ],
         "type": "object"
       },
+      "JobMonitorAccessResponse": {
+        "properties": {
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "expiresAt"
+        ],
+        "type": "object"
+      },
       "JsonElement": {},
       "LayoutDto": {
         "properties": {
@@ -1127,6 +1143,105 @@
           "items": {
             "items": {
               "$ref": "#/components/schemas/FileAssetDto"
+            },
+            "type": "array"
+          },
+          "pageNumber": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PagedResponseOfGroupDto": {
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GroupDto"
+            },
+            "type": "array"
+          },
+          "pageNumber": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PagedResponseOfGroupMemberDto": {
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GroupMemberDto"
+            },
+            "type": "array"
+          },
+          "pageNumber": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PagedResponseOfNotificationDto": {
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/NotificationDto"
             },
             "type": "array"
           },
@@ -2660,13 +2775,6 @@
           },
           {
             "in": "query",
-            "name": "TenantId",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
             "name": "FromUtc",
             "schema": {
               "format": "date-time",
@@ -3409,12 +3517,35 @@
     },
     "/api/v1/identity/groups": {
       "get": {
-        "description": "Retrieve all groups for the current tenant with optional search filter.",
+        "description": "Retrieve the current tenant's groups, ordered by name. Pageable via PageNumber/PageSize (at most 100); filterable via Search (case-insensitive substring against name and description).",
         "operationId": "ListGroups",
         "parameters": [
           {
             "in": "query",
-            "name": "search",
+            "name": "PageNumber",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "PageSize",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Search",
             "schema": {
               "type": "string"
             }
@@ -3425,14 +3556,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/GroupDto"
-                  },
-                  "type": "array"
+                  "$ref": "#/components/schemas/PagedResponseOfGroupDto"
                 }
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -3440,7 +3574,7 @@
             "Bearer": []
           }
         ],
-        "summary": "List all groups",
+        "summary": "List groups (paged)",
         "tags": [
           "Identity"
         ]
@@ -3492,7 +3626,7 @@
     },
     "/api/v1/identity/groups/{groupId}/members": {
       "get": {
-        "description": "Retrieve all users that belong to a specific group.",
+        "description": "Retrieve the users that belong to a specific group, ordered by user name. Pageable via PageNumber/PageSize (at most 100).",
         "operationId": "GetGroupMembers",
         "parameters": [
           {
@@ -3503,6 +3637,29 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "PageNumber",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "PageSize",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Sort",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3510,10 +3667,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/GroupMemberDto"
-                  },
-                  "type": "array"
+                  "$ref": "#/components/schemas/PagedResponseOfGroupMemberDto"
                 }
               }
             },
@@ -3534,7 +3688,7 @@
             "Bearer": []
           }
         ],
-        "summary": "Get members of a group",
+        "summary": "Get members of a group (paged)",
         "tags": [
           "Identity"
         ]
@@ -3987,6 +4141,39 @@
         ]
       }
     },
+    "/api/v1/identity/operator/job-monitor-access": {
+      "post": {
+        "description": "ADR-0009. Sets a short-lived cookie that opens the Job monitor (the Hangfire dashboard) in this browser: HttpOnly, Secure, SameSite=Strict, host-only, Path set to the Job monitor route, a fixed 15-minute life, bound to the caller's session — logging out or revoking the session ends it. The cookie is accepted on the Job monitor route only. Root operators only; refused while acting. Every issue is recorded as a security audit event. The body names the path to open and when the cookie expires; it never contains the credential.",
+        "operationId": "IssueJobMonitorAccess",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobMonitorAccessResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Open the Job monitor from a browser",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
     "/api/v1/identity/operator/token-exchange": {
       "post": {
         "description": "ADR-0002. Root operators cross tenants by exchanging tokens, never by header. Returns a short-lived, access-only token whose `tenant` claim is the target tenant and whose subject is a real user of that tenant (targetUserId, else the tenant's admin), carrying act_sub/act_tenant for the operator. No refresh token, no session row, no cookie. The exchange is audited and revocable through the impersonation grant list (same jti revocation path). Requesting more than the configured maximum clamps the lifetime rather than failing.",
@@ -4110,7 +4297,7 @@
     },
     "/api/v1/identity/profile": {
       "get": {
-        "description": "Retrieve the authenticated user's profile from the access token.",
+        "description": "Retrieve the authenticated user's profile from the access token. The strong ETag response header is the profile's version; send it back in If-Match on PUT /profile.",
         "operationId": "GetCurrentUserProfile",
         "responses": {
           "200": {
@@ -4138,8 +4325,17 @@
         ]
       },
       "put": {
-        "description": "Update profile details for the authenticated user. Any signed-in user may edit their own profile; no admin permission required.",
+        "description": "Update profile details for the authenticated user. Any signed-in user may edit their own profile; no admin permission required. Send the ETag from GET /profile in If-Match to refuse the update with 412 if the profile changed since it was read.",
         "operationId": "UpdateUserProfile",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "If-Match",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -4159,6 +4355,9 @@
           },
           "401": {
             "description": "Unauthorized"
+          },
+          "412": {
+            "description": "Precondition Failed"
           }
         },
         "security": [
@@ -4596,42 +4795,6 @@
         ]
       }
     },
-    "/api/v1/identity/users": {
-      "get": {
-        "description": "Retrieve a list of users for the current tenant.",
-        "operationId": "ListUsers",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/UserDto"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ],
-        "summary": "List users",
-        "tags": [
-          "Identity"
-        ]
-      }
-    },
     "/api/v1/identity/users/search": {
       "get": {
         "description": "Search and filter users with server-side pagination, sorting, and filtering by status, email confirmation, and role.",
@@ -5035,13 +5198,36 @@
     },
     "/api/v1/identity/users/{userId}/groups": {
       "get": {
-        "description": "Retrieve all groups that a specific user belongs to.",
+        "description": "Retrieve the groups a specific user belongs to, ordered by name. Pageable via PageNumber/PageSize (at most 100).",
         "operationId": "GetUserGroups",
         "parameters": [
           {
             "in": "path",
             "name": "userId",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "PageNumber",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "PageSize",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Sort",
             "schema": {
               "type": "string"
             }
@@ -5052,10 +5238,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/GroupDto"
-                  },
-                  "type": "array"
+                  "$ref": "#/components/schemas/PagedResponseOfGroupDto"
                 }
               }
             },
@@ -5066,6 +5249,9 @@
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
           }
         },
         "security": [
@@ -5073,7 +5259,7 @@
             "Bearer": []
           }
         ],
-        "summary": "Get groups for a user",
+        "summary": "Get groups for a user (paged)",
         "tags": [
           "Identity"
         ]
@@ -5348,25 +5534,32 @@
         "parameters": [
           {
             "in": "query",
-            "name": "unreadOnly",
+            "name": "PageNumber",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "PageSize",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "UnreadOnly",
             "schema": {
               "type": "boolean"
-            }
-          },
-          {
-            "in": "query",
-            "name": "page",
-            "schema": {
-              "format": "int32",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "pageSize",
-            "schema": {
-              "format": "int32",
-              "type": "integer"
             }
           }
         ],
@@ -5375,14 +5568,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/NotificationDto"
-                  },
-                  "type": "array"
+                  "$ref": "#/components/schemas/PagedResponseOfNotificationDto"
                 }
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [

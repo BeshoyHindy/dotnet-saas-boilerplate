@@ -51,7 +51,7 @@ Don't catch broadly to swallow. Background loops may `catch (Exception)` to stay
 
 ## Permissions
 
-Constants in `Shared/Identity/*Permissions.cs` (e.g. `IdentityPermissions`). Apply with `.RequirePermission(...)` on the endpoint. `RequiredPermissionAttribute` implements `IRequiredPermissionMetadata` — never let a duplicate of that interface appear; it silently disables **all** `.RequirePermission()` gates.
+Constants live in each module's Contracts project: `Modules.{X}.Contracts/Authorization/{X}Permissions.cs` (e.g. `IdentityPermissions`, `NotificationPermissions`) — one nested class per resource with a `Resource` string and `Permissions.{Resource}.{Action}` constants, plus an `All` list registered via `AddPermissions(...)`. `IsBasic`/`IsRoot` and how new permissions reach roles: `docs/new-project-guide.md` §3. Apply with `.RequirePermission(...)` on the endpoint. `RequiredPermissionAttribute` implements `IRequiredPermissionMetadata` — never let a duplicate of that interface appear; it silently disables **all** `.RequirePermission()` gates.
 
 **Every endpoint must declare exactly one intent**, and the permission policy fails closed — an endpoint declaring none is denied for everyone:
 
@@ -59,7 +59,9 @@ Constants in `Shared/Identity/*Permissions.cs` (e.g. `IdentityPermissions`). App
 - `.RequireAuthenticatedOnly()` — self-service routes scoped to the caller (own profile, own password, own 2FA).
 - `.AllowAnonymous()` — genuinely public (token issue/refresh, health, OpenAPI).
 
-`EndpointAuthorizationIntentTests` (Integration.Tests) reads the running host's `EndpointDataSource` and fails the build on an endpoint that declares nothing or more than one.
+`EndpointAuthorizationIntentTests` (Integration.Tests, so Docker) reads the running host's `EndpointDataSource` and fails on an endpoint that declares nothing or more than one. The build and Architecture.Tests stay green on such an endpoint — run the integration suite before you push.
+
+**A request never names a tenant** (ADR-0002). A command or query an endpoint binds or builds may not carry a property with "tenant" in its name; the tenant is the token's `tenant` claim, already ambient in the handler. `CallerNeverNamesATenantTests` (Architecture.Tests, no Docker) fails on one, and its allow-list holds only root-only operations on a tenant and the `{tenant}` segment of the anonymous auth routes, each with its reason. If a handler copies a tenant id onto a row anyway, Finbuckle refuses the save and the caller gets a 400 that names neither the exception nor the tenant.
 
 ## Specifications
 
@@ -67,8 +69,8 @@ Use `Specification<T>` (`src/BuildingBlocks/Persistence/Specifications/`) for qu
 
 ## Adding a feature (checklist)
 
-1. Command/query + response in `Modules.{Name}.Contracts/v1/{Area}/{Feature}/`.
-2. Handler in `Modules.{Name}/Features/v1/{Area}/{Feature}/`.
+1. Command/query + response in `Modules.{Name}.Contracts/v1/[{Area}/]{Feature}/` (the `{Area}/` level only in a module with several areas — see `architecture.md`).
+2. Handler in `Modules.{Name}/Features/v1/[{Area}/]{Feature}/`.
 3. Validator in the same folder.
 4. Endpoint in the same folder; wire in module `MapEndpoints()`.
-5. Tests in `Tests/{Name}.Tests/` (+ integration test if it touches DB/IO).
+5. Tests: integration tests in `Tests/Integration.Tests/Tests/{Name}/` are the default, including the tenant-sweep entry for a new noun (`integration-testing.md`). A unit test goes in `Tests/{Name}.Tests/` if the module has one; a product module's unit project is optional (`docs/new-project-guide.md` §3 gives its three steps).

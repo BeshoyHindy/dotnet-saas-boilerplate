@@ -1,7 +1,7 @@
 namespace Boilerplate.BuildingBlocks.Shared.Persistence;
 
 /// <summary>
-/// Supported database providers for the starter kit. PostgreSQL is the only one (ADR-0003).
+/// Supported database providers. PostgreSQL is the only one (ADR-0003).
 /// </summary>
 public static class DbProviders
 {

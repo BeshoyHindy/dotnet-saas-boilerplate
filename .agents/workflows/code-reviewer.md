@@ -16,7 +16,10 @@ playbook is the review procedure, not a second copy of the rules.
 **Boundaries / structure**
 - Cross-module references go only through `.Contracts` (never another module's runtime). Enforced by `Architecture.Tests`.
 - `src/BuildingBlocks/**` not modified without explicit approval (flag if it is).
-- New module → registered in **all four** places (Mediator + `moduleAssemblies` in Api **and** DbMigrator).
+- New module (platform or product — ADR-0010) → registered in **all four** lists: `HostModules.All`
+  (`HostModules.cs`) + Mediator's `o.Assemblies` (`Program.cs`), in **both** Api **and** DbMigrator.
+  `HostModuleListTests` (Architecture.Tests) fails loudly and names the missing one. A platform
+  module never references a product module (`PlatformModuleDirectionTests`).
 
 **CQRS / Mediator (not MediatR)**
 - Command/Query in the Contracts project; `using Mediator;` (`ICommand<T>`/`IQuery<T>`).

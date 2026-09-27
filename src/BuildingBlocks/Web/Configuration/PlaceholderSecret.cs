@@ -24,6 +24,7 @@ public static class PlaceholderSecret
         "development-only",
         "do-not-use-in-prod",
         "minioadmin",
+        "rustfsadmin",
         "your-",
     ];
 

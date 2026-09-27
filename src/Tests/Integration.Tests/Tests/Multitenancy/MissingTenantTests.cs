@@ -6,12 +6,12 @@ namespace Integration.Tests.Tests.Multitenancy;
 /// <summary>
 /// The anonymous, tenant-scoped endpoints exist only under <c>/api/v1/tenants/{tenant}/auth/...</c>
 /// (ADR-0002). Their old un-tenanted <c>/api/v1/identity/...</c> forms — which took the tenant from a
-/// header and returned 400 when it was absent (issue #1245) — are deleted, not redirected: no route
+/// header and returned 400 when it was absent — are deleted, not redirected: no route
 /// is left that could resolve a tenant from anything the caller chooses to send.
 ///
 /// Asserted twice over, because the two facts differ. The routing table must not contain the retired
 /// patterns at all; and over HTTP those paths must answer like any other unmapped route. They answer
-/// 404 (not 401): the host's catch-all fallback endpoint (issue #47) intercepts requests matching no
+/// 404 (not 401): the host's catch-all fallback endpoint intercepts requests matching no
 /// endpoint before the <c>FallbackPolicy</c> authorization policy would otherwise turn them into a
 /// 401 — unrelated to tenant resolution.
 /// </summary>

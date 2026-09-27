@@ -10,7 +10,7 @@
 
 ## Providers
 
-`AddHeroStorage(config)` reads `Storage:Provider` **eagerly at registration**: `"s3"` → `S3StorageService` (supports MinIO via `ServiceUrl` + `ForcePathStyle`), else `LocalStorageService`. The chosen implementation is registered directly as `IStorageService`.
+`AddAppStorage(config)` reads `Storage:Provider` **eagerly at registration**: `"s3"` → `S3StorageService` (supports S3-compatible storage via `ServiceUrl` + `ForcePathStyle`), else `LocalStorageService`. The chosen implementation is registered directly as `IStorageService`.
 
 **Production refuses to boot on Local.** `ProductionConfigurationGuard` fails fast unless `Storage:Provider=s3` (with a `Storage:S3:Bucket`) or the deployment opts in with `Storage:AllowLocalProviderInProduction=true` — Local serves every object anonymously out of `wwwroot`, which would publish private Files objects. `appsettings.Production.json` ships `s3`; compose and Dokploy set it too.
 
@@ -19,9 +19,9 @@
 Don't stream large files through the API. The pattern (see Files module):
 1. `RequestUploadUrl` — server validates category/extension/size, returns a presigned PUT URL, persists a `PendingUpload` record.
 2. Client uploads **directly** to storage.
-3. `FinalizeUpload` — verifies the stored object, flips to `Available`, publishes `FileFinalizedIntegrationEvent`.
+3. `FinalizeUpload` — verifies the stored object (size, content type, and the signature of its first bytes), flips to `Available`, publishes `FileFinalizedIntegrationEvent`.
 
-Local/dev without MinIO uses `LocalPresignTokenStore` (in-memory one-shot tokens) — issued but never consumed by any endpoint, so the Files upload flow effectively needs the `s3` provider. A token carries an already-authorized physical key and `Consume(token, tenantId)` re-checks that key's owner, so a token is not a bearer capability for whatever it happens to name.
+Local/dev without the bundled object store uses `LocalPresignTokenStore` (in-memory one-shot tokens) — issued but never consumed by any endpoint, so the Files upload flow effectively needs the `s3` provider. A token carries an already-authorized physical key and `Consume(token, tenantId)` re-checks that key's owner, so a token is not a bearer capability for whatever it happens to name.
 
 ## The block prefixes the tenant — you never do (ADR-0002)
 
@@ -33,21 +33,21 @@ var key = storage.ComposeKey(StorageSpace.Private, $"{ownerType}/{yyyy}/{MM}/{id
 
 `UploadAsync<T>` is the public-space shortcut (avatars, brand assets): it composes `uploads/tenants/{tenantId}/{typeName}/{owner}/{guid}_{file}` and returns `BuildPublicUrl` of it.
 
-## Inside one tenant, the owner segment (#83)
+## Inside one tenant, the owner segment
 
 **Clients never supply asset URLs; the server persists only what it issued.** There is no endpoint that takes a URL for an avatar or a brand asset — an upload goes in, the URL the block returns comes out (`PUT /identity/profile` with `image`/`deleteCurrentImage`; `PUT /tenants/theme` with `brandAssets.logo`/`deleteLogo`, whose write model has no URL fields at all). Anything that adds one back reopens this: a column a client can name is a column that can name somebody else's object.
 
 The tenant prefix answers "may this tenant touch this key" and inside one tenant answers nothing, so `UploadAsync<T>` takes a mandatory **owner** — the user id for an avatar, the asset slot (`logo`, `logo-dark`, `favicon`) for a brand asset — and writes it as a key segment. **The replace/remove path uses `RemoveIfOwnedAsync<T>(handle, owner, ct)`, not the tenant-wide `RemoveIfOwnedAsync`**: it deletes only a key this owner's own upload composed. Without it, user X pointing `ImageUrl` at user Y's avatar and then replacing their own deleted Y's bytes — the tenant did own that key.
 
-Old rows keep whatever they hold (arbitrary URLs, pre-#78 flat keys, pre-#83 keys with no owner segment); reads still return them, the first replace/remove **skips and logs** them instead of deleting, and the column is then overwritten with a server-issued value. There is no migration and no backfill. The owner is composed by the block (`TenantStorageKeyRules.ComposePublicAsset`) and sanitized to a single segment, so a caller cannot widen what a delete matches.
+Old rows keep whatever they hold (arbitrary URLs, flat keys from before the tenant prefix existed, keys with no owner segment from before this rule); reads still return them, the first replace/remove **skips and logs** them instead of deleting, and the column is then overwritten with a server-issued value. There is no migration and no backfill. The owner is composed by the block (`TenantStorageKeyRules.ComposePublicAsset`) and sanitized to a single segment, so a caller cannot widen what a delete matches.
 
 **Never write `tenants/` or `uploads/` into a key, and never interpolate a tenant id into one.** `Architecture.Tests/StorageKeyOwnershipTests` scans production sources for both. `StorageKeyBuilder` (Files) builds the relative part only.
 
-**Every method that takes a stored handle refuses one this tenant doesn't own**, before any call reaches the backend: `StorageKeyNotOwnedException`, which is a `NotFoundException` → **404, not 403** (a 403 answers the existence question). Refused: another tenant's key, a tenant id yours is merely a prefix of (`acme` vs `acme-2`), `..`, `//`, a leading slash, a backslash, a percent-encoded separator, any case variant of a root, and a pre-#78 flat `uploads/{typeName}/…` key. A handle may be the key **or** the URL a previous `BuildPublicUrl`/`GenerateDownloadUrlAsync` returned — mapping a URL back to a key is the block's job, not yours.
+**Every method that takes a stored handle refuses one this tenant doesn't own**, before any call reaches the backend: `StorageKeyNotOwnedException`, which is a `NotFoundException` → **404, not 403** (a 403 answers the existence question). Refused: another tenant's key, a tenant id yours is merely a prefix of (`acme` vs `acme-2`), `..`, `//`, a leading slash, a backslash, a percent-encoded separator, any case variant of a root, and a flat `uploads/{typeName}/…` key from before the tenant prefix existed. A handle may be the key **or** the URL a previous `BuildPublicUrl`/`GenerateDownloadUrlAsync` returned — mapping a URL back to a key is the block's job, not yours.
 
 **No ambient tenant → `MissingStorageTenantException`.** There is no fallback and no tenant-less space. Work outside a request (jobs, fan-outs, anything at startup) must enter the tenant through `ITenantScope` first, as the Files purge jobs do — and so must a test that pokes storage directly.
 
-**Deleting what you replaced:** use `RemoveIfOwnedAsync`, not `RemoveAsync` — and for anything `UploadAsync` wrote, the **owner-scoped `RemoveIfOwnedAsync<T>(handle, owner, ct)`** (above). Columns like `AppUser.ImageUrl` and `TenantTheme.LogoUrl` may still hold a URL a user pasted before #83, or a key from before this rule; those are skipped and logged rather than turned into a 500. `RemoveAsync` is strict and throws.
+**Deleting what you replaced:** use `RemoveIfOwnedAsync`, not `RemoveAsync` — and for anything `UploadAsync` wrote, the **owner-scoped `RemoveIfOwnedAsync<T>(handle, owner, ct)`** (above). Columns like `AppUser.ImageUrl` and `TenantTheme.LogoUrl` may still hold a URL a user pasted before the client stopped naming asset URLs, or a key from before this rule; those are skipped and logged rather than turned into a 500. `RemoveAsync` is strict and throws.
 
 Still true, and still worth doing: never pass a caller-supplied string to `DownloadAsync`/`GenerateDownloadUrlAsync` — look the key up from a tenant-filtered row first, as the Files module does. The block is the floor, not the plan.
 
@@ -61,7 +61,7 @@ Still true, and still worth doing: never pass a caller-supplied string to `Downl
 
 ## Test gotcha
 
-`AddHeroStorage` reads `Storage:Provider` **before** a test factory's in-memory config overlay applies, so it wires `LocalStorageService`. Integration tests that need MinIO must **remove the `IStorageService`/`LocalStorageService`/`S3StorageService` descriptors post-registration and re-register the S3 stack** pointed at the MinIO container (see `AppWebApplicationFactory`). See `integration-testing.md`.
+`AddAppStorage` reads `Storage:Provider` **before** a test factory's in-memory config overlay applies, so it wires `LocalStorageService`. Integration tests that need the object store must **remove the `IStorageService`/`LocalStorageService`/`S3StorageService` descriptors post-registration and re-register the S3 stack** pointed at the RustFS container (see `AppWebApplicationFactory`). See `integration-testing.md`.
 
 The test bucket carries the deploy stacks' grant — anonymous GET on `uploads/` and nowhere else — so an assertion that a durable avatar URL *works* is the real answer, and `tenants/` staying closed is testable.
 

@@ -1,5 +1,5 @@
 ---
-description: Verify changes don't violate architectural integrity — module boundaries, BuildingBlocks protection, the four-place module registration, and the architecture-test suite. Run before commit/PR. READ-ONLY.
+description: Verify changes don't violate architectural integrity — module boundaries, BuildingBlocks protection, the four-list module registration, and the architecture-test suite. Run before commit/PR. READ-ONLY.
 ---
 
 You are the architecture guardian for Boilerplate. You verify integrity and report — **READ-ONLY, never
@@ -36,11 +36,17 @@ Cross-module `using`s should resolve only to `*.Contracts` namespaces (same-modu
 grep -rn "MediatR\|IRequest<\|IRequestHandler<" src/Modules --include="*.cs"   # must be empty
 ```
 
-### 6. New-module registration (the four-place footgun)
-If a new `*Module` was added, confirm it appears in **all four**: Mediator `o.Assemblies` (Contracts marker **and** module type) + `moduleAssemblies` array, in **both** `Boilerplate.Api/Program.cs` and `Boilerplate.DbMigrator/Program.cs`.
+### 6. New-module registration (the four-list footgun)
+If a new `*Module` was added (platform or product — ADR-0010), confirm it appears in **all four
+lists**: `HostModules.All` (in `HostModules.cs`) and Mediator's `o.Assemblies` (Contracts marker
+**and** module type, in `Program.cs`), for **both** `Boilerplate.Api` and `Boilerplate.DbMigrator`.
+`HostModuleListTests` (Architecture.Tests) fails loudly and names the missing list, so a green run
+here already implies all four are covered — this heuristic just points at where to look first.
 ```bash
-grep -rn "{New}Module\|{New}ContractsMarker" src/Host/Boilerplate.Api/Program.cs src/Host/Boilerplate.DbMigrator/Program.cs
+grep -rn "{New}Module\|{New}ContractsMarker" src/Host/Boilerplate.Api/HostModules.cs src/Host/Boilerplate.Api/Program.cs src/Host/Boilerplate.DbMigrator/HostModules.cs src/Host/Boilerplate.DbMigrator/Program.cs
 ```
+A product module referencing a platform module only through its `.Contracts` (never its runtime),
+and never the reverse, is `PlatformModuleDirectionTests`' job — Architecture.Tests covers it, not this grep.
 
 ### 7. Permission-gate integrity
 Confirm exactly one `IRequiredPermissionMetadata` implementation exists — a duplicate silently disables **all** `.RequirePermission()` gates.
@@ -60,7 +66,7 @@ Architecture.Tests  : ✅ pass | ❌ {n} failed: {names}
 Build               : ✅ 0 warnings | ❌ {n}
 Module boundaries   : ✅ clean | ❌ {cross-module refs}
 Mediator usage      : ✅ | ❌ MediatR detected at {file:line}
-Module registration : ✅ 4/4 places | ❌ missing in {file}
+Module registration : ✅ 4/4 lists | ❌ missing in {file}
 Permission metadata : ✅ single | ❌ duplicate at {file:line}
 
 Overall: ✅ PASS | ❌ FAIL — fix before commit

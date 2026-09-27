@@ -16,8 +16,11 @@ internal sealed class UserStatusService(
     UserManager<AppUser> userManager,
     IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor,
     ICurrentUser currentUser,
-    IAuditClient auditClient) : IUserStatusService
+    IAuditClient auditClient,
+    ISessionService sessionService) : IUserStatusService
 {
+    internal const string SessionRevokedReason = "User deactivated";
+
     // Soft-delete is functionally identical to deactivation — delegate so the same admin/self/last-admin
     // guards and audit pipeline apply uniformly to both DELETE /users/{id} and PATCH /users/{id}.
     public Task DeleteAsync(string userId, CancellationToken cancellationToken = default)
@@ -127,10 +130,24 @@ internal sealed class UserStatusService(
         ToggleStatusContext context,
         CancellationToken cancellationToken)
     {
-        var result = await userManager.UpdateAsync(context.TargetUser);
-        if (!result.Succeeded)
+        if (context.ActivateUser)
         {
-            throw new CustomException("Toggle status failed", result.Errors.Select(e => e.Description).ToList(), HttpStatusCode.BadRequest);
+            // Reactivation revokes nothing and restores nothing: the user signs in again.
+            EnsureSucceeded(await userManager.UpdateAsync(context.TargetUser));
+        }
+        else
+        {
+            // Deactivation (and deletion, which is the same path) ends every session of the user
+            // (ASVS V7.4.2). The staged revocations and the new security stamp ride on the one save
+            // UpdateSecurityStampAsync makes for the status change, so a failure leaves neither half
+            // done — and with the per-request sid check the user's live access token stops working
+            // on its next request.
+            await sessionService.RevokeAllSessionsWithinSaveAsync(
+                context.TargetUser.Id,
+                revokedBy: context.ActorId.ToString(),
+                reason: SessionRevokedReason,
+                save: async _ => EnsureSucceeded(await userManager.UpdateSecurityStampAsync(context.TargetUser)),
+                cancellationToken);
         }
 
         await auditClient.WriteActivityAsync(
@@ -146,6 +163,14 @@ internal sealed class UserStatusService(
             severity: AuditSeverity.Information,
             source: "Identity",
             ct: cancellationToken).ConfigureAwait(false);
+    }
+
+    private static void EnsureSucceeded(IdentityResult result)
+    {
+        if (!result.Succeeded)
+        {
+            throw new CustomException("Toggle status failed", result.Errors.Select(e => e.Description).ToList(), HttpStatusCode.BadRequest);
+        }
     }
 
     private async Task AuditPolicyFailureAsync(

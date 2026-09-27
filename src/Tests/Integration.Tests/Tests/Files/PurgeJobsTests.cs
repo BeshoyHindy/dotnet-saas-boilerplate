@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Security.Cryptography;
 using Finbuckle.MultiTenant;
 using Finbuckle.MultiTenant.Abstractions;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
@@ -77,7 +76,7 @@ public sealed class PurgeJobsTests
         var method = typeof(PurgeDeletedFilesJob).GetMethod(
             nameof(PurgeDeletedFilesJob.RunAsync), BindingFlags.Public | BindingFlags.Instance);
         method.ShouldNotBeNull();
-        method!.GetCustomAttribute<AutomaticRetryAttribute>().ShouldNotBeNull();
+        method.GetCustomAttribute<AutomaticRetryAttribute>().ShouldNotBeNull();
     }
 
     #endregion
@@ -122,7 +121,7 @@ public sealed class PurgeJobsTests
         var method = typeof(PurgeOrphanedFilesJob).GetMethod(
             nameof(PurgeOrphanedFilesJob.RunAsync), BindingFlags.Public | BindingFlags.Instance);
         method.ShouldNotBeNull();
-        method!.GetCustomAttribute<AutomaticRetryAttribute>().ShouldNotBeNull();
+        method.GetCustomAttribute<AutomaticRetryAttribute>().ShouldNotBeNull();
     }
 
     #endregion
@@ -153,7 +152,7 @@ public sealed class PurgeJobsTests
     private Task<bool> ObjectExistsAsync(string storageKey)
     {
         // Through ITenantScope, not a bare DI scope: object keys are tenant-prefixed by the Storage
-        // block, and it refuses to answer for a key with no ambient tenant to own it (#78) — the
+        // block, and it refuses to answer for a key with no ambient tenant to own it — the
         // same rule the purge jobs themselves live by.
         return _factory.Services.GetRequiredService<ITenantScope>().RunAsync(
             TestConstants.RootTenantId,
@@ -221,8 +220,7 @@ public sealed class PurgeJobsTests
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var presigned = await response.DeserializeAsync<PresignedUploadResponse>();
 
-        byte[] bytes = new byte[sizeBytes];
-        RandomNumberGenerator.Fill(bytes);
+        byte[] bytes = UploadPayloads.Pdf(sizeBytes);
         using var raw = new HttpClient();
         using var put = new HttpRequestMessage(HttpMethod.Put, presigned.UploadUrl)
         {
@@ -249,6 +247,6 @@ public sealed class PurgeJobsTests
             .Select(f => f.StorageKey)
             .FirstOrDefaultAsync();
         key.ShouldNotBeNull();
-        return key!;
+        return key;
     }
 }

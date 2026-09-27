@@ -361,7 +361,7 @@ function PasswordField({
 function passwordStrength(pw: string): { score: number; label: string } {
   if (!pw) return { score: 0, label: "" };
   let s = 0;
-  if (pw.length >= 8) s++;
+  if (pw.length >= 10) s++;
   if (pw.length >= 12) s++;
   if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) s++;
   if (/\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)) s++;
@@ -412,14 +412,16 @@ function ChangePasswordDialog({
   const [localError, setLocalError] = useState<string | null>(null);
 
   // Reset state every time the dialog opens so stale values don't bleed.
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (open) {
       setCurrent("");
       setNext("");
       setConfirm("");
       setLocalError(null);
     }
-  }, [open]);
+  }
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -441,8 +443,8 @@ function ChangePasswordDialog({
     e.preventDefault();
     setLocalError(null);
 
-    if (next.length < 8) {
-      setLocalError("New password must be at least 8 characters.");
+    if (next.length < 10) {
+      setLocalError("New password must be at least 10 characters.");
       return;
     }
     if (next !== confirm) {
@@ -601,7 +603,10 @@ function TwoFactorEnroll() {
   const queryClient = useQueryClient();
   const [enrollment, setEnrollment] = useState<TwoFactorEnrollmentResponse | null>(null);
   const [code, setCode] = useState("");
-  const [qrSvg, setQrSvg] = useState<string | null>(null);
+  // The rendered QR remembers which otpauth URI it was drawn for, so it is
+  // shown only while that enrollment is the current one.
+  const [qr, setQr] = useState<{ uri: string; svg: string } | null>(null);
+  const qrSvg = enrollment && qr?.uri === enrollment.authenticatorUri ? qr.svg : null;
   const [copiedKey, setCopiedKey] = useState(false);
 
   const beginMutation = useMutation({
@@ -622,7 +627,6 @@ function TwoFactorEnroll() {
         });
         setEnrollment(null);
         setCode("");
-        setQrSvg(null);
         void queryClient.invalidateQueries({ queryKey: PROFILE_KEY });
       } else {
         toast.error("Verification failed", {
@@ -640,12 +644,10 @@ function TwoFactorEnroll() {
   // image source-of-truth in JS without an extra <canvas>, and lets us
   // theme it via currentColor so it tracks dark/light mode.
   useEffect(() => {
-    if (!enrollment) {
-      setQrSvg(null);
-      return;
-    }
+    if (!enrollment) return;
+    const uri = enrollment.authenticatorUri;
     let cancelled = false;
-    void QRCode.toString(enrollment.authenticatorUri, {
+    void QRCode.toString(uri, {
       type: "svg",
       margin: 1,
       width: 200,
@@ -657,7 +659,7 @@ function TwoFactorEnroll() {
         .replace(/fill="#FFFFFF"/gi, 'fill="transparent"')
         .replace(/fill="#000000"/gi, 'fill="currentColor"')
         .replace(/fill="#000"/gi, 'fill="currentColor"');
-      setQrSvg(themed);
+      setQr({ uri, svg: themed });
     });
     return () => {
       cancelled = true;

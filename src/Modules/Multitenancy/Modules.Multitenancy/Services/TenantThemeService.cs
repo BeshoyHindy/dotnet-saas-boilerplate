@@ -28,7 +28,7 @@ public sealed class TenantThemeService : ITenantThemeService
     // per-tenant tag; the cache now scopes tags to the ambient tenant itself, so the tag is a constant.
     private static readonly string[] ThemeTags = [CacheKeys.Tags.Themes];
 
-    // The owner segment each brand asset is stored under, inside the tenant's public space (#83).
+    // The owner segment each brand asset is stored under, inside the tenant's public space.
     // Slot-level, not tenant-level, so replacing the logo can only delete a previous logo — never the
     // favicon, and never a user's avatar. These are storage *owner* names, not key roots: the block
     // still composes the key.
@@ -103,7 +103,7 @@ public sealed class TenantThemeService : ITenantThemeService
     /// <summary>
     /// Every method here takes the tenant it operates on, and every caller passes the ambient one —
     /// the theme rows are behind the tenant query filter, so another tenant's row is invisible
-    /// anyway. Since #77 the cache key is derived from the ambient tenant rather than from this
+    /// anyway. The cache key is derived from the ambient tenant rather than from this
     /// argument, so the two must agree or the entry would be filed under the wrong tenant. Rather
     /// than let that drift, say so: crossing to another tenant is <c>ITenantScope.RunAsync</c>, the
     /// one mechanism for it (ADR-0002), not an argument.
@@ -176,7 +176,7 @@ public sealed class TenantThemeService : ITenantThemeService
     /// <b>Each slot is its own owner.</b> An asset is uploaded under the slot it is for
     /// (<see cref="LogoOwner"/>, <see cref="LogoDarkOwner"/>, <see cref="FaviconOwner"/>) and the
     /// value it replaces is dropped with the owner-scoped <c>RemoveIfOwnedAsync&lt;TenantTheme&gt;</c>,
-    /// which deletes only an object a previous upload <i>for that same slot</i> produced (#83). The
+    /// which deletes only an object a previous upload <i>for that same slot</i> produced. The
     /// tenant-wide check is not enough on its own: a user's avatar is a key this tenant owns too, so
     /// before the URL input was removed a tenant admin could park one in <c>LogoUrl</c> and have the
     /// next save delete someone's face.
@@ -375,7 +375,7 @@ public sealed class TenantThemeService : ITenantThemeService
     /// it</b>: they are written only by <see cref="HandleBrandAssetUploadsAsync"/>, from what the
     /// Storage block returned. This used to copy <c>dto.BrandAssets.LogoUrl</c> and friends straight
     /// across — with a <c>data:</c>-prefix check as the only filter — which is what let a client
-    /// name any URL at all, including another object of this tenant's (#83). The write model no
+    /// name any URL at all, including another object of this tenant's. The write model no
     /// longer carries those fields, so there is nothing here to copy.
     /// </summary>
     private static void MapDtoToEntity(TenantThemeUpdateDto dto, TenantTheme entity)

@@ -32,6 +32,20 @@ service_block() {
   ' "$1"
 }
 
+# Every service name declared directly under `services:`, one per line — the
+# top-level `services:` block up to the next top-level key, filtered to lines
+# that open a service (`  <name>:` with nothing after the colon). Used to
+# assert a property "on every service" without hardcoding the service list, so
+# a service added by a sibling ticket is caught by the loop instead of silently
+# skipped.
+service_names() {
+  awk '
+    /^services:[[:space:]]*$/ { inside = 1; next }
+    inside && /^[^ ]/ { inside = 0 }
+    inside && /^  [A-Za-z0-9_-]+:[[:space:]]*$/ { print }
+  ' "$1" | sed -E 's/^  ([A-Za-z0-9_-]+):.*/\1/'
+}
+
 # Every ${VAR} / ${VAR:-...} referenced by a compose file, one per line, sorted.
 compose_vars() {
   grep -ohE '\$\{[A-Za-z_][A-Za-z0-9_]*' "$@" | cut -c3- | sort -u
@@ -64,7 +78,7 @@ refute_match "no stack has a Dockerfile reference" "$both_text" '[Dd]ockerfile'
 app_images="$(printf '%s\n' "$app_text" | grep -E '^[[:space:]]*image:' | sed -E 's/^[[:space:]]*image:[[:space:]]*//')"
 # Pinned, so a service that silently disappears fails the contract. The two clients
 # are the services this stack may legitimately not have — `dotnet new saas
-# --frontend false` scaffolds an API-only product (ADR-0001) — so the expected count
+# --frontend false` scaffolds an API-only product — so the expected count
 # follows them and everything else stays fixed. They come as a pair (ADR-0008): one
 # without the other is a scaffolding bug, and the assertions below check each.
 expected_app_images=2
@@ -89,12 +103,29 @@ data_images="$(printf '%s\n' "$data_text" | grep -E '^[[:space:]]*image:' | sed 
 assert_true "data stack declares images" test -n "$data_images"
 while IFS= read -r image; do
   [ -n "$image" ] || continue
-  # An explicit tag, and never a floating one: the data plane must come back
-  # byte-identical after a host reboot.
-  assert_match "data image is pinned — $image" "$image" '^[a-z0-9./-]+:[A-Za-z0-9._-]+$'
+  # An explicit tag, a digest, or both, and never a floating tag: the data
+  # plane must come back byte-identical after a host reboot. The object
+  # store, its aws-cli one-shots and postgres-backup pin both (tag so a reader
+  # can tell the version at a glance, digest so it is exactly the same bytes
+  # on every host).
+  assert_match "data image is pinned — $image" "$image" \
+    '^[a-z0-9./-]+((:[A-Za-z0-9._-]+)?@sha256:[0-9a-f]{64}|:[A-Za-z0-9._-]+)$'
   refute_match "data image is not :latest — $image" "$image" ':latest$'
 done <<< "$data_images"
 refute_match "data stack interpolates no image tag" "$data_images" '\$\{'
+# MinIO's images are gone from Docker Hub and quay.io and Chainguard publishes
+# only :latest tags; the object store is now RustFS and must never pull a MinIO
+# image back.
+refute_match "no image comes from quay.io" "$data_images" 'quay\.io'
+refute_match "no MinIO image from Docker Hub" "$data_images" '^minio/'
+refute_match "no Chainguard MinIO image" "$data_images" 'chainguard/minio'
+assert_match "the object store is RustFS, pinned by tag and digest" "$data_images" \
+  '^rustfs/rustfs:[0-9][A-Za-z0-9._-]*@sha256:[0-9a-f]{64}$'
+# Every aws-cli service carries the same pin, so a bump is one value.
+awscli_pins="$(printf '%s\n' "$data_images" | grep '^amazon/aws-cli' | sort -u)"
+assert_eq "every aws-cli service shares one pin" "1" "$(printf '%s\n' "$awscli_pins" | grep -c .)"
+assert_match "the aws-cli pin is a tag and a digest" "$awscli_pins" \
+  '^amazon/aws-cli:[0-9][A-Za-z0-9._-]*@sha256:[0-9a-f]{64}$'
 
 # ── Migrator gates the API ───────────────────────────────────────────
 api_block="$(service_block "$APP" api)"
@@ -123,24 +154,116 @@ assert_match "migrator gets the migrations assembly" "$migrator_block" 'Database
 # silently publish every private file and make ChangeFileVisibility a no-op.
 #
 # Within `uploads/` the objects are tenant-prefixed by the Storage block
-# (`uploads/tenants/{tenantId}/…`, ADR-0002 / issue #78), but this grant stays at
+# (`uploads/tenants/{tenantId}/…`, ADR-0002), but this grant stays at
 # the top level: one one-shot has to cover tenants provisioned long after the
 # stack was deployed. So the assertions below pin both edges — the grant is not
 # the whole bucket, and it is not narrowed to one tenant either.
-init_block="$(service_block "$DATA" minio-init)"
-public_block="$(service_block "$DATA" minio-public-prefix)"
-assert_match "the bucket is created once, idempotently" "$init_block" 'command:.*mb.*--ignore-existing.*\$\{STORAGE_BUCKET\}'
-assert_match "anonymous download is granted" "$public_block" 'command:.*anonymous.*set.*download'
-assert_match "the grant is scoped to the uploads/ prefix" "$public_block" \
-  'local/\$\{STORAGE_BUCKET\}/uploads'
-refute_match "the grant is never the whole bucket" "$public_block" \
-  '"local/\$\{STORAGE_BUCKET\}"\]'
-refute_match "the grant stops at the uploads/ top level" "$public_block" \
+init_block="$(service_block "$DATA" storage-init)"
+assert_true "storage-init is a service in the data stack" test -n "$init_block"
+assert_match "storage-init names the Files bucket" "$init_block" 'FILES_BUCKET:[[:space:]]*\$\{STORAGE_BUCKET\}'
+assert_match "the bucket is created only when head-bucket says it is missing (idempotent)" "$init_block" \
+  'head-bucket.*\|\|.*create-bucket'
+assert_match "anonymous GetObject is granted by bucket policy" "$init_block" \
+  'put-bucket-policy.*s3:GetObject'
+assert_match "the policy is applied to the Files bucket" "$init_block" 'put-bucket-policy --bucket "\$\$FILES_BUCKET"'
+assert_match "the grant is scoped to the uploads/ prefix" "$init_block" \
+  'arn:aws:s3:::\$\$FILES_BUCKET/uploads/\*'
+refute_match "the grant is never the whole bucket" "$init_block" \
+  'arn:aws:s3:::\$\$FILES_BUCKET/\*'
+refute_match "the grant stops at the uploads/ top level" "$init_block" \
   'uploads/[A-Za-z0-9$]'
-refute_match "the grant never reaches the tenants/ prefix" "$data_text" 'download.*tenants'
-assert_match "the grant runs after the bucket exists" "$public_block" \
+refute_match "the grant never reaches the tenants/ prefix" "$data_text" 'arn:aws:s3:::[^"]*tenants'
+refute_match "no action beyond GetObject is granted" "$init_block" 's3:(Put|Delete|List|\*)'
+assert_match "storage-init waits for the store to be healthy" "$init_block" \
+  'condition:[[:space:]]*service_healthy'
+assert_match "storage-init is one-shot" "$init_block" '^[[:space:]]*restart:[[:space:]]*"no"'
+
+# ── The object store: RustFS, healthy, reachable only through Traefik ─
+# RustFS runs as uid 10001 and its image owns /data, so a fresh named volume
+# is writable as is: there is no volume-owner one-shot, and a root one must not
+# creep back in. Readiness gates storage-init on /health/ready (the S3 API),
+# while Traefik probes the liveness endpoint /health.
+storage_block="$(service_block "$DATA" storage)"
+assert_true "storage is a service in the data stack" test -n "$storage_block"
+assert_match "storage runs the RustFS image" "$storage_block" '^[[:space:]]*image:[[:space:]]*rustfs/rustfs:'
+assert_match "storage mounts its data volume" "$storage_block" '^[[:space:]]*-[[:space:]]*storage_data:/data'
+refute_match "no service runs as root to fix volume ownership" "$data_text" '^[[:space:]]*user:[[:space:]]*"0:0"'
+assert_match "storage takes its root access key from the environment" "$storage_block" \
+  'RUSTFS_ACCESS_KEY:[[:space:]]*\$\{STORAGE_ACCESS_KEY\}'
+assert_match "storage takes its root secret key from the environment" "$storage_block" \
+  'RUSTFS_SECRET_KEY:[[:space:]]*\$\{STORAGE_SECRET_KEY\}'
+assert_match "storage's container healthcheck waits for the S3 API" "$storage_block" \
+  'test:.*curl.*/health/ready'
+assert_match "storage's Traefik healthcheck is RustFS's /health" "$storage_block" \
+  'loadbalancer\.healthcheck\.path=/health"'
+assert_match "storage keeps the Host header the client signed" "$storage_block" 'loadbalancer\.passhostheader=true'
+refute_match "no MinIO environment is left behind" "$data_text" 'MINIO_'
+#if (frontend)
+# Both clients PUT presigned uploads from the browser, so the store answers CORS
+# for exactly their two origins (and nothing wider).
+assert_match "storage allows CORS from both client origins" "$storage_block" \
+  'RUSTFS_CORS_ALLOWED_ORIGINS:[[:space:]]*https://\$\{DASHBOARD_DOMAIN\},https://\$\{CONSOLE_DOMAIN\}$'
+#endif
+
+# ── D1: Postgres is backed up on a schedule and mirrored off-box ────
+# deploy-operability research D1: pg_data was a plain named volume with no
+# snapshot, replication or export step — a host disk failure, `docker volume
+# rm`, or a destructive migration had no recovery path but "there is no
+# backup". postgres-backup runs pg_dump on a cron schedule into its own
+# volume; postgres-backup-upload syncs that volume to the object store's
+# (separate) backup bucket, `--delete` so retention only has to be declared
+# once.
+backup_block="$(service_block "$DATA" postgres-backup)"
+upload_block="$(service_block "$DATA" postgres-backup-upload)"
+assert_true "postgres-backup is a service in the data stack" test -n "$backup_block"
+assert_true "postgres-backup-upload is a service in the data stack" test -n "$upload_block"
+# Same major version as the `postgres` service, pinned by BOTH tag and digest
+# (the ticket's requirement) — pg_dump refuses a server whose major version is
+# newer than its own, so the client here must never drift from the server.
+assert_match "postgres-backup runs the same Postgres major version" "$backup_block" \
+  '^[[:space:]]*image:[[:space:]]*postgres:18-alpine@sha256:[0-9a-f]{64}[[:space:]]*$'
+assert_match "postgres-backup waits for postgres to be healthy" "$backup_block" \
+  '^[[:space:]]*postgres:[[:space:]]*$'
+assert_match "postgres-backup depends on postgres being healthy, not just started" "$backup_block" \
+  'condition:[[:space:]]*service_healthy'
+# Env-configurable, default daily / keep 7 (the ticket's own wording) — the
+# only two keys outside *_MEM_LIMIT that carry a compose-file default.
+assert_match "the schedule is env-configurable with a daily default" "$backup_block" \
+  'BACKUP_SCHEDULE:[[:space:]]*"\$\{BACKUP_SCHEDULE:-0 3 \* \* \*\}"'
+assert_match "the retention window is env-configurable, default 7 days" "$backup_block" \
+  'BACKUP_KEEP_DAYS:[[:space:]]*\$\{BACKUP_KEEP_DAYS:-7\}'
+assert_match "postgres-backup dumps in the custom (pg_restore-able) format" "$backup_block" \
+  'pg_dump -Fc'
+assert_match "postgres-backup prunes dumps older than the retention window" "$backup_block" \
+  "find /backups -name '\\*\\.dump' -mtime"
+assert_match "postgres-backup installs the schedule into cron" "$backup_block" \
+  '/etc/crontabs/root'
+assert_match "postgres-backup writes dumps to its own volume" "$backup_block" \
+  '^[[:space:]]*-[[:space:]]*pg_backups:/backups[[:space:]]*$'
+# The upload side: syncs the dump volume in a loop and follows deletes, so
+# BACKUP_KEEP_DAYS is the only retention knob.
+assert_match "postgres-backup-upload runs after the backup bucket exists" "$upload_block" \
+  'storage-init:[[:space:]]*$'
+assert_match "postgres-backup-upload waits for the bucket-creating one-shot" "$upload_block" \
   'condition:[[:space:]]*service_completed_successfully'
-assert_match "the grant is one-shot" "$public_block" '^[[:space:]]*restart:[[:space:]]*"no"'
+assert_match "postgres-backup-upload mounts the dump volume read-only" "$upload_block" \
+  '^[[:space:]]*-[[:space:]]*pg_backups:/backups:ro[[:space:]]*$'
+assert_match "postgres-backup-upload keeps syncing for the life of the container" "$upload_block" \
+  'while true'
+assert_match "postgres-backup-upload syncs the dump volume" "$upload_block" 'aws s3 sync.*/backups'
+assert_match "postgres-backup-upload follows local retention deletes to the bucket" "$upload_block" \
+  'sync --delete'
+assert_match "postgres-backup-upload names the backup bucket" "$upload_block" \
+  'DUMPS_BUCKET:[[:space:]]*\$\{BACKUP_BUCKET\}'
+assert_match "postgres-backup-upload targets the backup bucket" "$upload_block" 's3://\$\$DUMPS_BUCKET'
+# A database dump must never be reachable unsigned: only STORAGE_BUCKET's
+# uploads/ prefix gets the anonymous read policy, never BACKUP_BUCKET.
+refute_match "the backup bucket is never given a bucket policy" "$data_text" \
+  'put-bucket-policy --bucket "\$\$DUMPS_BUCKET"'
+assert_match "the backup bucket is created alongside the Files bucket" "$init_block" \
+  'DUMPS_BUCKET:[[:space:]]*\$\{BACKUP_BUCKET\}'
+assert_match "storage-init creates both buckets" "$init_block" \
+  'for b in "\$\$FILES_BUCKET" "\$\$DUMPS_BUCKET"'
 
 # ── The shared external network ──────────────────────────────────────
 for f in "$DATA" "$APP"; do
@@ -194,13 +317,28 @@ assert_match "console is routed on CONSOLE_DOMAIN" "$console_block" 'Host\(.\$\{
 refute_match "dashboard never claims the console hostname" "$dashboard_block" 'CONSOLE_DOMAIN'
 refute_match "console never claims the dashboard hostname" "$console_block" 'Host\(.\$\{DASHBOARD_DOMAIN\}.\)'
 
-# Mailed links (password reset, email confirmation) go to a tenant's users, so the
-# origin the API writes into them is the dashboard's — never the operator console's.
-assert_match "mailed links point at the dashboard" "$api_block" \
+# Mailed links (password reset, email confirmation) go to a tenant's users, so the origin the
+# API writes into them defaults to the dashboard's; MailLinkOrigin swaps in the console's for the
+# root tenant's own users (operators).
+assert_match "mailed links default to the dashboard" "$api_block" \
   'OriginOptions__OriginUrl:[[:space:]]*https://\$\{DASHBOARD_DOMAIN\}'
+assert_match "root tenant's mailed links point at the console" "$api_block" \
+  'MailLinkOrigin__ConsoleOriginUrl:[[:space:]]*https://\$\{CONSOLE_DOMAIN\}'
 assert_match "both clients are in the CORS allow-list" "$api_block" \
   'CorsOptions__AllowedOrigins__1:[[:space:]]*https://\$\{CONSOLE_DOMAIN\}'
 #endif
+
+# An API-only product (`--frontend false`) ships no client page to link to, so mailed
+# links carry the API's own public origin rather than a hostname nothing serves. The
+# origin must still be SET: the Identity module refuses to mail a link without one
+# (MailLinkOrigin). Decided at run time, like the image count above, because the
+# template's own tree carries both variants' lines.
+if ! grep -qE '^  dashboard:' "$APP"; then
+  assert_match "API-only: mailed links point at the API's own origin" "$api_block" \
+    'OriginOptions__OriginUrl:[[:space:]]*https://\$\{API_DOMAIN\}'
+  refute_match "API-only: no client hostname is named" "$both_text" 'DASHBOARD_DOMAIN|CONSOLE_DOMAIN'
+  refute_match "API-only: no CORS allow-list without a browser client" "$api_block" 'CorsOptions__AllowedOrigins'
+fi
 
 # Traefik reports a middleware that two different containers define as a
 # configuration error, so every redirect middleware name must be unique.
@@ -231,6 +369,37 @@ refute_match "api declares no container healthcheck" "$api_block" '^[[:space:]]*
 # (and with it TLS, the host allow-list and the rate limiter).
 refute_match "data stack publishes no host ports" "$data_text" '^[[:space:]]*ports:'
 refute_match "app stack publishes no host ports"  "$app_text"  '^[[:space:]]*ports:'
+
+# ── Every service is bounded: memory limit and log rotation ──────────
+# D2/D4 (deploy-operability research): no per-service memory cap and no log
+# rotation on either stack meant one misbehaving container could exhaust the
+# 4 GB host, and unbounded json-file logs shared the disk with pg_data and
+# the object store's volume forever. Looping over `service_names` rather than a hardcoded
+# list means a service a sibling ticket adds to either file is caught by this
+# loop the moment it lands, not silently exempted.
+for f in "$DATA" "$APP"; do
+  name="${f##*/}"
+  file_text="$(cat "$f")"
+  assert_match "$name declares a default logging anchor (json-file, rotated)" \
+    "$file_text" 'x-logging:[[:space:]]*&default-logging'
+  assert_match "$name's driver is json-file" "$file_text" '^[[:space:]]*driver:[[:space:]]*json-file'
+  assert_match "$name's logs are capped by size" "$file_text" '^[[:space:]]*max-size:'
+  assert_match "$name's logs are capped by count" "$file_text" '^[[:space:]]*max-file:'
+  while IFS= read -r svc; do
+    [ -n "$svc" ] || continue
+    block="$(service_block "$f" "$svc")"
+    assert_match "$name/$svc has a memory limit" "$block" '^[[:space:]]*mem_limit:[[:space:]]*\$\{[A-Za-z_][A-Za-z0-9_]*(:-[^}]+)?\}'
+    assert_match "$name/$svc rotates its logs" "$block" '^[[:space:]]*logging:[[:space:]]*\*default-logging'
+  done <<< "$(service_names "$f")"
+done
+
+# D3: Compose's own default stop_grace_period (10s) is shorter than the 30s
+# ASP.NET Core's Generic Host gives every IHostedService — Hangfire's
+# BackgroundJobServer and the outbox dispatcher included — to drain on
+# StopAsync. 35s keeps every ordinary redeploy (pull_policy: always recreates
+# the api container) from SIGKILLing the process mid-drain.
+assert_match "api's stop grace period exceeds the host's 30s shutdown timeout" "$api_block" \
+  '^[[:space:]]*stop_grace_period:[[:space:]]*35s'
 
 # ── No literal secrets ───────────────────────────────────────────────
 # Any assignment whose key looks credential-shaped must take its value from the
@@ -266,6 +435,13 @@ if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; 
       SMTP_PORT)       value="587" ;;
       IMAGE_REGISTRY)  value="ghcr.io" ;;
       IMAGE_TAG)       value="0.0.0-test" ;;
+      # Left empty on purpose: these are the two classes of key with a
+      # compose-file default (`${VAR:-default}`), so an empty value here
+      # exercises the actual default instead of a placeholder `mem_limit`
+      # docker compose would reject, or a placeholder cron expression.
+      *_MEM_LIMIT)          value="" ;;
+      BACKUP_SCHEDULE)      value="" ;;
+      BACKUP_KEEP_DAYS)     value="" ;;
       *)               value="unset-in-tests" ;;
     esac
     printf '%s=%s\n' "$key" "$value" >> "$tmp_env"
