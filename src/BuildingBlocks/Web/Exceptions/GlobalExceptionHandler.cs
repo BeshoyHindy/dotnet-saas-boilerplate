@@ -4,8 +4,8 @@ using Boilerplate.BuildingBlocks.Core.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Logging;
-using Serilog.Context;
 
 namespace Boilerplate.BuildingBlocks.Web.Exceptions;
 
@@ -45,7 +45,9 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
             statusCode = (int)e.StatusCode;
 
             problemDetails.Status = statusCode;
-            problemDetails.Title = e.GetType().Name;
+            // A stable phrase for the status, never the CLR type name: renaming an internal exception
+            // must not change the public error shape, and the type name is implementation detail.
+            problemDetails.Title = TitleFor(statusCode);
             problemDetails.Detail = e.Message;
 
             if (e.ErrorMessages is { Count: > 0 })
@@ -94,14 +96,29 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
             ?? httpContext.TraceIdentifier;
         problemDetails.Extensions["correlationId"] = correlationId;
 
-        LogContext.PushProperty("exception_title", problemDetails.Title);
-        LogContext.PushProperty("exception_detail", problemDetails.Detail);
-        LogContext.PushProperty("exception_statusCode", problemDetails.Status);
-        LogContext.PushProperty("exception_stackTrace", exception.StackTrace);
+        var path = httpContext.Request.Path.Value?.Replace(Environment.NewLine, string.Empty, StringComparison.Ordinal);
 
-        logger.LogError("Exception at {Path} - {StatusCode} {Title}", httpContext.Request.Path.Value?.Replace(Environment.NewLine, string.Empty), statusCode, problemDetails.Title);
+        // A server fault is an incident: log it at Error with the exception, so the line carries the
+        // type, message and stack trace. A client mistake (4xx) is routine traffic: Warning, with the
+        // exception type and detail but no stack trace, so Error-level volume stays an incident signal.
+        if (statusCode >= StatusCodes.Status500InternalServerError)
+        {
+            logger.LogError(exception, "Exception at {Path} - {StatusCode} {Title}", path, statusCode, problemDetails.Title);
+        }
+        else
+        {
+            logger.LogWarning(
+                "Exception at {Path} - {StatusCode} {Title}: {ExceptionType} {Detail}",
+                path, statusCode, problemDetails.Title, exception.GetType().Name, problemDetails.Detail);
+        }
 
         await httpContext.Response.WriteAsJsonAsync(problemDetails, cancellationToken).ConfigureAwait(false);
         return true;
+    }
+
+    private static string TitleFor(int statusCode)
+    {
+        var phrase = ReasonPhrases.GetReasonPhrase(statusCode);
+        return string.IsNullOrEmpty(phrase) ? "Error" : phrase;
     }
 }

@@ -40,7 +40,7 @@ public sealed class DetailedTestExceptionHandler : IExceptionHandler
         else if (exception is CustomException customEx)
         {
             statusCode = (int)customEx.StatusCode;
-            problemDetails.Title = customEx.GetType().Name;
+            problemDetails.Title = Microsoft.AspNetCore.WebUtilities.ReasonPhrases.GetReasonPhrase(statusCode) is { Length: > 0 } phrase ? phrase : "Error";
             problemDetails.Detail = customEx.Message;
 
             if (customEx.ErrorMessages is { Count: > 0 })

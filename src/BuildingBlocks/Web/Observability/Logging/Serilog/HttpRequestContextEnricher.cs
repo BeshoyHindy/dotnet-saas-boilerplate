@@ -28,15 +28,13 @@ public class HttpRequestContextEnricher : ILogEventEnricher
             logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty("RequestPath", httpContext.Request.Path));
             logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty("UserAgent", httpContext.Request.Headers["User-Agent"]));
 
+            // Id and tenant identify the caller for correlation. No personal field (the email address)
+            // is added: this runs for every event of the request, so it would reach every log line and
+            // every backend the logs are shipped to.
             if (httpContext.User?.Identity?.IsAuthenticated == true)
             {
-                var userId = httpContext.User.GetUserId();
-                var tenant = httpContext.User.GetTenant();
-                var userEmailId = httpContext.User.GetEmail();
-
-                logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty("UserId", userId));
-                logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty("Tenant", tenant));
-                logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty("UserEmail", userEmailId));
+                logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty("UserId", httpContext.User.GetUserId()));
+                logEvent.AddPropertyIfAbsent(propertyFactory.CreateProperty("Tenant", httpContext.User.GetTenant()));
             }
         }
     }

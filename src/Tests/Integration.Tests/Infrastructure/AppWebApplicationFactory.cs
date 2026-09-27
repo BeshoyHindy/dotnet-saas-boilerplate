@@ -164,7 +164,6 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
                 ["Serilog:MinimumLevel:Override:Npgsql"] = "Fatal",
                 ["Serilog:WriteTo:0:Name"] = "Console",
                 ["Serilog:WriteTo:0:Args:restrictedToMinimumLevel"] = "Warning",
-                ["Serilog:WriteTo:1:Name"] = "",
                 ["MailOptions:UseSendGrid"] = "false",
                 ["HangfireOptions:Route"] = "/jobs",
                 ["RateLimitingOptions:Enabled"] = "false",
