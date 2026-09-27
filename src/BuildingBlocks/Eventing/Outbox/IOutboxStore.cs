@@ -25,6 +25,13 @@ public interface IOutboxStore : IOutboxWriter
 
     Task MarkAsProcessedAsync(OutboxMessage message, CancellationToken ct = default);
 
+    /// <summary>
+    /// Counts messages still waiting to be dispatched: not processed and not dead-lettered,
+    /// including those backing off before a retry and those currently leased. Feeds the
+    /// outbox-pending gauge.
+    /// </summary>
+    Task<int> CountPendingAsync(CancellationToken ct = default);
+
     Task MarkAsFailedAsync(OutboxMessage message, string error, bool isDead, CancellationToken ct = default);
 
     /// <summary>Lists dead-lettered (exhausted) messages so an operator can inspect them.</summary>

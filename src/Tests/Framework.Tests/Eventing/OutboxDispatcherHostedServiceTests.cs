@@ -11,6 +11,7 @@ using Xunit;
 
 namespace Framework.Tests.Eventing;
 
+[Collection(OutboxDispatcherDefinition.Name)]
 public class OutboxDispatcherHostedServiceTests
 {
     /// <summary>

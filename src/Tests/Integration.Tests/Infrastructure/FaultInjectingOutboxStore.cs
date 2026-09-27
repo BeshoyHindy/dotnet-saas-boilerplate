@@ -78,6 +78,9 @@ internal sealed class FaultInjectingOutboxStore : IOutboxStore
     public Task MarkAsProcessedAsync(OutboxMessage message, CancellationToken ct = default)
         => _inner.MarkAsProcessedAsync(message, ct);
 
+    public Task<int> CountPendingAsync(CancellationToken ct = default)
+        => _inner.CountPendingAsync(ct);
+
     public Task MarkAsFailedAsync(OutboxMessage message, string error, bool isDead, CancellationToken ct = default)
         => _inner.MarkAsFailedAsync(message, error, isDead, ct);
 
