@@ -440,7 +440,7 @@ export function CreateTenantDialog({
                     id="ct-adminPassword"
                     type={showPassword ? "text" : "password"}
                     autoComplete="new-password"
-                    placeholder="Min 8 characters"
+                    placeholder="Min 10 characters"
                     className="pr-16 font-mono"
                     {...register("adminPassword")}
                   />

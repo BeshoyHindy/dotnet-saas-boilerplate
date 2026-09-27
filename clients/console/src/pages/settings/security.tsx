@@ -361,7 +361,7 @@ function PasswordField({
 function passwordStrength(pw: string): { score: number; label: string } {
   if (!pw) return { score: 0, label: "" };
   let s = 0;
-  if (pw.length >= 8) s++;
+  if (pw.length >= 10) s++;
   if (pw.length >= 12) s++;
   if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) s++;
   if (/\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)) s++;
@@ -441,8 +441,8 @@ function ChangePasswordDialog({
     e.preventDefault();
     setLocalError(null);
 
-    if (next.length < 8) {
-      setLocalError("New password must be at least 8 characters.");
+    if (next.length < 10) {
+      setLocalError("New password must be at least 10 characters.");
       return;
     }
     if (next !== confirm) {

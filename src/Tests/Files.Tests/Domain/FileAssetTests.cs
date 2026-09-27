@@ -79,6 +79,15 @@ public class FileAssetTests
     }
 
     [Fact]
+    public void MarkAvailable_Should_TransitionToQuarantined_When_ScanFailed()
+    {
+        var f = NewPending();
+        f.MarkAvailable(2048, ScanStatus.ScanFailed);
+        f.Status.ShouldBe(FileAssetStatus.Quarantined);
+        f.ScanStatus.ShouldBe(ScanStatus.ScanFailed);
+    }
+
+    [Fact]
     public void MarkAvailable_Should_Reject_When_NotPendingUpload()
     {
         var f = NewPending();
