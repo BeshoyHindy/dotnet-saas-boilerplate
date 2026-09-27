@@ -151,6 +151,13 @@ above, the user's live access token is refused on its next request. **Reactivati
 and restores nothing** — the user signs in again. Don't split this into a revoke followed by an
 update: two saves are two commits.
 
+### The one cookie that authenticates: the Job monitor (ADR-0009)
+
+The default authenticate scheme is `JobMonitorCookieAuthentication.SelectorScheme`, a forwarding scheme: **bearer** for every request, except one whose matched endpoint carries `JobMonitorEndpointMetadata`, has no `Authorization` header and carries `__Secure-job_monitor` — that goes to `JobMonitor.CookieScheme` (a second JWT handler reading the cookie). The `RequiredPermission` policy names the selector too; naming `Bearer` there would re-authenticate the Job monitor request with a scheme that ignores the cookie. It must be the default scheme rather than an endpoint scheme because tenant resolution reads `HttpContext.User` before authorization runs.
+
+- `POST /identity/operator/job-monitor-access` (`IssueJobMonitorAccess`): `Hangfire.View`, root-tenant check in the handler, `.DenyWhenActing()`, audited as `TokenIssued` with client `job-monitor`. `JobMonitorTokenIssuer` re-signs the caller's claims (incl. `sid`) for the audience `{Audience}/job-monitor`, 15 minutes fixed; the endpoint sets `JobMonitorCookie` (`HttpOnly; Secure; SameSite=Strict`, host-only, `Path` = the Job monitor route) and never returns the token.
+- The cookie scheme runs the same `sid` check as bearer (`RejectUnlessSessionIsLiveAsync`) and refuses a token carrying `act_sub`. The two audiences keep either credential from working as the other. **Never** let the cookie scheme answer on another endpoint, and never mark the issuing endpoint idempotent.
+
 ## Acting as someone else (impersonation + operator token exchange)
 
 `IImpersonationTokenIssuer` is **the** place a token is minted for another identity. Two surfaces call it and they share everything downstream — one `ImpersonationGrant` table, one jti revocation list, one lifetime ceiling (`OperatorExchange:MaxMinutes`, clamped server-side), one audit record:

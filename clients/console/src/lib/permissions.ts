@@ -65,6 +65,11 @@ export const SystemPermissions = Object.freeze({
   Platform: {
     CrossTenantImpersonate: "Permissions.Platform.Users.Impersonate",
   },
+  // The Job monitor (ADR-0009): View opens it read-only, Manage makes it writable. Root only.
+  Hangfire: {
+    View: "Permissions.Hangfire.View",
+    Manage: "Permissions.Hangfire.Manage",
+  },
 } as const);
 
 export const AuditingPermissions = Object.freeze({

@@ -15,6 +15,11 @@ The console is the tool a root operator signs in to (ADR-0008). Dev port **5174*
 - **The impersonation list** — `src/pages/impersonation/list.tsx`, `src/api/impersonation-grants.ts`:
   the live acting grants and how to revoke one.
 - **The acting layer** — below.
+- **The Job monitor launcher** — `src/pages/system/job-monitor.tsx`, `src/api/job-monitor.ts`, nav
+  *System → Jobs* (`Permissions.Hangfire.View`). It asks `POST /identity/operator/job-monitor-access`
+  (`AS_OPERATOR`) for the `/jobs`-scoped cookie and opens `/jobs` in a new tab (ADR-0009). The tab is
+  opened synchronously on the click and navigated after the call, or popup blockers eat it. `/jobs`
+  belongs to nginx (and the Vite dev proxy), never to the SPA router.
 - **Identity, audits, health and sessions with an operator's reach**: the same screens the dashboard
   has, kept here because an operator needs them *while acting inside a tenant*. Audits here are the
   cross-tenant view.

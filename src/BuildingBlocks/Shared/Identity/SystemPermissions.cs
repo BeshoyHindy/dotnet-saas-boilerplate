@@ -10,6 +10,12 @@ public static class SystemPermissions
     {
         public const string Resource = nameof(Hangfire);
         public const string View = $"Permissions.{Resource}.View";
+
+        /// <summary>
+        /// Retry, delete and trigger jobs from the Job monitor. Without it the Job monitor is
+        /// read-only: <see cref="View"/> opens it, this makes it writable (ADR-0009).
+        /// </summary>
+        public const string Manage = $"Permissions.{Resource}.Manage";
     }
 
     public static class Dashboard
@@ -42,9 +48,11 @@ public static class SystemPermissions
 
     public static IReadOnlyList<AppPermission> All { get; } =
     [
-        // Operator-only: the Hangfire dashboard exposes every tenant's jobs and lets the viewer
-        // requeue or delete them, so it belongs to the platform operator, not to tenant members.
-        new("View Hangfire",  ActionConstants.View, Hangfire.Resource,  IsRoot: true),
+        // Operator-only: the Job monitor (Hangfire's dashboard) shows every tenant's jobs, so it
+        // belongs to the platform operator, not to tenant members. View opens it read-only; Manage
+        // additionally lets the operator requeue, delete or trigger jobs (ADR-0009).
+        new("View Hangfire",   ActionConstants.View, Hangfire.Resource, IsRoot: true),
+        new("Manage Hangfire", "Manage",             Hangfire.Resource, IsRoot: true),
         new("View Dashboard", ActionConstants.View, Dashboard.Resource, IsBasic: true),
 
         // Platform · cross-tenant — SuperAdmin only.

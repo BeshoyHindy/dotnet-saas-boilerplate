@@ -59,9 +59,14 @@ recurringJobs.AddOrUpdate<PurgeOrphanedFilesJob>("files:purge-orphaned",
 
 Examples in the tree: `PurgeOrphanedFiles`/`PurgeDeletedFiles` (Files), `AuditRetentionJob` (Auditing), `TenantExpiryScanJob` (Multitenancy). Eventing is not a module and has no `MapEndpoints`, so `EventingRetentionScheduler` makes the same `AddOrUpdate` call from a hosted service at start-up.
 
-## Dashboard & config
+## The Job monitor & config (ADR-0009)
 
-`/jobs` (`HangfireOptions.Route`), mapped as a routed endpoint after `UseAuthentication`/`UseAuthorization` and gated by `.RequirePermission(SystemPermissions.Hangfire.View)` — a root-only operator permission. There is no dashboard credential: anonymous → 401, signed in without the permission → 403. Hangfire's own `DashboardOptions.Authorization` is empty on purpose, so ASP.NET Core authorization is the single gate. Authentication is bearer-only (no cookie), so plain browser navigation gets 401; the request must carry an `Authorization: Bearer` header.
+The **Job monitor** is Hangfire's dashboard — call it that, not "the dashboard" (that is the tenant client). `/jobs` (`HangfireOptions.Route`), mapped as a routed endpoint after `UseAuthentication`/`UseAuthorization` and gated by `.RequirePermission(SystemPermissions.Hangfire.View)` — a root-only operator permission. There is no dashboard credential: anonymous → 401, signed in without the permission → 403. Hangfire's own `DashboardOptions.Authorization` is empty on purpose, so ASP.NET Core authorization is the single gate.
+
+- **Read-only unless `Hangfire.Manage`.** A Hangfire *async* authorization filter (always answers yes) checks `Manage` once per request through `IPermissionChecker` and stashes it for `IsReadOnlyFunc`, which is synchronous. Unknown means read-only. A read-only caller's write gets Hangfire's 401.
+- **Antiforgery is on.** `AddHeroJobs` registers `IAntiforgery`, which is what switches on Hangfire's check of every write; its token cookie is `job_monitor_antiforgery`, `Path` = the route. A write without the page's `csrf-token` is 403 for everyone. No other endpoint binds forms, so nothing else is affected — if you add a form-bound endpoint, it will now require antiforgery too.
+- **Two ways in.** API clients send `Authorization: Bearer`. A browser gets the `__Secure-job_monitor` cookie from `POST /api/v1/identity/operator/job-monitor-access` (root, `Hangfire.View`, refused while acting, audited), which the console calls before opening `/jobs` in a new tab. The cookie scheme (`JobMonitor.CookieScheme`) is picked by the forwarding default scheme only on the endpoint carrying `JobMonitorEndpointMetadata`, with no bearer header present; its `sid` is checked per request like a bearer token's. The cookie `Path` and the mapped route both come from `JobMonitor.RouteFrom(configuration)` — keep it that way, or the browser never sends the cookie.
+- **`--frontend false`** scaffolds have no console, so their Job monitor is bearer-only.
 
 ## Gotchas
 

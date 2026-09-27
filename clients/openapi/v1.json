@@ -967,6 +967,22 @@
         ],
         "type": "object"
       },
+      "JobMonitorAccessResponse": {
+        "properties": {
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "expiresAt"
+        ],
+        "type": "object"
+      },
       "JsonElement": {},
       "LayoutDto": {
         "properties": {
@@ -4087,6 +4103,39 @@
           }
         ],
         "summary": "Start user impersonation",
+        "tags": [
+          "Identity"
+        ]
+      }
+    },
+    "/api/v1/identity/operator/job-monitor-access": {
+      "post": {
+        "description": "ADR-0009. Sets a short-lived cookie that opens the Job monitor (the Hangfire dashboard) in this browser: HttpOnly, Secure, SameSite=Strict, host-only, Path set to the Job monitor route, a fixed 15-minute life, bound to the caller's session — logging out or revoking the session ends it. The cookie is accepted on the Job monitor route only. Root operators only; refused while acting. Every issue is recorded as a security audit event. The body names the path to open and when the cookie expires; it never contains the credential.",
+        "operationId": "IssueJobMonitorAccess",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobMonitorAccessResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "Bearer": []
+          }
+        ],
+        "summary": "Open the Job monitor from a browser",
         "tags": [
           "Identity"
         ]

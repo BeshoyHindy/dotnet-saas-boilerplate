@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Boilerplate.BuildingBlocks.Jobs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -16,13 +17,19 @@ internal static class JwtAuthenticationExtensions
         services.AddSingleton<IValidateOptions<JwtOptions>, JwtOptionsProductionValidator>();
 
         services.AddSingleton<IConfigureOptions<JwtBearerOptions>, ConfigureJwtBearerOptions>();
+        services.AddSingleton<IConfigureOptions<JwtBearerOptions>, ConfigureJobMonitorCookieOptions>();
         services
             .AddAuthentication(authentication =>
             {
-                authentication.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                // Bearer for every request except a Job monitor request carrying the Job monitor
+                // cookie and no bearer header (ADR-0009) — see JobMonitorCookieAuthentication.
+                authentication.DefaultAuthenticateScheme = JobMonitorCookieAuthentication.SelectorScheme;
                 authentication.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
             })
-            .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, null!);
+            .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, null!)
+            .AddJwtBearer(JobMonitor.CookieScheme, null!)
+            .AddPolicyScheme(JobMonitorCookieAuthentication.SelectorScheme, displayName: null, options =>
+                options.ForwardDefaultSelector = JobMonitorCookieAuthentication.Select);
 
         services.AddAuthorizationBuilder().AddRequiredPermissionPolicy();
         services.AddAuthorization(options =>

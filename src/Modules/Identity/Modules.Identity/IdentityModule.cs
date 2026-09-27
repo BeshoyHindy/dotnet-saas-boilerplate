@@ -29,6 +29,7 @@ using Boilerplate.Modules.Identity.Features.v1.Impersonation.GetImpersonationGra
 using Boilerplate.Modules.Identity.Features.v1.Impersonation.RevokeImpersonationGrant;
 using Boilerplate.Modules.Identity.Features.v1.Impersonation.StartImpersonation;
 using Boilerplate.Modules.Identity.Features.v1.Operators.ExchangeOperatorToken;
+using Boilerplate.Modules.Identity.Features.v1.Operators.IssueJobMonitorAccess;
 using Boilerplate.Modules.Identity.Features.v1.Permissions.GetPermissionCatalog;
 using Boilerplate.Modules.Identity.Features.v1.Roles;
 using Boilerplate.Modules.Identity.Features.v1.Roles.DeleteRole;
@@ -166,6 +167,9 @@ public class IdentityModule : IModule
         // Singleton: it owns the per-instance cache the JwtBearer hook reads on every request and
         // SessionService marks on every revoke — one instance, or revocation is not immediate here.
         services.AddSingleton<SessionLiveness>();
+
+        // Mints the Job monitor cookie's token (ADR-0009).
+        services.AddSingleton<JobMonitorTokenIssuer>();
 
         // Register group role service for group-derived permissions
         services.AddScoped<IGroupRoleService, GroupRoleService>();
@@ -321,6 +325,9 @@ public class IdentityModule : IModule
         // operator — cross-tenant token exchange (ADR-0002). Root-only; NOT in the anonymous
         // tenants/{tenant}/auth group: the caller already holds a signed root token.
         group.MapExchangeOperatorTokenEndpoint();
+
+        // operator — the Job monitor cookie (ADR-0009). Root-only, refused while acting.
+        group.MapIssueJobMonitorAccessEndpoint();
 
         // impersonation
         group.MapStartImpersonationEndpoint();

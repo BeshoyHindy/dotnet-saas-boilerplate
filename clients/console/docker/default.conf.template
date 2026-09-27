@@ -95,6 +95,36 @@ server {
     proxy_read_timeout 60s;
   }
 
+  # The Job monitor (Hangfire's dashboard, ADR-0009), served by the API and forwarded
+  # exactly like /api. It is proxied rather than linked so the short-lived Job monitor
+  # cookie (`Path=/jobs`, no Domain) belongs to the console's origin only; its pages,
+  # assets and polling all live under /jobs/. `^~ /jobs/` plus the exact `/jobs` for the
+  # same reasons as /api above: the asset regex must not claim its .js/.css, and `/jobsfoo`
+  # falls through to the SPA. Its operator page is the SPA route /system/job-monitor.
+  location ^~ /jobs/ {
+    include /etc/nginx/security-headers.conf;
+    set $jobs_upstream ${APP_API_URL};
+    proxy_ssl_server_name on;
+    proxy_pass $jobs_upstream$request_uri;
+    proxy_http_version 1.1;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 12m;
+    proxy_read_timeout 60s;
+  }
+
+  location = /jobs {
+    include /etc/nginx/security-headers.conf;
+    set $jobs_upstream ${APP_API_URL};
+    proxy_ssl_server_name on;
+    proxy_pass $jobs_upstream$request_uri;
+    proxy_http_version 1.1;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 12m;
+    proxy_read_timeout 60s;
+  }
+
   # The anonymous liveness/readiness probes the Health page reads. `^~ /health/` plus
   # the exact `/health` below, for the same reason as `/api/` above — `/healthfoo`
   # must fall through to the SPA.

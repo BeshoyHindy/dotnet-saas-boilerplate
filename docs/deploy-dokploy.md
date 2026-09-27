@@ -330,6 +330,30 @@ Then authenticate as `admin@root.com` with `SEED_ADMIN_PASSWORD` against the
 API's own sign-in endpoint, and change that password.
 <!--#endif -->
 
+### Opening the Job monitor
+
+The Job monitor — Hangfire's view of every tenant's queued, scheduled, failed and retrying jobs —
+lives at `/jobs` on the API and is root-only (`Permissions.Hangfire.View`; add
+`Permissions.Hangfire.Manage` to retry, delete or trigger jobs, otherwise it is read-only). It is
+deployed in every environment, Production included (ADR-0009).
+
+<!--#if (frontend) -->
+From a browser: sign in to the console (`https://console.example.com`) as an operator and choose
+**System → Jobs → Open Job monitor**. The console asks the API for a 15-minute cookie scoped to
+`/jobs` on the console's own origin and opens `https://console.example.com/jobs` in a new tab; the
+console's nginx forwards `/jobs` to the API. Signing out ends it, and it cannot be opened while you
+are acting inside a tenant. Opening `https://api.example.com/jobs` directly in a browser gets a 401 —
+that is expected.
+
+<!--#endif -->
+From a script or API client, send the operator's access token:
+
+```bash
+curl -fsS -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer $ACCESS_TOKEN" https://api.example.com/jobs   # 200
+```
+
+A scaffold made with `--frontend false` has no console, so this bearer route is its only way in.
+
 ## 6. Deploy from CI
 
 `deploy/dokploy/dokploy-deploy.sh` triggers a deployment and waits for **that**

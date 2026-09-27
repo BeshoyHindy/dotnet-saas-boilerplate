@@ -25,7 +25,10 @@ public static class RequiredPermissionAuthorizationExtensions
         builder.AddPolicy(RequiredPermissionDefaults.PolicyName, policy =>
         {
             policy.RequireAuthenticatedUser();
-            policy.AddAuthenticationSchemes(AuthenticationConstants.AuthenticationScheme);
+            // The forwarding default scheme, not "Bearer" directly: it is bearer for every request
+            // except a Job monitor request carrying the Job monitor cookie (ADR-0009). Naming Bearer
+            // here would re-authenticate that request with a scheme that ignores the cookie.
+            policy.AddAuthenticationSchemes(Jwt.JobMonitorCookieAuthentication.SelectorScheme);
             policy.RequireRequiredPermissions();
         });
 

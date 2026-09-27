@@ -20,6 +20,12 @@ namespace Boilerplate.Modules.Identity.Authorization.Jwt;
 
 public class ConfigureJwtBearerOptions : IConfigureNamedOptions<JwtBearerOptions>
 {
+    /// <summary>
+    /// <see cref="HttpContext.Items"/> key under which a validation hook leaves its failure reason
+    /// for <c>OnChallenge</c> to surface in Development.
+    /// </summary>
+    internal const string AuthFailureItemKey = "JwtAuthFailure";
+
     private readonly JwtOptions _options;
     private readonly IHostEnvironment _environment;
 
@@ -70,7 +76,7 @@ public class ConfigureJwtBearerOptions : IConfigureNamedOptions<JwtBearerOptions
         };
         // Capture the validation failure reason so OnChallenge can include it (in Development).
         // Without this we get a body of `{"error":"Unauthorized"}` with no clue why JwtBearer rejected.
-        const string FailureKey = "JwtAuthFailure";
+        const string FailureKey = AuthFailureItemKey;
         bool isDev = _environment.IsDevelopment();
 
         options.Events = new JwtBearerEvents
@@ -212,7 +218,7 @@ public class ConfigureJwtBearerOptions : IConfigureNamedOptions<JwtBearerOptions
     /// acting-token issuer) is handled by the grant branch before this runs. Anything else without a
     /// <c>sid</c> names no session, so nothing could ever revoke it.
     /// </remarks>
-    private static async Task RejectUnlessSessionIsLiveAsync(TokenValidatedContext context, string failureKey)
+    internal static async Task RejectUnlessSessionIsLiveAsync(TokenValidatedContext context, string failureKey)
     {
         var principal = context.Principal;
 
@@ -245,7 +251,7 @@ public class ConfigureJwtBearerOptions : IConfigureNamedOptions<JwtBearerOptions
         }
     }
 
-    private static void Reject(TokenValidatedContext context, string failureKey, string reason)
+    internal static void Reject(TokenValidatedContext context, string failureKey, string reason)
     {
         // Stashed for OnChallenge, which surfaces it in Development like the other failure reasons.
         context.HttpContext.Items[failureKey] = reason;
