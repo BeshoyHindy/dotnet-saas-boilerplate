@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, Sparkles, TimerOff } from "lucide-react";
 import { useAuth } from "@/auth/use-auth";
-import { consumeSignedOutReason, signedOutNotice } from "@/auth/inactivity";
+import { clearSignedOutReason, peekSignedOutReason, signedOutNotice } from "@/auth/inactivity";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,14 +33,14 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  // Why the previous session ended: read during render (so the banner is there on
+  // the first paint), and cleared after commit so it shows once.
+  const [notice, setNotice] = useState<string | null>(() =>
+    signedOutNotice(peekSignedOutReason()),
+  );
   const passwordRef = useRef<HTMLInputElement>(null);
 
-  // Surface why the previous session ended (read-and-clear, one-shot).
-  useEffect(() => {
-    const text = signedOutNotice(consumeSignedOutReason());
-    if (text) setNotice(text);
-  }, []);
+  useEffect(() => clearSignedOutReason(), []);
 
   if (isAuthenticated) {
     return <Navigate to={from} replace />;

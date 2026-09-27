@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   useMutation,
@@ -119,9 +119,11 @@ export function UserDetailPage() {
   // every `roles` array identity change. `roles` is `rolesQuery.data ?? []`,
   // so an incidental background refetch would otherwise wipe unsaved edits.
   // The deterministic post-save clear lives in saveRoles.onSuccess.
-  useEffect(() => {
+  const [pendingFor, setPendingFor] = useState(userId);
+  if (userId !== pendingFor) {
+    setPendingFor(userId);
     setPending(new Map());
-  }, [userId]);
+  }
 
   const effective = (role: UserRoleDto) => {
     if (!role.roleId) return role.enabled;

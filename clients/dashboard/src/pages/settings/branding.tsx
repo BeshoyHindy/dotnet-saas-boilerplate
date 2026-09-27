@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, Palette, RotateCcw, Save } from "lucide-react";
@@ -55,11 +55,11 @@ export function BrandingSettings() {
   // Seed the draft from the server payload — fires on initial load and after our
   // own save/reset invalidations (background refetches are disabled above, so
   // this never clobbers in-progress edits).
-  useEffect(() => {
-    if (themeQuery.data) {
-      setDraft(themeQuery.data);
-    }
-  }, [themeQuery.data]);
+  const [seededFrom, setSeededFrom] = useState<TenantThemeDraft | undefined>(undefined);
+  if (themeQuery.data && themeQuery.data !== seededFrom) {
+    setSeededFrom(themeQuery.data);
+    setDraft(themeQuery.data);
+  }
 
   const saveMutation = useMutation({
     mutationFn: (theme: TenantThemeDraft) => updateTenantTheme(theme),

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   useMutation,
@@ -106,14 +106,16 @@ export function RoleDetailPage() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    if (!role) return;
+  // Seed the form from each role payload the query hands back, during render.
+  const [seededFrom, setSeededFrom] = useState<typeof role>(undefined);
+  if (role && role !== seededFrom) {
+    setSeededFrom(role);
     setName(role.name);
     setDescription(role.description ?? "");
     const next = new Set(role.permissions ?? []);
     setSelected(next);
     setInitial(new Set(next));
-  }, [role]);
+  }
 
   const dirtyMeta = useMemo(() => {
     if (!role) return false;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -106,11 +106,6 @@ export function ResetPasswordPage() {
     },
   });
 
-  // Keep the error in sync with the form: typing after an error should
-  // clear it rather than persist a stale message under the new input.
-  useEffect(() => {
-    setError(null);
-  }, [password, confirm]);
 
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
@@ -195,7 +190,12 @@ export function ResetPasswordPage() {
                   id="new-password"
                   type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    // Typing after an error clears it rather than leaving a
+                    // stale message under the new input.
+                    setError(null);
+                  }}
                   placeholder="At least 10 characters"
                   required
                   autoComplete="new-password"
@@ -245,7 +245,10 @@ export function ResetPasswordPage() {
                   id="confirm-password"
                   type={showConfirm ? "text" : "password"}
                   value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
+                  onChange={(e) => {
+                    setConfirm(e.target.value);
+                    setError(null);
+                  }}
                   placeholder="Re-enter password"
                   required
                   autoComplete="new-password"

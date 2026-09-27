@@ -83,13 +83,27 @@ export function markSignedOut(reason: SignedOutReason): void {
   }
 }
 
-/** Read-and-clear the sign-out reason (one-shot). */
-export function consumeSignedOutReason(): string | null {
+/** Read the sign-out reason without clearing it — safe to call during render. */
+export function peekSignedOutReason(): string | null {
   try {
-    const value = sessionStorage.getItem(SIGNED_OUT_REASON_KEY);
-    if (value) sessionStorage.removeItem(SIGNED_OUT_REASON_KEY);
-    return value;
+    return sessionStorage.getItem(SIGNED_OUT_REASON_KEY);
   } catch {
     return null;
   }
+}
+
+/** Forget the sign-out reason once it has been shown. */
+export function clearSignedOutReason(): void {
+  try {
+    sessionStorage.removeItem(SIGNED_OUT_REASON_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Read-and-clear the sign-out reason (one-shot). */
+export function consumeSignedOutReason(): string | null {
+  const value = peekSignedOutReason();
+  if (value) clearSignedOutReason();
+  return value;
 }

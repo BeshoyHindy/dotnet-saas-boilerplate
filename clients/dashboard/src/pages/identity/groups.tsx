@@ -316,13 +316,15 @@ function CreateGroupDialog({ open, onClose }: { open: boolean; onClose: () => vo
   const [description, setDescription] = useState("");
   const [isDefault, setIsDefault] = useState(false);
 
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (!open) {
       setName("");
       setDescription("");
       setIsDefault(false);
     }
-  }, [open]);
+  }
 
   const mutation = useMutation({
     mutationFn: () =>

@@ -101,6 +101,29 @@ stranger's cached data. A path the user did not ask for passes a reason —
 existed; the inactivity guard marks `"inactivity"` itself — and the login page turns it into its
 notice banner (`signedOutNotice` in `src/auth/inactivity.ts`). A deliberate logout passes none.
 
+## Render correctness — the React Compiler lint rules are errors
+
+`pnpm lint` gates every `eslint-plugin-react-hooks` rule at `error`, including
+`set-state-in-effect`, `static-components` and `refs`. What they mean in practice:
+
+- **State that follows a prop or query is adjusted during render, not in an effect.** Keep the
+  previous value in state and compare, or set it in the event handler that caused the change (a
+  filter's `onChange` also resets `pageNumber`). A dialog that clears its form on close, a form
+  seeded from a query's payload, and a sidebar following the route all use this:
+
+  ```tsx
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (!open) setName("");
+  }
+  ```
+- **Derive, don't reset.** An image fallback remembers *which* `src` failed; a value that is
+  meaningless without its input (`expiresAt ? label : null`) is computed from it.
+- **Never create a component during render.** Pick an icon inside a small component that returns
+  the JSX (`<EventTypeIcon eventType={…} />`), not `const Icon = iconFor(x)`.
+- **Never read or write `ref.current` during render.** Mirror a prop into a ref from an effect.
+
 ## Design system (Tailwind v4, shadcn-style)
 
 - **`cn()` is at `src/lib/cn.ts`** (`twMerge(clsx(...))`) — not `lib/utils.ts`. `components.json`: `style:new-york`, `baseColor:slate`, `cssVariables:true`, `iconLibrary:lucide`.

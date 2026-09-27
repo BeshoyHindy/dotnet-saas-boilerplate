@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Camera, Fingerprint, UserCircle2 } from "lucide-react";
 import { toast } from "sonner";
@@ -29,30 +29,30 @@ export function ProfileSettings() {
 
   const profile = profileQuery.data;
   const loading = profileQuery.isLoading;
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
+  // Before the profile arrives, the JWT-derived `user` gives an immediate
+  // non-empty paint.
+  const provisional = !profile && user && loading ? user.name?.split(" ") : undefined;
+  const [firstName, setFirstName] = useState(
+    () => (profile ? profile.firstName : provisional?.[0]) ?? "",
+  );
+  const [lastName, setLastName] = useState(
+    () => (profile ? profile.lastName : provisional?.slice(1).join(" ")) ?? "",
+  );
+  const [phone, setPhone] = useState(() => profile?.phoneNumber ?? "");
   // Set when a save was refused because the profile changed elsewhere (412). Cleared by the next
   // successful save.
   const [conflict, setConflict] = useState(false);
 
-  // Seed the form from the fetched profile exactly once. The JWT-derived
-  // `user` provides an immediate non-empty paint; the authoritative profile
-  // then seeds and locks. Seeding once means a later background refetch
-  // can't clobber edits the user has already made.
-  const seededRef = useRef(false);
-  useEffect(() => {
-    if (seededRef.current) return;
-    if (profile) {
-      setFirstName(profile.firstName ?? "");
-      setLastName(profile.lastName ?? "");
-      setPhone(profile.phoneNumber ?? "");
-      seededRef.current = true;
-    } else if (user && loading) {
-      setFirstName(user.name?.split(" ")[0] ?? "");
-      setLastName(user.name?.split(" ").slice(1).join(" ") ?? "");
-    }
-  }, [profile, user, loading]);
+  // Seed the form from the fetched profile exactly once, during render; the
+  // authoritative profile then locks. Seeding once means a later background
+  // refetch can't clobber edits the user has already made.
+  const [seeded, setSeeded] = useState(profile !== undefined);
+  if (!seeded && profile) {
+    setSeeded(true);
+    setFirstName(profile.firstName ?? "");
+    setLastName(profile.lastName ?? "");
+    setPhone(profile.phoneNumber ?? "");
+  }
 
   /**
    * A save refused with 412: someone changed the profile after this page loaded it (#107). Refetch

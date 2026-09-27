@@ -185,10 +185,7 @@ function useCountdown(expiresAt: string | undefined): string | null {
   const [label, setLabel] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!expiresAt) {
-      setLabel(null);
-      return;
-    }
+    if (!expiresAt) return;
 
     const tick = () => {
       const msLeft = new Date(expiresAt).getTime() - Date.now();
@@ -207,5 +204,6 @@ function useCountdown(expiresAt: string | undefined): string | null {
     return () => clearInterval(handle);
   }, [expiresAt]);
 
-  return label;
+  // With nothing to count down to, there is no label — whatever the last tick left behind.
+  return expiresAt ? label : null;
 }

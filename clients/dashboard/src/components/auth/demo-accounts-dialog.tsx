@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import {
   Dialog,
@@ -40,9 +40,13 @@ export function DemoAccountsDialog({ open, onOpenChange, onPick, hint }: DemoAcc
   const [activeIdx, setActiveIdx] = useState(0);
 
   // Reset to the first tenant each time the dialog re-opens.
-  useEffect(() => {
-    if (open) setActiveIdx(0);
-  }, [open]);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setActiveIdx(0);
+    }
+  }
 
   const activeTenant = tenants[activeIdx];
 

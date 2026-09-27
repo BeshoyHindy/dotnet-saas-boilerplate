@@ -82,10 +82,8 @@ export function CommandPaletteRoot() {
   // Track whether the user has ever opened the palette in this session.
   // The lazy dialog is only included in the tree after that first open
   // so the cmdk + lucide-icon bundle deferral actually sticks.
-  const [hasEverOpened, setHasEverOpened] = useState(false);
-  useEffect(() => {
-    if (open) setHasEverOpened(true);
-  }, [open]);
+  const [hasEverOpened, setHasEverOpened] = useState(open);
+  if (open && !hasEverOpened) setHasEverOpened(true);
 
   if (!hasEverOpened) return null;
 

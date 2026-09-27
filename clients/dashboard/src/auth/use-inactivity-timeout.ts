@@ -43,9 +43,24 @@ export function useInactivityTimeout({ enabled, idleMs, warningMs, onExpire }: O
   const idleRef = useRef(idleMs);
   const warnRef = useRef(warningMs);
   const onExpireRef = useRef(onExpire);
-  idleRef.current = idleMs;
-  warnRef.current = warningMs;
-  onExpireRef.current = onExpire;
+  // Mirror the latest options after each commit, never during render. Declared
+  // before the wiring effect below so it has run by the time that one reads them.
+  useEffect(() => {
+    idleRef.current = idleMs;
+    warnRef.current = warningMs;
+    onExpireRef.current = onExpire;
+  });
+
+  // Signing out drops the tab back to "active" — adjusted during render when
+  // `enabled` flips off, so a stale warning never outlives the session.
+  const [wasEnabled, setWasEnabled] = useState(enabled);
+  if (enabled !== wasEnabled) {
+    setWasEnabled(enabled);
+    if (!enabled) {
+      setPhase("active");
+      setSecondsLeft(0);
+    }
+  }
 
   const evaluateNow = useCallback(() => {
     const { phase: next, secondsLeft: left } = evaluateInactivity(
@@ -87,8 +102,6 @@ export function useInactivityTimeout({ enabled, idleMs, warningMs, onExpire }: O
     if (!enabled) {
       phaseRef.current = "active";
       expiredRef.current = false;
-      setPhase("active");
-      setSecondsLeft(0);
       return;
     }
 
