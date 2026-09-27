@@ -70,9 +70,11 @@ export function MobileNavRoot() {
     findSectionForPath(location.pathname),
   );
 
-  useEffect(() => {
+  const [sectionPath, setSectionPath] = useState(location.pathname);
+  if (location.pathname !== sectionPath) {
+    setSectionPath(location.pathname);
     setOpenSection(findSectionForPath(location.pathname));
-  }, [location.pathname]);
+  }
 
   // Belt-and-braces: if the route changes while the drawer is open,
   // close it. NavItemLink also calls onNavigate to close on click.

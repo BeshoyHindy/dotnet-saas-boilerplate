@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CalendarClock } from "lucide-react";
 import { toast } from "sonner";
@@ -43,9 +43,11 @@ export function RenewTenantDialog({
   const [months, setMonths] = useState<string>("");
 
   // Reset the field each time the dialog opens.
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (open) setMonths("");
-  }, [open]);
+  }
 
   const parsedMonths = months.trim() ? Number(months) : null;
   const monthsInvalid =

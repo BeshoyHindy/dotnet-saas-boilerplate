@@ -67,10 +67,10 @@ export function Combobox({
   const [filter, setFilter] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Reset filter and focus search whenever the popover opens.
+  // Focus search whenever the popover opens (the filter is cleared by the
+  // open handler below).
   useEffect(() => {
     if (open) {
-      setFilter("");
       const t = setTimeout(() => inputRef.current?.focus(), 30);
       return () => clearTimeout(t);
     }
@@ -88,7 +88,11 @@ export function Combobox({
   const showFieldClear = clearable && hasValue && !disabled;
 
   return (
-    <DropdownMenu open={open} onOpenChange={(o) => !disabled && setOpen(o)}>
+    <DropdownMenu open={open} onOpenChange={(o) => {
+        if (disabled) return;
+        if (o) setFilter("");
+        setOpen(o);
+      }}>
       {variant === "filter" ? (
         <DropdownMenuTrigger asChild disabled={disabled}>
           <FilterTrigger

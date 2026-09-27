@@ -35,7 +35,9 @@ export function UserPicker({
   placeholder?: string;
   disabled?: boolean;
 }) {
-  const [selected, setSelected] = useState<UserDto | null>(initialSelected ?? null);
+  const [selected, setSelected] = useState<UserDto | null>(
+    value === null ? null : (initialSelected ?? null),
+  );
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [open, setOpen] = useState(false);
@@ -44,13 +46,15 @@ export function UserPicker({
   // Keep selected snapshot in sync when the parent swaps the value.
   // We also sync when the parent passes a fresh initialSelected after
   // having loaded a ticket / row by id.
-  useEffect(() => {
+  const [synced, setSynced] = useState({ value, initialSelected });
+  if (synced.value !== value || synced.initialSelected !== initialSelected) {
+    setSynced({ value, initialSelected });
     if (initialSelected && initialSelected.id === value) {
       setSelected(initialSelected);
     } else if (value === null) {
       setSelected(null);
     }
-  }, [value, initialSelected]);
+  }
 
   // Debounce the query string — typing fires the search 250ms after the
   // last keystroke, so a fast typist doesn't generate ten in-flight calls.

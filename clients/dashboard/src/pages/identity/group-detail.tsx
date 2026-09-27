@@ -113,15 +113,17 @@ export function GroupDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
 
-  useEffect(() => {
-    if (!group) return;
+  // Seed the form from each group payload the query hands back, during render.
+  const [seededFrom, setSeededFrom] = useState<typeof group>(undefined);
+  if (group && group !== seededFrom) {
+    setSeededFrom(group);
     setName(group.name);
     setDescription(group.description ?? "");
     setIsDefault(group.isDefault);
     const next = new Set(group.roleIds ?? []);
     setSelectedRoleIds(next);
     setInitialRoleIds(new Set(next));
-  }, [group]);
+  }
 
   const dirtyMeta = useMemo(() => {
     if (!group) return false;
@@ -539,13 +541,15 @@ function AddMembersDialog({
   const [debounced, setDebounced] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (!open) {
       setSearch("");
       setDebounced("");
       setPicked(new Set());
     }
-  }, [open]);
+  }
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search.trim()), 250);

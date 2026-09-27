@@ -413,9 +413,11 @@ function CustomAccentDialog({
   // Local draft so dragging the slider previews live without committing
   // until Apply. Initialised from the current spec on each open.
   const [draft, setDraft] = useState<CustomAccentSpec>(spec);
-  useEffect(() => {
+  const [seeded, setSeeded] = useState({ open, spec });
+  if (open !== seeded.open || spec !== seeded.spec) {
+    setSeeded({ open, spec });
     if (open) setDraft(spec);
-  }, [open, spec]);
+  }
 
   // Eleven candidate stops — used to render the live preview ladder.
   const stops = useMemo(() => buildCustomBrandStops(draft), [draft]);

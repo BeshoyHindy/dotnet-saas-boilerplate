@@ -30,21 +30,22 @@ export function ConfirmEmailPage() {
   const tenant = params.get("tenant") ?? "";
   const malformed = !userId || !code || !tenant;
 
-  const [status, setStatus] = useState<Status>({ kind: "loading" });
+  const [confirmStatus, setStatus] = useState<Status>({ kind: "loading" });
+  // A clipped link is known from the URL alone — no call, nothing to wait for.
+  const status: Status = malformed
+    ? {
+        kind: "error",
+        message:
+          "This confirmation link is missing required parameters. It may have been clipped by your email client.",
+      }
+    : confirmStatus;
 
   // We run the call exactly once per mount keyed on the URL params —
   // double-firing the GET in StrictMode would still be idempotent
   // server-side (UserManager.ConfirmEmailAsync is idempotent for the
   // same token), but holding off the second call keeps the UI honest.
   useEffect(() => {
-    if (malformed) {
-      setStatus({
-        kind: "error",
-        message:
-          "This confirmation link is missing required parameters. It may have been clipped by your email client.",
-      });
-      return;
-    }
+    if (malformed) return;
 
     let cancelled = false;
     void confirmEmail({ userId, code, tenant })

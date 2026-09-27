@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { DoorOpen, ShieldAlert } from "lucide-react";
@@ -38,12 +38,14 @@ export function EnterTenantDialog({ open, onOpenChange, tenantId, tenantName, on
   const [reason, setReason] = useState("");
   const [minutes, setMinutes] = useState<number>(15);
 
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (open) {
       setReason("");
       setMinutes(15);
     }
-  }, [open]);
+  }
 
   const trimmedReason = reason.trim();
   const reasonValid = trimmedReason.length >= 4;

@@ -92,9 +92,6 @@ export function UsersPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => {
-    setPageNumber(1);
-  }, [statusFilter, emailFilter, roleFilter]);
 
   const queryParams = useMemo(
     () => ({
@@ -134,6 +131,7 @@ export function UsersPage() {
     setStatusFilter("all");
     setEmailFilter("all");
     setRoleFilter(null);
+    setPageNumber(1);
   };
 
   return (
@@ -164,7 +162,10 @@ export function UsersPage() {
         <EntityFilterPill
           label="Account status"
           value={statusFilter}
-          onChange={setStatusFilter}
+          onChange={(next) => {
+            setStatusFilter(next);
+            setPageNumber(1);
+          }}
           options={[
             { value: "all", label: "All" },
             { value: "active", label: "Active" },
@@ -174,7 +175,10 @@ export function UsersPage() {
         <EntityFilterPill
           label="Email status"
           value={emailFilter}
-          onChange={setEmailFilter}
+          onChange={(next) => {
+            setEmailFilter(next);
+            setPageNumber(1);
+          }}
           options={[
             { value: "all", label: "Any email" },
             { value: "confirmed", label: "Confirmed" },
@@ -184,7 +188,10 @@ export function UsersPage() {
         <Combobox
           label="Role"
           value={roleFilter}
-          onChange={setRoleFilter}
+          onChange={(next) => {
+            setRoleFilter(next);
+            setPageNumber(1);
+          }}
           options={(rolesQuery.data ?? []).map((r) => ({
             value: r.id,
             label: r.name,
@@ -401,7 +408,9 @@ function RegisterUserDialog({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
 
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (!open) {
       setFirstName("");
       setLastName("");
@@ -411,7 +420,7 @@ function RegisterUserDialog({
       setConfirmPassword("");
       setPhoneNumber("");
     }
-  }, [open]);
+  }
 
   const passwordMismatch =
     confirmPassword.length > 0 && password !== confirmPassword;

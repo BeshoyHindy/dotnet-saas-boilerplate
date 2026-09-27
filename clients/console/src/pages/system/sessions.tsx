@@ -58,11 +58,13 @@ export function SessionsPage() {
   const [pageNumber, setPageNumber] = useState(1);
 
   useEffect(() => {
-    const id = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    const id = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setPageNumber(1);
+    }, 300);
     return () => window.clearTimeout(id);
   }, [search]);
 
-  useEffect(() => setPageNumber(1), [debouncedSearch, includeInactive]);
 
   const query = useQuery({
     queryKey: [
@@ -162,7 +164,10 @@ export function SessionsPage() {
         <EntityFilterPill<boolean>
           label="Visibility"
           value={includeInactive}
-          onChange={setIncludeInactive}
+          onChange={(next) => {
+            setIncludeInactive(next);
+            setPageNumber(1);
+          }}
           options={[
             { value: false, label: "Live only" },
             { value: true, label: "Include inactive" },

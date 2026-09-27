@@ -195,9 +195,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // for the user being acted as, and caching a stranger's grants as "my permissions"
   // would regate the operator's own chrome — hiding the very screens they entered from.
   useEffect(() => {
+    // Signed out: nothing to hydrate. The exposed flag reads true for a null
+    // user (see `value` below), so no state needs resetting here.
     if (!user) {
       lastHydratedSubject.current = null;
-      setPermissionsHydrated(true);
       return;
     }
     if (lastHydratedSubject.current === user.id && permissionsHydrated) {
@@ -434,7 +435,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       isAuthenticated: user !== null,
       isInitializing,
-      permissionsHydrated,
+      permissionsHydrated: user === null || permissionsHydrated,
       login,
       logout,
       refreshPermissions,

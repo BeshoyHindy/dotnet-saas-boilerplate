@@ -85,15 +85,15 @@ const HERO_COPY: Record<HealthStatus, { headline: string; subline: string }> = {
 // for unknown names so new modules render cleanly without code changes.
 // ────────────────────────────────────────────────────────────────────────
 
-function iconForCheck(name: string): React.ComponentType<{ className?: string }> {
+function CheckIcon({ name, className }: { name: string; className?: string }) {
   const k = name.toLowerCase();
-  if (k === "self") return ShieldCheck;
-  if (k === "redis") return Zap;
-  if (k === "hangfire") return Timer;
-  if (k.includes("postgres") || k.includes("db") || k.endsWith("-db")) return Database;
-  if (k.includes("storage") || k.includes("disk")) return HardDrive;
-  if (k.includes("http") || k.includes("api") || k.includes("webhook")) return Globe;
-  return Flame;
+  if (k === "self") return <ShieldCheck className={className} />;
+  if (k === "redis") return <Zap className={className} />;
+  if (k === "hangfire") return <Timer className={className} />;
+  if (k.includes("postgres") || k.includes("db") || k.endsWith("-db")) return <Database className={className} />;
+  if (k.includes("storage") || k.includes("disk")) return <HardDrive className={className} />;
+  if (k.includes("http") || k.includes("api") || k.includes("webhook")) return <Globe className={className} />;
+  return <Flame className={className} />;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -483,7 +483,6 @@ function DependencyRow({
   onToggle: () => void;
 }) {
   const tone = toneFor(entry.status);
-  const Icon = iconForCheck(entry.name);
   const toneColor = TONE_VAR[tone];
   const [num, unit] = splitLatency(entry.durationMs);
 
@@ -536,7 +535,7 @@ function DependencyRow({
             boxShadow: `inset 0 0 0 1px oklch(from ${toneColor} l c h / 0.18)`,
           }}
         >
-          <Icon className="size-3.5" />
+          <CheckIcon name={entry.name} className="size-3.5" />
         </span>
 
         {/* Name + description */}

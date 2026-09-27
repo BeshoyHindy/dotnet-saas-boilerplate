@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { DoorOpen, Loader2, Palette, RotateCcw, Save } from "lucide-react";
@@ -66,17 +66,20 @@ export function TenantBrandingCard({ tenantId }: { tenantId: string }) {
 
   // Seed draft state when the server payload arrives. We always replace the draft on a fresh
   // fetch so server-driven changes (another admin's edit, a reset) show up in the editor.
-  useEffect(() => {
-    if (themeQuery.data) {
-      setDraft(themeQuery.data);
-    }
-  }, [themeQuery.data]);
+  // Both adjustments happen during render, when the value they follow changes.
+  const [seededFrom, setSeededFrom] = useState<TenantThemeDraft | undefined>(undefined);
+  if (themeQuery.data && themeQuery.data !== seededFrom) {
+    setSeededFrom(themeQuery.data);
+    setDraft(themeQuery.data);
+  }
 
   // Leaving the tenant invalidates the credential this draft belongs to — drop it rather than
   // leaving edits on screen that can no longer be saved.
-  useEffect(() => {
+  const [wasActingHere, setWasActingHere] = useState(actingHere);
+  if (actingHere !== wasActingHere) {
+    setWasActingHere(actingHere);
     if (!actingHere) setDraft(null);
-  }, [actingHere]);
+  }
 
   const saveMutation = useMutation({
     mutationFn: (theme: TenantThemeDraft) => updateTenantTheme(theme),
