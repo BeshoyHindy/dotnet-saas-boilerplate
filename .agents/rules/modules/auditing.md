@@ -13,3 +13,20 @@ Append-only audit trail (entity changes, security events, exceptions, HTTP activ
 - `SqlAuditSink` groups a batch by `TenantId` and writes each group inside `ITenantScope.RunAsync` (null → Root) — the background writer has no ambient tenant, and `AuditDbContext` must be built under the tenant whose rows it holds. A tenant deleted between the event and the flush is logged and skipped, not fatal to the batch.
 - **JSON masking** redacts fields by keyword (password/secret/token/apiKey/connectionString…) → `****`. Add sensitive keys there.
 - Exclude an endpoint from activity auditing with `[NoAudit]` / the `NoAudit` endpoint extension.
+- **Entity-diff masking (#103)** — `EntityDiffBuilder` masks any changed property whose name matches the one canonical `SensitiveFieldNames` list (`BuildingBlocks/Shared/Security`, which includes `securitystamp`) to `****` in both old and new value; a null value stays null. There is no second keyword list for entity diffs — add a name to `SensitiveFieldNames` instead. `IAuditExempt` (`Modules.Auditing.Contracts`) is the stronger opt-out: an entity implementing it is skipped by `AuditingSaveChangesInterceptor` entirely, not merely masked. **Existing `AuditRecords` rows written before this change still carry clear-text `PasswordHash`/`SecurityStamp`/token hashes and are not cleaned up automatically.** A live deployment that wants them scrubbed runs a one-off against the `jsonb` payload, naming every property `SensitiveFieldNames` matches (the SQL below only checks the exact names, not its substring/trailing-word rules, so widen the `ANY (...)` list to match what actually shows up):
+  ```sql
+  UPDATE audit."AuditRecords"
+  SET "PayloadJson" = jsonb_set(
+        "PayloadJson",
+        '{changes}',
+        (SELECT jsonb_agg(
+                  CASE WHEN elem->>'name' = ANY (ARRAY['PasswordHash', 'SecurityStamp', 'RefreshTokenHash'])
+                       THEN elem
+                            || (CASE WHEN elem ? 'oldValue' THEN jsonb_build_object('oldValue', '****') ELSE '{}'::jsonb END)
+                            || (CASE WHEN elem ? 'newValue' THEN jsonb_build_object('newValue', '****') ELSE '{}'::jsonb END)
+                       ELSE elem
+                  END)
+         FROM jsonb_array_elements("PayloadJson" -> 'changes') elem))
+  WHERE "EventType" = 1 -- EntityChange
+    AND "PayloadJson" ? 'changes';
+  ```
