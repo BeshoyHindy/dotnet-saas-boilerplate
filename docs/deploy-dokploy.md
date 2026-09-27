@@ -136,9 +136,10 @@ openssl rand -base64 48 | tr -dc 'A-Za-z0-9'        # JWT_SIGNING_KEY (32+ chars
 echo "$(openssl rand -base64 18 | tr -dc 'A-Za-z0-9')Aa1"   # SEED_ADMIN_PASSWORD
 ```
 
-`SEED_ADMIN_PASSWORD` must satisfy the Identity policy: 10+ characters with an
-upper, a lower and a digit — hence the suffix. It is used once, by the migrator,
-to seed the root tenant's admin. Change it at first sign-in.
+`SEED_ADMIN_PASSWORD` must satisfy the Identity policy: 10+ characters and not on
+the bundled common-password list, which a random value clears. (The `Aa1` suffix
+dates from the old composition rules and is harmless.) It is used once, by the
+migrator, to seed the root tenant's admin. Change it at first sign-in.
 
 ### Find `PROXY_KNOWN_NETWORK`
 

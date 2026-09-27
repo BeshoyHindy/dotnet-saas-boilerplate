@@ -451,7 +451,7 @@ function RegisterUserDialog({
             <DialogTitle>Register a member</DialogTitle>
             <DialogDescription>
               Add a new user to this tenant. Username and email must be unique.
-              Passwords need an uppercase letter, lowercase letter, and a digit.
+              Passwords need at least 10 characters, and common ones are refused.
             </DialogDescription>
           </DialogHeader>
 

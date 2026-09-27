@@ -47,7 +47,7 @@ const schema = z.object({
   adminEmail: z.string().trim().email("Enter a valid email."),
   adminPassword: z
     .string()
-    .min(8, "At least 8 characters.")
+    .min(10, "At least 10 characters.")
     .max(128, "Maximum 128 characters."),
   issuer: z.string().trim().min(2, "Required.").max(256),
   // Optional: a `type="date"` input yields a `YYYY-MM-DD` string. Left empty,

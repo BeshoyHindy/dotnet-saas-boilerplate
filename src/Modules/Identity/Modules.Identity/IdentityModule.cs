@@ -69,6 +69,7 @@ using Boilerplate.Modules.Identity.Features.v1.Users.SearchUsers;
 using Boilerplate.Modules.Identity.Features.v1.Users.SelfRegistration;
 using Boilerplate.Modules.Identity.Features.v1.Users.ToggleUserStatus;
 using Boilerplate.Modules.Identity.Features.v1.Users.UpdateUser;
+using Boilerplate.Modules.Identity.Passwords;
 using Boilerplate.Modules.Identity.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
@@ -146,6 +147,10 @@ public class IdentityModule : IModule
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        // The bundled common-password list: read once, shared. Also consumed outside Identity
+        // (CreateTenant's admin password, the Migrator's demo password) through the contract.
+        services.AddSingleton<ICommonPasswordList, CommonPasswordList>();
+
         // Register password history service
         services.AddScoped<IPasswordHistoryService, PasswordHistoryService>();
 
@@ -164,11 +169,13 @@ public class IdentityModule : IModule
 
         services.AddIdentity<AppUser, AppRole>(options =>
         {
+            // ASVS 5.0 L1: length (V6.2.1) and the common-password list below (V6.2.4), and no
+            // composition rules (V6.2.5) — a long all-lowercase passphrase is a good password.
             options.Password.RequiredLength = IdentityModuleConstants.PasswordLength;
-            options.Password.RequireDigit = true;
-            options.Password.RequireLowercase = true;
+            options.Password.RequireDigit = false;
+            options.Password.RequireLowercase = false;
             options.Password.RequireNonAlphanumeric = false;
-            options.Password.RequireUppercase = true;
+            options.Password.RequireUppercase = false;
             options.User.RequireUniqueEmail = true;
 
             // Account lockout: 5 consecutive failed logins → 15-minute lockout (applies to new users by default).
@@ -178,7 +185,9 @@ public class IdentityModule : IModule
             options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
         })
            .AddEntityFrameworkStores<IdentityDbContext>()
-           .AddDefaultTokenProviders();
+           .AddDefaultTokenProviders()
+           // On the builder, so UserManager runs it on every path that sets a password.
+           .AddPasswordValidator<CommonPasswordValidator>();
 
         //metrics
         services.AddSingleton<IdentityMetrics>();
