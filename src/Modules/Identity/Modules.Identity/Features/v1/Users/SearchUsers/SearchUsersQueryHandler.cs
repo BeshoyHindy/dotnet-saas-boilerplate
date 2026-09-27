@@ -37,12 +37,14 @@ public sealed class SearchUsersQueryHandler : IQueryHandler<SearchUsersQuery, Pa
         // Apply filters
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            string term = query.Search.ToLowerInvariant();
+            // ILIKE on the raw columns, which their pg_trgm GIN indexes serve (see ContainsPattern).
+            string pattern = ContainsPattern.For(query.Search);
+            const string escape = ContainsPattern.EscapeCharacter;
             users = users.Where(u =>
-                (u.FirstName != null && u.FirstName.ToLower().Contains(term)) ||
-                (u.LastName != null && u.LastName.ToLower().Contains(term)) ||
-                (u.Email != null && u.Email.ToLower().Contains(term)) ||
-                (u.UserName != null && u.UserName.ToLower().Contains(term)));
+                (u.FirstName != null && EF.Functions.ILike(u.FirstName, pattern, escape)) ||
+                (u.LastName != null && EF.Functions.ILike(u.LastName, pattern, escape)) ||
+                (u.Email != null && EF.Functions.ILike(u.Email, pattern, escape)) ||
+                (u.UserName != null && EF.Functions.ILike(u.UserName, pattern, escape)));
         }
 
         if (query.IsActive.HasValue)

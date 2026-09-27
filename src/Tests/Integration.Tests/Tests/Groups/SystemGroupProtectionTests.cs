@@ -1,3 +1,4 @@
+using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 
@@ -91,9 +92,10 @@ public sealed class SystemGroupProtectionTests
 
     private static async Task<GroupDto> GetGroupByNameAsync(HttpClient client, string name)
     {
-        var response = await client.GetAsync($"{TestConstants.IdentityBasePath}/groups");
+        var response = await client.GetAsync(
+            $"{TestConstants.IdentityBasePath}/groups?Search={Uri.EscapeDataString(name)}&PageSize=100");
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var groups = await response.DeserializeAsync<GroupDto[]>();
-        return groups.First(g => g.Name == name);
+        var page = await response.DeserializeAsync<PagedResponse<GroupDto>>();
+        return page.Items.First(g => g.Name == name);
     }
 }

@@ -48,9 +48,6 @@ internal sealed class UserService(
     public Task<UserDto> GetAsync(string userId, CancellationToken cancellationToken)
         => profileService.GetAsync(userId, cancellationToken);
 
-    public Task<List<UserDto>> GetListAsync(CancellationToken cancellationToken)
-        => profileService.GetListAsync(cancellationToken);
-
     public Task<int> GetCountAsync(CancellationToken cancellationToken)
         => profileService.GetCountAsync(cancellationToken);
 

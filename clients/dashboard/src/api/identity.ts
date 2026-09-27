@@ -197,8 +197,24 @@ export async function adminRevokeAllUserSessions(
 // Groups
 // -----------------------------
 
-export async function listGroups(search?: string): Promise<GroupDto[]> {
-  return unwrap(await api.GET("/api/v1/identity/groups", { params: { query: { search } } }));
+export type ListGroupsParams = {
+  pageNumber?: number;
+  pageSize?: number;
+  search?: string;
+};
+
+export async function listGroups(params: ListGroupsParams = {}): Promise<Paged<GroupDto>> {
+  return unwrap(
+    await api.GET("/api/v1/identity/groups", {
+      params: {
+        query: {
+          PageNumber: params.pageNumber ?? 1,
+          PageSize: params.pageSize ?? 20,
+          Search: params.search,
+        },
+      },
+    }),
+  );
 }
 
 export async function getGroupById(id: string): Promise<GroupDto> {
@@ -219,9 +235,17 @@ export async function deleteGroup(id: string): Promise<void> {
   unwrapVoid(await api.DELETE("/api/v1/identity/groups/{id}", { params: { path: { id } } }));
 }
 
-export async function getGroupMembers(groupId: string): Promise<GroupMemberDto[]> {
+export async function getGroupMembers(
+  groupId: string,
+  params: { pageNumber?: number; pageSize?: number } = {},
+): Promise<Paged<GroupMemberDto>> {
   return unwrap(
-    await api.GET("/api/v1/identity/groups/{groupId}/members", { params: { path: { groupId } } }),
+    await api.GET("/api/v1/identity/groups/{groupId}/members", {
+      params: {
+        path: { groupId },
+        query: { PageNumber: params.pageNumber ?? 1, PageSize: params.pageSize ?? 20 },
+      },
+    }),
   );
 }
 

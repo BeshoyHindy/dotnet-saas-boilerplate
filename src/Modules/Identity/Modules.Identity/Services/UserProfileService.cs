@@ -54,27 +54,6 @@ internal sealed class UserProfileService(
     public Task<int> GetCountAsync(CancellationToken cancellationToken) =>
         userManager.Users.AsNoTracking().CountAsync(cancellationToken);
 
-    public async Task<List<UserDto>> GetListAsync(CancellationToken cancellationToken)
-    {
-        var users = await userManager.Users.AsNoTracking().ToListAsync(cancellationToken);
-        var result = new List<UserDto>(users.Count);
-        foreach (var user in users)
-        {
-            result.Add(new UserDto
-            {
-                Id = user.Id,
-                Email = user.Email,
-                UserName = user.UserName,
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                ImageUrl = ResolveImageUrl(user.ImageUrl),
-                IsActive = user.IsActive
-            });
-        }
-
-        return result;
-    }
-
     public async Task UpdateAsync(string userId, string firstName, string lastName, string phoneNumber, FileUploadRequest image, bool deleteCurrentImage, CancellationToken cancellationToken = default)
     {
         var user = await userManager.FindByIdAsync(userId);

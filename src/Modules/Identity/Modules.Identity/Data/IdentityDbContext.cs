@@ -42,6 +42,11 @@ public class IdentityDbContext : MultiTenantIdentityDbContext<AppUser,
         ArgumentNullException.ThrowIfNull(builder);
 
         base.OnModelCreating(builder);
+
+        // Required for the trigram GIN indexes on the searched Users/Groups columns. Idempotent
+        // (IF NOT EXISTS); the Audit context declares it too.
+        builder.HasPostgresExtension("pg_trgm");
+
         builder.ApplyConfigurationsFromAssembly(typeof(IdentityDbContext).Assembly);
 
         // The outbox/inbox tables are framework infrastructure, owned by EventingDbContext (issue #1349).

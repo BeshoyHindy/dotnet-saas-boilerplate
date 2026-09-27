@@ -90,7 +90,6 @@ public static class TenantSweepShape
         "GET api/v{version:apiVersion}/identity/roles",
         "GET api/v{version:apiVersion}/identity/sessions",
         "GET api/v{version:apiVersion}/identity/sessions/me",
-        "GET api/v{version:apiVersion}/identity/users",
         "GET api/v{version:apiVersion}/identity/users/search",
         "GET api/v{version:apiVersion}/notifications/",
         "GET api/v{version:apiVersion}/notifications/unread-count",

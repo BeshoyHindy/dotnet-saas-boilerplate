@@ -1149,6 +1149,72 @@
         },
         "type": "object"
       },
+      "PagedResponseOfGroupDto": {
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GroupDto"
+            },
+            "type": "array"
+          },
+          "pageNumber": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "PagedResponseOfGroupMemberDto": {
+        "properties": {
+          "hasNext": {
+            "type": "boolean"
+          },
+          "hasPrevious": {
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GroupMemberDto"
+            },
+            "type": "array"
+          },
+          "pageNumber": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "pageSize": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "totalCount": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalPages": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "PagedResponseOfRoleDto": {
         "properties": {
           "hasNext": {
@@ -3409,12 +3475,35 @@
     },
     "/api/v1/identity/groups": {
       "get": {
-        "description": "Retrieve all groups for the current tenant with optional search filter.",
+        "description": "Retrieve the current tenant's groups, ordered by name. Pageable via PageNumber/PageSize (at most 100); filterable via Search (case-insensitive substring against name and description).",
         "operationId": "ListGroups",
         "parameters": [
           {
             "in": "query",
-            "name": "search",
+            "name": "PageNumber",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "PageSize",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Sort",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Search",
             "schema": {
               "type": "string"
             }
@@ -3425,14 +3514,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/GroupDto"
-                  },
-                  "type": "array"
+                  "$ref": "#/components/schemas/PagedResponseOfGroupDto"
                 }
               }
             },
             "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         },
         "security": [
@@ -3440,7 +3532,7 @@
             "Bearer": []
           }
         ],
-        "summary": "List all groups",
+        "summary": "List groups (paged)",
         "tags": [
           "Identity"
         ]
@@ -3492,7 +3584,7 @@
     },
     "/api/v1/identity/groups/{groupId}/members": {
       "get": {
-        "description": "Retrieve all users that belong to a specific group.",
+        "description": "Retrieve the users that belong to a specific group, ordered by user name. Pageable via PageNumber/PageSize (at most 100).",
         "operationId": "GetGroupMembers",
         "parameters": [
           {
@@ -3503,6 +3595,29 @@
               "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "PageNumber",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "PageSize",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Sort",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3510,10 +3625,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/GroupMemberDto"
-                  },
-                  "type": "array"
+                  "$ref": "#/components/schemas/PagedResponseOfGroupMemberDto"
                 }
               }
             },
@@ -3534,7 +3646,7 @@
             "Bearer": []
           }
         ],
-        "summary": "Get members of a group",
+        "summary": "Get members of a group (paged)",
         "tags": [
           "Identity"
         ]
@@ -4596,42 +4708,6 @@
         ]
       }
     },
-    "/api/v1/identity/users": {
-      "get": {
-        "description": "Retrieve a list of users for the current tenant.",
-        "operationId": "ListUsers",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/UserDto"
-                  },
-                  "type": "array"
-                }
-              }
-            },
-            "description": "OK"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          }
-        },
-        "security": [
-          {
-            "Bearer": []
-          }
-        ],
-        "summary": "List users",
-        "tags": [
-          "Identity"
-        ]
-      }
-    },
     "/api/v1/identity/users/search": {
       "get": {
         "description": "Search and filter users with server-side pagination, sorting, and filtering by status, email confirmation, and role.",
@@ -5035,13 +5111,36 @@
     },
     "/api/v1/identity/users/{userId}/groups": {
       "get": {
-        "description": "Retrieve all groups that a specific user belongs to.",
+        "description": "Retrieve the groups a specific user belongs to, ordered by name. Pageable via PageNumber/PageSize (at most 100).",
         "operationId": "GetUserGroups",
         "parameters": [
           {
             "in": "path",
             "name": "userId",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "PageNumber",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "PageSize",
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "Sort",
             "schema": {
               "type": "string"
             }
@@ -5052,10 +5151,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/GroupDto"
-                  },
-                  "type": "array"
+                  "$ref": "#/components/schemas/PagedResponseOfGroupDto"
                 }
               }
             },
@@ -5066,6 +5162,9 @@
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
           }
         },
         "security": [
@@ -5073,7 +5172,7 @@
             "Bearer": []
           }
         ],
-        "summary": "Get groups for a user",
+        "summary": "Get groups for a user (paged)",
         "tags": [
           "Identity"
         ]

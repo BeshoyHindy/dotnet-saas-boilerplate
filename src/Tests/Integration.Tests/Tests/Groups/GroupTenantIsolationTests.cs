@@ -1,3 +1,4 @@
+using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 
@@ -55,11 +56,11 @@ public sealed class GroupTenantIsolationTests
         var rootName = $"RootOnly-{uniqueId}";
         var groupId = await CreateGroupAsync(rootClient, rootName);
 
-        // Act — tenant B lists groups (endpoint returns a plain array).
+        // Act — tenant B lists groups (a page; a fresh tenant has far fewer than 100).
         using var listResponse = await otherClient.GetAsync(
-            $"{TestConstants.IdentityBasePath}/groups");
+            $"{TestConstants.IdentityBasePath}/groups?PageSize=100");
         listResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var groups = await listResponse.DeserializeAsync<List<GroupDto>>();
+        var groups = (await listResponse.DeserializeAsync<PagedResponse<GroupDto>>()).Items;
         var body = await otherClient.GetStringAsync($"{TestConstants.IdentityBasePath}/groups");
 
         // Assert — tenant A's group never appears in tenant B's listing.
