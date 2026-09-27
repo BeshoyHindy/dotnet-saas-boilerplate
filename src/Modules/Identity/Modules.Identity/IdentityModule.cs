@@ -62,7 +62,6 @@ using Boilerplate.Modules.Identity.Features.v1.Users.GetUserGroups;
 using Boilerplate.Modules.Identity.Features.v1.Users.GetUserPermissions;
 using Boilerplate.Modules.Identity.Features.v1.Users.GetUserProfile;
 using Boilerplate.Modules.Identity.Features.v1.Users.GetUserRoles;
-using Boilerplate.Modules.Identity.Features.v1.Users.GetUsers;
 using Boilerplate.Modules.Identity.Features.v1.Users.RegisterUser;
 using Boilerplate.Modules.Identity.Features.v1.Users.ResetPassword;
 using Boilerplate.Modules.Identity.Features.v1.Users.SearchUsers;
@@ -288,7 +287,6 @@ public class IdentityModule : IModule
         group.MapGetCurrentUserPermissionsEndpoint();
         group.MapGetMeEndpoint();
         group.MapGetUserRolesEndpoint();
-        group.MapGetUsersListEndpoint();
         group.MapSearchUsersEndpoint();
         group.MapRegisterUserEndpoint();
         group.MapToggleUserStatusEndpoint();

@@ -1,3 +1,4 @@
+using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 
@@ -21,6 +22,32 @@ public sealed class GroupCrudTests
         var response = await client.GetAsync($"{TestConstants.IdentityBasePath}/groups?pageNumber=1&pageSize=10");
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task GetGroups_Should_MatchCaseInsensitiveFragment_When_SearchProvided()
+    {
+        using var client = await _auth.CreateRootAdminClientAsync();
+        var uniqueId = Guid.NewGuid().ToString("N")[..8];
+        var name = $"Srch-{uniqueId}-Alpha";
+        (await client.PostAsJsonAsync($"{TestConstants.IdentityBasePath}/groups", new
+        {
+            name,
+            description = "search test",
+            isDefault = false,
+            roleIds = new List<string>()
+        })).StatusCode.ShouldBe(HttpStatusCode.Created);
+
+        var page = await (await client.GetAsync(
+                $"{TestConstants.IdentityBasePath}/groups?Search={Uri.EscapeDataString($"SRCH-{uniqueId}-alp")}"))
+            .DeserializeAsync<PagedResponse<GroupDto>>();
+        var literal = await (await client.GetAsync(
+                $"{TestConstants.IdentityBasePath}/groups?Search={Uri.EscapeDataString($"Srch_{uniqueId}")}"))
+            .DeserializeAsync<PagedResponse<GroupDto>>();
+
+        page.TotalCount.ShouldBe(1);
+        page.Items.Single().Name.ShouldBe(name);
+        literal.TotalCount.ShouldBe(0, "'_' in a search term is a literal, not a LIKE wildcard");
     }
 
     [Fact]

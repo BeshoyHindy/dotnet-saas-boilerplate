@@ -14,11 +14,6 @@ public interface IUserProfileService
     Task<UserDto> GetAsync(string userId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Gets all users.
-    /// </summary>
-    Task<List<UserDto>> GetListAsync(CancellationToken cancellationToken);
-
-    /// <summary>
     /// Gets the total user count.
     /// </summary>
     Task<int> GetCountAsync(CancellationToken cancellationToken);

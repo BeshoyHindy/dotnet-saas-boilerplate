@@ -392,8 +392,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List all groups
-         * @description Retrieve all groups for the current tenant with optional search filter.
+         * List groups (paged)
+         * @description Retrieve the current tenant's groups, ordered by name. Pageable via PageNumber/PageSize (at most 100); filterable via Search (case-insensitive substring against name and description).
          */
         get: operations["ListGroups"];
         put?: never;
@@ -416,8 +416,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get members of a group
-         * @description Retrieve all users that belong to a specific group.
+         * Get members of a group (paged)
+         * @description Retrieve the users that belong to a specific group, ordered by user name. Pageable via PageNumber/PageSize (at most 100).
          */
         get: operations["GetGroupMembers"];
         put?: never;
@@ -792,26 +792,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/identity/users": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List users
-         * @description Retrieve a list of users for the current tenant.
-         */
-        get: operations["ListUsers"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/identity/users/search": {
         parameters: {
             query?: never;
@@ -932,8 +912,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get groups for a user
-         * @description Retrieve all groups that a specific user belongs to.
+         * Get groups for a user (paged)
+         * @description Retrieve the groups a specific user belongs to, ordered by name. Pageable via PageNumber/PageSize (at most 100).
          */
         get: operations["GetUserGroups"];
         put?: never;
@@ -1749,6 +1729,32 @@ export interface components {
             hasNext: boolean;
             hasPrevious: boolean;
             items: components["schemas"]["FileAssetDto"][];
+            /** Format: int32 */
+            pageNumber: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int64 */
+            totalCount: number;
+            /** Format: int32 */
+            totalPages: number;
+        };
+        PagedResponseOfGroupDto: {
+            hasNext: boolean;
+            hasPrevious: boolean;
+            items: components["schemas"]["GroupDto"][];
+            /** Format: int32 */
+            pageNumber: number;
+            /** Format: int32 */
+            pageSize: number;
+            /** Format: int64 */
+            totalCount: number;
+            /** Format: int32 */
+            totalPages: number;
+        };
+        PagedResponseOfGroupMemberDto: {
+            hasNext: boolean;
+            hasPrevious: boolean;
+            items: components["schemas"]["GroupMemberDto"][];
             /** Format: int32 */
             pageNumber: number;
             /** Format: int32 */
@@ -2798,7 +2804,10 @@ export interface operations {
     ListGroups: {
         parameters: {
             query?: {
-                search?: string;
+                PageNumber?: number;
+                PageSize?: number;
+                Sort?: string;
+                Search?: string;
             };
             header?: never;
             path?: never;
@@ -2812,8 +2821,22 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["GroupDto"][];
+                    "application/json": components["schemas"]["PagedResponseOfGroupDto"];
                 };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -2864,7 +2887,11 @@ export interface operations {
     };
     GetGroupMembers: {
         parameters: {
-            query?: never;
+            query?: {
+                PageNumber?: number;
+                PageSize?: number;
+                Sort?: string;
+            };
             header?: never;
             path: {
                 groupId: string;
@@ -2879,7 +2906,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["GroupMemberDto"][];
+                    "application/json": components["schemas"]["PagedResponseOfGroupMemberDto"];
                 };
             };
             /** @description Unauthorized */
@@ -3810,40 +3837,6 @@ export interface operations {
             };
         };
     };
-    ListUsers: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["UserDto"][];
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     SearchUsers: {
         parameters: {
             query?: {
@@ -4182,7 +4175,11 @@ export interface operations {
     };
     GetUserGroups: {
         parameters: {
-            query?: never;
+            query?: {
+                PageNumber?: number;
+                PageSize?: number;
+                Sort?: string;
+            };
             header?: never;
             path: {
                 userId: string;
@@ -4197,7 +4194,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["GroupDto"][];
+                    "application/json": components["schemas"]["PagedResponseOfGroupDto"];
                 };
             };
             /** @description Unauthorized */
@@ -4209,6 +4206,13 @@ export interface operations {
             };
             /** @description Forbidden */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -9,7 +9,7 @@ Auth (JWT + ASP.NET Identity), users, roles, permissions, sessions, impersonatio
 | Interface | Concern |
 |---|---|
 | `IUserRegistrationService` | register, external-principal create, email/phone confirm |
-| `IUserProfileService` | get/list/count, update profile, image, existence checks |
+| `IUserProfileService` | get/count, update profile, image, existence checks |
 | `IUserStatusService` | activate/deactivate (`DeleteAsync` == deactivate), audited toggles |
 | `IUserRoleService` | role assignment, admin-role guards |
 | `IUserPasswordService` | forgot/reset/change password, history + expiry |

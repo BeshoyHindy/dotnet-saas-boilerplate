@@ -9,8 +9,8 @@ namespace Boilerplate.Modules.Files.Domain;
 /// <summary>
 /// A file asset tracked by the Files module. Owns a presigned upload lifecycle (PendingUpload →
 /// Available | Quarantined) plus soft-delete semantics consistent with the kit's other entities.
-/// Tenant scoping is implicit (one DB/schema per tenant via the framework's BaseDbContext); we do
-/// not carry a TenantId column here.
+/// Tenant scoping is the TenantId shadow column Finbuckle adds (see FileAssetConfiguration) and the
+/// default-on query filter; the entity itself carries no TenantId property.
 /// </summary>
 public sealed class FileAsset : AggregateRoot<Guid>, ISoftDeletable
 {

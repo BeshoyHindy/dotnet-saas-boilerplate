@@ -1,3 +1,4 @@
+using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Integration.Tests.Infrastructure;
 using Integration.Tests.Infrastructure.Extensions;
 
@@ -83,6 +84,54 @@ public sealed class GroupMembershipTests
             $"{TestConstants.IdentityBasePath}/groups/{group.Id}/members?pageNumber=1&pageSize=10");
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task GetGroupMembers_Should_ReturnOnePageAtATime_When_MembersExceedPageSize()
+    {
+        using var client = await _auth.CreateRootAdminClientAsync();
+        var uniqueId = Guid.NewGuid().ToString("N")[..8];
+
+        var userIds = new List<string>();
+        for (var i = 0; i < 3; i++)
+        {
+            var userResponse = await client.PostAsJsonAsync($"{TestConstants.IdentityBasePath}/register", new
+            {
+                firstName = "GroupPage",
+                lastName = $"Test{i}",
+                email = $"grppage{i}-{uniqueId}@example.com",
+                userName = $"grppage{i}-{uniqueId}",
+                password = "Test@1234!",
+                confirmPassword = "Test@1234!"
+            });
+            userIds.Add((await userResponse.DeserializeAsync<RegisterResult>()).UserId);
+        }
+
+        var groupResponse = await client.PostAsJsonAsync($"{TestConstants.IdentityBasePath}/groups", new
+        {
+            name = $"PageGroup-{uniqueId}",
+            description = "Paged members test",
+            isDefault = false,
+            roleIds = new List<string>()
+        });
+        var group = await groupResponse.DeserializeAsync<GroupDto>();
+
+        (await client.PostAsJsonAsync(
+            $"{TestConstants.IdentityBasePath}/groups/{group.Id}/members",
+            new { userIds })).StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var first = await (await client.GetAsync(
+                $"{TestConstants.IdentityBasePath}/groups/{group.Id}/members?PageNumber=1&PageSize=2"))
+            .DeserializeAsync<PagedResponse<GroupMemberDto>>();
+        var second = await (await client.GetAsync(
+                $"{TestConstants.IdentityBasePath}/groups/{group.Id}/members?PageNumber=2&PageSize=2"))
+            .DeserializeAsync<PagedResponse<GroupMemberDto>>();
+
+        first.Items.Count.ShouldBe(2);
+        first.TotalCount.ShouldBe(3);
+        first.TotalPages.ShouldBe(2);
+        second.Items.Count.ShouldBe(1);
+        first.Items.Concat(second.Items).Select(m => m.UserId).ShouldBe(userIds, ignoreOrder: true);
     }
 
     [Fact]

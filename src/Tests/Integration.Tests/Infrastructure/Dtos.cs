@@ -50,6 +50,12 @@ public sealed class GroupDto
     public int MemberCount { get; set; }
 }
 
+public sealed class GroupMemberDto
+{
+    public string UserId { get; set; } = default!;
+    public string? UserName { get; set; }
+}
+
 public sealed class CreateTenantResult
 {
     public string Id { get; set; } = default!;

@@ -53,11 +53,14 @@ import {
   EntityDetailHero,
   EntityDetailSection,
   EntityDetailStat,
+  EntityPager,
   ErrorBand,
   Field,
 } from "@/components/list";
 import { describe, pad2 } from "@/lib/list-helpers";
 import { cn } from "@/lib/cn";
+
+const MEMBERS_PAGE_SIZE = 20;
 
 function memberDisplay(m: GroupMemberDto): string {
   const parts = [m.firstName, m.lastName].filter(Boolean);
@@ -82,10 +85,12 @@ export function GroupDetailPage() {
     enabled: !!groupId,
   });
 
+  const [membersPage, setMembersPage] = useState(1);
   const membersQuery = useQuery({
-    queryKey: ["identity", "groups", groupId, "members"],
-    queryFn: () => getGroupMembers(groupId),
+    queryKey: ["identity", "groups", groupId, "members", { pageNumber: membersPage }],
+    queryFn: () => getGroupMembers(groupId, { pageNumber: membersPage, pageSize: MEMBERS_PAGE_SIZE }),
     enabled: !!groupId,
+    placeholderData: keepPreviousData,
   });
 
   const rolesQuery = useQuery({
@@ -95,7 +100,8 @@ export function GroupDetailPage() {
   });
 
   const group = groupQuery.data;
-  const members = membersQuery.data ?? [];
+  const membersData = membersQuery.data;
+  const members = membersData?.items ?? [];
   const roles = rolesQuery.data ?? [];
 
   // Metadata + role edit state
@@ -417,6 +423,16 @@ export function GroupDetailPage() {
               ))}
             </ul>
           )}
+          <div className="px-5 pb-3">
+            <EntityPager
+              page={membersData?.pageNumber ?? 1}
+              totalPages={Math.max(membersData?.totalPages ?? 1, 1)}
+              hasPrev={membersData?.hasPrevious ?? false}
+              hasNext={membersData?.hasNext ?? false}
+              onPrev={() => setMembersPage((p) => Math.max(1, p - 1))}
+              onNext={() => setMembersPage((p) => p + 1)}
+            />
+          </div>
         </EntityDetailSection>
       </div>
 
@@ -450,6 +466,8 @@ export function GroupDetailPage() {
       <AddMembersDialog
         open={addOpen}
         groupId={groupId}
+        // Only the members on the page in view: one already in the group but on another page stays
+        // pickable, and the server reports it back as already present rather than adding it twice.
         existingMemberIds={new Set(members.map((m) => m.userId))}
         onClose={() => setAddOpen(false)}
       />
