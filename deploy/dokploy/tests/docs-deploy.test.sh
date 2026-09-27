@@ -27,11 +27,18 @@ guide_text="$(cat "$GUIDE")"
 # two separate hostnames (ADR-0008); a reader creating only three records has
 # no CONSOLE_DOMAIN to point at.
 refute_match "the guide no longer claims three hostnames" "$guide_text" 'Three hostnames'
+# The guide templates its frontend and API-only sides, so a scaffold
+# keeps only one side: assert each side only where it survives. In the repository
+# these directives are plain comments and both sides are checked.
+#if (frontend)
 assert_match "the frontend guide claims four hostnames" "$guide_text" 'Four hostnames point at the server'
-assert_match "the API-only guide claims two hostnames" "$guide_text" 'Two hostnames point at the server'
 assert_match "the DNS table has its own Dashboard record" "$guide_text" '\| Dashboard \|'
 assert_match "the DNS table has its own Console record, on its own hostname" "$guide_text" \
   '\| Console \| `console\.example\.com` \|'
+#endif
+#if (!frontend)
+assert_match "the API-only guide claims two hostnames" "$guide_text" 'Two hostnames point at the server'
+#endif
 refute_match "the DNS table no longer conflates Console with the web front end" "$guide_text" \
   '\| Console \| `app\.example\.com` \|'
 
@@ -40,8 +47,10 @@ refute_match "the DNS table no longer conflates Console with the web front end" 
 # a tenant user who lands on it is told it is not their app — the two are not
 # interchangeable, so the seeded root admin's first sign-in must not point at
 # DASHBOARD_DOMAIN's example host.
+#if (frontend)
 assert_match "first sign-in is on the console's example host" "$guide_text" \
   'sign in at `https://console\.example\.com`'
+#endif
 refute_match "first sign-in no longer points at the dashboard's example host" "$guide_text" \
   'sign in at `https://app\.example\.com`'
 assert_match "the seeded admin is named at first sign-in" "$guide_text" 'admin@root\.com'
