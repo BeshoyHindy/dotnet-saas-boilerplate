@@ -45,7 +45,7 @@ builder.Services.AddMediator(o =>
 // the exported document is identical either way.
 var exportOpenApi = Boilerplate.Api.OpenApiDocumentExport.IsRequested(args);
 
-builder.AddHeroPlatform(o =>
+builder.AddAppPlatform(o =>
 {
     o.EnableCaching = true;
     o.EnableMailing = true;
@@ -53,7 +53,7 @@ builder.AddHeroPlatform(o =>
 });
 
 // The transactional outbox is framework infrastructure with exactly one owner
-// (EventingDbContext), so the host registers it once for every module (issue #1349).
+// (EventingDbContext), so the host registers it once for every module.
 builder.Services.AddEventingCore(builder.Configuration);
 
 // The module list lives in HostModules.cs; HostModuleListTests fails when an [AppModule] assembly is
@@ -75,7 +75,7 @@ if (exportOpenApi)
 // Tenant resolution is NOT installed here: it has to run after UseAuthentication(), so
 // MultitenancyModule.ConfigureMiddleware() calls UseMultiTenant() from inside
 // UseModuleMiddlewares(). See ADR-0002.
-app.UseHeroPlatform(p =>
+app.UseAppPlatform(p =>
 {
     p.MapModules = true;
     p.ServeStaticFiles = true;

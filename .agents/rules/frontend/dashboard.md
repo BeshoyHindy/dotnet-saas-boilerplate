@@ -20,7 +20,7 @@ administration section, a basic member does not.
 
 - **No acting layer.** There is no `src/auth/acting-store.ts`, no `src/api/operator.ts`, no acting
   banner, and no same-tenant "Impersonate" action on the user detail page. Acting as another user —
-  in any tenant, including one's own — is the console's job (ADR-0008, issue #9). This app holds
+  in any tenant, including one's own — is the console's job (ADR-0008). This app holds
   exactly one credential: the signed-in user's own access token.
 - **No `X-Console-As-Operator` sentinel.** With one credential there is nothing to opt out of, so
   `api-client.ts` has no `AS_OPERATOR` export. If you are copying transport code over from the

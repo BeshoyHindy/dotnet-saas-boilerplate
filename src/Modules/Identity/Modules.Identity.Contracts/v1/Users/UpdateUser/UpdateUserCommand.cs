@@ -16,7 +16,7 @@ public class UpdateUserCommand : ICommand<Unit>
 
     /// <summary>
     /// The request's raw <c>If-Match</c> header, set by the endpoint — never read from the body.
-    /// Null when the caller sent none; the check is optional (#107).
+    /// Null when the caller sent none; optimistic concurrency checking is optional.
     /// </summary>
     [JsonIgnore]
     public string? IfMatch { get; set; }

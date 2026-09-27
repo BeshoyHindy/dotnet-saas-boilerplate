@@ -40,12 +40,14 @@ Rules: handlers return **`ValueTask<T>`** (not `Task<T>`); parameter named `comm
 `public sealed`; `.ConfigureAwait(false)` on awaits. Send via `mediator.Send(command, ct)` (the `IMediator`
 interface name matches MediatR's — that part is fine).
 
-## Registration — the four places
+## Registration — the four lists
 
 The source generator only scans assemblies listed in `o.Assemblies`, and that list exists in **two host
-files**. A new module needs **two markers** (a Contracts type **and** the module type) added to the Mediator
-list **plus** an entry in the `moduleAssemblies` array — in **both** `Boilerplate.Api/Program.cs` **and**
-`Boilerplate.DbMigrator/Program.cs`:
+`Program.cs` files** (it stays a literal `typeof` list because the generator reads it as written — it
+can't take a variable). A new module (platform or product — ADR-0010) needs **two markers** (a Contracts
+type **and** the module type) added to the Mediator list **plus** an entry in `HostModules.All`
+(`HostModules.cs`) — in **both** `Boilerplate.Api` **and** `Boilerplate.DbMigrator`. `HostModuleListTests`
+(Architecture.Tests) fails loudly and names the missing list if either host's pair is incomplete:
 
 ```csharp
 builder.Services.AddMediator(o =>
@@ -66,4 +68,4 @@ See `add-module` for the full procedure.
 |---|---|
 | `IRequest<T>` / `IRequestHandler<,>` not found | MediatR interface → use `ICommand`/`IQuery` + `ICommandHandler`/`IQueryHandler` |
 | `Task<T>` vs `ValueTask<T>` mismatch | Handler must return `ValueTask<T>` |
-| Handler not invoked at runtime | Assembly missing from `o.Assemblies` (in one or both Program.cs files) |
+| Handler not invoked at runtime | Assembly missing from `o.Assemblies` (in one or both `Program.cs` files) |

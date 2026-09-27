@@ -12,7 +12,7 @@
 #                       lockfile lines carrying such a digest are skipped, so
 #                       package names and URLs in lockfiles are still checked.
 #   .gitleaksignore   - its fingerprints necessarily name upstream's historical
-#                       file paths (issue #88).
+#                       file paths.
 #   README credit line - only that exact line is permitted; any other mention
 #                       in README still fails.
 set -euo pipefail

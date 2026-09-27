@@ -14,7 +14,7 @@ namespace Integration.Tests.Tests.Users;
 
 /// <summary>
 /// Registration is one fact about the world — a user exists, with their role, their default groups
-/// and the event that says so — and #86 is the observation that it was four independent commits.
+/// and the event that says so — yet historically it was four independent commits.
 /// A failure after the first left a user row nothing could finish and no retry could get past, and
 /// e-mail uniqueness lived only in a validator's query, so two concurrent sign-ups with the same
 /// address both won.

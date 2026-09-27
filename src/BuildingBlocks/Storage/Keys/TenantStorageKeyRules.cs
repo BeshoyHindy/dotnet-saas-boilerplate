@@ -50,7 +50,7 @@ public static partial class TenantStorageKeyRules
     [GeneratedRegex(TenantIdPattern, RegexOptions.CultureInvariant)]
     private static partial Regex TenantIdSlug();
 
-    /// <summary>Anything an owner-type folder may not contain — the pre-#83 sanitizer, unchanged.</summary>
+    /// <summary>Anything an owner-type folder may not contain — the sanitizer predates the owner segment, unchanged.</summary>
     [GeneratedRegex("[^a-z0-9]", RegexOptions.CultureInvariant)]
     private static partial Regex OwnerTypeSanitizer();
 
@@ -123,7 +123,7 @@ public static partial class TenantStorageKeyRules
     /// The prefix one <b>owner</b> holds in the public space, trailing slash included:
     /// <c>uploads/tenants/{tenantId}/{ownerType}/{owner}/</c>.
     ///
-    /// <para><b>Why an owner segment at all (#83).</b> The tenant prefix answers "may this tenant
+    /// <para><b>Why an owner segment at all.</b> The tenant prefix answers "may this tenant
     /// touch this object"; inside one tenant it answers nothing. An avatar and a brand asset are
     /// written for exactly one owner — a user, a theme slot — and the replace/remove path must be
     /// able to say "delete only what <i>this</i> owner's own uploads produced". Carrying the owner

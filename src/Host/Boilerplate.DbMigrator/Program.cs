@@ -94,7 +94,7 @@ builder.Services.AddMediator(o =>
 
 // Disable runtime-only concerns; persistence + multitenancy stay on so DbInitializers resolve. Caching
 // stays on because some modules' ctor wiring touches IDistributedCache (in-memory fallback if no Redis).
-builder.AddHeroPlatform(o =>
+builder.AddAppPlatform(o =>
 {
     o.EnableOpenTelemetry = false;
     o.EnableCors = false;
@@ -109,7 +109,7 @@ builder.AddHeroPlatform(o =>
 });
 
 // Registers EventingDbContext + its IDbInitializer, so the schema pass below creates the framework
-// outbox/inbox schema alongside every module's (issue #1349).
+// outbox/inbox schema alongside every module's.
 builder.Services.AddEventingCore(builder.Configuration);
 
 // The module list lives in HostModules.cs; HostModuleListTests fails when an [AppModule] assembly is
@@ -217,9 +217,9 @@ try
     }
 
     // ── Step 2 — the shared module schema, then per-tenant seeds ─────────
-    // Every tenant lives in the one shared database (#75), so schema is migrated ONCE, not once per
-    // tenant. Seeding is the part that is genuinely per tenant — tenant-scoped roles, groups and the
-    // tenant admin — so that pass still walks the catalog, and --tenant scopes it.
+    // All tenants live in one shared database, so schema is migrated ONCE, not once per tenant.
+    // Seeding is the part that is genuinely per tenant — tenant-scoped roles, groups and the tenant
+    // admin — so that pass still walks the catalog, and --tenant scopes it.
     if (!cli.CatalogOnly)
     {
         var tenantStore = host.Services.GetRequiredService<IMultiTenantStore<AppTenantInfo>>();

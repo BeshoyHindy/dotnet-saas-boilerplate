@@ -11,8 +11,8 @@ using System.Net;
 namespace Framework.Tests.Web;
 
 /// <summary>
-/// Ticket #104, ported from upstream's <c>IdempotencyCancellationBindingTests</c> (<c>bf86648</c> part
-/// c). Minimal-API parameter binding resolves a handler's <see cref="CancellationToken"/> parameter
+/// Ported from upstream's <c>IdempotencyCancellationBindingTests</c> (<c>bf86648</c> part c).
+/// Minimal-API parameter binding resolves a handler's <see cref="CancellationToken"/> parameter
 /// from <see cref="HttpContext.RequestAborted"/> <i>before</i> endpoint filters run, so the value that
 /// reaches the handler is whatever <c>RequestAborted</c> was at binding time — reassigning
 /// <c>HttpContext.RequestAborted</c> inside the filter does not retroactively change an argument
@@ -89,9 +89,9 @@ public sealed class IdempotencyClientAbortBindingTests
 
         // The filter resolves CacheKeyScope and IDistributedCache from the request scope. No
         // Multitenancy module here, so singleTenant: true supplies the fixed-partition accessor
-        // AddHeroCaching otherwise demands (ADR-0002 — there is no untenanted default).
-        builder.Services.AddHeroCaching(builder.Configuration, singleTenant: true);
-        builder.Services.AddHeroIdempotency(builder.Configuration);
+        // AddAppCaching otherwise demands (ADR-0002 — there is no untenanted default).
+        builder.Services.AddAppCaching(builder.Configuration, singleTenant: true);
+        builder.Services.AddAppIdempotency(builder.Configuration);
 
         var app = builder.Build();
         if (clientAbort.CanBeCanceled)

@@ -15,7 +15,7 @@ name: Frontend CI
 # The third gate is drift: `pnpm generate:api` must be a no-op against the
 # checked-in contract (clients/openapi/v1.json). The backend half of that gate —
 # re-exporting the document from the API — is the `openapi-drift` job in
-# backend.yml; both call scripts/check-openapi-drift.sh (issue #15).
+# backend.yml; both call scripts/check-openapi-drift.sh.
 #
 # Gitflow (ADR-0007): `develop` integrates, so the gates run on PRs into
 # `develop`, `main` and the release/hotfix branches.
@@ -114,7 +114,7 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
-      # The frontend half of the OpenAPI drift gate (issue #15, ADR-0008):
+      # The frontend half of the OpenAPI drift gate (ADR-0008):
       # regenerating the types from the checked-in document must change nothing,
       # in EITHER client. Shared with the backend half in
       # scripts/check-openapi-drift.sh so the same check runs here and on a

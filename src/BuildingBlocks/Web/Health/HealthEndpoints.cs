@@ -12,7 +12,7 @@ public static class HealthEndpoints
 {
     public sealed record HealthResult(string Status, IEnumerable<HealthEntry> Results);
     public sealed record HealthEntry(string Name, string Status, string? Description, double DurationMs, Dictionary<string, object>? Details = default);
-    public static IEndpointRouteBuilder MapHeroHealthEndpoints(this IEndpointRouteBuilder app)
+    public static IEndpointRouteBuilder MapAppHealthEndpoints(this IEndpointRouteBuilder app)
     {
         // Anonymous by design. Rate limiting is decided per endpoint. The two probes are exempt because
         // the proxy and orchestrator poll them, and a throttled probe would take the API out of rotation.

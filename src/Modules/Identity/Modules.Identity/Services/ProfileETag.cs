@@ -4,8 +4,8 @@ using Microsoft.Net.Http.Headers;
 namespace Boilerplate.Modules.Identity.Services;
 
 /// <summary>
-/// The version of a user's profile on the wire (#107): <c>AppUser.ConcurrencyStamp</c> as a strong
-/// entity tag. <c>GET /identity/profile</c> sends it as <c>ETag</c>; <c>PUT /identity/profile</c>
+/// The version of a user's profile on the wire for optimistic concurrency: <c>AppUser.ConcurrencyStamp</c>
+/// as a strong entity tag. <c>GET /identity/profile</c> sends it as <c>ETag</c>; <c>PUT /identity/profile</c>
 /// honours it in an optional <c>If-Match</c>.
 ///
 /// <para>The PUT is a full-representation update, so without this two editors silently overwrite

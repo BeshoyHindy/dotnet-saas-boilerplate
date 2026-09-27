@@ -25,7 +25,7 @@ public static class GetUserProfileEndpoint
 
             var profile = await mediator.Send(new GetCurrentUserProfileQuery(userId), cancellationToken);
 
-            // The version the caller echoes in If-Match on PUT /profile (#107).
+            // The version the caller echoes in If-Match on PUT /profile for optimistic concurrency.
             if (ProfileETag.Format(profile.ConcurrencyStamp) is { } etag)
             {
                 response.Headers.ETag = etag;

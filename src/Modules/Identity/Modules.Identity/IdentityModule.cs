@@ -109,7 +109,7 @@ public class IdentityModule : IModule
         // User services - focused single-responsibility services
         services.AddTransient<IUserRegistrationService, UserRegistrationService>();
         // One definition of the "confirm your e-mail" message, shared by the registration event
-        // handler and the resend endpoint so the two links cannot drift apart (#86).
+        // handler and the resend endpoint so the two links stay synchronized.
         services.AddTransient<ConfirmationMailBuilder>();
         services.AddTransient<IUserProfileService, UserProfileService>();
         services.AddTransient<IUserStatusService, UserStatusService>();
@@ -122,9 +122,9 @@ public class IdentityModule : IModule
         services.AddTransient<IUserService, UserService>();
 
         services.AddTransient<IRoleService, RoleService>();
-        services.AddHeroStorage(builder.Configuration);
+        services.AddAppStorage(builder.Configuration);
         services.AddScoped<IIdentityService, IdentityService>();
-        services.AddHeroDbContext<IdentityDbContext>();
+        services.AddAppDbContext<IdentityDbContext>();
         // Eventing itself is bootstrapped by the host (AddEventingCore) — the outbox is framework
         // infrastructure, not Identity's. Handler registration stays per module.
         services.AddIntegrationEventHandlers(typeof(IdentityModule).Assembly);
@@ -201,7 +201,7 @@ public class IdentityModule : IModule
 
         // Skipped only by hosts that never authenticate a caller (the DbMigrator), which would
         // otherwise need a signing key purely to satisfy JwtOptions.ValidateOnStart().
-        if (builder.GetHeroPlatformOptions().EnableAuthentication)
+        if (builder.GetAppPlatformOptions().EnableAuthentication)
         {
             services.ConfigureJwtAuth();
         }
@@ -295,7 +295,7 @@ public class IdentityModule : IModule
         group.MapRegisterUserEndpoint();
         group.MapToggleUserStatusEndpoint();
         // No "set my avatar URL" endpoint: an avatar is uploaded on MapUpdateUserEndpoint (bytes in,
-        // server-issued URL out) and removed with its `deleteCurrentImage` flag (#83).
+        // server-issued URL out) and removed with its `deleteCurrentImage` flag.
         group.MapUpdateUserEndpoint();
 
         // sessions - user endpoints

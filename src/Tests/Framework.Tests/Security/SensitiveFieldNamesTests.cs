@@ -26,7 +26,7 @@ public sealed class SensitiveFieldNamesTests
     [InlineData("access_token")]
     [InlineData("credential")]
     [InlineData("awsCredentials")]
-    // Rotated on every password change/reset; as sensitive as the password itself (#103).
+    // Rotated on every password change/reset; as sensitive as the password itself.
     [InlineData("securityStamp")]
     [InlineData("SecurityStamp")]
     // A connection string is a credential. No shipped command binds one, and a consumer's does.

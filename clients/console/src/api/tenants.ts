@@ -116,7 +116,7 @@ export async function retryTenantProvisioning(id: string): Promise<TenantProvisi
 //
 // The theme endpoints are CURRENT-TENANT scoped server-side: they act on the tenant the
 // caller's token names, and a caller cannot name another one (ADR-0002). To edit tenant
-// X's branding, ENTER tenant X first (the operator token exchange, #9): the acting token
+// X's branding, ENTER tenant X first (the operator token exchange): the acting token
 // makes X the current tenant, so these same calls read and write X. TenantBrandingCard
 // gates on exactly that.
 // ─────────────────────────────────────────────────────────────────────────
@@ -132,11 +132,10 @@ export type TenantThemeDto = Schemas["TenantThemeDto"];
  * The editors' working copy: the theme as the API returned it, plus whatever asset is staged for
  * THIS save.
  *
- * The two halves are separate on the wire since issue #83. The response's `brandAssets` carries the
- * URLs the server issued; the request's carries bytes and delete flags and **no URL at all** — there
- * is no field to paste a link into, which is the point: the column can only ever hold a value the
- * server produced for that asset. Carrying both on one draft object is a UI convenience;
- * `updateTenantTheme` is what separates them again.
+ * The API response's `brandAssets` carries the URLs the server issued; the request's carries bytes
+ * and delete flags and **no URL at all** — there is no field to paste a link into, which is the
+ * point: the column can only ever hold a value the server produced for that asset. Carrying both on
+ * one draft object is a UI convenience; `updateTenantTheme` is what separates them again.
  */
 export type TenantThemeDraft = TenantThemeDto & {
   brandAssets: BrandAssetsDto & Partial<BrandAssetUploadsDto>;
@@ -176,7 +175,7 @@ export async function getTenantTheme(): Promise<TenantThemeDto> {
  *
  * Sends the write model only: a staged file per slot, or the flag that removes what is stored. The
  * draft's `logoUrl`/`logoDarkUrl`/`faviconUrl` are deliberately left behind — the server issues
- * those, and sending one back would be a client naming an asset URL (#83).
+ * those, and the API no longer accepts asset URLs from the client.
  */
 export async function updateTenantTheme(draft: TenantThemeDraft): Promise<void> {
   const assets = draft.brandAssets;

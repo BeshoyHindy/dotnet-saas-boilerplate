@@ -6,7 +6,7 @@ namespace Boilerplate.Modules.Identity.Services;
 
 /// <summary>
 /// A create ASP.NET Identity refused because the address or the username is already held in this
-/// tenant (#86).
+/// tenant.
 ///
 /// It is a <see cref="CustomException"/> with the message and the 400 the caller would have got
 /// anyway, so letting it escape changes nothing a client can see. What it adds is

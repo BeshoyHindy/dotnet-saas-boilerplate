@@ -15,7 +15,7 @@ public static class Extensions
     private const string MissingTenantAccessorMessage =
         "Cache entries are tenant-scoped (ADR-0002) but no ICacheTenantAccessor is registered. Compose the " +
         "Multitenancy module — it registers the Finbuckle-backed accessor — or call " +
-        "AddHeroCaching(configuration, singleTenant: true) if this host genuinely serves a single tenant. " +
+        "AddAppCaching(configuration, singleTenant: true) if this host genuinely serves a single tenant. " +
         "The choice is deliberate on purpose: there is no silent default.";
 
     /// <summary>
@@ -39,7 +39,7 @@ public static class Extensions
     /// <see cref="HybridCache"/> for tenant-scoped entries and <see cref="GlobalHybridCache"/> for
     /// the explicitly tenant-less ones; both decorators are otherwise transparent.
     /// </remarks>
-    public static IServiceCollection AddHeroCaching(
+    public static IServiceCollection AddAppCaching(
         this IServiceCollection services,
         IConfiguration configuration,
         bool singleTenant = false)

@@ -1,4 +1,4 @@
-# Dependabot (issue #19).
+# Dependabot configuration.
 #
 # Tuned for Actions minutes, not for freshness. Four ecosystems, one grouped
 # pull request each, once a month, at most two open at a time — a dependency

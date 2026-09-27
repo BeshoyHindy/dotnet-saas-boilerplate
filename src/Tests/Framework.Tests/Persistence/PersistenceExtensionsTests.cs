@@ -7,8 +7,8 @@ using Microsoft.Extensions.Options;
 namespace Framework.Tests.Persistence;
 
 /// <summary>
-/// `AddHeroDatabaseOptions` must keep failing a host with an empty connection string at runtime
-/// (issue #116): the design-time factories that let `dotnet ef migrations add` skip this validation
+/// `AddAppDatabaseOptions` must keep failing a host with an empty connection string at runtime.
+/// The design-time factories that let `dotnet ef migrations add` skip this validation
 /// must not weaken it for the running API.
 /// </summary>
 public sealed class PersistenceExtensionsTests
@@ -29,7 +29,7 @@ public sealed class PersistenceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddHeroDatabaseOptions(Config());
+        services.AddAppDatabaseOptions(Config());
         var provider = services.BuildServiceProvider();
 
         // Act
@@ -49,7 +49,7 @@ public sealed class PersistenceExtensionsTests
     {
         // Arrange
         var services = new ServiceCollection();
-        services.AddHeroDatabaseOptions(Config("Host=db;Database=app;Username=app;Password=app"));
+        services.AddAppDatabaseOptions(Config("Host=db;Database=app;Username=app;Password=app"));
         var provider = services.BuildServiceProvider();
 
         // Act

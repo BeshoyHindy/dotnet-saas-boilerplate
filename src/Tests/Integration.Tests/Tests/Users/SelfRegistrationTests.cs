@@ -81,7 +81,7 @@ public sealed class SelfRegistrationTests
     [Fact]
     public async Task SelfRegister_Should_NotReplay_When_RepeatedWithSameIdempotencyKey()
     {
-        // Anonymous routes are never marked idempotent (#84): the same Idempotency-Key header must
+        // Anonymous routes are never marked idempotent: the same Idempotency-Key header must
         // not replay the first response. The second attempt is refused as a duplicate (400), the same
         // as it would be without the header at all.
         using var client = _factory.CreateClient();

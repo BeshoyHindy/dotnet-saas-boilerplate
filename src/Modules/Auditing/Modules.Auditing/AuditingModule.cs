@@ -43,7 +43,7 @@ public class AuditingModule : IModule
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddScoped<IAuditClient, DefaultAuditClient>();
         builder.Services.AddScoped<ISecurityAudit, SecurityAudit>();
-        builder.Services.AddHeroDbContext<AuditDbContext>();
+        builder.Services.AddAppDbContext<AuditDbContext>();
         builder.Services.AddScoped<IDbInitializer, AuditDbInitializer>();
         builder.Services.AddSingleton<IAuditSerializer, SystemTextJsonAuditSerializer>();
         builder.Services.AddHealthChecks()

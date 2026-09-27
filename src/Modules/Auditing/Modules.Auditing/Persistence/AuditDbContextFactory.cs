@@ -8,7 +8,7 @@ namespace Boilerplate.Modules.Auditing.Persistence;
 
 /// <summary>
 /// Design-time factory for <see cref="AuditDbContext"/>. `dotnet ef migrations add` builds the
-/// model straight from this factory, so it never goes through <c>AddHeroPlatform</c>'s strict
+/// model straight from this factory, so it never goes through <c>AddAppPlatform</c>'s strict
 /// <c>DatabaseOptions</c> validation (which requires a real connection string) or the DI container.
 /// The fallback connection string below is never dialed — no query runs at design time.
 /// </summary>

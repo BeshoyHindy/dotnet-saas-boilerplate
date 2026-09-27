@@ -5,7 +5,7 @@ using Integration.Tests.Infrastructure.Extensions;
 namespace Integration.Tests.Tests.Files;
 
 /// <summary>
-/// Locks down how a <c>Visibility=Public</c> Files asset is served (issue #52).
+/// Locks down how a <c>Visibility=Public</c> Files asset is served.
 ///
 /// Files objects live under <c>tenants/{tenantId}/…</c>, a key space that public and private files
 /// share and that the deploy stacks deliberately never grant anonymous read on (only <c>uploads/</c>,

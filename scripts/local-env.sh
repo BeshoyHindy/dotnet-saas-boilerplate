@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generate the .env that the local docker-compose stack needs (issue #17). The containers run as
+# Generate the .env that the local docker-compose stack needs. The containers run as
 # Production, so ProductionConfigurationGuard rejects any secret that looks like a template
 # placeholder — which is why docker-compose.yml ships no default for these five and this script
 # makes real ones instead. .env is gitignored; nothing generated here is ever committed.

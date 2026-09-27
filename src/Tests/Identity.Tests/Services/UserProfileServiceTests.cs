@@ -16,7 +16,7 @@ namespace Identity.Tests.Services;
 
 /// <summary>
 /// The avatar half of <c>UserProfileService.UpdateAsync</c> — the only thing that writes
-/// <c>AppUser.ImageUrl</c> since #83 removed "set my avatar URL".
+/// <c>AppUser.ImageUrl</c> after the removal of manual avatar URL setting.
 ///
 /// <para>What these pin is <b>who</b> the upload and the delete are scoped to. The tenant prefix
 /// cannot separate two users of the same tenant, so the delete that follows a replace has to be
@@ -92,7 +92,7 @@ public sealed class UserProfileServiceTests
     public async Task UpdateAsync_Should_DropThePreviousAvatar_OwnerScoped_NotTenantWide()
     {
         // The previous value here is another user's avatar — the state an existing row can be in,
-        // because until #83 any string was accepted. The owner-scoped delete refuses it (skips and
+        // before avatar URLs were restricted to server-issued values. The owner-scoped delete refuses it (skips and
         // logs); the tenant-wide one would have deleted it, which is the bug.
         const string neighboursAvatar = "https://cdn.example.com/uploads/tenants/acme/appuser/someone-else/theirs.png";
         _user.ImageUrl = new Uri(neighboursAvatar);
@@ -130,7 +130,7 @@ public sealed class UserProfileServiceTests
         _user.ImageUrl.ShouldNotBeNull();
     }
 
-    #region If-Match and the save result (#107)
+    #region If-Match and the save result
 
     [Theory]
     [InlineData(null)]

@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Identity;
 namespace Integration.Tests.Tests.Auditing;
 
 /// <summary>
-/// #103: a self-service password change writes an entity-change audit row for the user, and the row
+/// A self-service password change writes an entity-change audit row for the user, and the row
 /// carries no clear-text credential. The interceptor (unit-tested in Auditing.Tests against a real EF
 /// change tracker) masks anything <c>SensitiveFieldNames</c> matches; this proves it end to end through
 /// the real HTTP + Identity + Auditing pipeline.

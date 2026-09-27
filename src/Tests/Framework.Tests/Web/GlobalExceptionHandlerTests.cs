@@ -28,10 +28,9 @@ public sealed class GlobalExceptionHandlerTests
         return document.RootElement.GetProperty("title").GetString()!;
     }
 
-    // Regression for #1245: a missing required bound parameter surfaces as a
-    // BadHttpRequestException during binding and must render with its own status (400), not the
-    // generic 500 fallback. (The original trigger — a missing `tenant` header — is gone with
-    // ADR-0002; the mapping it exposed still needs guarding.)
+    // A missing required bound parameter surfaces as a BadHttpRequestException during binding
+    // and must render with its own status (400), not the generic 500 fallback. (The original
+    // trigger — a missing `tenant` header — is gone with ADR-0002; the mapping still needs guarding.)
     [Fact]
     public async Task TryHandleAsync_Should_Map_BadHttpRequestException_To_ItsStatusCode()
     {

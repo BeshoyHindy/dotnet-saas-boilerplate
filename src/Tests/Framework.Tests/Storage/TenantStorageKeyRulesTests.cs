@@ -79,13 +79,13 @@ public sealed class TenantStorageKeyRulesTests
     public void KeyRootSegments_Should_BeTheFirstSegmentOfEachRoot()
     {
         // The one literal an S3 bucket name or Storage:S3:Prefix's first segment must never collide
-        // with — see S3StorageOptions validation (#78 hardening item 2).
+        // with — see S3StorageOptions validation (protects against bucket prefix collisions).
         TenantStorageKeyRules.KeyRootSegments.ShouldBe(["tenants", "uploads"]);
     }
 
     #endregion
 
-    #region Public assets carry their owner (#83)
+    #region Public assets carry their owner
 
     [Fact]
     public void ComposePublicAsset_Should_PutTheOwnerBetweenTheTypeAndTheFile()
@@ -148,8 +148,8 @@ public sealed class TenantStorageKeyRulesTests
 
     [Theory]
     [InlineData("https://cdn.example.com/avatars/me.png")]        // an arbitrary URL from an old row
-    [InlineData("uploads/appuser/legacy_avatar.png")]             // pre-#78 flat key
-    [InlineData("uploads/tenants/acme/appuser/pre-owner.png")]    // pre-#83 key: no owner segment
+    [InlineData("uploads/appuser/legacy_avatar.png")]             // flat key from before the tenant prefix
+    [InlineData("uploads/tenants/acme/appuser/pre-owner.png")]    // key from before the owner segment
     [InlineData("uploads/tenants/acme/tenanttheme/logo/x.png")]   // another owner type entirely
     [InlineData("uploads/tenants/globex/appuser/user-1/x.png")]   // another tenant
     [InlineData("tenants/acme/myfiles/2026/09/ab/x.pdf")]         // the private space
@@ -212,7 +212,7 @@ public sealed class TenantStorageKeyRulesTests
     [InlineData("TENANTS/ACME/x.png")]
     [InlineData("Uploads/tenants/acme/x.png")]
     [InlineData("uploads/Tenants/acme/x.png")]
-    [InlineData("uploads/appuser/legacy_avatar.png")]   // pre-#78 flat key: no tenant segment at all
+    [InlineData("uploads/appuser/legacy_avatar.png")]   // flat key from before the tenant segment
     [InlineData("tenants/acme")]                        // the prefix itself, no object
     [InlineData("tenants/acme/")]
     [InlineData("uploads/tenants/acme/")]

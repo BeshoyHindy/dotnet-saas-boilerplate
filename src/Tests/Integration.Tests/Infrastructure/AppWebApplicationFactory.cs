@@ -45,7 +45,7 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
         .WithCleanUp(true)
         .Build();
 
-    // RustFS, the S3-compatible store every stack runs (#95), pinned by the same tag and digest as the
+    // RustFS, the S3-compatible store every stack runs, pinned by the same tag and digest as the
     // AppHost and both compose stacks. A generic container, not a store-specific module: Testcontainers
     // dropped its MinIO module and has no RustFS one. No volume is mounted, so the image's own /data
     // (owned by the image's non-root user) is writable as is.
@@ -211,7 +211,7 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
             services.AddHangfire((provider, config) =>
             {
                 config.UseInMemoryStorage();
-                config.UseHeroJobPipeline(provider);
+                config.UseAppJobPipeline(provider);
             });
             services.AddHangfireServer(options =>
             {
@@ -230,7 +230,7 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
             // tenant fails the real Migrations step; every other tenant sees a no-op.
             services.AddScoped<IDbInitializer, FaultInjectingDbInitializer>();
 
-            // Fault-injection seam for the registration-atomicity suite (#86): the real store, wrapped
+            // Fault-injection seam for the registration-atomicity suite: the real store, wrapped
             // so an armed registration's publish writes its row and then throws. IOutboxWriter is
             // registered as a forward to IOutboxStore, so decorating the one covers both, and every
             // unarmed publish — including the dispatcher's own reads and marks — is the production path.
@@ -264,7 +264,7 @@ public sealed class AppWebApplicationFactory : WebApplicationFactory<Program>, I
             foreach (var h in existingHandlers) services.Remove(h);
             services.AddExceptionHandler<DetailedTestExceptionHandler>();
 
-            // AddHeroStorage reads `Storage:Provider` eagerly (before the test config overlay applies), so it
+            // AddAppStorage reads `Storage:Provider` eagerly (before the test config overlay applies), so it
             // wires LocalStorageService. Replace it here with the S3 stack pointed at the object-store testcontainer.
             RewireStorageForS3(services);
         });

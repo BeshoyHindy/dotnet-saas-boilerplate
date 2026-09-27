@@ -2,7 +2,7 @@ namespace Boilerplate.BuildingBlocks.Caching;
 
 /// <summary>
 /// <see cref="ICacheTenantAccessor"/> for a host that has chosen — explicitly, at registration, via
-/// <c>AddHeroCaching(configuration, singleTenant: true)</c> — to run without multitenancy.
+/// <c>AddAppCaching(configuration, singleTenant: true)</c> — to run without multitenancy.
 ///
 /// Every key then lands under one fixed partition, so the physical key layout is the same shape
 /// whether or not the host is multi-tenant and nothing downstream (the idempotency probe, a Redis

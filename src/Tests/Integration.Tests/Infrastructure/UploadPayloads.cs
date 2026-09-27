@@ -4,7 +4,7 @@ namespace Integration.Tests.Infrastructure;
 
 /// <summary>
 /// Bytes to upload through the Files flow. Finalize reads an object's first bytes and refuses one
-/// that does not carry its declared type's signature (#125), so a test that only needs "a file"
+/// that does not carry its declared type's signature, so a test that only needs "a file"
 /// uploads random bytes behind a real header rather than bare random bytes.
 /// </summary>
 public static class UploadPayloads

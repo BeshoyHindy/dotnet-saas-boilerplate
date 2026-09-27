@@ -8,7 +8,7 @@ namespace Architecture.Tests;
 ///
 /// <para>The store used to be MinIO. Docker Hub stopped carrying its images, quay.io withdrew
 /// anonymous pulls, Chainguard's free tier publishes only <c>:latest</c>, and Testcontainers dropped
-/// its MinIO module — so the object store is RustFS (issue #95). The pin carries the tag, so a reader
+/// its MinIO module — so the object store is RustFS. The pin carries the tag, so a reader
 /// can tell the version, and the digest, so every machine runs the same bytes; it is kept identical
 /// in all five sites so a bump is one value, not five drifting ones. The bucket bootstrap's
 /// <c>amazon/aws-cli</c> image is pinned the same way in the AppHost and both compose stacks.</para>

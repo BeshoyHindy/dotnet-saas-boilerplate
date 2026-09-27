@@ -13,11 +13,11 @@ using Serilog.Events;
 namespace Framework.Tests.Web.Logging;
 
 /// <summary>
-/// Drives a real (in-memory) host wired by <c>AddHeroLogging</c> and reads what reaches the sink.
+/// Drives a real (in-memory) host wired by <c>AddAppLogging</c> and reads what reaches the sink.
 /// Every test here lives in one class on purpose: Serilog's hosting integration routes through the
 /// static <c>Log.Logger</c>, so two hosts built in parallel would write into each other's logger.
 /// </summary>
-public sealed class HeroLoggingPipelineTests
+public sealed class AppLoggingPipelineTests
 {
     private const string RequestLoggingSource = "Serilog.AspNetCore.RequestLoggingMiddleware";
 
@@ -44,7 +44,7 @@ public sealed class HeroLoggingPipelineTests
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddProblemDetails();
         builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
-        builder.AddHeroLogging();
+        builder.AddAppLogging();
 
         var app = builder.Build();
         app.UseExceptionHandler();

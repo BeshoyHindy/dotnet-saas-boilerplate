@@ -10,7 +10,7 @@ namespace Files.Tests.Services;
 
 /// <summary>
 /// <see cref="PublicFileUrlFactory"/> is the single place that decides what <c>publicUrl</c> means
-/// for a Files asset (issue #52): a short-lived presigned GET for Public files, nothing at all for
+/// for a Files asset: a short-lived presigned GET for Public files, nothing at all for
 /// Private ones — for <b>every</b> storage provider, since the tenants/ key space is never granted
 /// anonymous read.
 /// </summary>

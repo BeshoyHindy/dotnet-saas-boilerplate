@@ -96,11 +96,11 @@ export async function resendUserConfirmationEmail(userId: string): Promise<void>
   );
 }
 
-// There is no `setProfileImage(url)` any more (#83). PUT /identity/profile/image accepted any
-// string, so a user could point their avatar at another user's — and the next replace deleted that
-// other user's object, which the tenant legitimately owned. An avatar is now uploaded with
-// `updateMyProfile({ image })` and cleared with `updateMyProfile({ deleteCurrentImage: true })`;
-// the URL is the server's answer, never the client's request.
+// There is no `setProfileImage(url)` any more. The API stopped accepting URLs from the client
+// because a URL the client names may belong to another user, and replacing or removing the asset
+// would then delete their bytes. An avatar is now uploaded with `updateMyProfile({ image })` and
+// cleared with `updateMyProfile({ deleteCurrentImage: true })`; the URL is always the server's
+// answer, never the client's request.
 
 /**
  * The signed-in user's effective permissions. The JWT carries only role names;
@@ -112,9 +112,10 @@ export async function getMyPermissions(): Promise<string[]> {
 }
 
 /**
- * The authenticated user's profile plus its version: the strong `ETag` the server sends with it
- * (#107). `etag` is what `updateMyProfile` echoes in `If-Match`, so the version travels with the
- * representation the user is looking at. Null only if the header did not reach script.
+ * The authenticated user's profile plus its version: the strong `ETag` the server sends with it.
+ * The `etag` is what `updateMyProfile` echoes in `If-Match`, so the version travels with the
+ * representation the user is looking at, enabling optimistic concurrency control. Null only if
+ * the header did not reach script.
  */
 export type MyProfile = UserDto & { etag: string | null };
 
@@ -289,8 +290,8 @@ export type UpdateProfileInput = {
   /**
    * A new avatar, as raw bytes. The server uploads it with `IStorageService.UploadAsync` into the
    * `uploads/` prefix and persists the durable unsigned URL that comes back. This is the ONE way
-   * the dashboard uploads an avatar: a Files-module `publicUrl` is a presigned GET that expires in
-   * minutes, so storing one on the column stores a dead link (issue #72).
+   * the dashboard uploads an avatar: presigned URLs expire in minutes, so storing one on the
+   * column would result in a dead link.
    */
   image?: Schemas["FileUploadRequest"] | null;
   /** Delete the current avatar — clears the column AND removes the stored object. */
@@ -304,8 +305,8 @@ export type UpdateProfileInput = {
  * `current` is the profile the user was shown — not a fresh read. Its fields fill whatever
  * `input` leaves unset in this full-representation PUT, and its `etag` rides in `If-Match`, so a
  * profile changed elsewhere since then is refused with 412 (`isProfileConflict`) instead of
- * overwritten (#107). Re-reading here, as this used to, would always send the newest version and
- * protect nothing. On a 412 the caller refetches and shows the conflict; it never resends.
+ * overwritten. This prevents lost updates from concurrent modifications. On a 412 the caller
+ * refetches and shows the conflict; it never resends.
  */
 export async function updateMyProfile(current: MyProfile, input: UpdateProfileInput): Promise<void> {
   if (!current.etag) {
@@ -374,7 +375,7 @@ export async function resetPassword(input: {
 /**
  * Confirm-email landing. The tenant is a path segment; (userId, code) come as query
  * parameters from the mailed link, which points at the dashboard's own `/confirm-email`
- * page (issue #46). Returns the server's confirmation message.
+ * page. Returns the server's confirmation message.
  */
 export async function confirmEmail(input: {
   userId: string;

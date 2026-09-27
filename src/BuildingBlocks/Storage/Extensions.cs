@@ -14,14 +14,14 @@ namespace Boilerplate.BuildingBlocks.Storage;
 
 public static class Extensions
 {
-    public static IServiceCollection AddHeroLocalFileStorage(this IServiceCollection services)
+    public static IServiceCollection AddAppLocalFileStorage(this IServiceCollection services)
     {
         AddTenantStorageKeys(services);
         services.AddScoped<IStorageService, LocalStorageService>();
         return services;
     }
 
-    public static IServiceCollection AddHeroStorage(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddAppStorage(this IServiceCollection services, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);

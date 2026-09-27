@@ -7,7 +7,7 @@ namespace Integration.Tests.Infrastructure;
 
 /// <summary>
 /// A test-only <see cref="IOutboxStore"/> decorator that fails the publish step of a registration,
-/// on demand — the fault-injection seam for the registration-atomicity suite (#86).
+/// on demand — the fault-injection seam for the registration-atomicity suite.
 ///
 /// It is the last step of <c>UserRegistrationService.RegisterAsync</c>, so a throw here stands in
 /// for "anything after the user row is created blew up": the user, the role, the default groups and

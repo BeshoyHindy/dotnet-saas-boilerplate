@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bootstrap the local development secrets (issue #13). The repository ships no credentials, so a
+# Bootstrap the local development secrets. The repository ships no credentials, so a
 # fresh clone needs this once — after that, `dotnet run --project src/Host/Boilerplate.AppHost`
 # works as before. Values live in the .NET user-secrets store (outside the repo), never in
 # appsettings.Development.json.

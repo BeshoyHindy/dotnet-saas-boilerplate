@@ -27,7 +27,7 @@ Any exception to publishing via the outbox needs a strong reason, documented in 
 
 ## One store, owned by the framework
 
-`OutboxMessages`/`InboxMessages` live in schema `framework`, owned by `EventingDbContext` (`src/BuildingBlocks/Eventing/Persistence/`) — **not** by any module's context. That is what keeps `IOutboxStore`/`IInboxStore` to a single, non-keyed DI registration: registering them per module DbContext made .NET DI resolve whichever module registered last for the whole application, so a second module publishing broke every module's outbox (issue #1349). `EventingRegistrationTests` guards the registration count; don't add a second one.
+`OutboxMessages`/`InboxMessages` live in schema `framework`, owned by `EventingDbContext` (`src/BuildingBlocks/Eventing/Persistence/`) — **not** by any module's context. That is what keeps `IOutboxStore`/`IInboxStore` to a single, non-keyed DI registration: registering them per module DbContext made .NET DI resolve whichever module registered last for the whole application, so a second module publishing broke every module's outbox. `EventingRegistrationTests` guards the registration count; don't add a second one.
 
 `EventingDbContext` derives from `BaseDbContext`, so its rows sit in the one shared database next to the business data they accompany, and one dispatcher pass per cycle sees every tenant's rows.
 
@@ -47,7 +47,7 @@ Set an event's `CorrelationId` to the current trace id, `Activity.Current?.Trace
 
 ## Atomicity
 
-`IScopedDbConnectionProvider` gives every DbContext in a DI scope the same `DbConnection`, which is the only way EF Core can enlist a second context in a transaction another one opened (Npgsql has no distributed-transaction promotion). `AmbientDbTransactionRegistry` — an `IDbTransactionInterceptor` on every Hero context — records open transactions, since `DbConnection` can't be asked. `AddAsync` joins the ambient transaction when there is one, so the outbox row commits or rolls back with the business data; with none, it commits on its own exactly as before.
+`IScopedDbConnectionProvider` gives every DbContext in a DI scope the same `DbConnection`, which is the only way EF Core can enlist a second context in a transaction another one opened (Npgsql has no distributed-transaction promotion). `AmbientDbTransactionRegistry` — an `IDbTransactionInterceptor` on every `AddAppDbContext`-registered context — records open transactions, since `DbConnection` can't be asked. `AddAsync` joins the ambient transaction when there is one, so the outbox row commits or rolls back with the business data; with none, it commits on its own exactly as before.
 
 ## Idempotency is free (in-memory bus)
 
@@ -67,7 +67,7 @@ A **module** only registers its handlers:
 services.AddIntegrationEventHandlers(typeof(MyModule).Assembly);        // scans IIntegrationEventHandler<>
 ```
 
-There is no per-module store registration — `AddEventingForDbContext<T>` was removed in #1349. A module publishes by injecting `IOutboxWriter`; nothing else is needed.
+There is no per-module store registration — `AddEventingForDbContext<T>` was removed (see the single-registration note above). A module publishes by injecting `IOutboxWriter`; nothing else is needed.
 
 Bus = `InMemoryEventBus`, always. ADR-0003 dropped the RabbitMQ provider (and `EventingOptions.Provider` with it): the monolith runs handlers in-process and the outbox/inbox pair provides the durability a broker would.
 

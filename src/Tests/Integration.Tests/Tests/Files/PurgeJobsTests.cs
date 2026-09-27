@@ -152,7 +152,7 @@ public sealed class PurgeJobsTests
     private Task<bool> ObjectExistsAsync(string storageKey)
     {
         // Through ITenantScope, not a bare DI scope: object keys are tenant-prefixed by the Storage
-        // block, and it refuses to answer for a key with no ambient tenant to own it (#78) — the
+        // block, and it refuses to answer for a key with no ambient tenant to own it — the
         // same rule the purge jobs themselves live by.
         return _factory.Services.GetRequiredService<ITenantScope>().RunAsync(
             TestConstants.RootTenantId,

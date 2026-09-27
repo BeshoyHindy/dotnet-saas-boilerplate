@@ -20,7 +20,7 @@ public static class Extensions
 {
     private const string HealthEndpointPath = "/health";
     private const string AlivenessEndpointPath = "/alive";
-    public static IHostApplicationBuilder AddHeroOpenTelemetry(this IHostApplicationBuilder builder)
+    public static IHostApplicationBuilder AddAppOpenTelemetry(this IHostApplicationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
 

@@ -7,7 +7,7 @@ using Boilerplate.Modules.Multitenancy.Features.v1.UpdateTenantTheme;
 namespace Multitenancy.Tests.Validators;
 
 /// <summary>
-/// A brand asset is uploaded through the theme save itself (#83), so this validator is the only
+/// A brand asset is uploaded through the theme save itself, so this validator is the only
 /// thing between a caller's bytes and <c>IStorageService.UploadAsync</c> — whose own extension/size
 /// check throws <see cref="InvalidOperationException"/>, i.e. a 500 for a caller's mistake. Every
 /// case below is one the storage block would otherwise have rejected too late.

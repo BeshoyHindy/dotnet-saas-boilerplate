@@ -13,7 +13,7 @@ using Microsoft.Extensions.Options;
 namespace Boilerplate.Modules.Identity.Events;
 
 /// <summary>
-/// Sends the confirmation link once a registration has actually committed (#86).
+/// Sends the confirmation link once a registration has actually committed.
 ///
 /// Registration used to queue this mail inline, mid-way through four separate commits, so a failure
 /// after it still mailed a link to an account that then rolled back — or never rolled back and stayed

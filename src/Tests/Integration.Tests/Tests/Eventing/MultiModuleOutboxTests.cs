@@ -11,11 +11,11 @@ using Integration.Tests.Infrastructure;
 namespace Integration.Tests.Tests.Eventing;
 
 /// <summary>
-/// Covers issue #1349: the outbox was registered once per module DbContext, non-keyed, so .NET DI
-/// resolved whichever module registered last for the whole application — and only IdentityDbContext
-/// mapped the tables, so every other module's publish hit a missing relation. These tests exercise
-/// the real store against Postgres, with no substitution, so they fail if the single framework-owned
-/// registration regresses.
+/// The outbox must be registered once per module DbContext with keying, not non-keyed.
+/// Non-keyed registration causes .NET DI to resolve whichever module registered last for the whole application.
+/// Only IdentityDbContext mapped the tables, so every other module's publish hit a missing relation.
+/// These tests exercise the real store against Postgres, with no substitution, so they fail if the
+/// single framework-owned registration regresses.
 /// </summary>
 [Collection(AppCollectionDefinition.Name)]
 public sealed class MultiModuleOutboxTests
@@ -60,10 +60,10 @@ public sealed class MultiModuleOutboxTests
 
         scope.ServiceProvider.GetServices<IOutboxStore>().Count().ShouldBe(
             1,
-            "a second IOutboxStore registration makes DI resolve the last one for every module (issue #1349)");
+            "a second IOutboxStore registration makes DI resolve the last one for every module");
         scope.ServiceProvider.GetServices<IInboxStore>().Count().ShouldBe(
             1,
-            "a second IInboxStore registration silently redirects idempotency writes (issue #1349)");
+            "a second IInboxStore registration silently redirects idempotency writes");
     }
 
     [Fact]

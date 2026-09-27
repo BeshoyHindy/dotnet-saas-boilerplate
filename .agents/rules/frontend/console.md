@@ -55,7 +55,7 @@ account" — which **prefills the email only** (`APP_DEMO_OPERATOR_EMAIL`, defau
 It never signs in: that account's password is `Seed__DefaultAdminPassword`, not the demo tenants'
 shared secret, so this app has nothing to sign in with and must not pretend otherwise.
 
-## The acting token (`src/auth/acting-store.ts`, `src/api/operator.ts`, ADR-0002 + issue #9)
+## The acting token (`src/auth/acting-store.ts`, `src/api/operator.ts`, ADR-0002)
 
 Two ways in, one way out, one in-memory credential:
 
@@ -63,7 +63,7 @@ Two ways in, one way out, one in-memory credential:
   `POST /identity/operator/token-exchange`, root only (`SystemPermissions.Platform.CrossTenantImpersonate`).
   Pass `targetUserId` to act as a specific user rather than the tenant's admin.
 - `useAuth().impersonateInOwnTenant({ … })` — `POST /identity/impersonation/start`, **same tenant
-  only** since #9; a cross-tenant start is a 403 pointing at the exchange.
+  only**; a cross-tenant start is a 403 pointing at the exchange.
 - `useAuth().exitTenant()` — `POST /identity/impersonation/end`, which returns **no token**: your own
   session was never taken away.
 

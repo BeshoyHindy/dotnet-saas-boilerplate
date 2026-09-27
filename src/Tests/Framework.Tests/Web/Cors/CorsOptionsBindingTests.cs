@@ -38,7 +38,7 @@ public sealed class CorsOptionsBindingTests
 
         // Get<T>() constructs CorsOptions with its default (property-initializer) values and then
         // binds the section onto it — the same "seed, then bind" path AddOptions<T>().Bind(...) uses
-        // in Extensions.AddHeroCors, so it reproduces the append bug exactly as the host sees it.
+        // in Extensions.AddAppCors, so it reproduces the append bug exactly as the host sees it.
         return builder.Build().GetSection(nameof(CorsOptions)).Get<CorsOptions>()
             ?? throw new InvalidOperationException("CorsOptions section did not bind.");
     }
@@ -79,7 +79,7 @@ public sealed class CorsOptionsBindingTests
     public void Binding_Should_Leave_DevelopmentAllowAll_Unaffected_When_HeadersAndMethodsAreNotConfigured()
     {
         // Act — the Development overlay flips AllowAll on and configures neither header nor method
-        // list; AddHeroCors' AllowAll branch never reads either one, so an empty default there
+        // list; AddAppCors' AllowAll branch never reads either one, so an empty default there
         // changes nothing observable for it.
         var options = Bind("appsettings.json", "appsettings.Development.json");
 

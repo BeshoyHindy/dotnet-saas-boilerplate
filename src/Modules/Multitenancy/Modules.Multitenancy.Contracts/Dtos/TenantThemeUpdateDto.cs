@@ -4,7 +4,7 @@ namespace Boilerplate.Modules.Multitenancy.Contracts.Dtos;
 
 /// <summary>
 /// What a client may <b>write</b> to a tenant's theme. Deliberately not <see cref="TenantThemeDto"/>:
-/// that one is the read model and carries the brand-asset URLs, which a client may not set (#83).
+/// that one is the read model and carries the brand-asset URLs, which a client may not set.
 ///
 /// <para>Before this split the same record served both directions, so <c>logoUrl</c> was an input —
 /// any string became the tenant's logo, including the URL of a user's avatar in the same tenant,

@@ -9,7 +9,7 @@ namespace Architecture.Tests;
 /// <summary>
 /// ADR-0002's first rule, <i>a caller never names a tenant</i>, as a fast test (no Docker).
 ///
-/// <para>The scaffold dry run (#92, F36) added <c>string? TenantId</c> to a create command and had the
+/// <para>A scaffold dry run added <c>string? TenantId</c> to a create command and had the
 /// handler write it onto the new row. The build, every architecture test and the cross-tenant sweep
 /// stayed green — the sweep substitutes route ids and cannot see a body field — and the field would
 /// have shipped in the Contract. Only Finbuckle's save-time mismatch check stopped the write. This

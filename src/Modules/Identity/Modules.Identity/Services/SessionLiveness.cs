@@ -9,7 +9,7 @@ namespace Boilerplate.Modules.Identity.Services;
 /// <summary>
 /// Answers "is the session this access token names still live?" for the JwtBearer
 /// <c>OnTokenValidated</c> hook, so a revoked, expired or unknown session is refused with 401 on the
-/// next request rather than when the access token expires (#118).
+/// next request rather than when the access token expires.
 /// </summary>
 /// <remarks>
 /// <para>

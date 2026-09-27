@@ -55,10 +55,10 @@ export function ProfileSettings() {
   }
 
   /**
-   * A save refused with 412: someone changed the profile after this page loaded it (#107). Refetch
-   * it, put the latest values in the form and say so. Never resend: the form's values for every
-   * field the user did not touch are the old ones, and sending them again would overwrite exactly
-   * the change the 412 protected.
+   * A save refused with 412: someone else changed the profile concurrently. Refetch it, put the
+   * latest values in the form and say so. Never resend: the form's values for every field the user
+   * did not touch are the old ones, and sending them again would overwrite exactly the change the
+   * 412 protected.
    */
   const showConflict = async () => {
     setConflict(true);
@@ -140,7 +140,7 @@ export function ProfileSettings() {
    * The avatar rides on the profile PUT as raw bytes. The server writes it with
    * `IStorageService.UploadAsync` into the `uploads/` prefix — public-read by design — and stores
    * the durable unsigned URL it returns. It deliberately does NOT go through the Files module,
-   * whose `publicUrl` is a presigned GET that expires in minutes (issue #72).
+   * which uses presigned URLs that expire in minutes.
    */
   const uploadMutation = useMutation({
     mutationFn: ({ base, image }: { base: MyProfile; image: ImageUpload }) =>

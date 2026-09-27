@@ -10,11 +10,11 @@ namespace Boilerplate.Api;
 /// contract a client's types are generated from — in the repository.
 ///
 /// <para>
-/// It deliberately does NOT run <c>UseHeroPlatform</c>. The document is built from endpoint metadata
+/// It deliberately does NOT run <c>UseAppPlatform</c>. The document is built from endpoint metadata
 /// alone, so the export only needs the modules' routes mapped; the middleware pipeline would also
 /// mount the Hangfire dashboard, which resolves <c>JobStorage</c> and opens a PostgreSQL connection.
-/// Exporting a contract must not need a database — that is what lets the drift gate (issue #15) run
-/// on a bare CI runner.
+/// Exporting a contract must not need a database so it can run on a bare CI runner without
+/// any infrastructure dependencies.
 /// </para>
 /// </summary>
 internal static class OpenApiDocumentExport

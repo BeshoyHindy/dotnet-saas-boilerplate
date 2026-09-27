@@ -19,9 +19,9 @@ namespace Framework.Tests.Web;
 /// <summary>
 /// The idempotency filter keeps its own entries in L2 — it reads and writes them through
 /// <see cref="IDistributedCache"/> itself, because HybridCache has no get-only probe
-/// (dotnet/aspnetcore#57191) and the payload it frames into L2 is not readable by anything else
-/// (issue #82: the old split — write through HybridCache, probe through IDistributedCache — made the
-/// first replay of every key a 500 against Redis, and a silent no-op without it).
+/// (dotnet/aspnetcore#57191) and the payload it frames into L2 is not readable by anything else.
+/// The mixed-cache approach (write through HybridCache, probe through IDistributedCache) made the
+/// first replay of every key a 500 against Redis, and a silent no-op without it.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -144,10 +144,10 @@ public sealed class IdempotencyEndpointFilterTests
 
         services.AddSingleton<IConfiguration>(config);
         services.AddSingleton<ICacheTenantAccessor>(tenant);
-        // Registered before AddHeroCaching: its in-memory fallback is a TryAdd, so this one wins.
+        // Registered before AddAppCaching: its in-memory fallback is a TryAdd, so this one wins.
         services.AddSingleton<IDistributedCache>(l2);
-        services.AddHeroCaching(config);
-        services.AddHeroIdempotency(config);
+        services.AddAppCaching(config);
+        services.AddAppIdempotency(config);
         if (ttl is not null)
         {
             services.Configure<IdempotencyOptions>(o => o.DefaultTtl = ttl.Value);
@@ -299,7 +299,7 @@ public sealed class IdempotencyEndpointFilterTests
     public async Task Entry_Should_Land_Under_The_TenantScoped_PhysicalKey()
     {
         // The filter reads and writes L2 by key itself, so the key has to carry the tenant the same
-        // way CacheKeyScope would — an unprefixed key is the shared bucket #77 removed.
+        // way CacheKeyScope would — an unprefixed key is the shared bucket that was removed.
         var (provider, tenant, l2) = BuildServices();
         await using (provider)
         {
@@ -778,12 +778,12 @@ public sealed class IdempotencyEndpointFilterTests
     }
 
     /// <summary>
-    /// Ticket #104, ported from upstream's disconnect regression (<c>bf86648</c> part c). The client
-    /// hangs up — cancelling <see cref="HttpContext.RequestAborted"/> — right after the handler commits
-    /// its side effect (the counter increment stands in for it), and the handler's own code checks that
-    /// same ambient token again afterwards, the way an outbox dispatch or a second query would. Before
-    /// the fix that next await throws out of the filter and stores nothing, so a retry with the same
-    /// key re-runs the handler; that is the bug this test pins red first.
+    /// Ported from upstream's disconnect regression (<c>bf86648</c> part c). The client hangs up —
+    /// cancelling <see cref="HttpContext.RequestAborted"/> — right after the handler commits its side
+    /// effect (the counter increment stands in for it), and the handler's own code checks that same
+    /// ambient token again afterwards, the way an outbox dispatch or a second query would. Before the
+    /// fix that next await throws out of the filter and stores nothing, so a retry with the same key
+    /// re-runs the handler; that is the bug this test pins red first.
     /// </summary>
     [Fact]
     public async Task FirstCall_Should_StillCacheResponse_When_ClientDisconnectsAfterHandlerCommits()
@@ -872,7 +872,7 @@ public sealed class IdempotencyEndpointFilterTests
     public async Task A_ConnectionString_Should_Not_Enter_TheFingerprint()
     {
         // The field that got through the first time — a connection string hashed into an entry that
-        // lives 24h. The kit binds none today (#75 cut per-tenant databases), and the name rule stays
+        // lives 24h. The kit binds none today with per-tenant databases, and the name rule stays
         // so a consumer's own connection-string-bearing command is safe without marking anything.
         var (provider, tenant, l2) = BuildServices();
         await using (provider)

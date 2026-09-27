@@ -39,7 +39,7 @@ If Docker is down, integration tests fail fast with `DockerUnavailableException`
 ## Integration-test gotchas
 
 - Set the Finbuckle tenant context **inline** in the test method (AsyncLocal — an awaited helper loses it → NRE in the tenant filter).
-- `AddHeroStorage` reads config eagerly; rewire `IStorageService` **after** registration in the factory.
+- `AddAppStorage` reads config eagerly; rewire `IStorageService` **after** registration in the factory.
 
 <!--#if (frontend) -->
 ## Frontend tests

@@ -19,7 +19,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<IAuditClient, DefaultAuditClient>();
         services.AddScoped<ISecurityAudit, SecurityAudit>();
-        services.AddHeroDbContext<AuditDbContext>();
+        services.AddAppDbContext<AuditDbContext>();
         services.AddSingleton<IAuditSerializer, SystemTextJsonAuditSerializer>();
 
         // Request-scoped scope reader (HttpContext-backed)

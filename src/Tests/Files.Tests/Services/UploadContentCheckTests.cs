@@ -6,7 +6,7 @@ namespace Files.Tests.Services;
 
 /// <summary>
 /// <see cref="UploadContentCheck"/> is what makes finalize look at the bytes rather than at the
-/// caller's own metadata (ASVS 5.0 V5.2.2, #125): the declared content type must be one the file's
+/// caller's own metadata (ASVS 5.0 V5.2.2): the declared content type must be one the file's
 /// extension allows, and the object's first bytes must carry that type's signature. Expected
 /// signatures below are the published ones (PNG spec, JFIF/EXIF, GIF87a/89a, RIFF/WebP, ICONDIR,
 /// ISO 32000, ZIP APPNOTE), not values read back from the implementation.

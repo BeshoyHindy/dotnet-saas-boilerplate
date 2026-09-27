@@ -4,7 +4,7 @@ using Xunit;
 namespace Architecture.Tests;
 
 /// <summary>
-/// A cheap, fast early warning for one of the two idempotency-hardening rules from #84/#85: for an
+/// A cheap, fast early warning for one of the idempotency-hardening rules: for an
 /// anonymous caller the idempotency partition has no subject to bind to, so it collapses to tenant +
 /// <c>anon</c> + method + path + the caller-supplied <c>Idempotency-Key</c> alone, and anyone who
 /// presents another caller's key on that route is handed their stored response.

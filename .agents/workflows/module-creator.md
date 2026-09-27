@@ -7,14 +7,17 @@ skill** — follow it; this playbook adds the decision gate, sequencing, and ver
 
 ## Decide: is this really a new module?
 A new module has its own domain entities and is a distinct bounded context. If it's just an operation in
-an existing domain → use `feature-scaffolder` instead.
+an existing domain → use `feature-scaffolder` instead. The template ships five **platform modules**
+(Identity, Multitenancy, Auditing, Files, Notifications — ADR-0003); anything a product adds is a
+**product module** (ADR-0010), one per bounded context of its own, not one per feature. A product
+module may use a platform module's `.Contracts`; a platform module never references a product module.
 
 ## Sequence (each step → its skill)
-1. **Scaffold the module** — follow **`add-module`**: copy an existing module's two `.csproj` files; `[assembly: AppModule(typeof({X}Module), order)]` (assembly-level); `IModule` with `AddHeroDbContext<{X}DbContext>()`, `services.AddPermissions({X}Permissions.All)`, a version-set endpoint group, and the eventing trio if it publishes/handles events; `{X}DbContext : BaseDbContext` with `base.OnModelCreating` **last**.
+1. **Scaffold the module** — follow **`add-module`**: copy an existing module's two `.csproj` files; `[assembly: AppModule(typeof({X}Module), order)]` (assembly-level — product modules take order 1000 and up, in steps of 100); `IModule` with `AddAppDbContext<{X}DbContext>()`, `services.AddPermissions({X}Permissions.All)`, a version-set endpoint group, and the eventing trio if it publishes/handles events; `{X}DbContext : BaseDbContext` with `base.OnModelCreating` **last**.
 2. **First entity** — follow **`add-entity`**.
 3. **First feature** — follow **`add-feature`** (and `add-react-page` if it has UI).
-4. **Migration** — follow **`create-migration`** with `--context {X}DbContext --output-dir {X}`; add the `{X}/` folder in the Migrations project.
-5. **⚠️ Register in ALL FOUR places** — Mediator `o.Assemblies` (Contracts marker **and** module type) + `moduleAssemblies` array, in **both** `Boilerplate.Api/Program.cs` **and** `Boilerplate.DbMigrator/Program.cs`. Add to `.slnx`; reference the runtime project from Api, DbMigrator, and the Migrations project.
+4. **Migration** — follow **`create-migration`** with `--context {X}DbContext --output-dir {X}`; add the `{X}/` folder in the Migrations project. The Migrations project's `ProjectReference` to the module's runtime project is how both hosts reach it.
+5. **⚠️ Register in ALL FOUR lists** — `HostModules.All` (`HostModules.cs`) + Mediator's `o.Assemblies` (Contracts marker **and** module type, in `Program.cs`), in **both** `Boilerplate.Api` **and** `Boilerplate.DbMigrator`. Add both projects to `.slnx`. `HostModuleListTests` (Architecture.Tests) fails loudly and names the missing list if you miss one.
 
 ## Verify it actually loaded (not just compiled)
 ```bash
@@ -25,4 +28,4 @@ dotnet run --project src/Host/Boilerplate.DbMigrator -- list-pending   # new con
 Then hit one endpoint and confirm the handler runs — a missing Mediator marker compiles fine but the handler is silently undiscovered. Finish with the `architecture-guard` workflow.
 
 ## The footgun, restated
-Four registration edits (2 lists × 2 host files). Miss the Mediator marker → handler not found at runtime. Miss the `moduleAssemblies` entry → module never loads. Miss the DbMigrator pair → migrate/seed skips it.
+Four registration edits (2 lists × 2 hosts). Miss the Mediator marker → handler not found at runtime. Miss the `HostModules.All` entry → module never loads. Miss the DbMigrator pair → migrate/seed skips it. `HostModuleListTests` catches any of these before you find out at runtime.

@@ -6,10 +6,10 @@ using System.Text.Json;
 namespace Integration.Tests.Tests.Storage;
 
 /// <summary>
-/// #83, on real MinIO: <b>the server persists only asset URLs it issued, for the owner it issued
+/// Owner-scoped asset URLs on real S3: <b>the server persists only asset URLs it issued, for the owner it issued
 /// them to.</b>
 ///
-/// <para>The tenant boundary (#78) answers "may this tenant touch this object" and inside one
+/// <para>The tenant boundary answers "may this tenant touch this object" and inside one
 /// tenant it answers nothing. The hole this pins shut lived entirely inside one tenant: user X set
 /// their <c>ImageUrl</c> to user Y's avatar URL — any string was accepted — and then replaced or
 /// removed their avatar, at which point the delete path found a key the tenant legitimately owns and
@@ -144,7 +144,7 @@ public sealed class ServerIssuedAssetUrlTests : IAsyncLifetime
     public async Task TenantAdmin_Should_NotBeAbleToPointABrandAsset_AtAUsersAvatar()
     {
         // The admin holds Tenants.UpdateTheme and every avatar in the tenant is a key the tenant
-        // owns, so before #83 parking one in LogoUrl and saving twice deleted it.
+        // owns, so previously parking one in LogoUrl and saving twice would delete it.
         using var adminClient = await AdminClientAsync();
         var victim = await SeedUserAsync(adminClient, "own-victim");
         using var victimClient = await ClientForAsync(victim);

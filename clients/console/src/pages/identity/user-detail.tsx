@@ -266,7 +266,7 @@ export function UserDetailPage() {
       if (!user?.id) throw new Error("Missing user id");
       if (!actor?.tenant) throw new Error("No tenant on current session");
       // Same tenant by construction — this page only ever lists the caller's own users,
-      // and since #9 the server refuses a cross-tenant start outright (that is the
+      // and the server refuses a cross-tenant start outright (that is the
       // operator token exchange, driven from the tenant registry).
       return impersonateInOwnTenant({
         targetUserId: user.id,

@@ -13,7 +13,7 @@ public static class Extensions
 {
     private const string PolicyName = "AppCorsPolicy";
 
-    public static IServiceCollection AddHeroCors(
+    public static IServiceCollection AddAppCors(
         this IServiceCollection services,
         IConfiguration configuration)
     {
@@ -63,9 +63,9 @@ public static class Extensions
                             .WithMethods(settings.AllowedMethods);
                     }
 
-                    // The profile's version travels as ETag out and If-Match back (#107). A browser
-                    // hides a response header from script unless it is exposed — AllowAnyHeader
-                    // covers request headers only — so both branches expose it.
+                    // The profile's version travels as ETag out and If-Match back for optimistic
+                    // concurrency control. A browser hides a response header from script unless it is
+                    // exposed — AllowAnyHeader covers request headers only — so both branches expose it.
                     builder.WithExposedHeaders(HeaderNames.ETag);
                 });
             });
@@ -76,8 +76,8 @@ public static class Extensions
 
     /// <summary>
     /// The configured request headers plus <c>If-Match</c>, which the clients always send on a
-    /// profile update (#107). A lone <c>*</c> is left alone: CORS treats the list as "any header"
-    /// only while it is exactly that, so appending to it would narrow the policy.
+    /// profile update for optimistic concurrency control. A lone <c>*</c> is left alone: CORS treats
+    /// the list as "any header" only while it is exactly that, so appending to it would narrow the policy.
     /// </summary>
     internal static string[] WithIfMatch(string[] allowedHeaders)
     {
@@ -92,7 +92,7 @@ public static class Extensions
         return [.. allowedHeaders, HeaderNames.IfMatch];
     }
 
-    public static void UseHeroCors(this WebApplication app)
+    public static void UseAppCors(this WebApplication app)
     {
         ArgumentNullException.ThrowIfNull(app);
         app.UseCors(PolicyName);

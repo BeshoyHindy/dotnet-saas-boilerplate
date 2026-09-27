@@ -232,7 +232,7 @@ internal sealed class UserRegistrationService(
 
     /// <summary>
     /// Runs the whole of a registration in one database transaction: the user row, the role, the
-    /// default groups and the outbox row either all exist or none of them do (#86). Before this,
+    /// default groups and the outbox row either all exist or none of them do. Before this,
     /// each was its own commit, and a failure after the first left a user with no role, no groups
     /// and no event — a row every retry was then refused on, with no way for the caller to recover.
     ///

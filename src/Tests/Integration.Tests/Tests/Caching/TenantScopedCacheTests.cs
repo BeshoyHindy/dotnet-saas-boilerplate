@@ -13,7 +13,7 @@ namespace Integration.Tests.Tests.Caching;
 /// and two tenants that were created the way tenants are created.
 ///
 /// Tenants are entered through <see cref="ITenantScope"/>, which is the one mechanism for crossing
-/// into a tenant outside a request (ADR-0002) and, since #77, also the one way to reach another
+/// into a tenant outside a request (ADR-0002) and also the exclusive way to reach another
 /// tenant's cache entries. There is deliberately no <c>ForTenant(id)</c> escape hatch on the block:
 /// an API that lets a caller name someone else's partition is the hole the prefix exists to close.
 /// </summary>
@@ -70,7 +70,7 @@ public sealed class TenantScopedCacheTests : IAsyncLifetime
     [Fact]
     public async Task TagInvalidation_In_OneTenant_Should_Leave_TheOthers_Entry_Cached()
     {
-        // Before #77, RemoveByTagAsync("permissions") from any tenant cleared every tenant's entries —
+        // Previously, RemoveByTagAsync("permissions") from any tenant would clear every tenant's entries —
         // a one-request, cross-tenant cache flush available to anyone who could change a role.
         var key = $"probe:{Guid.NewGuid():N}";
         var tag = $"probe-tag:{Guid.NewGuid():N}";

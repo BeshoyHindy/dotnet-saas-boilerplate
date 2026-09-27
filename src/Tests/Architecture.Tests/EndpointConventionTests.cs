@@ -266,7 +266,7 @@ public class EndpointConventionTests
                                name.StartsWith("Void", StringComparison.Ordinal) ||
                                name.StartsWith("Mark", StringComparison.Ordinal) ||
                                name.StartsWith("Issue", StringComparison.Ordinal) ||
-                               // ExchangeOperatorToken (#9) — trading one token for another.
+                               // ExchangeOperatorToken — trading one token for another.
                                name.StartsWith("Exchange", StringComparison.Ordinal) ||
                                name.StartsWith("Capture", StringComparison.Ordinal) ||
                                name.StartsWith("Request", StringComparison.Ordinal) ||

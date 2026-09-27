@@ -198,7 +198,7 @@ public class BuildingBlocksIndependenceTests
         CheckBuildingBlockDependencies("Eventing.Abstractions", [], layerViolations);
 
         // Eventing should depend on Core, Eventing.Abstractions, and Persistence (EventingDbContext
-        // derives from BaseDbContext so the outbox row joins the business transaction, issue #1349), and
+        // derives from BaseDbContext so the outbox row joins the business transaction), and
         // on Jobs (layer 2) for the [SystemJob] that purges processed outbox and inbox rows.
         CheckBuildingBlockDependencies("Eventing", ["Core", "Eventing.Abstractions", "Jobs", "Persistence"], layerViolations);
 

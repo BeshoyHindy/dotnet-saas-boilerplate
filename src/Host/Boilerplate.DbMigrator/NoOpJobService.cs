@@ -20,7 +20,7 @@ internal sealed class NoOpJobService : IJobService
 {
     private static InvalidOperationException Reject(string method) =>
         new($"IJobService.{method} called from the DbMigrator — jobs are not supported in the one-shot migrator. " +
-            "If this code path is now needed at migration time, enable Hangfire in DbMigrator's AddHeroPlatform options.");
+            "If this code path is now needed at migration time, enable Hangfire in DbMigrator's AddAppPlatform options.");
 
     public bool Delete(string jobId) => throw Reject(nameof(Delete));
     public bool Delete(string jobId, string fromState) => throw Reject(nameof(Delete));

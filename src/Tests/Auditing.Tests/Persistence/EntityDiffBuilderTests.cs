@@ -6,8 +6,8 @@ namespace Auditing.Tests.Persistence;
 
 /// <summary>
 /// <see cref="EntityDiffBuilder"/> against a real EF Core change tracker (in-memory SQLite), because
-/// what it reads off <c>PropertyEntry</c> is exactly what a hand-built fake would get wrong. Pins
-/// #103: a sensitive property's old/new value is replaced with <c>****</c> — not merely flagged — and
+/// what it reads off <c>PropertyEntry</c> is exactly what a hand-built fake would get wrong. This ensures
+/// a sensitive property's old/new value is replaced with <c>****</c> — not merely flagged — and
 /// a null value is never turned into one.
 /// </summary>
 public sealed class EntityDiffBuilderTests : IDisposable

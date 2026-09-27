@@ -7,9 +7,9 @@ using Integration.Tests.Infrastructure;
 namespace Integration.Tests.Tests.Sessions;
 
 /// <summary>
-/// Deactivating or deleting a user ends every one of their sessions (#124, ASVS V7.4.2). The status
+/// Deactivating or deleting a user ends every one of their sessions (ASVS V7.4.2). The status
 /// change, the revocation of each session row and the new security stamp are written in one save, and
-/// with the per-request <c>sid</c> check (#118) the user's live access token stops working on its next
+/// with the per-request <c>sid</c> check the user's live access token stops working on its next
 /// request rather than when it expires. Reactivation restores nothing: the user signs in again.
 /// </summary>
 [Collection(AppCollectionDefinition.Name)]

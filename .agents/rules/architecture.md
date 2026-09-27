@@ -88,7 +88,7 @@ A new module is seven edits. The four host lists are checked by `HostModuleListT
 
 ## Middleware ordering (critical)
 
-In `src/BuildingBlocks/Web/Extensions.cs` (`UseHeroPlatform`):
+In `src/BuildingBlocks/Web/Extensions.cs` (`UseAppPlatform`):
 
 0. **ForwardedHeaders first** (when `ProxyOptions.Enabled`) — everything downstream that reads the scheme or client IP must see the caller's values, not the proxy's
 1. ExceptionHandler → ResponseCompression
@@ -112,4 +112,4 @@ No global mutable static collections enumerated under concurrency. `Audit` (Audi
 - Where a rule needs DI or the environment, data annotations can't express it: register an **`IValidateOptions<T>`** instead. Existing ones: `JwtOptionsProductionValidator` (Production placeholder/localhost keys), `CorsOptionsValidator` (`AllowAll` banned in Production, origins must be absolute and slash-free), `RateLimitingOptionsValidator` (per-policy ranges, only when `Enabled`), `ProxyOptionsValidator` (parseable proxy addresses, "enabled but trusting nobody").
 - **Production fail-fast** (`Program.cs` → `builder.ValidateProductionConfiguration()`, before service registration): missing `DatabaseOptions:ConnectionString` / `CachingOptions:Redis` / `JwtOptions:SigningKey`, a secret that still matches `PlaceholderSecret.Looks(...)`, or an `AllowedHosts` that is empty or contains `*` all throw.
 - **No credential ever lands in `appsettings*.json`.** Dev secrets via `dotnet user-secrets` — `bash scripts/dev-secrets.sh` bootstraps them (API and DbMigrator share one `UserSecretsId`); the AppHost passes Aspire parameters; deployments pass environment variables. `gitleaks dir .` (config in `.gitleaks.toml`) must stay clean.
-- Platform composition is one call each: `builder.AddHeroPlatform(o => { o.Enable... })` (DI) and `app.UseHeroPlatform(...)` (middleware). Toggles cover Caching/Jobs/Mailing/OpenTelemetry/CORS/OpenAPI/Idempotency.
+- Platform composition is one call each: `builder.AddAppPlatform(o => { o.Enable... })` (DI) and `app.UseAppPlatform(...)` (middleware). Toggles cover Caching/Jobs/Mailing/OpenTelemetry/CORS/OpenAPI/Idempotency.
