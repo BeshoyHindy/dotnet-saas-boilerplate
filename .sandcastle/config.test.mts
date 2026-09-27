@@ -34,6 +34,8 @@ const limits: LimitsConfig = {
   plannerQueueDepth: 10,
   idleTimeoutSeconds: 3900,
   healAttempts: 0,
+  usagePollMinutes: 5,
+  usageMaxWaitHours: 6,
 };
 
 const models: Readonly<Record<PhaseName, PhaseModel>> = {
@@ -150,6 +152,49 @@ test("a malformed override throws instead of falling back silently", () => {
   assert.throws(
     () => resolveLimits(limits, { SANDCASTLE_HEAL_ATTEMPTS: "1.5" }),
     /SANDCASTLE_HEAL_ATTEMPTS/,
+  );
+});
+
+test("the usage-limit wait's poll interval and budget take env overrides", () => {
+  const resolved = resolveLimits(limits, {
+    SANDCASTLE_USAGE_POLL_MINUTES: "10",
+    SANDCASTLE_USAGE_MAX_WAIT_HOURS: "12",
+  });
+
+  assert.equal(resolved.usagePollMinutes, 10);
+  assert.equal(resolved.usageMaxWaitHours, 12);
+  // Zero hours is legal: it is how the wait is turned off.
+  assert.equal(
+    resolveLimits(limits, { SANDCASTLE_USAGE_MAX_WAIT_HOURS: "0" }).usageMaxWaitHours,
+    0,
+  );
+  // Blank falls back to the config.
+  const blank = resolveLimits(limits, {
+    SANDCASTLE_USAGE_POLL_MINUTES: " ",
+    SANDCASTLE_USAGE_MAX_WAIT_HOURS: "",
+  });
+  assert.equal(blank.usagePollMinutes, 5);
+  assert.equal(blank.usageMaxWaitHours, 6);
+});
+
+// A poll of 0 would probe in a tight loop; a typo'd budget that quietly
+// restored the default would wait hours the operator did not ask for.
+test("a malformed usage-limit override throws instead of falling back", () => {
+  assert.throws(
+    () => resolveLimits(limits, { SANDCASTLE_USAGE_POLL_MINUTES: "0" }),
+    /SANDCASTLE_USAGE_POLL_MINUTES must be an integer >= 1/,
+  );
+  assert.throws(
+    () => resolveLimits(limits, { SANDCASTLE_USAGE_POLL_MINUTES: "5m" }),
+    /SANDCASTLE_USAGE_POLL_MINUTES/,
+  );
+  assert.throws(
+    () => resolveLimits(limits, { SANDCASTLE_USAGE_MAX_WAIT_HOURS: "-1" }),
+    /SANDCASTLE_USAGE_MAX_WAIT_HOURS must be an integer >= 0/,
+  );
+  assert.throws(
+    () => resolveLimits(limits, { SANDCASTLE_USAGE_MAX_WAIT_HOURS: "5.5" }),
+    /SANDCASTLE_USAGE_MAX_WAIT_HOURS/,
   );
 });
 
@@ -284,6 +329,7 @@ test("defineConfig returns the config unchanged", () => {
       merger: { model: "m", effort: "xhigh" },
       healer: { model: "m", effort: "xhigh" },
     },
+    usageProbeModel: "m",
     sandbox: {
       cacheRoot: "~/.cache",
       caches: [],

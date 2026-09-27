@@ -216,6 +216,14 @@ export function renderDryRun(
     `  idle timeout         ${limits.idleTimeoutSeconds}s`,
     `  healing attempts     ${limits.healAttempts}` +
       (limits.healAttempts === 0 ? " (healing is OFF)" : ""),
+    // The dry run spends no probe, so the startup self-check (which can still
+    // turn the wait off for a run) is only named here, never performed.
+    `  usage-limit wait     ` +
+      (limits.usageMaxWaitHours === 0
+        ? "OFF (SANDCASTLE_USAGE_MAX_WAIT_HOURS is 0)"
+        : `probe every ${limits.usagePollMinutes} min, give up after ` +
+          `${limits.usageMaxWaitHours} h (a run confirms it with one ` +
+          `startup probe of ${config.usageProbeModel})`),
     "",
     "Models",
   ];

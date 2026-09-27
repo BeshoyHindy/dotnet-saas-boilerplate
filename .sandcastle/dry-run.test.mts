@@ -44,6 +44,8 @@ const config: SandcastleConfig = {
     plannerQueueDepth: 10,
     idleTimeoutSeconds: 3900,
     healAttempts: 0,
+    usagePollMinutes: 5,
+    usageMaxWaitHours: 6,
   },
   models: {
     planner: { model: "model-planner", effort: "medium" },
@@ -52,6 +54,7 @@ const config: SandcastleConfig = {
     merger: { model: "model-merge", effort: "xhigh" },
     healer: { model: "model-heal", effort: "xhigh" },
   },
+  usageProbeModel: "model-probe",
   sandbox: {
     cacheRoot: "~/.sandcastle-cache",
     caches: [],
@@ -240,6 +243,30 @@ test("healing off is called out, and a raised attempt count is not", () => {
   const healing = resolveLimits(config.limits, { SANDCASTLE_HEAL_ATTEMPTS: "2" });
   assert.doesNotMatch(renderDryRun(config, healing, models, { ok: true, issues: [] }), /healing is OFF/);
   assert.match(renderDryRun(config, healing, models, { ok: true, issues: [] }), /healing attempts\s+2/);
+});
+
+test("the report shows the usage-limit wait's resolved interval and budget", () => {
+  const report = renderDryRun(config, limits, models, { ok: true, issues: [] });
+  assert.match(
+    report,
+    /usage-limit wait\s+probe every 5 min, give up after 6 h \(a run confirms it with one startup probe of model-probe\)/,
+  );
+
+  const tuned = resolveLimits(config.limits, {
+    SANDCASTLE_USAGE_POLL_MINUTES: "2",
+    SANDCASTLE_USAGE_MAX_WAIT_HOURS: "10",
+  });
+  assert.match(
+    renderDryRun(config, tuned, models, { ok: true, issues: [] }),
+    /probe every 2 min, give up after 10 h/,
+  );
+});
+
+test("a usage-limit wait budget of 0 is called out as OFF", () => {
+  const off = resolveLimits(config.limits, { SANDCASTLE_USAGE_MAX_WAIT_HOURS: "0" });
+  const report = renderDryRun(config, off, models, { ok: true, issues: [] });
+  assert.match(report, /usage-limit wait\s+OFF/);
+  assert.doesNotMatch(report, /probe every/);
 });
 
 test("the report shows each gate's real command, timeout and parser", () => {
