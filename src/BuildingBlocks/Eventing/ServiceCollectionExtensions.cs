@@ -3,11 +3,13 @@ using Boilerplate.BuildingBlocks.Eventing.Inbox;
 using Boilerplate.BuildingBlocks.Eventing.InMemory;
 using Boilerplate.BuildingBlocks.Eventing.Outbox;
 using Boilerplate.BuildingBlocks.Eventing.Persistence;
+using Boilerplate.BuildingBlocks.Eventing.Retention;
 using Boilerplate.BuildingBlocks.Eventing.Serialization;
 using Boilerplate.BuildingBlocks.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using System.Reflection;
 
 namespace Boilerplate.BuildingBlocks.Eventing;
@@ -57,6 +59,12 @@ public static class ServiceCollectionExtensions
         services.TryAddScoped<IOutboxWriter>(sp => sp.GetRequiredService<IOutboxStore>());
         services.TryAddScoped<IInboxStore, EfCoreInboxStore>();
         services.TryAddScoped<OutboxDispatcher>();
+
+        // Processed outbox rows and inbox rows are purged daily; without it both tables grow for
+        // the life of the installation. The scheduler no-ops in a host without Hangfire.
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddTransient<EventingRetentionJob>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, EventingRetentionScheduler>());
 
         return services;
     }

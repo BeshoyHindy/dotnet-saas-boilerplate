@@ -31,6 +31,10 @@ Any exception to publishing via the outbox needs a strong reason, documented in 
 
 `EventingDbContext` derives from `BaseDbContext`, so its rows sit in the one shared database next to the business data they accompany, and one dispatcher pass per cycle sees every tenant's rows.
 
+## Retention
+
+`EventingRetentionJob` (`Eventing/Retention/`), a daily `[SystemJob]` (`eventing-retention`, `RetentionCron`, default `45 3 * * *` UTC), deletes processed outbox rows and inbox rows older than `ProcessedRetentionDays` (default 7; zero or less turns it off), `RetentionDeleteBatchSize` rows per statement. Pending and dead-lettered outbox rows are never deleted. The tables are global, so it is one pass, not a tenant sweep. An inbox row is what deduplicates a redelivery, so an event redelivered after the window is handled again — keep the window longer than any redelivery you expect.
+
 ## Multi-instance safety
 
 `ClaimBatchAsync` leases rows with `FOR UPDATE SKIP LOCKED` in a single `UPDATE … RETURNING`, so several API instances partition a batch instead of all publishing the same message. `ClaimedUntilUtc` is an expiry (`OutboxClaimLeaseSeconds`, default 300), so a dispatcher that dies mid-batch has its rows recovered rather than stranded — raise it if a batch can take longer than the lease, or a second instance re-claims rows still in flight. Completing or failing a message releases the lease. Non-Postgres providers have no portable `SKIP LOCKED`: they fall back to an unclaimed read and log a warning that only one instance is safe.

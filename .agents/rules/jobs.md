@@ -28,7 +28,7 @@ There is no third, silent option:
 | `[SystemJob]` | never stamped | runs tenant-less |
 | tenant deleted or deactivated | — | **job fails** |
 
-Mark the job class (or the method Hangfire invokes) `[SystemJob]` only when the work genuinely belongs to no tenant — a maintenance sweep, a fan-out, provisioning a tenant that is not usable yet. Today: `PurgeOrphanedFilesJob`, `PurgeDeletedFilesJob`, `AuditRetentionJob`, `TenantExpiryScanJob`, `TenantProvisioningJob`.
+Mark the job class (or the method Hangfire invokes) `[SystemJob]` only when the work genuinely belongs to no tenant — a maintenance sweep, a fan-out, provisioning a tenant that is not usable yet. Today: `PurgeOrphanedFilesJob`, `PurgeDeletedFilesJob`, `AuditRetentionJob`, `EventingRetentionJob`, `TenantExpiryScanJob`, `TenantProvisioningJob`.
 
 ## Touching tenant data from a system job — `ITenantScope`
 
@@ -57,7 +57,7 @@ recurringJobs.AddOrUpdate<PurgeOrphanedFilesJob>("files:purge-orphaned",
     j => j.RunAsync(CancellationToken.None), Cron.Hourly(), new() { TimeZone = TimeZoneInfo.Utc });
 ```
 
-Examples in the tree: `PurgeOrphanedFiles`/`PurgeDeletedFiles` (Files), `AuditRetentionJob` (Auditing), `TenantExpiryScanJob` (Multitenancy).
+Examples in the tree: `PurgeOrphanedFiles`/`PurgeDeletedFiles` (Files), `AuditRetentionJob` (Auditing), `TenantExpiryScanJob` (Multitenancy). Eventing is not a module and has no `MapEndpoints`, so `EventingRetentionScheduler` makes the same `AddOrUpdate` call from a hosted service at start-up.
 
 ## Dashboard & config
 
