@@ -87,7 +87,10 @@ export interface GitConfig {
 }
 
 export interface LimitsConfig {
-  /** Maximum plan → execute → merge cycles before the run stops. */
+  /**
+   * Maximum plan → execute → merge cycles before the run stops. Overridden
+   * per run by `SANDCASTLE_MAX_ITERATIONS`.
+   */
   readonly maxIterations: number;
   /**
    * Hard cap on simultaneously running issue sandboxes. A RAM budget, not a
@@ -98,6 +101,7 @@ export interface LimitsConfig {
    * How many issues the planner queues per round — deliberately MORE than can
    * run at once, so a pipeline that finishes early starts the next issue
    * instead of idling its slot. Clamped up to `maxConcurrentAgents`.
+   * Overridden per run by `PLANNER_QUEUE_DEPTH`.
    */
   readonly plannerQueueDepth: number;
   /**
@@ -266,9 +270,19 @@ export function resolveLimits(
     return parsed;
   };
 
+  const maxIterations = readInt(
+    "SANDCASTLE_MAX_ITERATIONS",
+    limits.maxIterations,
+    1,
+  );
   const maxConcurrentAgents = readInt(
     "MAX_CONCURRENT_AGENTS",
     limits.maxConcurrentAgents,
+    1,
+  );
+  const plannerQueueDepth = readInt(
+    "PLANNER_QUEUE_DEPTH",
+    limits.plannerQueueDepth,
     1,
   );
   const healAttempts = readInt(
@@ -290,11 +304,12 @@ export function resolveLimits(
 
   return {
     ...limits,
+    maxIterations,
     maxConcurrentAgents,
     healAttempts,
     usagePollMinutes,
     usageMaxWaitHours,
-    plannerQueueDepth: Math.max(limits.plannerQueueDepth, maxConcurrentAgents),
+    plannerQueueDepth: Math.max(plannerQueueDepth, maxConcurrentAgents),
   };
 }
 

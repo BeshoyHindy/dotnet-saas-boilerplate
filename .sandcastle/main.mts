@@ -124,7 +124,8 @@ import {
 // Resolved configuration
 // ---------------------------------------------------------------------------
 
-// Environment overrides (MAX_CONCURRENT_AGENTS, SANDCASTLE_HEAL_ATTEMPTS,
+// Environment overrides (SANDCASTLE_MAX_ITERATIONS, MAX_CONCURRENT_AGENTS,
+// PLANNER_QUEUE_DEPTH, SANDCASTLE_HEAL_ATTEMPTS,
 // SANDCASTLE_USAGE_POLL_MINUTES, SANDCASTLE_USAGE_MAX_WAIT_HOURS, the
 // per-phase SANDCASTLE_<PHASE>_MODEL / SANDCASTLE_<PHASE>_EFFORT, and the
 // SANDCASTLE_FALLBACK_ACCOUNT switch) are applied here and nowhere else; a

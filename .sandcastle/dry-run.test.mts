@@ -269,6 +269,17 @@ test("a usage-limit wait budget of 0 is called out as OFF", () => {
   assert.doesNotMatch(report, /probe every/);
 });
 
+test("the report shows the round cap and queue depth resolved from the environment", () => {
+  const tuned = resolveLimits(config.limits, {
+    SANDCASTLE_MAX_ITERATIONS: "7",
+    PLANNER_QUEUE_DEPTH: "12",
+  });
+  const report = renderDryRun(config, tuned, models, { ok: true, issues: [] });
+
+  assert.match(report, /max iterations\s+7\n/);
+  assert.match(report, /planner queue depth\s+12\n/);
+});
+
 test("the report shows whether the fallback account is on", () => {
   const empty = { ok: true, issues: [] } as const;
   assert.match(renderDryRun(config, limits, models, empty), /fallback account\s+OFF/);

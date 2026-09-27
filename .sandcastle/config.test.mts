@@ -214,6 +214,50 @@ test("the planner queue is clamped up to the concurrency cap, never below it", (
   assert.equal(resolveLimits(limits, { MAX_CONCURRENT_AGENTS: "2" }).plannerQueueDepth, 10);
 });
 
+test("SANDCASTLE_MAX_ITERATIONS overrides the round cap, and absent or blank keeps it", () => {
+  assert.equal(resolveLimits(limits, { SANDCASTLE_MAX_ITERATIONS: "250" }).maxIterations, 250);
+  assert.equal(resolveLimits(limits, {}).maxIterations, limits.maxIterations);
+  assert.equal(
+    resolveLimits(limits, { SANDCASTLE_MAX_ITERATIONS: " " }).maxIterations,
+    limits.maxIterations,
+  );
+});
+
+test("a malformed SANDCASTLE_MAX_ITERATIONS throws instead of falling back", () => {
+  for (const raw of ["0", "-3", "1.5", "lots"]) {
+    assert.throws(
+      () => resolveLimits(limits, { SANDCASTLE_MAX_ITERATIONS: raw }),
+      new RegExp(`SANDCASTLE_MAX_ITERATIONS must be an integer >= 1, got "${raw}"`),
+    );
+  }
+});
+
+test("PLANNER_QUEUE_DEPTH overrides the queue depth, and absent or blank keeps it", () => {
+  assert.equal(resolveLimits(limits, { PLANNER_QUEUE_DEPTH: "15" }).plannerQueueDepth, 15);
+  assert.equal(resolveLimits(limits, {}).plannerQueueDepth, limits.plannerQueueDepth);
+  assert.equal(
+    resolveLimits(limits, { PLANNER_QUEUE_DEPTH: "" }).plannerQueueDepth,
+    limits.plannerQueueDepth,
+  );
+});
+
+test("a malformed PLANNER_QUEUE_DEPTH throws instead of falling back", () => {
+  for (const raw of ["0", "-1", "2.5", "deep"]) {
+    assert.throws(
+      () => resolveLimits(limits, { PLANNER_QUEUE_DEPTH: raw }),
+      new RegExp(`PLANNER_QUEUE_DEPTH must be an integer >= 1, got "${raw}"`),
+    );
+  }
+});
+
+test("an overridden queue depth is still clamped up to the concurrency cap", () => {
+  assert.equal(
+    resolveLimits(limits, { PLANNER_QUEUE_DEPTH: "2", MAX_CONCURRENT_AGENTS: "4" })
+      .plannerQueueDepth,
+    4,
+  );
+});
+
 // --- models ----------------------------------------------------------------
 
 test("resolveModels keeps the configured models when nothing is overridden", () => {
