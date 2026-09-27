@@ -228,7 +228,8 @@ public sealed class IdempotencyEndpointFilterTests
         object? payload = null,
         string path = "/things",
         EndpointFilterDelegate? handler = null,
-        Stream? responseBody = null)
+        Stream? responseBody = null,
+        CancellationToken? requestAborted = null)
     {
         var httpContext = new DefaultHttpContext { RequestServices = provider };
         httpContext.Request.Method = HttpMethods.Post;
@@ -236,6 +237,11 @@ public sealed class IdempotencyEndpointFilterTests
         if (!string.IsNullOrEmpty(idempotencyKey))
         {
             httpContext.Request.Headers[HeaderName] = idempotencyKey;
+        }
+
+        if (requestAborted is { } aborted)
+        {
+            httpContext.RequestAborted = aborted;
         }
 
         var body = new MemoryStream();
@@ -768,6 +774,97 @@ public sealed class IdempotencyEndpointFilterTests
 
             release.SetResult();
             await first;
+        }
+    }
+
+    /// <summary>
+    /// Ticket #104, ported from upstream's disconnect regression (<c>bf86648</c> part c). The client
+    /// hangs up — cancelling <see cref="HttpContext.RequestAborted"/> — right after the handler commits
+    /// its side effect (the counter increment stands in for it), and the handler's own code checks that
+    /// same ambient token again afterwards, the way an outbox dispatch or a second query would. Before
+    /// the fix that next await throws out of the filter and stores nothing, so a retry with the same
+    /// key re-runs the handler; that is the bug this test pins red first.
+    /// </summary>
+    [Fact]
+    public async Task FirstCall_Should_StillCacheResponse_When_ClientDisconnectsAfterHandlerCommits()
+    {
+        var (provider, tenant, l2) = BuildServices();
+        await using (provider)
+        {
+            tenant.TenantId = "alpha";
+            using var aborted = new CancellationTokenSource();
+            var counter = new Counter();
+
+            EndpointFilterDelegate disconnectingHandler = async ctx =>
+            {
+                counter.Executions++; // the side effect commits...
+                await aborted.CancelAsync(); // ...and only then does the client hang up.
+
+                // ...and the handler's own code reads RequestAborted again afterwards — an outbox
+                // dispatch or a follow-up query, say. Without the swap this throws.
+                await Task.Delay(1, ctx.HttpContext.RequestAborted);
+                return TypedResults.Created("/things/1", new Created(1));
+            };
+
+            // The first response never reaches this client — the real one is long gone by the time
+            // FlushAsync tries to write to it, and that failure is allowed: the entry is already stored
+            // by then, which is the whole point.
+            await Should.ThrowAsync<OperationCanceledException>(
+                () => InvokeAsync(provider, "req-1", counter, handler: disconnectingHandler, requestAborted: aborted.Token));
+
+            counter.Executions.ShouldBe(1, "the handler must still run to completion once, exactly like a normal request.");
+            l2.WrittenKeys.ShouldHaveSingleItem(
+                "the entry must be stored even though the client hung up before capture — the handler already "
+                + "committed, and a lost entry means the retry repeats that side effect.");
+
+            var retry = await InvokeAsync(provider, "req-1", counter);
+
+            retry.Replayed.ShouldBeTrue("a retry with the same key must replay, not re-run the side effect the first call already committed.");
+            counter.Executions.ShouldBe(1);
+            retry.StatusCode.ShouldBe(StatusCodes.Status201Created);
+            retry.Body.ShouldBe("""{"id":1}""");
+        }
+    }
+
+    /// <summary>
+    /// Upstream's commit message also claims a cancelled capture can cache an <i>empty</i> 2xx body for
+    /// the full TTL, because <c>WriteAsJsonAsync</c> swallows the cancellation rather than throwing.
+    /// Verified against this codebase before the fix: it reproduces —
+    /// <see cref="Microsoft.AspNetCore.Http.HttpResults.Ok{TValue}"/> executed under an already-cancelled
+    /// <see cref="HttpContext.RequestAborted"/> writes a zero-length body, and the filter stored it as a
+    /// 200 that would have replayed empty for the whole TTL. The fix below closes it the same way as the
+    /// other disconnect test, by detaching the capture from the client's abort.
+    /// </summary>
+    [Fact]
+    public async Task Empty_Body_Claim_Should_Not_Survive_The_Fix()
+    {
+        var (provider, tenant, l2) = BuildServices();
+        await using (provider)
+        {
+            tenant.TenantId = "alpha";
+            using var aborted = new CancellationTokenSource();
+            var counter = new Counter();
+
+            EndpointFilterDelegate disconnectingHandler = async ctx =>
+            {
+                counter.Executions++;
+                await aborted.CancelAsync();
+                return TypedResults.Ok(new Created(1));
+            };
+
+            await Should.ThrowAsync<OperationCanceledException>(
+                () => InvokeAsync(provider, "req-1", counter, handler: disconnectingHandler, requestAborted: aborted.Token));
+
+            var stored = JsonSerializer.Deserialize<CachedIdempotentResponse>(
+                new MemoryDistributedCacheProbe(l2).Read(IdempotencyKeyIn(l2)), EntryJson);
+            stored.ShouldNotBeNull();
+            stored.Body.ShouldNotBeEmpty(
+                "an empty body cached for the full TTL is worse than not caching at all — the fix must make the " +
+                "detached capture write the real body, not merely avoid the exception.");
+
+            var retry = await InvokeAsync(provider, "req-1", counter);
+            retry.Replayed.ShouldBeTrue();
+            retry.Body.ShouldBe("""{"id":1}""");
         }
     }
 
