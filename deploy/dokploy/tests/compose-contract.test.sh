@@ -218,10 +218,13 @@ assert_match "console is routed on CONSOLE_DOMAIN" "$console_block" 'Host\(.\$\{
 refute_match "dashboard never claims the console hostname" "$dashboard_block" 'CONSOLE_DOMAIN'
 refute_match "console never claims the dashboard hostname" "$console_block" 'Host\(.\$\{DASHBOARD_DOMAIN\}.\)'
 
-# Mailed links (password reset, email confirmation) go to a tenant's users, so the
-# origin the API writes into them is the dashboard's — never the operator console's.
-assert_match "mailed links point at the dashboard" "$api_block" \
+# Mailed links (password reset, email confirmation) go to a tenant's users, so the origin the
+# API writes into them defaults to the dashboard's; MailLinkOrigin swaps in the console's for the
+# root tenant's own users (operators).
+assert_match "mailed links default to the dashboard" "$api_block" \
   'OriginOptions__OriginUrl:[[:space:]]*https://\$\{DASHBOARD_DOMAIN\}'
+assert_match "root tenant's mailed links point at the console" "$api_block" \
+  'MailLinkOrigin__ConsoleOriginUrl:[[:space:]]*https://\$\{CONSOLE_DOMAIN\}'
 assert_match "both clients are in the CORS allow-list" "$api_block" \
   'CorsOptions__AllowedOrigins__1:[[:space:]]*https://\$\{CONSOLE_DOMAIN\}'
 #endif

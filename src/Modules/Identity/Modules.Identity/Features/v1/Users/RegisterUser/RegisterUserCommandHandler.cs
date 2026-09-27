@@ -1,7 +1,9 @@
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.BuildingBlocks.Web.Origin;
 using Boilerplate.Modules.Identity.Contracts.Services;
 using Boilerplate.Modules.Identity.Contracts.v1.Users.RegisterUser;
 using Boilerplate.Modules.Identity.Services;
+using Finbuckle.MultiTenant.Abstractions;
 using Mediator;
 using Microsoft.Extensions.Options;
 
@@ -11,11 +13,19 @@ public sealed class RegisterUserCommandHandler : ICommandHandler<RegisterUserCom
 {
     private readonly IUserService _userService;
     private readonly IOptions<OriginOptions> _originOptions;
+    private readonly IOptions<MailLinkOriginOptions> _mailLinkOriginOptions;
+    private readonly IMultiTenantContextAccessor<AppTenantInfo> _multiTenantContextAccessor;
 
-    public RegisterUserCommandHandler(IUserService userService, IOptions<OriginOptions> originOptions)
+    public RegisterUserCommandHandler(
+        IUserService userService,
+        IOptions<OriginOptions> originOptions,
+        IOptions<MailLinkOriginOptions> mailLinkOriginOptions,
+        IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor)
     {
         _userService = userService;
         _originOptions = originOptions;
+        _mailLinkOriginOptions = mailLinkOriginOptions;
+        _multiTenantContextAccessor = multiTenantContextAccessor;
     }
 
     public async ValueTask<RegisterUserResponse> Handle(RegisterUserCommand command, CancellationToken cancellationToken)
@@ -26,7 +36,7 @@ public sealed class RegisterUserCommandHandler : ICommandHandler<RegisterUserCom
         // configuration, never the request (see MailLinkOrigin). The mail itself is sent from the
         // registration event, where the origin is resolved the same way — this call is the guard
         // that refuses the sign-up up front rather than creating an account no mail can reach.
-        _ = MailLinkOrigin.Require(_originOptions);
+        _ = MailLinkOrigin.Require(_originOptions, _mailLinkOriginOptions, _multiTenantContextAccessor);
 
         string userId = await _userService.RegisterAsync(
             command.FirstName,

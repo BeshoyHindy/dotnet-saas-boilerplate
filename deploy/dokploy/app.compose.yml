@@ -63,9 +63,13 @@ services:
       CachingOptions__Redis: ${STACK_NAME}-valkey:6379
       CachingOptions__EnableSsl: "false"
       JwtOptions__SigningKey: ${JWT_SIGNING_KEY}
-      # Mailed links go to a tenant's users, so the origin the API writes into them is
-      # the DASHBOARD's. Both clients are in the CORS allow-list (ADR-0008).
+      # Mailed links go to a tenant's users, so the origin the API writes into them defaults to
+      # the DASHBOARD's. MailLinkOrigin swaps in the console's for the root tenant's own users
+      # (operators) — see ConsoleOriginUrl below. Both clients are in the CORS allow-list (ADR-0008).
       OriginOptions__OriginUrl: https://${DASHBOARD_DOMAIN}
+      #if (frontend)
+      MailLinkOrigin__ConsoleOriginUrl: https://${CONSOLE_DOMAIN}
+      #endif
       CorsOptions__AllowedOrigins__0: https://${DASHBOARD_DOMAIN}
       CorsOptions__AllowedOrigins__1: https://${CONSOLE_DOMAIN}
       # Host allow-list. Must contain API_DOMAIN and must not contain "*", or the

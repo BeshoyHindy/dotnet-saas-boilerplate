@@ -1,8 +1,11 @@
 using AutoFixture;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.BuildingBlocks.Web.Origin;
+using Boilerplate.Modules.Identity;
 using Boilerplate.Modules.Identity.Contracts.Services;
 using Boilerplate.Modules.Identity.Contracts.v1.Users.ResendConfirmationEmail;
 using Boilerplate.Modules.Identity.Features.v1.Users.ResendConfirmationEmail;
+using Finbuckle.MultiTenant.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 
@@ -18,6 +21,8 @@ public sealed class ResendConfirmationEmailCommandHandlerTests
 
     private readonly IUserService _userService;
     private readonly IOptions<OriginOptions> _originOptions;
+    private readonly IOptions<MailLinkOriginOptions> _mailLinkOriginOptions;
+    private readonly IMultiTenantContextAccessor<AppTenantInfo> _multiTenantContextAccessor;
     private readonly ResendConfirmationEmailCommandHandler _sut;
     private readonly IFixture _fixture;
 
@@ -26,7 +31,13 @@ public sealed class ResendConfirmationEmailCommandHandlerTests
         _userService = Substitute.For<IUserService>();
         _originOptions = Substitute.For<IOptions<OriginOptions>>();
         _originOptions.Value.Returns(new OriginOptions { OriginUrl = new Uri(ConfiguredOrigin) });
-        _sut = new ResendConfirmationEmailCommandHandler(_userService, _originOptions);
+        _mailLinkOriginOptions = Substitute.For<IOptions<MailLinkOriginOptions>>();
+        _mailLinkOriginOptions.Value.Returns(new MailLinkOriginOptions());
+        _multiTenantContextAccessor = Substitute.For<IMultiTenantContextAccessor<AppTenantInfo>>();
+        var mtContext = Substitute.For<IMultiTenantContext<AppTenantInfo>>();
+        mtContext.TenantInfo.Returns(new AppTenantInfo("acme", "acme", "Acme"));
+        _multiTenantContextAccessor.MultiTenantContext.Returns(mtContext);
+        _sut = new ResendConfirmationEmailCommandHandler(_userService, _originOptions, _mailLinkOriginOptions, _multiTenantContextAccessor);
         _fixture = new Fixture();
     }
 

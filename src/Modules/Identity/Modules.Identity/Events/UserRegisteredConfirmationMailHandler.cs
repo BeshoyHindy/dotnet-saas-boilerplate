@@ -1,9 +1,11 @@
 using Boilerplate.BuildingBlocks.Eventing.Abstractions;
 using Boilerplate.BuildingBlocks.Mailing.Services;
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.BuildingBlocks.Web.Origin;
 using Boilerplate.Modules.Identity.Contracts.Events;
 using Boilerplate.Modules.Identity.Domain;
 using Boilerplate.Modules.Identity.Services;
+using Finbuckle.MultiTenant.Abstractions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -29,6 +31,8 @@ internal sealed class UserRegisteredConfirmationMailHandler(
     ConfirmationMailBuilder mailBuilder,
     IMailService mailService,
     IOptions<OriginOptions> originOptions,
+    IOptions<MailLinkOriginOptions> mailLinkOriginOptions,
+    IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor,
     ILogger<UserRegisteredConfirmationMailHandler> logger)
     : IIntegrationEventHandler<UserRegisteredIntegrationEvent>
 {
@@ -54,7 +58,7 @@ internal sealed class UserRegisteredConfirmationMailHandler(
         }
 
         var mail = await mailBuilder
-            .BuildAsync(user, MailLinkOrigin.Require(originOptions))
+            .BuildAsync(user, MailLinkOrigin.Require(originOptions, mailLinkOriginOptions, multiTenantContextAccessor))
             .ConfigureAwait(false);
 
         if (mail is null)
