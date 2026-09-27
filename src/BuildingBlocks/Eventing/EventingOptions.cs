@@ -49,4 +49,24 @@ public sealed class EventingOptions
     /// If false, you should configure Hangfire or another scheduler.
     /// </summary>
     public bool UseHostedServiceDispatcher { get; set; } = true;
+
+    /// <summary>
+    /// Days a processed outbox row, and an inbox row, are kept before
+    /// <see cref="Retention.EventingRetentionJob"/> deletes them. Unprocessed and dead-lettered
+    /// outbox rows are never deleted. An inbox row is what makes a handler idempotent, so an event
+    /// redelivered after this window would be handled again; keep it longer than any redelivery you
+    /// expect. Zero or less switches the purge off.
+    /// </summary>
+    public int ProcessedRetentionDays { get; set; } = 7;
+
+    /// <summary>
+    /// Maximum rows deleted per statement by the retention purge. The purge loops until a
+    /// statement deletes fewer, so each one holds its locks only briefly.
+    /// </summary>
+    public int RetentionDeleteBatchSize { get; set; } = 1_000;
+
+    /// <summary>
+    /// Cron expression (UTC) for the retention purge. Daily at 03:45 by default.
+    /// </summary>
+    public string RetentionCron { get; set; } = "45 3 * * *";
 }
