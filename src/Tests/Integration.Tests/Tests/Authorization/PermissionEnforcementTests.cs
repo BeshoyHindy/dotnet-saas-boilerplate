@@ -19,7 +19,7 @@ public sealed class PermissionEnforcementTests
     {
         using var client = _factory.CreateClient();
 
-        var response = await client.GetAsync($"{TestConstants.IdentityBasePath}/users?pageNumber=1&pageSize=10");
+        var response = await client.GetAsync($"{TestConstants.IdentityBasePath}/users/search?pageNumber=1&pageSize=10");
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
@@ -31,7 +31,7 @@ public sealed class PermissionEnforcementTests
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", "invalid.jwt.token");
 
-        var response = await client.GetAsync($"{TestConstants.IdentityBasePath}/users?pageNumber=1&pageSize=10");
+        var response = await client.GetAsync($"{TestConstants.IdentityBasePath}/users/search?pageNumber=1&pageSize=10");
 
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }

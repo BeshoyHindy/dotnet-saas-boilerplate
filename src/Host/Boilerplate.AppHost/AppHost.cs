@@ -21,7 +21,14 @@ var appPrefix = builder.Environment.ApplicationName
 // machine's volume, a regenerated Initial migration), every connection fails with "password
 // authentication failed", the migrator never starts, and the API and clients hang behind it.
 // Bump the suffix to start clean without deleting anyone's data; the old volume is left alone.
+// Pinned by tag AND digest, matching the same Postgres major/image the compose stacks and the
+// dokploy backup service run, so every environment starts byte-identical bits.
+const string PostgresImageTag = "18-alpine";
+const string PostgresImageDigest = "77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873";
+
 var postgresServer = builder.AddPostgres("postgres")
+    .WithImageTag(PostgresImageTag)
+    .WithImageSHA256(PostgresImageDigest)
     .WithDataVolume($"{appPrefix}-postgres-data-v2")
     .WithLifetime(ContainerLifetime.Persistent);
 
@@ -32,7 +39,13 @@ var apiPgConnection = ReferenceExpression.Create(
     $"{postgres.Resource.ConnectionStringExpression};Minimum Pool Size=5");
 
 // Valkey (BSD-3 Redis fork) as a plain container: Aspire 13.4.0 AddRedis() forces TLS-by-default in run mode and never materializes the container, so we drop to plain RESP over TCP. Name stays "redis" so config keys don't churn.
-var redis = builder.AddContainer("redis", "valkey/valkey", "9.1.2")
+// Pinned by tag AND digest, matching the compose stacks, so every environment runs the same bytes.
+const string ValkeyImage = "valkey/valkey";
+const string ValkeyImageTag = "9.1.2";
+const string ValkeyImageDigest = "418652cfb58ef879d4978c33553735d7147016032d5aefaa14c828e611eb9dfd";
+
+var redis = builder.AddContainer("redis", ValkeyImage, ValkeyImageTag)
+    .WithImageSHA256(ValkeyImageDigest)
     .WithEndpoint(targetPort: 6379, scheme: "tcp", name: "tcp")
     .WithVolume($"{appPrefix}-redis-data", "/data")
     .WithLifetime(ContainerLifetime.Persistent);
@@ -138,7 +151,13 @@ var storageInit = builder.AddContainer("storage-init", AwsCliImage, AwsCliImageT
 // listen on the container's 1025/8025; the host ports are Aspire's to allocate, for the same
 // reason the object store's are (a second instance must not be blocked by the first). Open the inbox from the
 // Aspire dashboard's "mailpit" resource link; the API is wired to the SMTP endpoint by reference.
-var mailpit = builder.AddContainer("mailpit", "axllent/mailpit", "v1.31")
+// Pinned by tag AND digest, matching docker-compose.yml, so every environment runs the same bytes.
+const string MailpitImage = "axllent/mailpit";
+const string MailpitImageTag = "v1.31";
+const string MailpitImageDigest = "74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d";
+
+var mailpit = builder.AddContainer("mailpit", MailpitImage, MailpitImageTag)
+    .WithImageSHA256(MailpitImageDigest)
     .WithEndpoint(targetPort: 1025, scheme: "tcp", name: "smtp")
     .WithHttpEndpoint(targetPort: 8025, name: "http")
     .WithEnvironment("MP_SMTP_AUTH_ACCEPT_ANY", "true")

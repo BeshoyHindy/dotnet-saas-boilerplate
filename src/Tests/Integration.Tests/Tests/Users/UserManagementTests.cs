@@ -42,9 +42,13 @@ public sealed class UserManagementTests
     {
         using var client = await _auth.CreateRootAdminClientAsync();
 
-        var response = await client.GetAsync($"{TestConstants.IdentityBasePath}/users?pageNumber=1&pageSize=10");
+        var response = await client.GetAsync($"{TestConstants.IdentityBasePath}/users/search?pageNumber=1&pageSize=10");
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var page = await response.DeserializeAsync<PagedResponse<UserDto>>();
+        page.Items.ShouldNotBeNull();
+        page.PageNumber.ShouldBe(1);
+        page.PageSize.ShouldBe(10);
     }
 
     [Fact]
