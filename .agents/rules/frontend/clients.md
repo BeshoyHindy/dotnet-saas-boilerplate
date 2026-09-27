@@ -96,7 +96,10 @@ broader one.
 failed silent refresh — MUST call `endSessionLocally()` (`src/lib/query-client.ts`), never clear
 `tokenStore` by hand. It clears the token store and the query cache together (and, in the console,
 the acting session), so a forced sign-out can never hand the next person who signs in on that tab a
-stranger's cached data.
+stranger's cached data. A path the user did not ask for passes a reason —
+`endSessionLocally("expired")` for a dead refresh or a failed boot restore of a session that
+existed; the inactivity guard marks `"inactivity"` itself — and the login page turns it into its
+notice banner (`signedOutNotice` in `src/auth/inactivity.ts`). A deliberate logout passes none.
 
 ## Design system (Tailwind v4, shadcn-style)
 

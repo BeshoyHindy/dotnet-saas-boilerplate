@@ -2,6 +2,7 @@ import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 import { ApiRequestError, isTenantDeactivatedError } from "@/lib/api-client";
 import { router } from "@/routes";
 import { tokenStore } from "@/auth/token-store";
+import { markSignedOut, type SignedOutReason } from "@/auth/inactivity";
 import { actingStore } from "@/auth/acting-store";
 
 const TENANT_DEACTIVATED_PATH = "/tenant-deactivated";
@@ -32,8 +33,13 @@ function handleGlobalError(error: unknown) {
  * (logout, a dead refresh, a token-gone 401, boot's failed silent refresh) must call
  * this instead of clearing `tokenStore`/`actingStore` by hand — see
  * `.agents/rules/frontend/clients.md` (the rule) and `console.md` (the acting session it also drops).
+ *
+ * Pass a `reason` when the session ended without the user asking (a dead refresh, boot's
+ * failed restore): the login page reads it back and says why, instead of greeting them
+ * with a blank form. A deliberate sign-out passes none.
  */
-export function endSessionLocally(): void {
+export function endSessionLocally(reason?: SignedOutReason): void {
+  if (reason) markSignedOut(reason);
   actingStore.clear();
   tokenStore.clear();
   queryClient.clear();

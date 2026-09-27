@@ -7,6 +7,7 @@ import { AuthProvider } from "@/auth/auth-context";
 import { useAuth } from "@/auth/use-auth";
 import { tokenStore } from "@/auth/token-store";
 import { loadRuntimeConfig } from "@/env";
+import { consumeSignedOutReason } from "@/auth/inactivity";
 import { issueToken, type TokenResponse } from "@/auth/api";
 
 // `login()` goes through `issueToken` (openapi-fetch), which needs a `baseUrl` per
@@ -55,6 +56,7 @@ describe("AuthProvider session-ending paths", () => {
 
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     queryClient.clear();
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -125,5 +127,40 @@ describe("AuthProvider session-ending paths", () => {
 
     expect(localStorage.getItem("boilerplate.dashboard.accessToken")).toBeNull();
     expect(latest?.isAuthenticated).toBe(false);
+  });
+
+  it("a failed boot refresh tells the login page the session ended", async () => {
+    localStorage.setItem("boilerplate.dashboard.accessToken", "expired-token");
+    localStorage.setItem("boilerplate.dashboard.tenant", "acme");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: Request | string) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (url.includes("/auth/refresh")) return json({ status: 401 }, 401);
+        return json([]);
+      }),
+    );
+
+    await mount();
+    await vi.waitFor(() => {
+      expect(latest?.isInitializing).toBe(false);
+    });
+
+    // The reason the login page's notice banner reads back (see pages/login.tsx).
+    expect(consumeSignedOutReason()).toBe("expired");
+  });
+
+  it("a deliberately signed-out tab restores nothing and explains nothing", async () => {
+    // What logout() leaves behind: the tenant (for the next sign-in), no access token.
+    localStorage.setItem("boilerplate.dashboard.tenant", "acme");
+
+    await mount();
+    await vi.waitFor(() => {
+      expect(latest?.isInitializing).toBe(false);
+    });
+
+    expect(latest?.isAuthenticated).toBe(false);
+    expect(consumeSignedOutReason()).toBeNull();
   });
 });

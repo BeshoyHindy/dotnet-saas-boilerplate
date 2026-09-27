@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowRight, LogOut, ShieldAlert, UserCog } from "lucide-react";
+import { ArrowRight, LogOut, ShieldAlert, ShieldOff, UserCog, X } from "lucide-react";
 import { useAuth } from "@/auth/use-auth";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
@@ -22,7 +22,7 @@ import { cn } from "@/lib/cn";
  * those claims can no longer appear there.
  */
 export function ActingBanner() {
-  const { acting, exitTenant, user } = useAuth();
+  const { acting, exitTenant, user, actingEndedNotice, dismissActingEndedNotice } = useAuth();
   const navigate = useNavigate();
   const remaining = useCountdown(acting?.expiresAt);
 
@@ -35,7 +35,11 @@ export function ActingBanner() {
     onError: () => toast.error("Could not end the session cleanly"),
   });
 
-  if (!acting) return null;
+  if (!acting) {
+    return actingEndedNotice ? (
+      <ActingEndedBanner notice={actingEndedNotice} onDismiss={dismissActingEndedNotice} />
+    ) : null;
+  }
 
   // Crossing a tenant boundary is the louder of the two: a root operator reached into
   // somebody else's tenant. Same-tenant impersonation stays on the warning tone.
@@ -116,6 +120,61 @@ export function ActingBanner() {
       >
         <LogOut className="mr-1.5 h-3.5 w-3.5" />
         {exit.isPending ? "Leaving…" : "Exit"}
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * What the banner becomes when the acting session ended without the operator asking
+ * (grant revoked, token expired): the reason, in the same place, until they dismiss it.
+ * The swap of identity underneath them is the moment that most needs explaining, and a
+ * toast is gone before an operator who was looking elsewhere can read it.
+ */
+function ActingEndedBanner({ notice, onDismiss }: { notice: string; onDismiss: () => void }) {
+  const tone = "var(--color-warning)";
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      data-testid="acting-ended-banner"
+      className="relative z-40 flex flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-2.5 text-sm sm:px-6"
+      style={{
+        borderColor: `oklch(from ${tone} l c h / 0.28)`,
+        backgroundColor: "var(--color-muted)",
+      }}
+    >
+      <span
+        aria-hidden
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-xl"
+        style={{
+          backgroundColor: `oklch(from ${tone} l c h / 0.14)`,
+          color: tone,
+          boxShadow: `inset 0 0 0 1px oklch(from ${tone} l c h / 0.32)`,
+        }}
+      >
+        <ShieldOff className="h-3.5 w-3.5" />
+      </span>
+
+      <p className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-1">
+        <span
+          className="text-[11px] font-semibold uppercase tracking-wider"
+          style={{ color: tone }}
+        >
+          Stopped acting
+        </span>
+        <span className="text-[13px]">{notice}</span>
+      </p>
+
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={onDismiss}
+        data-testid="acting-ended-dismiss"
+        className="shrink-0"
+      >
+        <X className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+        Dismiss
       </Button>
     </div>
   );
