@@ -20,11 +20,17 @@ Build runs with `TreatWarningsAsErrors` — interpolated log calls won't even co
 
 ## Serilog
 
-`AddHeroLogging()` reads the `Serilog` config section (Console sink by default), attaches `HttpRequestContextEnricher` (adds `RequestMethod`/`RequestPath`/`UserAgent` + `UserId`/`Tenant`/`UserEmail` when authenticated), overrides Microsoft/EF/Hangfire/Finbuckle to higher levels, and excludes the `ExceptionHandlerMiddleware` source (the global handler logs exceptions itself — don't double-log).
+`AddHeroLogging()` reads the `Serilog` config section (Console sink only), attaches `HttpRequestContextEnricher` (adds `RequestMethod`/`RequestPath`/`UserAgent` + `UserId`/`Tenant` when authenticated — never the email address or any other personal field: the enricher stamps every event of the request), and excludes the `ExceptionHandlerMiddleware` source (the global handler logs exceptions itself — don't double-log).
+
+- **Levels live in config.** Category overrides (Microsoft, EF Core, Hangfire, Finbuckle) are in `Serilog:MinimumLevel:Override` in the API's `appsettings.json`; never set one in code, where it would silently beat the deployment's config. There is no `Logging:LogLevel` section: Serilog replaces the Microsoft.Extensions.Logging providers, so it would do nothing.
+- **Rendering.** Development's Console `outputTemplate` prints tenant, user and correlation id; Production's Console uses `RenderedCompactJsonFormatter`, one JSON object per event with every property. A new enriched property is invisible in Development until the template names it.
+- **Access log.** `AddHeroLogging` registers a startup filter that puts `UseSerilogRequestLogging` outside the whole pipeline, so the line records the status the caller received. 5xx → Error; a successful `/health/live` or `/health/ready` probe → Verbose (dropped); otherwise Information.
+- **Exceptions.** `GlobalExceptionHandler` logs a ≥500 at Error with the exception attached, and a 4xx at Warning with the exception type and detail but no stack trace. A `CustomException`'s ProblemDetails `Title` is the status reason phrase, never the CLR type name.
+- **No static sink entries for OTLP** in `Serilog:WriteTo` — log export is added in code only when an endpoint resolves (below).
 
 ## Correlation
 
-`X-Correlation-ID` request header (falls back to `HttpContext.TraceIdentifier`), surfaced in every ProblemDetails and pushed to the Serilog `LogContext`. `CurrentUserMiddleware` tags the current `Activity` with `boilerplate.user_id` / `boilerplate.tenant_id` / `boilerplate.correlation_id`.
+`X-Correlation-ID` request header (falls back to `HttpContext.TraceIdentifier`), surfaced in every ProblemDetails. Log events carry a per-request `CorrelationId` from the `WithCorrelationId` enricher (Serilog.Enrichers.CorrelationId). `CurrentUserMiddleware` tags the current `Activity` with `boilerplate.user_id` / `boilerplate.tenant_id` / `boilerplate.correlation_id`.
 
 ## OpenTelemetry
 

@@ -1,8 +1,9 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
-using Serilog.Events;
 using Serilog.Filters;
 using Serilog.Sinks.OpenTelemetry;
 
@@ -15,6 +16,11 @@ public static class Extensions
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddSingleton<HttpRequestContextEnricher>();
 
+        // One access-log line per request. Registered as a startup filter so it wraps the whole
+        // pipeline, outside UseExceptionHandler: the line then records the status the caller actually
+        // received (a handled NotFoundException logs 404, not the 500 it would see from inside).
+        builder.Services.AddTransient<IStartupFilter, RequestLoggingStartupFilter>();
+
         // Resolve OTLP log export once (env-var/config), so the sink is only added when an endpoint is available.
         var otlp = ResolveOtlpLogExport(builder);
 
@@ -23,13 +29,12 @@ public static class Extensions
             var httpEnricher = context.GetRequiredService<HttpRequestContextEnricher>();
             logger.ReadFrom.Configuration(builder.Configuration);
             logger.Enrich.With(httpEnricher);
-            logger
-                .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-                .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
-                .MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Error)
-                .MinimumLevel.Override("Hangfire", LogEventLevel.Warning)
-                .MinimumLevel.Override("Finbuckle.MultiTenant", LogEventLevel.Warning)
-                .Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware"));
+
+            // Category levels (Microsoft, EF Core, Hangfire, Finbuckle) live in Serilog:MinimumLevel:Override
+            // in appsettings, not here: an override set in code would silently beat whatever the deployment
+            // configures. The one rule that stays in code is structural — the global handler logs every
+            // exception itself, so the framework's own copy of the same exception is dropped.
+            logger.Filter.ByExcluding(Matching.FromSource("Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware"));
 
             // Ship structured logs over OTLP (e.g. the .NET Aspire dashboard / compose collector) when an endpoint is
             // available. Serilog owns the logging pipeline and does NOT forward to other ILogger providers, so the
