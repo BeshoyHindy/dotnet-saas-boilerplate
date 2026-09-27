@@ -224,6 +224,7 @@
                 "skills-lock.json",
                 "docs/adr/0001-*",
                 "docs/research/**",
+                "CHANGELOG.md",
                 ".github/workflows/brand-gate.yml",
                 ".github/workflows/template-smoke.yml",
                 "scripts/brand-gate.sh",
