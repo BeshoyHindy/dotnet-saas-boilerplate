@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, Sparkles, TimerOff } from "lucide-react";
 import { useAuth } from "@/auth/use-auth";
-import { consumeSignedOutReason } from "@/auth/inactivity";
+import { consumeSignedOutReason, signedOutNotice } from "@/auth/inactivity";
 import {
   readRememberedTenant,
   rememberTenant,
@@ -63,9 +63,8 @@ export function LoginPage() {
 
   // Surface why the previous session ended (read-and-clear, one-shot).
   useEffect(() => {
-    if (consumeSignedOutReason() === "inactivity") {
-      setNotice("You were signed out due to inactivity.");
-    }
+    const text = signedOutNotice(consumeSignedOutReason());
+    if (text) setNotice(text);
   }, []);
 
   if (isAuthenticated) {

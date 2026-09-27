@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { endSessionLocally, queryClient } from "@/lib/query-client";
+import { consumeSignedOutReason } from "@/auth/inactivity";
 
 describe("endSessionLocally", () => {
   afterEach(() => {
@@ -23,5 +24,13 @@ describe("endSessionLocally", () => {
   it("is a no-op when there is nothing to clear", () => {
     expect(() => endSessionLocally()).not.toThrow();
     expect(localStorage.getItem("boilerplate.dashboard.accessToken")).toBeNull();
+  });
+
+  it("stashes an involuntary ending's reason for the login page, and a deliberate one's none", () => {
+    endSessionLocally();
+    expect(consumeSignedOutReason()).toBeNull();
+
+    endSessionLocally("expired");
+    expect(consumeSignedOutReason()).toBe("expired");
   });
 });

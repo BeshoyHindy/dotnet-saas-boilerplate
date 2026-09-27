@@ -1,14 +1,9 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Bell, Check, MessageCircle } from "lucide-react";
-import {
-  getUnreadCount,
-  listNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
-  type NotificationDto,
-} from "@/api/notifications";
+import { getUnreadCount, listNotifications, type NotificationDto } from "@/api/notifications";
+import { useMarkNotificationsRead } from "@/components/notifications/use-mark-read";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,7 +19,6 @@ import { cn } from "@/lib/cn";
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
   const unreadQuery = useQuery({
     queryKey: ["notifications", "unread-count"],
@@ -39,21 +33,7 @@ export function NotificationBell() {
     staleTime: 0,
   });
 
-  const markAllMutation = useMutation({
-    mutationFn: markAllNotificationsRead,
-    onSuccess: () => {
-      queryClient.setQueryData(["notifications", "unread-count"], 0);
-      void queryClient.invalidateQueries({ queryKey: ["notifications", "inbox"] });
-    },
-  });
-
-  const markOneMutation = useMutation({
-    mutationFn: (id: string) => markNotificationRead(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["notifications", "unread-count"] });
-      void queryClient.invalidateQueries({ queryKey: ["notifications", "inbox"] });
-    },
-  });
+  const { markAll: markAllMutation, markOne: markOneMutation } = useMarkNotificationsRead();
 
   const unread = unreadQuery.data ?? 0;
   const inbox = inboxQuery.data ?? [];

@@ -101,4 +101,7 @@ operator gate above).
 `login()` additionally clears `actingStore` up front (before issuing the new token), since it is
 establishing a session rather than ending one. An acting session dropped **involuntarily**
 (revoked/expired, `acting-store`'s `drop()`) still calls `queryClient.clear()`, not
-`invalidateQueries()`: stale data must not be able to render before a refetch replaces it.
+`invalidateQueries()`: stale data must not be able to render before a refetch replaces it. Its
+reason stays in `acting-store` (`useAuth().actingEndedNotice`) and `ActingBanner` shows it in the
+acting session's place until the operator dismisses it — not a toast, which is gone before an
+operator who was looking elsewhere can read it. A new acting session or `clear()` retires it.

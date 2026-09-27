@@ -7,6 +7,7 @@ import { AuthProvider } from "@/auth/auth-context";
 import { useAuth } from "@/auth/use-auth";
 import { actingStore, type ActingSession } from "@/auth/acting-store";
 import { loadRuntimeConfig } from "@/env";
+import { consumeSignedOutReason } from "@/auth/inactivity";
 import { issueToken, type TokenResponse } from "@/auth/api";
 
 // `login()` goes through `issueToken` (openapi-fetch), which needs a `baseUrl` per
@@ -64,6 +65,7 @@ describe("AuthProvider session-ending paths", () => {
 
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
     actingStore.clear();
     queryClient.clear();
     container = document.createElement("div");
@@ -135,5 +137,68 @@ describe("AuthProvider session-ending paths", () => {
 
     expect(actingStore.get()).toBeNull();
     expect(localStorage.getItem("boilerplate.console.accessToken")).toBeNull();
+  });
+
+  it("a failed boot refresh tells the login page the session ended", async () => {
+    localStorage.setItem("boilerplate.console.accessToken", "expired-token");
+    localStorage.setItem("boilerplate.console.tenant", "acme");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: Request | string) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (url.includes("/auth/refresh")) return json({ status: 401 }, 401);
+        return json([]);
+      }),
+    );
+
+    await mount();
+    await vi.waitFor(() => {
+      expect(latest?.isInitializing).toBe(false);
+    });
+
+    // The reason the login page's notice banner reads back (see pages/login.tsx).
+    expect(consumeSignedOutReason()).toBe("expired");
+  });
+
+  it("a deliberately signed-out tab restores nothing and explains nothing", async () => {
+    // What logout() leaves behind: the tenant (for the next sign-in), no access token.
+    localStorage.setItem("boilerplate.console.tenant", "acme");
+
+    await mount();
+    await vi.waitFor(() => {
+      expect(latest?.isInitializing).toBe(false);
+    });
+
+    expect(latest?.isAuthenticated).toBe(false);
+    expect(consumeSignedOutReason()).toBeNull();
+  });
+
+  it("an involuntary acting drop keeps its reason, and clears the cache, until dismissed", async () => {
+    actingStore.start(ACTING);
+    await mount();
+    queryClient.setQueryData(["users"], [{ id: "acme-user" }]);
+
+    const reason = "Your session inside Acme Corp ended (revoked or expired).";
+    act(() => actingStore.drop(reason));
+
+    expect(latest?.acting).toBeNull();
+    expect(latest?.actingEndedNotice).toBe(reason);
+    // Fetched under the dropped credential, in another tenant.
+    expect(queryClient.getQueryData(["users"])).toBeUndefined();
+
+    act(() => latest!.dismissActingEndedNotice());
+    expect(latest?.actingEndedNotice).toBeNull();
+  });
+
+  it("a new acting session retires the previous one's ended notice", async () => {
+    actingStore.start(ACTING);
+    await mount();
+    act(() => actingStore.drop("Your session inside Acme Corp ended (revoked or expired)."));
+    expect(latest?.actingEndedNotice).not.toBeNull();
+
+    act(() => actingStore.start({ ...ACTING, jti: "acting-jti-2" }));
+
+    expect(latest?.actingEndedNotice).toBeNull();
   });
 });
