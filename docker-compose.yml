@@ -28,7 +28,7 @@ services:
   # needs them, and not publishing them keeps this file from colliding with a
   # Postgres you already run locally.
   postgres:
-    image: postgres:18-alpine
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-boilerplate}
@@ -48,7 +48,7 @@ services:
   # Valkey (BSD-licensed Redis fork). No password: the port is compose-internal
   # only, and a fake one here would just be a credential-shaped literal to leak.
   valkey:
-    image: valkey/valkey:9.1.2-alpine
+    image: valkey/valkey:9.1.2-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11
     restart: unless-stopped
     command: ["valkey-server", "--appendonly", "yes"]
     volumes:
@@ -134,7 +134,7 @@ services:
   # Mail catcher: every message the API sends is trapped here instead of being
   # delivered. Web UI on http://localhost:8025.
   mailpit:
-    image: axllent/mailpit:v1.31
+    image: axllent/mailpit:v1.31@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
     restart: unless-stopped
     environment:
       MP_MAX_MESSAGES: "500"
