@@ -32,9 +32,15 @@ public sealed class RefreshTokenRevocationTests
         var sessionsContent = await sessionsResponse.Content.ReadAsStringAsync();
         sessionsResponse.StatusCode.ShouldBe(HttpStatusCode.OK, $"Content: {sessionsContent}");
         var sessions = await sessionsResponse.Content.ReadFromJsonAsync<IEnumerable<UserSessionDto>>();
-        // Note: isCurrentSession is currently hardcoded to false in GetUserSessionsAsync
-        // so we take the first active session for this user.
-        var currentSession = sessions?.FirstOrDefault();
+        // isCurrentSession is hardcoded to false in GetUserSessionsAsync, so pick this token's own
+        // session by its sid. Taking "the first" root-admin session could revoke one another test is
+        // still using — and since #118 a revoked session's access token is refused immediately.
+        var sid = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler()
+            .ReadJwtToken(tokenPair.AccessToken)
+            .Claims
+            .First(c => c.Type == System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sid)
+            .Value;
+        var currentSession = sessions?.FirstOrDefault(s => s.Id == Guid.Parse(sid));
         currentSession.ShouldNotBeNull();
 
         // Act - Revoke current session

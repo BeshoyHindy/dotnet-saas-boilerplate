@@ -155,6 +155,9 @@ public class IdentityModule : IModule
         // Register session service and background cleanup
         services.AddScoped<ISessionService, SessionService>();
         services.AddHostedService<SessionCleanupHostedService>();
+        // Singleton: it owns the per-instance cache the JwtBearer hook reads on every request and
+        // SessionService marks on every revoke — one instance, or revocation is not immediate here.
+        services.AddSingleton<SessionLiveness>();
 
         // Register group role service for group-derived permissions
         services.AddScoped<IGroupRoleService, GroupRoleService>();
