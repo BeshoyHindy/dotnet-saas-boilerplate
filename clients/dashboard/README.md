@@ -55,7 +55,8 @@ user, in any tenant, is done in the console.
 |---|---|
 | `pnpm dev` | Vite dev server on port 5173 |
 | `pnpm build` | `tsc -b && vite build` — the typecheck + bundle gate |
-| `pnpm test` | Vitest units (jsdom), beside the source |
+| `pnpm test` | Vitest units (jsdom), beside the source, plus page tests for the users list and user detail |
+| `pnpm size` | Bundle budget (size-limit, `.size-limit.json`) — run after `pnpm build` |
 | `pnpm test:e2e` | Playwright smoke suite: sign-in and user CRUD (`--workers=1`) |
 | `pnpm lint` | ESLint |
 | `pnpm generate:api` | Regenerate `src/api/schema.d.ts` from the checked-in contract |
