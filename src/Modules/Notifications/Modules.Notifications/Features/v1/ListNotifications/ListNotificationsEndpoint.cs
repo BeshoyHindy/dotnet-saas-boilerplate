@@ -1,5 +1,7 @@
 using Boilerplate.BuildingBlocks.Shared.Identity.Authorization;
+using Boilerplate.BuildingBlocks.Shared.Persistence;
 using Boilerplate.Modules.Notifications.Contracts.Authorization;
+using Boilerplate.Modules.Notifications.Contracts.v1.DTOs;
 using Boilerplate.Modules.Notifications.Contracts.v1.Queries;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
@@ -12,11 +14,12 @@ public static class ListNotificationsEndpoint
 {
     internal static RouteHandlerBuilder MapListNotificationsEndpoint(this IEndpointRouteBuilder endpoints)
         => endpoints.MapGet("/",
-                async (bool? unreadOnly, int? page, int? pageSize, IMediator mediator, CancellationToken cancellationToken) =>
-                    TypedResults.Ok(await mediator.Send(
-                        new ListNotificationsQuery(unreadOnly ?? false, page ?? 1, pageSize ?? 50),
-                        cancellationToken)))
+                async ([AsParameters] ListNotificationsQuery query, IMediator mediator, CancellationToken cancellationToken) =>
+                    TypedResults.Ok(await mediator.Send(query, cancellationToken)))
             .WithName("ListNotifications")
             .WithSummary("List the caller's notifications (newest first)")
-            .RequirePermission(NotificationPermissions.Inbox.View);
+            .RequirePermission(NotificationPermissions.Inbox.View)
+            .Produces<PagedResponse<NotificationDto>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden);
 }

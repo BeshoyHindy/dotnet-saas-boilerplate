@@ -24,14 +24,22 @@ Cross-module communication: through Contracts service interfaces or integration 
 
 ## Feature folder layout (VSA)
 
-Each feature is a vertical slice in `Features/v{version}/{Area}/{Feature}/`:
+Each feature is a vertical slice in `Features/v{version}/{Feature}/`. A module with several areas adds
+one level, `Features/v{version}/{Area}/{Feature}/` — Identity does (`Users/`, `Roles/`, `Groups/` …);
+the four smaller modules are flat, and a new small module should be too.
 
 ```
-Features/v1/Users/RegisterUser/
+Features/v1/Users/RegisterUser/          # Identity: {Area}/{Feature}
 ├── RegisterUserEndpoint.cs          # minimal API endpoint
 ├── RegisterUserCommandHandler.cs    # CQRS handler (public sealed)
 └── RegisterUserCommandValidator.cs  # FluentValidation
+Features/v1/ListNotifications/           # Notifications: {Feature}
 ```
+
+The Contracts project mirrors it: `Contracts/v1/[{Area}/]{Feature}/` holds that feature's command or
+query and its response. Files and Notifications instead group Contracts by kind
+(`Contracts/v1/Commands/`, `Queries/`, `DTOs/`); that predates the rule — don't copy it into a new
+module.
 
 Module support folders: `Domain/`, `Data/`, `Services/`, `Events/`, `Authorization/`.
 
@@ -60,7 +68,7 @@ Adding a module requires editing **four** lists. Miss one and it fails *silently
 
 | Place | File | Symptom if missed |
 |---|---|---|
-| Mediator `o.Assemblies` (two markers: Contracts type **and** module type) | `src/Host/Boilerplate.Api/Program.cs` | Handlers silently undiscovered |
+| Mediator `o.Assemblies` (two types per module: any type from its **Contracts** assembly **and** any type from its **runtime** assembly — the generator scans each type's assembly, so a command, DTO or `*ContractsMarker` all work) | `src/Host/Boilerplate.Api/Program.cs` | Handlers silently undiscovered |
 | `moduleAssemblies` array | `src/Host/Boilerplate.Api/Program.cs` | Module never loaded |
 | Mediator assemblies (same pair) | `src/Host/Boilerplate.DbMigrator/Program.cs` | Migrate/seed misses the module |
 | module assemblies array | `src/Host/Boilerplate.DbMigrator/Program.cs` | Migrate/seed misses the module |

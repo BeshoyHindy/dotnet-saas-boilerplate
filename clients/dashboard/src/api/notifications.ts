@@ -1,17 +1,18 @@
-import { api, unwrap, unwrapVoid, type Schemas } from "@/lib/api-client";
+import { api, unwrap, unwrapVoid, type Paged, type Schemas } from "@/lib/api-client";
 
 export type NotificationDto = Schemas["NotificationDto"];
 
+/** The caller's inbox, newest first, one page at a time. The server's page size defaults to 50. */
 export async function listNotifications(
-  params: { unreadOnly?: boolean; page?: number; pageSize?: number } = {},
-): Promise<NotificationDto[]> {
+  params: { unreadOnly?: boolean; pageNumber?: number; pageSize?: number } = {},
+): Promise<Paged<NotificationDto>> {
   return unwrap(
     await api.GET("/api/v1/notifications", {
       params: {
         query: {
-          unreadOnly: params.unreadOnly,
-          page: params.page,
-          pageSize: params.pageSize,
+          UnreadOnly: params.unreadOnly,
+          PageNumber: params.pageNumber,
+          PageSize: params.pageSize,
         },
       },
     }),

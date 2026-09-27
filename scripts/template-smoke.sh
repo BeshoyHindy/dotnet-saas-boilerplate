@@ -104,6 +104,16 @@ if hits="$(grep -ri boilerplate "$OUT" || true)" && [ -n "$hits" ]; then
 fi
 echo "No 'boilerplate' in $OUT."
 
+# The template repository's own gates, research and history must not leak into a product's
+# docs: a scaffold's guide that tells its owner to run a script it does not have is wrong.
+step "grep for template-maintainer text over the scaffold (must be empty)"
+if hits="$(grep -rniE 'template-smoke|brand gate|brand-gate|docs/research|ADR-0001|starter kit' "$OUT" || true)" \
+    && [ -n "$hits" ]; then
+  echo "$hits" | head -50
+  fail "the scaffold still carries template-maintainer text"
+fi
+echo "No template-maintainer text in $OUT."
+
 step "Brand gate over the scaffold"
 # scripts/brand-gate.sh answers about tracked files, so the scaffold needs a git
 # index; it is a temp directory, and the repository under test is never touched.
@@ -139,6 +149,9 @@ exists "SECURITY.md"
 # Repo-only files the product must not inherit.
 not_exists ".git"
 not_exists "LICENSE"
+not_exists "docs/research"
+! grep -q '/.claude/worktrees/' "$OUT/.gitignore" \
+  || fail "the scaffold's .gitignore still carries the template repository's worktree line"
 not_exists ".gitleaksignore"
 not_exists ".template.config"
 not_exists ".agents/skills"

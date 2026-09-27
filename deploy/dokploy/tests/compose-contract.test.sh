@@ -78,7 +78,7 @@ refute_match "no stack has a Dockerfile reference" "$both_text" '[Dd]ockerfile'
 app_images="$(printf '%s\n' "$app_text" | grep -E '^[[:space:]]*image:' | sed -E 's/^[[:space:]]*image:[[:space:]]*//')"
 # Pinned, so a service that silently disappears fails the contract. The two clients
 # are the services this stack may legitimately not have — `dotnet new saas
-# --frontend false` scaffolds an API-only product (ADR-0001) — so the expected count
+# --frontend false` scaffolds an API-only product — so the expected count
 # follows them and everything else stays fixed. They come as a pair (ADR-0008): one
 # without the other is a scaffolding bug, and the assertions below check each.
 expected_app_images=2

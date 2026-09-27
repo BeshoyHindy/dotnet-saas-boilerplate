@@ -36,7 +36,7 @@ export function NotificationBell() {
   const { markAll: markAllMutation, markOne: markOneMutation } = useMarkNotificationsRead();
 
   const unread = unreadQuery.data ?? 0;
-  const inbox = inboxQuery.data ?? [];
+  const inbox = inboxQuery.data?.items ?? [];
 
   const onItemSelect = (n: NotificationDto) => {
     if (!n.readAtUtc) markOneMutation.mutate(n.id);

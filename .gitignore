@@ -498,7 +498,10 @@ spec-os/
 **/wwwroot/uploads/*
 
 /.claude/settings.local.json
+#if (templateRepository)
+# The template repository's own agent worktrees. A scaffold drops this block (the symbol is never set).
 /.claude/worktrees/
+#endif
 /.claude/scheduled_tasks.lock
 /.claude/last30days.env
 # Local AI-tool state should never be tracked, at any depth.

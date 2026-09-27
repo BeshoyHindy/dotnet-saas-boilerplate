@@ -124,7 +124,7 @@ public sealed record SweptUser(string UserId, string Email, string Password, str
 /// name) onto the resource the sweep substitutes there.
 ///
 /// This is the registry the coverage test enforces: a route with a resource parameter whose key is
-/// absent here, and which carries no <c>[TenantSweepExempt]</c>, fails the sweep with a message
+/// absent here, and which is not exempted with <c>.ExemptFromTenantSweep(...)</c>, fails the sweep with a message
 /// naming the key to add. That is how "a newly added endpoint is covered automatically" is true
 /// rather than aspirational.
 /// </summary>

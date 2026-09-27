@@ -5,7 +5,7 @@ status: accepted
 
 Every access token carries exactly one `tenant` claim (the immutable tenant Id, not the renameable identifier), and on an authenticated request that claim is the *only* input to tenant resolution. The `tenant` header strategy, the `?tenant=` query strategy and any host strategy are deleted, not disabled. `UseAuthentication()` runs before tenant resolution; an authenticated principal without a `tenant` claim is rejected with 401.
 
-The upstream starter kit resolved the tenant from a caller-supplied header and relied on tenant-scoped user rows to make a foreign header harmless, then added post-auth middleware to compensate. That is isolation by coincidence of several layers. We want it by construction: the caller cannot name a tenant, so there is nothing to validate.
+The upstream project this one was derived from resolved the tenant from a caller-supplied header and relied on tenant-scoped user rows to make a foreign header harmless, then added post-auth middleware to compensate. That is isolation by coincidence of several layers. We want it by construction: the caller cannot name a tenant, so there is nothing to validate.
 
 ## The rules
 

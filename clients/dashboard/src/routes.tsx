@@ -2,7 +2,10 @@ import { lazy, Suspense, type ComponentType } from "react";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppShell } from "@/components/layout/app-shell";
 import { ProtectedRoute } from "@/auth/protected-route";
+import { RouteGuard } from "@/auth/route-guard";
 import { RouteError } from "@/components/route-error";
+import { IdentityPermissions, AuditingPermissions } from "@/lib/permissions";
+import { ALL_TRASH_PERMISSIONS } from "@/lib/trash-permissions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
 
@@ -157,17 +160,87 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: withSuspense(<OverviewPage />) },
           { path: "system/health", element: withSuspense(<HealthPage />) },
-          { path: "system/audits", element: withSuspense(<AuditsPage />) },
-          { path: "system/trash", element: withSuspense(<TrashPage />) },
-          { path: "system/sessions", element: withSuspense(<SessionsPage />) },
-          { path: "files", element: withSuspense(<MyFilesPage />) },
+          {
+            path: "system/audits",
+            element: (
+              <RouteGuard perms={[AuditingPermissions.AuditTrails.View]}>
+                {withSuspense(<AuditsPage />)}
+              </RouteGuard>
+            ),
+          },
+          {
+            path: "system/trash",
+            element: (
+              <RouteGuard anyPerms={ALL_TRASH_PERMISSIONS}>
+                {withSuspense(<TrashPage />)}
+              </RouteGuard>
+            ),
+          },
+          {
+            path: "system/sessions",
+            element: (
+              <RouteGuard perms={[IdentityPermissions.Sessions.ViewAll]}>
+                {withSuspense(<SessionsPage />)}
+              </RouteGuard>
+            ),
+          },
+          {
+            path: "files",
+            element: (
+              <RouteGuard perms={["Permissions.Files.Upload"]}>
+                {withSuspense(<MyFilesPage />)}
+              </RouteGuard>
+            ),
+          },
           { path: "identity", element: <Navigate to="/identity/users" replace /> },
-          { path: "identity/users", element: withSuspense(<UsersPage />) },
-          { path: "identity/users/:userId", element: withSuspense(<UserDetailPage />) },
-          { path: "identity/roles", element: withSuspense(<RolesPage />) },
-          { path: "identity/roles/:roleId", element: withSuspense(<RoleDetailPage />) },
-          { path: "identity/groups", element: withSuspense(<GroupsPage />) },
-          { path: "identity/groups/:groupId", element: withSuspense(<GroupDetailPage />) },
+          {
+            path: "identity/users",
+            element: (
+              <RouteGuard perms={[IdentityPermissions.Users.Update]}>
+                {withSuspense(<UsersPage />)}
+              </RouteGuard>
+            ),
+          },
+          {
+            path: "identity/users/:userId",
+            element: (
+              <RouteGuard perms={[IdentityPermissions.Users.Update]}>
+                {withSuspense(<UserDetailPage />)}
+              </RouteGuard>
+            ),
+          },
+          {
+            path: "identity/roles",
+            element: (
+              <RouteGuard perms={[IdentityPermissions.Roles.Update]}>
+                {withSuspense(<RolesPage />)}
+              </RouteGuard>
+            ),
+          },
+          {
+            path: "identity/roles/:roleId",
+            element: (
+              <RouteGuard perms={[IdentityPermissions.Roles.Update]}>
+                {withSuspense(<RoleDetailPage />)}
+              </RouteGuard>
+            ),
+          },
+          {
+            path: "identity/groups",
+            element: (
+              <RouteGuard perms={["Permissions.Groups.Update"]}>
+                {withSuspense(<GroupsPage />)}
+              </RouteGuard>
+            ),
+          },
+          {
+            path: "identity/groups/:groupId",
+            element: (
+              <RouteGuard perms={["Permissions.Groups.Update"]}>
+                {withSuspense(<GroupDetailPage />)}
+              </RouteGuard>
+            ),
+          },
 
           {
             path: "settings",

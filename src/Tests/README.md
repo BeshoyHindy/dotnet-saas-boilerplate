@@ -1,6 +1,6 @@
 # Architecture Tests
 
-This folder contains solution-wide architecture tests for the Boilerplate .NET 10 Starter Kit. The goal is to automatically enforce layering, dependency, and naming rules as the codebase evolves.
+This folder contains solution-wide architecture tests for Boilerplate. The goal is to automatically enforce layering, dependency, and naming rules as the codebase evolves.
 
 ## Project
 

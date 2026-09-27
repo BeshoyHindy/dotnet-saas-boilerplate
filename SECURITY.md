@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-This is a starter kit. Only the current `main` branch receives security fixes. Forks, downstream projects, and tagged releases are owned by their maintainers — pull fixes in on your own cadence.
+Only the latest release — the current `main` branch — receives security fixes. Older tags are not patched; upgrade to the latest release.
 
 ## Reporting a vulnerability
 
@@ -28,8 +28,8 @@ Fixes ship as a patched commit on `main` plus a GitHub Security Advisory. Report
 
 In scope: `src/` (BuildingBlocks, Modules, Host), the default `appsettings.*.json`, and anything this repository ships under `clients/`.
 
-Out of scope: third-party NuGet/npm packages (report upstream) and issues in downstream forks (contact that fork's maintainer).
+Out of scope: vulnerabilities in third-party NuGet/npm packages themselves (report them upstream; do tell us if one is exploitable through this project).
 
 ## Production hardening
 
-This kit ships with development-friendly defaults. Before deploying a fork, rotate JWT signing keys and seeded passwords, lock CORS, keep the `Permissions.Hangfire.View` operator permission on the root tenant's Admin role only, and persist DataProtection keys to a shared store for multi-instance hosting.
+Local development runs with development-friendly defaults. Before any deployment, rotate JWT signing keys and seeded passwords, lock CORS, keep the `Permissions.Hangfire.View` operator permission on the root tenant's Admin role only, and persist DataProtection keys to a shared store for multi-instance hosting.

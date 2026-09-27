@@ -1,7 +1,7 @@
 name: Secret Scan
 
 # The template must ship zero credential-shaped literals (.gitleaks.toml states
-# the rule and its narrow allow-list). Like the brand gate this runs on EVERY
+# the rule and its narrow allow-list). It runs on EVERY
 # pull request with no path filter — a secret can land in any file type.
 #
 # The upstream gitleaks *action* is licence-gated for organisations, so this job

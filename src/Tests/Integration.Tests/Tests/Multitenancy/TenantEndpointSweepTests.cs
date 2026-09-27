@@ -26,7 +26,7 @@ namespace Integration.Tests.Tests.Multitenancy;
 /// The endpoint list comes from <c>EndpointDataSource</c> at run time, so a route added tomorrow is
 /// swept tomorrow. A route the registry cannot seed a resource for fails
 /// <see cref="Every_Resource_Endpoint_Is_Covered_By_The_Registry_Or_Explicitly_Exempt"/> with the
-/// registry key to add; the only way out is <c>[TenantSweepExempt("reason")]</c> at the mapping site.
+/// registry key to add; the only way out is <c>.ExemptFromTenantSweep("reason")</c> at the mapping site.
 ///
 /// <para><b>Shape.</b> These are aggregating tests, not a theory-per-endpoint. xUnit resolves theory
 /// data at discovery time, and the endpoint list does not exist until a host is built — enumerating
@@ -763,7 +763,7 @@ public sealed class TenantEndpointSweepTests
         yield return (ResourceKind.Session,
             "/api/v1/identity/sessions?pageNumber=1&pageSize=100", tenant[ResourceKind.Session]);
         yield return (ResourceKind.Notification,
-            "/api/v1/notifications?page=1&pageSize=100", tenant[ResourceKind.Notification]);
+            "/api/v1/notifications?pageNumber=1&pageSize=100", tenant[ResourceKind.Notification]);
         yield return (ResourceKind.ImpersonationGrant,
             "/api/v1/identity/impersonation/grants?take=100", tenant[ResourceKind.ImpersonationGrant]);
         yield return (ResourceKind.TrashedFile,

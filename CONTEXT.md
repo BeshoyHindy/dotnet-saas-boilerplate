@@ -1,6 +1,11 @@
 # Boilerplate
 
-A multi-tenant SaaS product: one modular .NET monolith, one React console, one deployment shape.
+<!--#if (frontend) -->
+A multi-tenant SaaS product: one modular .NET monolith, two React clients (the Dashboard and the
+Console), one deployment shape.
+<!--#else -->
+A multi-tenant SaaS product: one modular .NET monolith and its API, one deployment shape.
+<!--#endif -->
 This is the glossary — the words this repository uses and the words it refuses. Decisions behind them
 live in `docs/adr/`.
 
@@ -146,12 +151,12 @@ _Avoid_: the frontend, the SPA (there are two).
 
 **Contract**:
 The checked-in OpenAPI document `clients/openapi/v1.json` — the one agreed description of the API.
-The console's types are generated from it and nothing hand-writes an API type.
+Both clients' types are generated from it and nothing hand-writes an API type.
 _Avoid_: schema, spec, swagger, API docs.
 
 **Drift gate**:
 The CI check that re-derives both sides of the Contract — re-exporting the document from the API and
-regenerating the console's types — and fails when either differs from what is committed.
+regenerating both clients' types — and fails when either differs from what is committed.
 _Avoid_: codegen check, sync check, lint.
 
 ### Running and shipping it
@@ -171,8 +176,8 @@ admin, which are not demo accounts), fixture.
 
 **Stack**:
 One deployable compose unit. There are two: the data-services stack (database, cache, object storage)
-and the app stack (migrator, API, console). Staging and production run the same two stacks with
-different values (ADR-0005).
+and the app stack (migrator, API, dashboard, console). Staging and production run the same two
+stacks with different values (ADR-0005).
 _Avoid_: environment (an environment is staging or production), deployment, service, cluster.
 
 **Public file URL**:

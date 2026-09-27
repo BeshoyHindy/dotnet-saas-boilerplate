@@ -296,14 +296,41 @@ public sealed class NotificationsEndpointTests
         await client.PostAsync($"{NotificationsBasePath}/{seeded[0]}/read", content: null);
 
         using var unreadOnlyResp = await client.GetAsync($"{NotificationsBasePath}/?unreadOnly=true");
-        var unreadList = await unreadOnlyResp.DeserializeAsync<IReadOnlyList<NotificationDto>>();
+        var unreadPage = await unreadOnlyResp.DeserializeAsync<PagedResponse<NotificationDto>>();
+        unreadPage.TotalCount.ShouldBe(2, "The total must count only the filtered rows");
+        var unreadList = unreadPage.Items.ToList();
         unreadList.Count.ShouldBe(2);
         unreadList.ShouldAllBe(n => n.ReadAtUtc == null);
         unreadList.ShouldNotContain(n => n.Id == seeded[0]);
 
         using var allResp = await client.GetAsync($"{NotificationsBasePath}/");
-        var allList = await allResp.DeserializeAsync<IReadOnlyList<NotificationDto>>();
-        allList.Count.ShouldBe(3, "Default list (no unreadOnly) must include both read and unread");
+        var allPage = await allResp.DeserializeAsync<PagedResponse<NotificationDto>>();
+        allPage.Items.Count.ShouldBe(3, "Default list (no unreadOnly) must include both read and unread");
+    }
+
+    [Fact]
+    public async Task ListNotifications_Should_Default_PageSize_To_50()
+    {
+        var user = await RegisterFreshUserAsync();
+        using var client = await _auth.CreateAuthenticatedClientAsync(user.Email, user.Password);
+
+        using var response = await client.GetAsync($"{NotificationsBasePath}/");
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var page = await response.DeserializeAsync<PagedResponse<NotificationDto>>();
+
+        page.PageNumber.ShouldBe(1);
+        page.PageSize.ShouldBe(50);
+    }
+
+    [Fact]
+    public async Task ListNotifications_Should_Return400_When_PageSize_Exceeds_Cap()
+    {
+        var user = await RegisterFreshUserAsync();
+        using var client = await _auth.CreateAuthenticatedClientAsync(user.Email, user.Password);
+
+        using var response = await client.GetAsync($"{NotificationsBasePath}/?pageSize=101");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
     }
 
     [Fact]
@@ -329,17 +356,26 @@ public sealed class NotificationsEndpointTests
         var seeded = await SeedNotificationsAsync(user.Id, count: 4, spaceCreationByMs: 50);
         using var client = await _auth.CreateAuthenticatedClientAsync(user.Email, user.Password);
 
-        using var page1Resp = await client.GetAsync($"{NotificationsBasePath}/?page=1&pageSize=2");
-        var page1 = await page1Resp.DeserializeAsync<IReadOnlyList<NotificationDto>>();
-        page1.Count.ShouldBe(2, "Page 1 with pageSize=2 must return the first 2 rows");
-        page1[0].Id.ShouldBe(seeded[3], "Newest first across pages");
-        page1[1].Id.ShouldBe(seeded[2]);
+        using var page1Resp = await client.GetAsync($"{NotificationsBasePath}/?pageNumber=1&pageSize=2");
+        var page1 = await page1Resp.DeserializeAsync<PagedResponse<NotificationDto>>();
+        page1.PageNumber.ShouldBe(1);
+        page1.PageSize.ShouldBe(2);
+        page1.TotalCount.ShouldBe(4);
+        page1.TotalPages.ShouldBe(2);
+        page1.HasNext.ShouldBeTrue();
+        var page1Items = page1.Items.ToList();
+        page1Items.Count.ShouldBe(2, "Page 1 with pageSize=2 must return the first 2 rows");
+        page1Items[0].Id.ShouldBe(seeded[3], "Newest first across pages");
+        page1Items[1].Id.ShouldBe(seeded[2]);
 
-        using var page2Resp = await client.GetAsync($"{NotificationsBasePath}/?page=2&pageSize=2");
-        var page2 = await page2Resp.DeserializeAsync<IReadOnlyList<NotificationDto>>();
-        page2.Count.ShouldBe(2);
-        page2[0].Id.ShouldBe(seeded[1]);
-        page2[1].Id.ShouldBe(seeded[0]);
+        using var page2Resp = await client.GetAsync($"{NotificationsBasePath}/?pageNumber=2&pageSize=2");
+        var page2 = await page2Resp.DeserializeAsync<PagedResponse<NotificationDto>>();
+        page2.PageNumber.ShouldBe(2);
+        page2.HasNext.ShouldBeFalse();
+        var page2Items = page2.Items.ToList();
+        page2Items.Count.ShouldBe(2);
+        page2Items[0].Id.ShouldBe(seeded[1]);
+        page2Items[1].Id.ShouldBe(seeded[0]);
     }
 
     // ─── helpers ─────────────────────────────────────────────────────
@@ -444,9 +480,11 @@ public sealed class NotificationsEndpointTests
 
     private static async Task<IReadOnlyList<NotificationDto>> ReadInboxAsync(HttpClient client)
     {
-        using var response = await client.GetAsync($"{NotificationsBasePath}/?pageSize=200");
+        // 100 is the shared pager's cap; no test seeds more than a handful of rows per user.
+        using var response = await client.GetAsync($"{NotificationsBasePath}/?pageSize=100");
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
-        return await response.DeserializeAsync<IReadOnlyList<NotificationDto>>();
+        var page = await response.DeserializeAsync<PagedResponse<NotificationDto>>();
+        return page.Items.ToList();
     }
 
     private static async Task<int> GetUnreadCountAsync(HttpClient client)
