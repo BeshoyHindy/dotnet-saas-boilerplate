@@ -95,6 +95,14 @@ event-side counterpart of a system job. A blank tenant without the declaration i
 platform-wide event.
 _Avoid_: system event, broadcast event, untenanted event.
 
+**Job monitor**:
+Hangfire's dashboard as this product ships it: every tenant's jobs, at `/jobs`, for root operators
+only. `Hangfire.View` opens it read-only and `Hangfire.Manage` makes it writable. API clients reach
+it with a bearer token; a browser reaches it through the console, which hands out a short-lived
+cookie accepted on that route alone (ADR-0009).
+_Avoid_: Hangfire dashboard, jobs dashboard (*Dashboard* is the tenant client), job console, admin
+jobs page.
+
 ### Shape of the codebase
 
 **Module**:

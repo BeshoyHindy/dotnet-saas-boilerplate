@@ -2,6 +2,7 @@ import {
   Building2,
   HeartPulse,
   LayoutDashboard,
+  ListChecks,
   ScrollText,
   Settings,
   ShieldCheck,
@@ -10,7 +11,7 @@ import {
   UsersRound,
   Wifi,
 } from "lucide-react";
-import { IdentityPermissions, MultitenancyPermissions } from "@/lib/permissions";
+import { IdentityPermissions, MultitenancyPermissions, SystemPermissions } from "@/lib/permissions";
 
 export type NavSpec = {
   to: string;
@@ -97,6 +98,8 @@ export const sections: NavSection[] = [
       { to: "/system/health", label: "Health", icon: HeartPulse },
       { to: "/system/audits", label: "Audit trail", icon: ScrollText, perm: "Permissions.AuditTrails.View" },
       { to: "/system/sessions", label: "Sessions", icon: Wifi, perm: "Permissions.Sessions.ViewAll" },
+      // Opens the Job monitor (Hangfire's dashboard) in a new tab — ADR-0009.
+      { to: "/system/job-monitor", label: "Jobs", icon: ListChecks, perm: SystemPermissions.Hangfire.View },
     ],
   },
 ];

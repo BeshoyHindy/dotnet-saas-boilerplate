@@ -560,6 +560,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/identity/operator/job-monitor-access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open the Job monitor from a browser
+         * @description ADR-0009. Sets a short-lived cookie that opens the Job monitor (the Hangfire dashboard) in this browser: HttpOnly, Secure, SameSite=Strict, host-only, Path set to the Job monitor route, a fixed 15-minute life, bound to the caller's session — logging out or revoking the session ends it. The cookie is accepted on the Job monitor route only. Root operators only; refused while acting. Every issue is recorded as a security audit event. The body names the path to open and when the cookie expires; it never contains the credential.
+         */
+        post: operations["IssueJobMonitorAccess"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/identity/operator/token-exchange": {
         parameters: {
             query?: never;
@@ -1698,6 +1718,11 @@ export interface components {
             actorUserId: string;
             impersonatedTenantId: string;
             impersonatedUserId: string;
+        };
+        JobMonitorAccessResponse: {
+            /** Format: date-time */
+            expiresAt: string;
+            path: string;
         };
         JsonElement: unknown;
         LayoutDto: {
@@ -3270,6 +3295,40 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    IssueJobMonitorAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobMonitorAccessResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

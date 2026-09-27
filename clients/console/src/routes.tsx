@@ -4,7 +4,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { ProtectedRoute } from "@/auth/protected-route";
 import { RouteGuard } from "@/auth/route-guard";
 import { RouteError } from "@/components/route-error";
-import { IdentityPermissions, MultitenancyPermissions } from "@/lib/permissions";
+import { IdentityPermissions, MultitenancyPermissions, SystemPermissions } from "@/lib/permissions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
 
@@ -62,6 +62,7 @@ const AppearanceSettings = lazyNamed(
 const HealthPage = lazyNamed(() => import("@/pages/health"), "HealthPage");
 const AuditsPage = lazyNamed(() => import("@/pages/audits"), "AuditsPage");
 const SessionsPage = lazyNamed(() => import("@/pages/system/sessions"), "SessionsPage");
+const JobMonitorPage = lazyNamed(() => import("@/pages/system/job-monitor"), "JobMonitorPage");
 const UsersPage = lazyNamed(() => import("@/pages/identity/users"), "UsersPage");
 const UserDetailPage = lazyNamed(
   () => import("@/pages/identity/user-detail"),
@@ -162,6 +163,15 @@ export const router = createBrowserRouter([
           { path: "system/health", element: withSuspense(<HealthPage />) },
           { path: "system/audits", element: withSuspense(<AuditsPage />) },
           { path: "system/sessions", element: withSuspense(<SessionsPage />) },
+          {
+            // Not `/jobs`: that path is the Job monitor itself, which nginx forwards to the API.
+            path: "system/job-monitor",
+            element: (
+              <RouteGuard perms={[SystemPermissions.Hangfire.View]}>
+                {withSuspense(<JobMonitorPage />)}
+              </RouteGuard>
+            ),
+          },
           { path: "identity", element: <Navigate to="/identity/users" replace /> },
           { path: "identity/users", element: withSuspense(<UsersPage />) },
           { path: "identity/users/:userId", element: withSuspense(<UserDetailPage />) },

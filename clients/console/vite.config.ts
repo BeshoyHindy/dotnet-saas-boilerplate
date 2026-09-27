@@ -33,6 +33,8 @@ export default defineConfig(({ mode }) => {
         // /system/health page 404s in dev, because Vite would serve the request
         // itself instead of proxying it.
         "/health": { target: apiBase, changeOrigin: true, secure: false },
+        // The Job monitor (ADR-0009) is served by the API; nginx forwards it in production.
+        "/jobs": { target: apiBase, changeOrigin: true, secure: false },
       },
     },
     test: {
