@@ -140,6 +140,10 @@ public class IdentityModule : IModule
         // Tenant validity grace period (shared "TenantValidity" section) — used by the login expiry check.
         services.Configure<TenantGraceOptions>(builder.Configuration.GetSection(TenantGraceOptions.SectionName));
 
+        // The console's origin for the root tenant's own mailed links (see MailLinkOrigin). Optional —
+        // a `--frontend false` scaffold never sets it, and every mail keeps using OriginOptions.OriginUrl.
+        services.Configure<MailLinkOriginOptions>(builder.Configuration.GetSection(MailLinkOriginOptions.SectionName));
+
         // Lifetime ceiling for every acting token (operator exchange + impersonation). Validated on
         // start so a misconfigured Default/Max pair fails the host, not the first exchange.
         services.AddOptions<OperatorExchangeOptions>()

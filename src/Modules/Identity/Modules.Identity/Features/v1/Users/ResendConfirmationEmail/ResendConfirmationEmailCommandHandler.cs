@@ -1,7 +1,9 @@
+using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.BuildingBlocks.Web.Origin;
 using Boilerplate.Modules.Identity.Contracts.Services;
 using Boilerplate.Modules.Identity.Contracts.v1.Users.ResendConfirmationEmail;
 using Boilerplate.Modules.Identity.Services;
+using Finbuckle.MultiTenant.Abstractions;
 using Mediator;
 using Microsoft.Extensions.Options;
 
@@ -11,11 +13,19 @@ public sealed class ResendConfirmationEmailCommandHandler : ICommandHandler<Rese
 {
     private readonly IUserService _userService;
     private readonly IOptions<OriginOptions> _originOptions;
+    private readonly IOptions<MailLinkOriginOptions> _mailLinkOriginOptions;
+    private readonly IMultiTenantContextAccessor<AppTenantInfo> _multiTenantContextAccessor;
 
-    public ResendConfirmationEmailCommandHandler(IUserService userService, IOptions<OriginOptions> originOptions)
+    public ResendConfirmationEmailCommandHandler(
+        IUserService userService,
+        IOptions<OriginOptions> originOptions,
+        IOptions<MailLinkOriginOptions> mailLinkOriginOptions,
+        IMultiTenantContextAccessor<AppTenantInfo> multiTenantContextAccessor)
     {
         _userService = userService;
         _originOptions = originOptions;
+        _mailLinkOriginOptions = mailLinkOriginOptions;
+        _multiTenantContextAccessor = multiTenantContextAccessor;
     }
 
     public async ValueTask<Unit> Handle(ResendConfirmationEmailCommand command, CancellationToken cancellationToken)
@@ -23,7 +33,7 @@ public sealed class ResendConfirmationEmailCommandHandler : ICommandHandler<Rese
         ArgumentNullException.ThrowIfNull(command);
 
         // Same source as the password-reset link (see MailLinkOrigin): configuration, not the request.
-        var origin = MailLinkOrigin.Require(_originOptions);
+        var origin = MailLinkOrigin.Require(_originOptions, _mailLinkOriginOptions, _multiTenantContextAccessor);
 
         await _userService.ResendConfirmationEmailAsync(command.UserId, origin, cancellationToken).ConfigureAwait(false);
 

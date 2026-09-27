@@ -198,8 +198,12 @@ services:
       CachingOptions__EnableSsl: "false"
       JwtOptions__SigningKey: ${JWT_SIGNING_KEY:?run scripts/local-env.sh to generate .env}
       # Mailed links (password reset, email confirmation) go to a tenant's users, so the
-      # origin the API writes into them is the DASHBOARD's, never the operator console's.
+      # origin the API writes into them defaults to the DASHBOARD's. MailLinkOrigin swaps in
+      # the console's for the root tenant's own users (operators) — see ConsoleOriginUrl below.
       OriginOptions__OriginUrl: ${APP_DASHBOARD_URL:-http://localhost:8081}
+      #if (frontend)
+      MailLinkOrigin__ConsoleOriginUrl: ${APP_CONSOLE_URL:-http://localhost:8082}
+      #endif
       CorsOptions__AllowedOrigins__0: ${APP_DASHBOARD_URL:-http://localhost:8081}
       CorsOptions__AllowedOrigins__1: ${APP_CONSOLE_URL:-http://localhost:8082}
       AllowedHosts: ${ALLOWED_HOSTS:-localhost;127.0.0.1;api}
