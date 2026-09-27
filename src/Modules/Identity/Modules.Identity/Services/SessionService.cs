@@ -526,6 +526,58 @@ public sealed class SessionService : ISessionService
         return sessions.Count;
     }
 
+    public async Task<int> RevokeAllSessionsWithinSaveAsync(
+        string userId,
+        string revokedBy,
+        string reason,
+        Func<CancellationToken, Task> save,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(save);
+        var tenantId = CurrentTenantId();
+
+        // Tracked + Revoke (not ExecuteUpdate) so each SessionRevokedEvent is raised, and so the rows
+        // ride on the caller's save instead of committing on their own.
+        var sessions = await _db.UserSessions
+            .Where(s => s.UserId == userId && !s.IsRevoked)
+            .ToListAsync(cancellationToken);
+
+        var revokedAt = _timeProvider.GetUtcNow().UtcDateTime;
+        foreach (var session in sessions)
+        {
+            session.Revoke(revokedAt, revokedBy, reason, tenantId);
+        }
+
+        try
+        {
+            await save(cancellationToken);
+        }
+        catch
+        {
+            // The caller's save failed, so nothing was revoked. Put the staged rows back as they were,
+            // or a later save in this scope would commit the revocations on their own.
+            foreach (var session in sessions)
+            {
+                var entry = _db.Entry(session);
+                entry.CurrentValues.SetValues(entry.OriginalValues);
+                entry.State = EntityState.Unchanged;
+                session.ClearDomainEvents();
+            }
+
+            throw;
+        }
+
+        MarkRevokedOnThisInstance(sessions.Select(s => s.Id));
+
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("{RevokedBy} revoked {Count} sessions for user {UserId}: {Reason}",
+                revokedBy, sessions.Count, userId, reason);
+        }
+
+        return sessions.Count;
+    }
+
     public async Task<bool> RevokeSessionForAdminAsync(
         Guid sessionId,
         string revokedBy,
