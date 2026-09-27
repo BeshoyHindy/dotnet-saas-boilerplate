@@ -1,4 +1,4 @@
-import { api, AS_OPERATOR, unwrap, unwrapVoid, type Paged, type Schemas } from "@/lib/api-client";
+import { api, ApiRequestError, AS_OPERATOR, unwrap, unwrapVoid, type Paged, type Schemas } from "@/lib/api-client";
 
 // -----------------------------
 // Types — every one of them is the generated contract type (ADR-0004).
@@ -121,9 +121,18 @@ export async function getMyPermissions(options: { asOperator?: boolean } = {}): 
   );
 }
 
-/** The authenticated user's full profile (name, email, phone, imageUrl, …). */
-export async function getMyProfile(): Promise<UserDto> {
-  return unwrap(await api.GET("/api/v1/identity/profile", {}));
+/**
+ * The authenticated user's profile plus its version: the strong `ETag` the server sends with it
+ * (#107). `etag` is what `updateMyProfile` echoes in `If-Match`, so the version travels with the
+ * representation the user is looking at. Null only if the header did not reach script.
+ */
+export type MyProfile = UserDto & { etag: string | null };
+
+/** The authenticated user's full profile (name, email, phone, imageUrl, …) and its version. */
+export async function getMyProfile(): Promise<MyProfile> {
+  const result = await api.GET("/api/v1/identity/profile", {});
+  const profile = unwrap(result);
+  return { ...profile, etag: result.response.headers.get("ETag") };
 }
 
 export async function registerUser(input: RegisterUserInput): Promise<RegisterUserResponse> {
@@ -300,24 +309,39 @@ export type UpdateProfileInput = {
 
 /**
  * Updates the authenticated user's profile. Email changes go through their own dedicated
- * endpoint. Reads the current profile first so unset optional fields keep their existing
- * values instead of being nulled.
+ * endpoint.
+ *
+ * `current` is the profile the user was shown — not a fresh read. Its fields fill whatever
+ * `input` leaves unset in this full-representation PUT, and its `etag` rides in `If-Match`, so a
+ * profile changed elsewhere since then is refused with 412 (`isProfileConflict`) instead of
+ * overwritten (#107). Re-reading here, as this used to, would always send the newest version and
+ * protect nothing. On a 412 the caller refetches and shows the conflict; it never resends.
  */
-export async function updateMyProfile(input: UpdateProfileInput): Promise<void> {
-  const profile = await getMyProfile();
+export async function updateMyProfile(current: MyProfile, input: UpdateProfileInput): Promise<void> {
+  if (!current.etag) {
+    throw new Error(
+      "Your profile's version is unknown, so it cannot be saved safely. Reload the page and try again.",
+    );
+  }
   unwrapVoid(
     await api.PUT("/api/v1/identity/profile", {
+      params: { header: { "If-Match": current.etag } },
       body: {
-        id: profile.id ?? "",
-        firstName: input.firstName ?? profile.firstName ?? null,
-        lastName: input.lastName ?? profile.lastName ?? null,
-        phoneNumber: input.phoneNumber ?? profile.phoneNumber ?? null,
-        email: profile.email,
+        id: current.id ?? "",
+        firstName: input.firstName ?? current.firstName ?? null,
+        lastName: input.lastName ?? current.lastName ?? null,
+        phoneNumber: input.phoneNumber ?? current.phoneNumber ?? null,
+        email: current.email,
         image: input.image ?? null,
         deleteCurrentImage: input.deleteCurrentImage ?? false,
       },
     }),
   );
+}
+
+/** True for the 412 a profile update gets when the profile changed since it was read. */
+export function isProfileConflict(error: unknown): boolean {
+  return error instanceof ApiRequestError && error.status === 412;
 }
 
 // -----------------------------

@@ -95,6 +95,10 @@ than a 400; `DemoSeedGuard` does for the demo password.
 
 The avatar's object key carries the user id (`uploads/tenants/{t}/appuser/{userId}/…`) and the replace/remove path calls the owner-scoped `RemoveIfOwnedAsync<AppUser>(old, user.Id, ct)`, so one user's avatar change can never delete another's object — the tenant owns both keys, which is exactly why tenant scoping was not enough. A row still holding an arbitrary URL is skipped and logged on that first delete, then overwritten. See `storage.md`.
 
+## Profile updates are conditional (#107)
+
+`PUT /identity/profile` replaces the whole profile, so two editors would silently overwrite each other. `GET /identity/profile` sends `AppUser.ConcurrencyStamp` as a strong `ETag` (`ProfileETag`; `UserDto.ConcurrencyStamp` is `[JsonIgnore]`, so no body carries it). The PUT takes an **optional** `If-Match`, checked straight after the user is loaded and **before any storage call**, so a stale request never uploads or deletes an avatar. A mismatch, and Identity's `ConcurrencyFailure` from either save (`SetPhoneNumberAsync` saves too), is `ProfileChangedException` → **412**. `RefreshSignInAsync` runs only after the save succeeded. Both clients always send `If-Match` with the version the user was shown (never a fresh read), and on 412 refetch and show the conflict — **never resend automatically**, which would overwrite the change the 412 protected.
+
 ## Permission gating footgun
 
 `RequiredPermissionAttribute` implements `Boilerplate.BuildingBlocks.Shared.Identity.Authorization.IRequiredPermissionMetadata`. **Never let a second/duplicate `IRequiredPermissionMetadata` appear** — it silently disables **all** `.RequirePermission()` gates across the app. Permission constants live in `Shared/Identity/*Permissions.cs`.

@@ -48,17 +48,27 @@ internal sealed class UserProfileService(
             EmailConfirmed = user.EmailConfirmed,
             PhoneNumber = user.PhoneNumber,
             TwoFactorEnabled = user.TwoFactorEnabled,
+            ConcurrencyStamp = user.ConcurrencyStamp,
         };
     }
 
     public Task<int> GetCountAsync(CancellationToken cancellationToken) =>
         userManager.Users.AsNoTracking().CountAsync(cancellationToken);
 
-    public async Task UpdateAsync(string userId, string firstName, string lastName, string phoneNumber, FileUploadRequest image, bool deleteCurrentImage, CancellationToken cancellationToken = default)
+    public async Task UpdateAsync(string userId, string firstName, string lastName, string phoneNumber, FileUploadRequest image, bool deleteCurrentImage, string? ifMatch = null, CancellationToken cancellationToken = default)
     {
         var user = await userManager.FindByIdAsync(userId);
 
         _ = user ?? throw new NotFoundException("user not found");
+
+        // The precondition is checked here, straight after the load and before the storage calls
+        // below: a stale request must not upload a new avatar or delete the current one (#107).
+        // A save that lands after this check is still caught — UserManager saves with the stamp it
+        // loaded, and that comes back as ConcurrencyFailure.
+        if (!ProfileETag.Matches(ifMatch, user.ConcurrencyStamp))
+        {
+            throw new ProfileChangedException();
+        }
 
         Uri imageUri = user.ImageUrl ?? null!;
         // image is optional: text-only edits forward a null FileUploadRequest, so guard before
@@ -96,16 +106,32 @@ internal sealed class UserProfileService(
         string? currentPhoneNumber = await userManager.GetPhoneNumberAsync(user);
         if (phoneNumber != currentPhoneNumber)
         {
-            await userManager.SetPhoneNumberAsync(user, phoneNumber);
+            // SetPhoneNumberAsync saves on its own, so its result is a save result like the one below.
+            EnsureSaved(await userManager.SetPhoneNumberAsync(user, phoneNumber));
         }
 
-        var result = await userManager.UpdateAsync(user);
+        EnsureSaved(await userManager.UpdateAsync(user));
+
+        // Only after the save succeeded: refreshing the sign-in for a change that did not persist
+        // would re-issue the principal from values the database does not hold.
         await signInManager.RefreshSignInAsync(user);
+    }
 
-        if (!result.Succeeded)
+    private static void EnsureSaved(IdentityResult result)
+    {
+        if (result.Succeeded)
         {
-            throw new CustomException("Update profile failed");
+            return;
         }
+
+        // Matched on the code, never the localizable description.
+        var concurrencyFailure = new IdentityErrorDescriber().ConcurrencyFailure().Code;
+        if (result.Errors.Any(error => error.Code == concurrencyFailure))
+        {
+            throw new ProfileChangedException();
+        }
+
+        throw new CustomException("Update profile failed");
     }
 
     public async Task<bool> ExistsWithEmailAsync(string email, string? exceptId = null, CancellationToken cancellationToken = default)

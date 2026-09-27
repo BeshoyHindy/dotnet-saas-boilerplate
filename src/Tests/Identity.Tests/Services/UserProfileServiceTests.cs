@@ -1,4 +1,5 @@
 using Finbuckle.MultiTenant.Abstractions;
+using Boilerplate.BuildingBlocks.Core.Exceptions;
 using Boilerplate.BuildingBlocks.Shared.Multitenancy;
 using Boilerplate.BuildingBlocks.Shared.Storage;
 using Boilerplate.BuildingBlocks.Storage;
@@ -30,7 +31,9 @@ public sealed class UserProfileServiceTests
     private readonly UserManager<AppUser> _userManager;
     private readonly SignInManager<AppUser> _signInManager;
     private readonly IStorageService _storage = Substitute.For<IStorageService>();
-    private readonly AppUser _user = new() { Id = UserId, UserName = "ada", Email = "ada@example.com" };
+    private const string Stamp = "3c2a9e57-6f0d-4f4e-8a8e-6f3f1d7b2c10";
+
+    private readonly AppUser _user = new() { Id = UserId, UserName = "ada", Email = "ada@example.com", ConcurrencyStamp = Stamp };
 
     public UserProfileServiceTests()
     {
@@ -44,6 +47,7 @@ public sealed class UserProfileServiceTests
 
         _userManager.FindByIdAsync(UserId).Returns(_user);
         _userManager.UpdateAsync(Arg.Any<AppUser>()).Returns(IdentityResult.Success);
+        _userManager.SetPhoneNumberAsync(Arg.Any<AppUser>(), Arg.Any<string?>()).Returns(IdentityResult.Success);
         _storage.UploadAsync<AppUser>(
                 Arg.Any<FileUploadRequest>(), Arg.Any<FileType>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("https://cdn.example.com/uploads/tenants/acme/appuser/" + UserId + "/new.png");
@@ -77,7 +81,7 @@ public sealed class UserProfileServiceTests
     {
         var sut = CreateSut();
 
-        await sut.UpdateAsync(UserId, "Ada", "Lovelace", "123", Png(), deleteCurrentImage: false, CancellationToken.None);
+        await sut.UpdateAsync(UserId, "Ada", "Lovelace", "123", Png(), deleteCurrentImage: false, cancellationToken: CancellationToken.None);
 
         await _storage.Received(1).UploadAsync<AppUser>(
             Arg.Any<FileUploadRequest>(), FileType.Image, UserId, Arg.Any<CancellationToken>());
@@ -94,7 +98,7 @@ public sealed class UserProfileServiceTests
         _user.ImageUrl = new Uri(neighboursAvatar);
         var sut = CreateSut();
 
-        await sut.UpdateAsync(UserId, "Ada", "Lovelace", "123", Png(), deleteCurrentImage: false, CancellationToken.None);
+        await sut.UpdateAsync(UserId, "Ada", "Lovelace", "123", Png(), deleteCurrentImage: false, cancellationToken: CancellationToken.None);
 
         await _storage.Received(1).RemoveIfOwnedAsync<AppUser>(
             neighboursAvatar, UserId, Arg.Any<CancellationToken>());
@@ -108,7 +112,7 @@ public sealed class UserProfileServiceTests
         _user.ImageUrl = new Uri(mine);
         var sut = CreateSut();
 
-        await sut.UpdateAsync(UserId, "Ada", "Lovelace", "123", null!, deleteCurrentImage: true, CancellationToken.None);
+        await sut.UpdateAsync(UserId, "Ada", "Lovelace", "123", null!, deleteCurrentImage: true, cancellationToken: CancellationToken.None);
 
         await _storage.Received(1).RemoveIfOwnedAsync<AppUser>(mine, UserId, Arg.Any<CancellationToken>());
         _user.ImageUrl.ShouldBeNull();
@@ -120,9 +124,90 @@ public sealed class UserProfileServiceTests
         _user.ImageUrl = new Uri("https://cdn.example.com/uploads/tenants/acme/appuser/" + UserId + "/keep.png");
         var sut = CreateSut();
 
-        await sut.UpdateAsync(UserId, "Ada", "Lovelace", "123", null!, deleteCurrentImage: false, CancellationToken.None);
+        await sut.UpdateAsync(UserId, "Ada", "Lovelace", "123", null!, deleteCurrentImage: false, cancellationToken: CancellationToken.None);
 
         _storage.ReceivedCalls().ShouldBeEmpty();
         _user.ImageUrl.ShouldNotBeNull();
     }
+
+    #region If-Match and the save result (#107)
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("\"" + Stamp + "\"")]
+    [InlineData("*")]
+    [InlineData("\"something-else\", \"" + Stamp + "\"")]
+    public async Task UpdateAsync_Should_Save_When_IfMatchIsAbsentOrNamesTheCurrentVersion(string? ifMatch)
+    {
+        var sut = CreateSut();
+
+        await sut.UpdateAsync(UserId, "Ada", "Lovelace", "123", Png(), deleteCurrentImage: false, ifMatch, CancellationToken.None);
+
+        await _userManager.Received(1).UpdateAsync(_user);
+        await _signInManager.Received(1).RefreshSignInAsync(_user);
+    }
+
+    [Theory]
+    [InlineData("\"an-older-version\"")]
+    [InlineData("W/\"" + Stamp + "\"")]
+    [InlineData("not-a-quoted-tag")]
+    public async Task UpdateAsync_Should_Throw412_BeforeAnyStorageCall_When_IfMatchIsStale(string ifMatch)
+    {
+        // A weak tag never passes If-Match (strong comparison), and neither does one that does not
+        // parse. The check sits before the avatar upload and the delete of the old one, so a stale
+        // request leaves storage exactly as it was.
+        _user.ImageUrl = new Uri("https://cdn.example.com/uploads/tenants/acme/appuser/" + UserId + "/old.png");
+        var sut = CreateSut();
+
+        var ex = await Should.ThrowAsync<ProfileChangedException>(() =>
+            sut.UpdateAsync(UserId, "Ada", "Lovelace", "123", Png(), deleteCurrentImage: false, ifMatch, CancellationToken.None));
+
+        ex.StatusCode.ShouldBe(System.Net.HttpStatusCode.PreconditionFailed);
+        _storage.ReceivedCalls().ShouldBeEmpty();
+        await _userManager.DidNotReceive().UpdateAsync(Arg.Any<AppUser>());
+        await _signInManager.DidNotReceive().RefreshSignInAsync(Arg.Any<AppUser>());
+    }
+
+    [Fact]
+    public async Task UpdateAsync_Should_Throw412_AndNotRefreshSignIn_When_TheSaveHitsAConcurrencyFailure()
+    {
+        // A save that lands between the load and this one: the If-Match passed, the stamp did not.
+        _userManager.UpdateAsync(_user).Returns(IdentityResult.Failed(new IdentityErrorDescriber().ConcurrencyFailure()));
+        var sut = CreateSut();
+
+        var ex = await Should.ThrowAsync<ProfileChangedException>(() =>
+            sut.UpdateAsync(UserId, "Ada", "Lovelace", "123", null!, deleteCurrentImage: false, "\"" + Stamp + "\"", CancellationToken.None));
+
+        ex.StatusCode.ShouldBe(System.Net.HttpStatusCode.PreconditionFailed);
+        await _signInManager.DidNotReceive().RefreshSignInAsync(Arg.Any<AppUser>());
+    }
+
+    [Fact]
+    public async Task UpdateAsync_Should_Throw412_When_ThePhoneNumberSaveHitsAConcurrencyFailure()
+    {
+        // SetPhoneNumberAsync saves on its own; its result used to be discarded.
+        _userManager.GetPhoneNumberAsync(_user).Returns("000");
+        _userManager.SetPhoneNumberAsync(_user, "123").Returns(IdentityResult.Failed(new IdentityErrorDescriber().ConcurrencyFailure()));
+        var sut = CreateSut();
+
+        await Should.ThrowAsync<ProfileChangedException>(() =>
+            sut.UpdateAsync(UserId, "Ada", "Lovelace", "123", null!, deleteCurrentImage: false, null, CancellationToken.None));
+
+        await _signInManager.DidNotReceive().RefreshSignInAsync(Arg.Any<AppUser>());
+    }
+
+    [Fact]
+    public async Task UpdateAsync_Should_StillFailWithoutA412_When_TheSaveFailsForAnotherReason()
+    {
+        _userManager.UpdateAsync(_user).Returns(IdentityResult.Failed(new IdentityError { Code = "Other", Description = "nope" }));
+        var sut = CreateSut();
+
+        var ex = await Should.ThrowAsync<CustomException>(() =>
+            sut.UpdateAsync(UserId, "Ada", "Lovelace", "123", null!, deleteCurrentImage: false, null, CancellationToken.None));
+
+        ex.ShouldNotBeOfType<ProfileChangedException>();
+        await _signInManager.DidNotReceive().RefreshSignInAsync(Arg.Any<AppUser>());
+    }
+
+    #endregion
 }
