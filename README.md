@@ -147,6 +147,19 @@ Dokploy environment variables (ADR-0005)
 — see [`docs/deploy-dokploy.md`](docs/deploy-dokploy.md), which takes a blank server to a healthy
 HTTPS deployment.
 
+Telemetry is fully instrumented but exported nowhere by default. To see it locally:
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=http://otlp-receiver:18889 docker compose --profile otel up --build
+```
+
+Traces, logs and metrics then show up at <http://localhost:18888> (the standalone .NET Aspire
+Dashboard, unauthenticated, local-only) — no other setup needed. To keep the endpoint set without
+repeating it on the command line, put the same `OTEL_EXPORTER_OTLP_ENDPOINT` line in `.env` instead
+(see [`.env.example`](.env.example)). Point it at any other OTLP-compatible receiver instead to skip
+this container entirely. See [`docs/deploy-dokploy.md`](docs/deploy-dokploy.md#9-wire-an-otlp-backend)
+for wiring a real backend behind a deployment.
+
 | Symptom | Likely cause |
 |---|---|
 | `POSTGRES_PASSWORD ... run scripts/local-env.sh` at `docker compose up` | No `.env` yet. Run the script; the error names the missing variable. |

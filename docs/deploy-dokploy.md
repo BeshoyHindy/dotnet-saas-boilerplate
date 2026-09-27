@@ -470,7 +470,44 @@ docker compose -f deploy/dokploy/app.compose.yml config -q
 (with an env file supplying the keys — the contract test generates a throwaway
 one for exactly this).
 
-## 9. Hardening follow-up
+## 9. Wire an OTLP backend
+
+Both compose stacks build the API's full OpenTelemetry instrumentation —
+traces, metrics, and OTLP log export via Serilog — whether or not anything
+receives it. Neither Dokploy stack ships a collector, and that is a product's
+choice stated here, not an oversight: which backend to send telemetry to (a
+hosted SaaS, a self-managed collector, whatever the operator already runs) is
+for each product to decide, not this template.
+
+Two variables from the worksheet in §3 drive it, and `app.compose.yml` passes
+both straight through to the API container unchanged:
+
+| Variable | Effect |
+|---|---|
+| `OTEL_EXPORTER_ENABLED` | `false` (the default) computes every span, log line and metric point and discards it. `true` turns export on. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Where to send it — any OTLP-compatible receiver reachable from the server. The protocol is fixed to gRPC (`appsettings.Production.json`), so the URL must carry a gRPC port explicitly, e.g. `http://collector:4317` — `http://collector` alone resolves to port 80 and export fails. |
+
+To wire a backend: set both `OTEL_EXPORTER_ENABLED=true` and
+`OTEL_EXPORTER_OTLP_ENDPOINT=<your receiver's URL:port>` in the application
+stack's Environment tab, then redeploy. The two keys are read together — an
+endpoint left in place with the flag still `false` is dead configuration that
+looks live (§3 above says the same thing from the worksheet's side).
+
+This is enough for any backend that accepts OTLP over gRPC without extra
+headers — a self-hosted OpenTelemetry Collector in front of whatever you
+actually use, or a managed endpoint that embeds its credential in the URL
+itself. Neither `app.compose.yml` nor `.env.example` passes through
+`OTEL_EXPORTER_OTLP_PROTOCOL` or `OTEL_EXPORTER_OTLP_HEADERS`, so an
+`http/protobuf`-only backend or one that authenticates over an OTLP header
+(an API-key header, a per-vendor auth header) is not reachable straight from
+either compose file today — that is a known limit of this template, not of
+your backend; put your own collector in front of it if you need one.
+
+For local development instead of a real backend, `docker compose --profile
+otel up` in the repo root (not this Dokploy stack) runs a disposable OTLP
+receiver + viewer — see [`README.md`](../README.md).
+
+## 10. Hardening follow-up
 
 Two things this stack does are correct-but-broad, and worth tightening once a
 deployment is real:
@@ -497,7 +534,7 @@ signature carries the access, so `publicUrl` must never be persisted: un-sharing
 a file stops issuance immediately, but a signature already handed out stays
 usable until it expires.
 
-## 10. When it does not work
+## 11. When it does not work
 
 | Symptom | Cause |
 |---|---|
