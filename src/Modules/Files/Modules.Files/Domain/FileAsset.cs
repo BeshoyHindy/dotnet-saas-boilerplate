@@ -96,7 +96,12 @@ public sealed class FileAsset : AggregateRoot<Guid>, ISoftDeletable
 
         SizeBytes = actualSize;
         ScanStatus = scanResult;
-        Status = scanResult == ScanStatus.Infected ? FileAssetStatus.Quarantined : FileAssetStatus.Available;
+        // Fail closed: a scan that couldn't reach a verdict is treated the same as an infected
+        // one. Only a scan that came back Clean may serve the file; ScanFailed stays quarantined
+        // for an operator to retry the scan or clear manually, same as Infected.
+        Status = scanResult is ScanStatus.Infected or ScanStatus.ScanFailed
+            ? FileAssetStatus.Quarantined
+            : FileAssetStatus.Available;
         UploadDeadline = null;
         UpdatedAtUtc = DateTime.UtcNow;
 
