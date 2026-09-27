@@ -16,6 +16,16 @@ internal sealed class ConfigureForwardedHeaders(IOptions<ProxyOptions> options) 
         ArgumentNullException.ThrowIfNull(forwarded);
 
         var proxy = options.Value;
+
+        // Cleared unconditionally, even when proxy support is disabled: the stock defaults trust
+        // loopback only, which never matches a proxy running in another container, but if
+        // ASPNETCORE_FORWARDEDHEADERS_ENABLED=true is ever set, ASP.NET Core's own
+        // ForwardedHeadersOptionsSetup empties both lists on top of whatever this method leaves behind
+        // — and an empty list means "trust any peer". Clearing here too means that variable can never
+        // turn an implicitly-disabled proxy into one that trusts everyone.
+        forwarded.KnownProxies.Clear();
+        forwarded.KnownIPNetworks.Clear();
+
         if (!proxy.Enabled)
         {
             return;
@@ -28,10 +38,6 @@ internal sealed class ConfigureForwardedHeaders(IOptions<ProxyOptions> options) 
         // header, so there is nothing to recover from the forwarded one.
         forwarded.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
         forwarded.ForwardLimit = proxy.ForwardLimit;
-
-        // The defaults trust loopback only, which never matches a proxy running in another container.
-        forwarded.KnownProxies.Clear();
-        forwarded.KnownIPNetworks.Clear();
 
         if (proxy.TrustAnyProxy)
         {

@@ -5,8 +5,10 @@ using Boilerplate.BuildingBlocks.Web.Security;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using System.Net;
 
 namespace Framework.Tests.Web;
 
@@ -148,6 +150,25 @@ public sealed class HardeningOptionsTests
     }
 
     [Fact]
+    public void ConfigureForwardedHeaders_Should_ClearTheTrustLists_When_ProxySupportIsDisabled()
+    {
+        // Arrange — pre-populate as if a prior configurator (or ASP.NET Core's own
+        // ForwardedHeadersOptionsSetup, triggered by ASPNETCORE_FORWARDEDHEADERS_ENABLED=true) had
+        // already added entries. An empty list means "trust any peer", so a disabled proxy must never
+        // leave stale entries — or a later empty-by-default state — meaning that.
+        var forwarded = new ForwardedHeadersOptions();
+        forwarded.KnownProxies.Add(IPAddress.Parse("10.1.2.3"));
+        forwarded.KnownIPNetworks.Add(System.Net.IPNetwork.Parse("10.0.0.0/8"));
+
+        // Act
+        new ConfigureForwardedHeaders(Options.Create(new ProxyOptions { Enabled = false })).Configure(forwarded);
+
+        // Assert
+        forwarded.KnownProxies.ShouldBeEmpty();
+        forwarded.KnownIPNetworks.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void ProxyOptionsValidator_Should_Succeed_When_Disabled()
     {
         // Act
@@ -242,6 +263,42 @@ public sealed class HardeningOptionsTests
 
         // Assert
         result.Succeeded.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("appsettings.json")]
+    [InlineData("appsettings.Production.json")]
+    public void CorsOptions_Should_AllowPatch_When_LoadedFromTheHostConfiguration(string fileName)
+    {
+        // Arrange — two PATCH endpoints exist (toggle user status, change file visibility) and both
+        // clients call them; a caller on another origin needs the restricted policy to allow PATCH.
+        var configuration = new ConfigurationBuilder()
+            .AddJsonFile(HostAppsettingsPath(fileName))
+            .Build();
+
+        // Act
+        var methods = configuration.GetSection("CorsOptions:AllowedMethods").Get<string[]>();
+
+        // Assert
+        methods.ShouldNotBeNull();
+        methods.ShouldContain("PATCH");
+    }
+
+    private static string HostAppsettingsPath(string fileName)
+    {
+        var directory = new DirectoryInfo(Directory.GetCurrentDirectory());
+
+        while (directory is not null && !Directory.Exists(Path.Combine(directory.FullName, "src")))
+        {
+            directory = directory.Parent;
+        }
+
+        if (directory is null)
+        {
+            throw new InvalidOperationException("Unable to locate solution root containing 'src' folder.");
+        }
+
+        return Path.Combine(directory.FullName, "src", "Host", "Boilerplate.Api", fileName);
     }
 
     #endregion
