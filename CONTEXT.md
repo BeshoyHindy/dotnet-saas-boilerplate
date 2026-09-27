@@ -61,7 +61,8 @@ static class is gone).
 **Authorization intent**:
 The single declaration every endpoint must carry about who may call it — a permission set,
 authenticated-only, or anonymous. There is no default: an endpoint that declares nothing is denied
-for everyone and fails the build.
+for everyone and fails `EndpointAuthorizationIntentTests` in Integration.Tests (the build and the
+architecture tests do not catch it).
 _Avoid_: auth attribute, endpoint policy, "unsecured endpoint" (there is no such endpoint).
 
 ### Work in the background

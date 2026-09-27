@@ -2660,13 +2660,6 @@
           },
           {
             "in": "query",
-            "name": "TenantId",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
             "name": "FromUtc",
             "schema": {
               "format": "date-time",

@@ -2263,7 +2263,6 @@ export interface operations {
             query?: {
                 Action?: components["schemas"]["SecurityAction"];
                 UserId?: string;
-                TenantId?: string;
                 FromUtc?: string;
                 ToUtc?: string;
                 Skip?: number;

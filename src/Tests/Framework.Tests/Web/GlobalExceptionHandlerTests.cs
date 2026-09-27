@@ -62,4 +62,24 @@ public sealed class GlobalExceptionHandlerTests
 
         context.Response.StatusCode.ShouldBe(StatusCodes.Status500InternalServerError);
     }
+
+    // F36 of the scaffold dry run: a handler that honoured a tenant id taken from the request body
+    // made Finbuckle refuse the save ("1 added entities with Tenant Id mismatch"). The data stayed
+    // safe, but the caller got a 500 naming the exception type. The caller asked for something that
+    // cannot be done in its own tenant — a client error — and the answer must name neither the
+    // library that refused it nor anything about the tenant the request named.
+    [Fact]
+    public async Task TryHandleAsync_Should_Map_MultiTenantException_To_400_Without_Naming_It()
+    {
+        var context = await HandleAsync(
+            new Finbuckle.MultiTenant.Abstractions.MultiTenantException("1 added entities with Tenant Id mismatch."));
+
+        context.Response.StatusCode.ShouldBe(StatusCodes.Status400BadRequest);
+
+        context.Response.Body.Position = 0;
+        using var reader = new StreamReader(context.Response.Body);
+        var body = await reader.ReadToEndAsync();
+        body.ShouldNotContain("MultiTenantException");
+        body.ShouldNotContain("Tenant Id mismatch");
+    }
 }

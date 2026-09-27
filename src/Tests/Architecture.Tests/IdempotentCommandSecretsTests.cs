@@ -163,7 +163,7 @@ public sealed partial class IdempotentCommandSecretsTests
     /// <c>ModuleAssemblyDiscovery</c> does — "whatever happens to be loaded already" depends on which
     /// test ran first, which is not a thing to build a guarantee on.
     /// </summary>
-    private static IEnumerable<Assembly> ContractsAssemblies()
+    internal static IEnumerable<Assembly> ContractsAssemblies()
     {
         foreach (var file in Directory.GetFiles(AppContext.BaseDirectory, "Boilerplate.Modules.*.Contracts.dll"))
         {
