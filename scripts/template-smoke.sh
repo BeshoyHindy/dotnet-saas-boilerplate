@@ -71,6 +71,16 @@ echo "template-smoke: name=$NAME frontend=$FRONTEND aspire=$ASPIRE sandcastle=$S
 echo "template-smoke: workspace $WORK"
 
 # ── Scaffold ─────────────────────────────────────────────────────────
+# `dotnet new install <dir>` scans the whole tree for .template.config, and when it
+# finds several with the same identity (e.g. agent worktrees under .claude/worktrees,
+# each a full checkout of some older branch) it silently picks one — so the smoke
+# would test a stale copy of the template, not this one. Refuse instead.
+nested="$(find "$REPO" -mindepth 2 -type d -name .template.config -not -path '*/node_modules/*' 2>/dev/null || true)"
+if [ -n "$nested" ]; then
+  echo "$nested"
+  fail "nested .template.config directories under $REPO would shadow this template; run from a clean worktree or remove them (e.g. .claude/worktrees)"
+fi
+
 step "Installing the template from $REPO into a throwaway hive"
 dotnet new install "$REPO" --debug:custom-hive "$HIVE"
 
