@@ -310,8 +310,7 @@ public sealed class OperatorTokenExchangeTests : IAsyncLifetime
         using var actingClient = ClientWithBearer(acting.AccessToken);
 
         // Act
-        var users = await actingClient.GetFromJsonAsync<List<UserPayload>>(
-            $"{TestConstants.IdentityBasePath}/users", Json);
+        var users = await ListAllUsersAsync(actingClient);
 
         // Assert — exactly one tenant is visible: the target's.
         users.ShouldNotBeNull();
@@ -331,8 +330,7 @@ public sealed class OperatorTokenExchangeTests : IAsyncLifetime
         forgedClient.DefaultRequestHeaders.Add("tenant", TestConstants.RootTenantId);
 
         // Act
-        var users = await forgedClient.GetFromJsonAsync<List<UserPayload>>(
-            $"{TestConstants.IdentityBasePath}/users", Json);
+        var users = await ListAllUsersAsync(forgedClient);
 
         // Assert — still the target tenant's users, header or no header.
         users.ShouldNotBeNull();
@@ -649,6 +647,18 @@ public sealed class OperatorTokenExchangeTests : IAsyncLifetime
         return client;
     }
 
+    // The paged search is the only user listing (#136). The target tenant holds a handful of
+    // users, so one max-size page is the whole set — asserted, so a ShouldNotContain can never
+    // pass merely because the row sat on a later page.
+    private static async Task<List<UserPayload>> ListAllUsersAsync(HttpClient client)
+    {
+        var page = await client.GetFromJsonAsync<UserPage>(
+            $"{TestConstants.IdentityBasePath}/users/search?pageNumber=1&pageSize=100", Json);
+        page.ShouldNotBeNull();
+        page.TotalCount.ShouldBe(page.Items.Count);
+        return page.Items;
+    }
+
     private Task<HttpClient> CreateTenantAdminClientAsync() =>
         _auth.CreateAuthenticatedClientAsync(_tenantAdminEmail, TestConstants.DefaultPassword, _tenantId);
 
@@ -697,6 +707,12 @@ public sealed class OperatorTokenExchangeTests : IAsyncLifetime
     {
         public string Id { get; set; } = default!;
         public string? Email { get; set; }
+    }
+
+    private sealed class UserPage
+    {
+        public List<UserPayload> Items { get; set; } = [];
+        public int TotalCount { get; set; }
     }
 
     private sealed class SessionPayload
