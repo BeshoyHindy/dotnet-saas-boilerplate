@@ -26,6 +26,8 @@
          seeded accounts in through the real login endpoint. Internal + this, rather than public,
          because CA1515 is right that an application assembly has no public API. -->
     <InternalsVisibleTo Include="Boilerplate.Integration.Tests" />
+    <!-- HostModules.All, compared with every [AppModule] assembly by HostModuleListTests. -->
+    <InternalsVisibleTo Include="Boilerplate.Architecture.Tests" />
   </ItemGroup>
 
   <ItemGroup>

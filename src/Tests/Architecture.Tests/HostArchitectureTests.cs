@@ -55,9 +55,21 @@ public class HostArchitectureTests
             .NotHaveDependencyOnAny(forbiddenNamespaces)
             .GetResult();
 
-        var hostFailingTypes = hostResult.FailingTypeNames ?? Array.Empty<string>();
+        // The Migrator is a data tool: two of its types reach module data layers on purpose. They went
+        // unchecked until Architecture.Tests referenced the DbMigrator (for HostModuleListTests).
+        var allowed = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Boilerplate.DbMigrator.ModuleSchema"] =
+                "leaves TenantDbContext out of the shared module-schema pass; the catalog is migrated first",
+            ["Boilerplate.DbMigrator.DemoSeed.DemoSeeder"] =
+                "writes the demo tenants and people straight into the Identity and Multitenancy stores (ADR-0003 amendment)",
+        };
 
-        hostResult.IsSuccessful.ShouldBeTrue(
+        var hostFailingTypes = (hostResult.FailingTypeNames ?? Array.Empty<string>())
+            .Where(name => !allowed.ContainsKey(name))
+            .ToArray();
+
+        hostFailingTypes.ShouldBeEmpty(
             "Hosts should not depend directly on module feature or data internals. " +
             $"Failing types: {string.Join(", ", hostFailingTypes)}");
     }

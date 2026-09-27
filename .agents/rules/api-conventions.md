@@ -73,4 +73,4 @@ Use `Specification<T>` (`src/BuildingBlocks/Persistence/Specifications/`) for qu
 2. Handler in `Modules.{Name}/Features/v1/[{Area}/]{Feature}/`.
 3. Validator in the same folder.
 4. Endpoint in the same folder; wire in module `MapEndpoints()`.
-5. Tests in `Tests/{Name}.Tests/` (+ integration test if it touches DB/IO).
+5. Tests: integration tests in `Tests/Integration.Tests/Tests/{Name}/` are the default, including the tenant-sweep entry for a new noun (`integration-testing.md`). A unit test goes in `Tests/{Name}.Tests/` if the module has one; a product module's unit project is optional (`docs/new-project-guide.md` §3 gives its three steps).

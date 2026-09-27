@@ -10,8 +10,9 @@ Host (composition root)  →  Modules.{Name} (runtime)  →  Modules.{Name}.Cont
 ```
 
 - **BuildingBlocks** (`src/BuildingBlocks/`) — Core, Persistence, Web, Caching, Eventing, Storage, Jobs, Mailing, Shared. Consumed by all modules. **Do not modify without explicit approval.**
-- **Modules** (`src/Modules/{Name}/`) — bounded contexts. Each = a runtime project (internal) + a `.Contracts` project (public API: commands, queries, events, DTOs, service interfaces).
+- **Modules** (`src/Modules/{Name}/`) — bounded contexts. Each = a runtime project (internal) + a `.Contracts` project (public API: commands, queries, events, DTOs, service interfaces). The five the template ships (Identity, Multitenancy, Auditing, Files, Notifications) are **platform modules** (ADR-0003); a product adds **product modules**, one per bounded context of its own, not one per feature (ADR-0010).
 - A module **MUST NOT** reference another module's runtime project — only its `.Contracts`. Enforced by `Architecture.Tests` (NetArchTest).
+- A product module may reference a platform module's `.Contracts`; a platform module **never** references a product module, runtime or `.Contracts`. Enforced by `PlatformModuleDirectionTests`, which lists the five platform modules by name. It keeps the platform modules mergeable from the upstream template.
 
 ## Module = runtime + Contracts
 
@@ -48,7 +49,7 @@ Module support folders: `Domain/`, `Data/`, `Services/`, `Events/`, `Authorizati
 Each module implements `IModule`, declared via an **assembly-level** `[AppModule]` attribute (positional `(Type moduleType, int order = 0)`) — **not** a class-level `[AppModule(Order = n)]`:
 
 ```csharp
-[assembly: AppModule(typeof(Boilerplate.Modules.Identity.IdentityModule), 1)]   // above the namespace
+[assembly: AppModule(typeof(Boilerplate.Modules.Identity.IdentityModule), 100)]   // above the namespace
 
 namespace Boilerplate.Modules.Identity;
 
@@ -62,18 +63,22 @@ public sealed class IdentityModule : IModule
 
 `ModuleLoader.AddModules` (`src/BuildingBlocks/Web/Modules/ModuleLoader.cs`) discovers `[AppModule]` attributes, orders by `Order` then name, instantiates each, and calls `ConfigureServices`. Endpoints map under `api/v{version:apiVersion}/{module}`.
 
-## ⚠️ The four-place registration footgun
+Order: platform modules sit below 1000 (Identity 100 … Notifications 750). A product module takes **1000 and up, in steps of 100**.
 
-Adding a module requires editing **four** lists. Miss one and it fails *silently*:
+## Registering a module: seven edits
 
-| Place | File | Symptom if missed |
-|---|---|---|
-| Mediator `o.Assemblies` (two types per module: any type from its **Contracts** assembly **and** any type from its **runtime** assembly — the generator scans each type's assembly, so a command, DTO or `*ContractsMarker` all work) | `src/Host/Boilerplate.Api/Program.cs` | Handlers silently undiscovered |
-| `moduleAssemblies` array | `src/Host/Boilerplate.Api/Program.cs` | Module never loaded |
-| Mediator assemblies (same pair) | `src/Host/Boilerplate.DbMigrator/Program.cs` | Migrate/seed misses the module |
-| module assemblies array | `src/Host/Boilerplate.DbMigrator/Program.cs` | Migrate/seed misses the module |
+A new module is seven edits. The four host lists are checked by `HostModuleListTests` (Architecture.Tests), which fails naming the list and the file when an `[AppModule]` assembly is missing from one:
 
-After wiring, the fastest sanity check is: build, hit the endpoint, confirm the handler runs.
+| # | Edit | File | Caught by |
+|---|---|---|---|
+| 1–2 | The runtime and the `.Contracts` project | `src/Boilerplate.slnx` | nothing: the projects still build through the Migrations reference; only the solution view lacks them |
+| 3 | `ProjectReference` to the runtime project, plus `<Folder Include="{Module}\" />` — how both hosts reach the module | `src/Host/Boilerplate.Migrations.PostgreSQL/Boilerplate.Migrations.PostgreSQL.csproj` | the build: the host lists name the module's types, which the hosts reach only through this reference |
+| 4 | `HostModules.All` | `src/Host/Boilerplate.Api/HostModules.cs` | `HostModules_Should_List_Every_AppModule_Assembly` |
+| 5 | Mediator `o.Assemblies`: a type from the **Contracts** assembly **and** one from the **runtime** assembly (the generator scans each type's assembly, so a command, DTO or `*ContractsMarker` all work) | `src/Host/Boilerplate.Api/Program.cs` | `MediatorAssemblies_Should_Register_Every_AppModule_Handlers` |
+| 6 | `HostModules.All` | `src/Host/Boilerplate.DbMigrator/HostModules.cs` | `HostModules_Should_List_Every_AppModule_Assembly` |
+| 7 | Mediator `o.Assemblies` (same pair) | `src/Host/Boilerplate.DbMigrator/Program.cs` | `MediatorAssemblies_Should_Register_Every_AppModule_Handlers` |
+
+`o.Assemblies` stays a literal `typeof` list because Mediator's source generator reads it as written; the test calls each host's generated `AddMediator` and checks every module's handlers are registered. A product module also gets its own `.agents/rules/modules/<name>.md`. The full walk-through is `docs/new-project-guide.md` §3, *A new product module*.
 
 ## DI & handler conventions
 

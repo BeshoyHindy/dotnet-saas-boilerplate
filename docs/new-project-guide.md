@@ -222,17 +222,46 @@ nothing is denied for everyone.
   else goes to Admin only — the role-permission sync grants a newly registered permission to every
   tenant's Admin role on the next start, so there is no migration or seed step to write.
 
-### A new module
+### A new product module
 
-Five modules exist and the sixth needs a reason (ADR-0003). If you add one: a runtime project plus a
-`.Contracts` project, `[AppModule]` at assembly level, and **four** registration lists to edit (API
-and migrator, mediator assemblies and module assemblies). Miss one and it fails silently.
+The five modules the template ships are **platform modules** (ADR-0003). Your product's own nouns go
+in **product modules** (ADR-0010). Add one for a new bounded context, not for a new feature: a
+tenant-scoped `Note` starts a `Notes` module, and the next Note feature is a slice inside it. A
+product module may use a platform module's `.Contracts`; a platform module never references a
+product module.
+
+A module is a runtime project plus a `.Contracts` project, with `[AppModule]` at assembly level.
+Product modules take order 1000 and up, in steps of 100 (`[assembly: AppModule(typeof(NotesModule),
+1000)]`), so they start after the platform modules. Then make seven edits:
+
+1. `src/Boilerplate.slnx`: the runtime project.
+2. `src/Boilerplate.slnx`: the `.Contracts` project.
+3. `src/Host/Boilerplate.Migrations.PostgreSQL/Boilerplate.Migrations.PostgreSQL.csproj`: a
+   `ProjectReference` to the runtime project, plus its `<Folder Include="{Module}\" />` for the
+   migrations. This reference is how both hosts reach the module.
+4. `src/Host/Boilerplate.Api/HostModules.cs`: `typeof({Module}Module).Assembly`.
+5. `src/Host/Boilerplate.Api/Program.cs`: two entries in the `o.Assemblies` list of `AddMediator`,
+   a type from the `.Contracts` assembly and one from the runtime assembly.
+6. `src/Host/Boilerplate.DbMigrator/HostModules.cs`: as in 4.
+7. `src/Host/Boilerplate.DbMigrator/Program.cs`: as in 5.
+
+The `o.Assemblies` lists stay literal because Mediator's source generator reads them as written.
+**`HostModuleListTests`** (Architecture.Tests) fails when an `[AppModule]` assembly is missing from
+any of the four host lists, and names the list and the file to edit. Give the module its own rule
+file, `.agents/rules/modules/<name>.md`, like the five platform modules have.
 
 - **Architecture tests** fail if a module references another module's runtime, if a module-level
-  cycle appears (including through Contracts), or if a command/paginated-query handler has no
-  validator.
+  cycle appears (including through Contracts), if a platform module references a product module
+  (`PlatformModuleDirectionTests`), or if a command/paginated-query handler has no validator.
 - Entities are tenant-isolated by default; opting out is `IGlobalEntity` and an architecture test
   watches the opt-outs. `IgnoreQueryFilters()` lives in a reviewed allow-list.
+- **Tests**: integration tests are a product module's default, in `src/Tests/Integration.Tests/Tests/{Module}/`.
+  Each new noun gets a tenant-sweep entry (a `ResourceKind` and a seeder in `TenantSweepSeeder`),
+  list-only nouns included; see `.agents/rules/integration-testing.md`. A unit-test project is
+  optional. If you want one: create `src/Tests/{Module}.Tests/Boilerplate.{Module}.Tests.csproj`
+  (copy `Files.Tests`' and point its references at your module), add it to `src/Boilerplate.slnx`
+  under `/Tests/`, and add `[assembly: InternalsVisibleTo("Boilerplate.{Module}.Tests")]` to the
+  module's `AssemblyInfo.cs`.
 
 ### A new job
 
