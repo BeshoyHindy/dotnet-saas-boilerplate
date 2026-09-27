@@ -71,15 +71,15 @@ public sealed class MinioImagePinningTests
 //#endif
 
     [Theory]
-    [InlineData(LocalComposePath)]
-    [InlineData(DokployComposePath)]
-    public void ComposeStacks_Should_PinEveryMinioServiceToTheChainguardDigest_When_DeclaringMinio(string composePath)
+    [InlineData(LocalComposePath, 4)]
+    [InlineData(DokployComposePath, 5)]
+    public void ComposeStacks_Should_PinEveryMinioServiceToTheChainguardDigest_When_DeclaringMinio(string composePath, int minioServices)
     {
         string compose = Read(composePath);
 
-        // minio-volume-owner, minio, minio-init and minio-public-prefix.
+        // minio-volume-owner, minio, minio-init and minio-public-prefix; Dokploy adds postgres-backup-upload.
         CountOf(compose, $"image: {PinnedImageReference}")
-            .ShouldBe(4, $"every MinIO service in {composePath} must pin the Chainguard digest");
+            .ShouldBe(minioServices, $"every MinIO service in {composePath} must pin the Chainguard digest");
         compose.ShouldContain("minio-volume-owner:");
         compose.ShouldContain("command: [\"-R\", \"65532:65532\", \"/data\"]");
     }
