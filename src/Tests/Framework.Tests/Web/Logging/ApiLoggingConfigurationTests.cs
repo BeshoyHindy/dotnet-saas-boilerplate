@@ -72,7 +72,7 @@ public sealed class ApiLoggingConfigurationTests
 
         var formatterName = console["Args:formatter"];
         formatterName.ShouldNotBeNullOrWhiteSpace();
-        var formatterType = Type.GetType(formatterName!, throwOnError: false);
+        var formatterType = Type.GetType(formatterName, throwOnError: false);
         formatterType.ShouldNotBeNull($"'{formatterName}' must resolve to a formatter type");
         // Serilog's configuration reader constructs the formatter with its optional arguments defaulted.
         var constructor = formatterType.GetConstructors().First(c => c.GetParameters().All(p => p.IsOptional));
@@ -99,7 +99,7 @@ public sealed class ApiLoggingConfigurationTests
         template.ShouldNotBeNullOrWhiteSpace();
 
         var line = Render(
-            new MessageTemplateTextFormatter(template!, formatProvider: null),
+            new MessageTemplateTextFormatter(template, formatProvider: null),
             RequestEvent(new InvalidOperationException("boom")));
 
         line.ShouldContain("acme");

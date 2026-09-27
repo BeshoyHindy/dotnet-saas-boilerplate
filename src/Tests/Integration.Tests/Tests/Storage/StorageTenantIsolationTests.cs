@@ -251,7 +251,7 @@ public sealed class StorageTenantIsolationTests : IAsyncLifetime
                 var asset = await db.FileAssets.AsNoTracking()
                     .FirstOrDefaultAsync(f => f.Id == fileAssetId, ct);
                 asset.ShouldNotBeNull();
-                return asset!.StorageKey;
+                return asset.StorageKey;
             },
             CancellationToken.None);
 
@@ -292,7 +292,7 @@ public sealed class StorageTenantIsolationTests : IAsyncLifetime
         using var profile = await client.GetAsync($"{TestConstants.IdentityBasePath}/profile");
         var dto = await profile.DeserializeAsync<UserDto>();
         dto.ImageUrl.ShouldNotBeNullOrWhiteSpace();
-        return dto.ImageUrl!;
+        return dto.ImageUrl;
     }
 
     private static async Task<string> UploadLogoAsync(HttpClient client, string fileName)
@@ -305,7 +305,7 @@ public sealed class StorageTenantIsolationTests : IAsyncLifetime
         var json = await theme.Content.ReadFromJsonAsync<JsonElement>();
         var logoUrl = json.GetProperty("brandAssets").GetProperty("logoUrl").GetString();
         logoUrl.ShouldNotBeNullOrWhiteSpace();
-        return logoUrl!;
+        return logoUrl;
     }
 
     private static object ThemeWithLogo(string fileName) => new

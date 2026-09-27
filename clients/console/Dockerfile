@@ -4,12 +4,12 @@
 # start. One image promotes across environments — nothing environment-specific is
 # baked in (ADR-0004).
 
-FROM node:25-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-# Node 25 ships without corepack, and corepack does not support Node 25 yet, so pnpm is
-# installed directly — at the version pinned in package.json#packageManager, which stays
-# the one source of truth for it.
+# Node 24 is the active LTS line. pnpm is installed with npm rather than corepack, because
+# Node 25 and later no longer ship corepack and the next LTS bump should need no change here.
+# The version comes from package.json#packageManager, the one source of truth for it.
 RUN npm install --global "pnpm@$(node -p "require('./package.json').packageManager.split('@')[1]")"
 RUN pnpm install --frozen-lockfile
 COPY . .

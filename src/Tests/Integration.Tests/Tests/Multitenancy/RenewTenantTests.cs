@@ -237,7 +237,7 @@ public sealed class RenewTenantTests
         response.StatusCode.ShouldBe(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         var result = await response.Content.ReadFromJsonAsync<RenewResult>(Json);
         result.ShouldNotBeNull();
-        return result!;
+        return result;
     }
 
     private static async Task CreateTenantAsync(HttpClient rootClient, string tenantId, string adminEmail)
@@ -260,7 +260,7 @@ public sealed class RenewTenantTests
         resp.StatusCode.ShouldBe(HttpStatusCode.OK);
         var status = await resp.Content.ReadFromJsonAsync<TenantStatus>(Json);
         status.ShouldNotBeNull();
-        return status!;
+        return status;
     }
 
     private static async Task WaitForProvisioningAsync(HttpClient client, string tenantId, int maxRetries = 60)

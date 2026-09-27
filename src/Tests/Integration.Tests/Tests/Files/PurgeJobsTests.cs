@@ -76,7 +76,7 @@ public sealed class PurgeJobsTests
         var method = typeof(PurgeDeletedFilesJob).GetMethod(
             nameof(PurgeDeletedFilesJob.RunAsync), BindingFlags.Public | BindingFlags.Instance);
         method.ShouldNotBeNull();
-        method!.GetCustomAttribute<AutomaticRetryAttribute>().ShouldNotBeNull();
+        method.GetCustomAttribute<AutomaticRetryAttribute>().ShouldNotBeNull();
     }
 
     #endregion
@@ -121,7 +121,7 @@ public sealed class PurgeJobsTests
         var method = typeof(PurgeOrphanedFilesJob).GetMethod(
             nameof(PurgeOrphanedFilesJob.RunAsync), BindingFlags.Public | BindingFlags.Instance);
         method.ShouldNotBeNull();
-        method!.GetCustomAttribute<AutomaticRetryAttribute>().ShouldNotBeNull();
+        method.GetCustomAttribute<AutomaticRetryAttribute>().ShouldNotBeNull();
     }
 
     #endregion
@@ -247,6 +247,6 @@ public sealed class PurgeJobsTests
             .Select(f => f.StorageKey)
             .FirstOrDefaultAsync();
         key.ShouldNotBeNull();
-        return key!;
+        return key;
     }
 }

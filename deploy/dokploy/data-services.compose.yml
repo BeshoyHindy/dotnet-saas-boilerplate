@@ -68,7 +68,7 @@ services:
   # credential here would be one more secret to rotate for no added boundary.
   # CachingOptions__Redis in app.compose.yml matches this (no auth, no TLS).
   valkey:
-    image: valkey/valkey:9.1.0-alpine
+    image: valkey/valkey:9.1.2-alpine
     restart: unless-stopped
     mem_limit: ${VALKEY_MEM_LIMIT:-256m}
     logging: *default-logging

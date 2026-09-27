@@ -236,7 +236,7 @@ jobs:
     # against an ephemeral Postgres and asserts exit 0.
     services:
       postgres:
-        image: postgres:17-alpine
+        image: postgres:18-alpine
         env:
           POSTGRES_PASSWORD: migrator_smoke_pwd
           POSTGRES_DB: boilerplate_migrator_smoke

@@ -254,7 +254,7 @@ public sealed class ServerIssuedAssetUrlTests : IAsyncLifetime
 
         var url = await ProfileImageUrlAsync(client);
         url.ShouldNotBeNullOrWhiteSpace();
-        return url!;
+        return url;
     }
 
     private static async Task RemoveAvatarAsync(HttpClient client)
@@ -292,7 +292,7 @@ public sealed class ServerIssuedAssetUrlTests : IAsyncLifetime
 
         var url = await BrandAssetUrlAsync(client, $"{slot}Url");
         url.ShouldNotBeNullOrWhiteSpace();
-        return url!;
+        return url;
     }
 
     private static async Task DeleteBrandAssetAsync(HttpClient client, string deleteFlag)

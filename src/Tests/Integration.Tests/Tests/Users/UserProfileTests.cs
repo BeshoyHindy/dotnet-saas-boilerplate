@@ -145,7 +145,7 @@ public sealed class UserProfileTests
 
         // …under the uploads/ prefix, the only key space the deploy stacks grant anonymous read on
         // (contract-tested in deploy/dokploy/tests) — so the avatar keeps resolving.
-        dto.ImageUrl!.ShouldContain("/uploads/");
+        dto.ImageUrl.ShouldContain("/uploads/");
 
         // …and unsigned: no presign to expire. A Files-module publicUrl would carry these and die
         // within minutes of being written to the column.

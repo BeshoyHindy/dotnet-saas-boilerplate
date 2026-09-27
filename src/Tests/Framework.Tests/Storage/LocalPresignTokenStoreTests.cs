@@ -21,7 +21,7 @@ public sealed class LocalPresignTokenStoreTests
         // Assert
         token.ShouldNotBeNullOrWhiteSpace();
         consumed.ShouldNotBeNull();
-        consumed!.StorageKey.ShouldBe(AcmeKey);
+        consumed.StorageKey.ShouldBe(AcmeKey);
         consumed.ContentType.ShouldBe("image/png");
         consumed.MaxBytes.ShouldBe(2048);
     }

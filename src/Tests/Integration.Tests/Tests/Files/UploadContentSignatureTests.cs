@@ -143,7 +143,7 @@ public sealed class UploadContentSignatureTests
             .Select(f => f.StorageKey)
             .FirstOrDefaultAsync();
         key.ShouldNotBeNull();
-        return key!;
+        return key;
     }
 
     private Task<bool> ObjectExistsAsync(string storageKey)

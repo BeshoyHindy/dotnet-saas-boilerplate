@@ -17,7 +17,7 @@ namespace Integration.Tests.Tests.Caching;
 /// </summary>
 public sealed class HybridCacheRedisTests : IAsyncLifetime
 {
-    private readonly RedisContainer _redis = new RedisBuilder("valkey/valkey:9.1.0-alpine")
+    private readonly RedisContainer _redis = new RedisBuilder("valkey/valkey:9.1.2-alpine")
         .Build();
 
     public Task InitializeAsync() => _redis.StartAsync();
@@ -85,7 +85,7 @@ public sealed class HybridCacheRedisTests : IAsyncLifetime
             // Read the underlying L2 directly to confirm bytes are present.
             var raw = await distributedCache.GetAsync(scope.TenantKey("rt:set"));
             raw.ShouldNotBeNull();
-            raw!.Length.ShouldBeGreaterThan(0);
+            raw.Length.ShouldBeGreaterThan(0);
 
             // And nothing was written under the unscoped logical key.
             (await distributedCache.GetAsync("rt:set")).ShouldBeNull();

@@ -85,7 +85,7 @@ Run the whole thing locally — scaffold, build, test, brand-grep — with
 - [.NET 10 SDK](https://dotnet.microsoft.com/download) (pinned in `global.json`)
 - [Docker](https://www.docker.com/) — Postgres, Valkey and RustFS are started by Aspire, and the
   integration tests use Testcontainers
-- [Node 20+](https://nodejs.org/) and [pnpm](https://pnpm.io) for the React clients and the agent pipeline
+- [Node 22.22+](https://nodejs.org/) and [pnpm](https://pnpm.io) for the React clients and the agent pipeline
 
 ## Run
 

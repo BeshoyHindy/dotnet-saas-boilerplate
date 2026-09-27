@@ -52,7 +52,7 @@ public sealed class RefreshTokenCommandHandler
         if (rotation.Status != SessionRotationStatus.Rotated)
         {
             await _securityAudit.TokenRevokedAsync(
-                rotation.UserId ?? "unknown", clientId!, RevocationReason(rotation.Status), cancellationToken);
+                rotation.UserId ?? "unknown", clientId, RevocationReason(rotation.Status), cancellationToken);
 
             // One message for every failure mode: the caller learns only that the token is no good,
             // never whether it was unknown, expired, replayed or beaten by a concurrent refresh.
@@ -62,7 +62,7 @@ public sealed class RefreshTokenCommandHandler
         var validated = await _identityService.BuildClaimsForRefreshAsync(rotation.UserId!, cancellationToken);
         if (validated is null)
         {
-            await _securityAudit.TokenRevokedAsync(rotation.UserId!, clientId!, "UserNotFound", cancellationToken);
+            await _securityAudit.TokenRevokedAsync(rotation.UserId!, clientId, "UserNotFound", cancellationToken);
             throw new UnauthorizedException("Invalid refresh token.");
         }
 
@@ -89,13 +89,13 @@ public sealed class RefreshTokenCommandHandler
             if (!string.IsNullOrEmpty(accessTokenSubject) &&
                 !string.Equals(accessTokenSubject, subject, StringComparison.Ordinal))
             {
-                await _securityAudit.TokenRevokedAsync(subject, clientId!, "RefreshTokenSubjectMismatch", cancellationToken);
+                await _securityAudit.TokenRevokedAsync(subject, clientId, "RefreshTokenSubjectMismatch", cancellationToken);
                 throw new UnauthorizedException("Access token subject mismatch.");
             }
         }
 
         // Audit previous token revocation by rotation (no raw tokens)
-        await _securityAudit.TokenRevokedAsync(subject, clientId!, "RefreshTokenRotated", cancellationToken);
+        await _securityAudit.TokenRevokedAsync(subject, clientId, "RefreshTokenRotated", cancellationToken);
 
         // `sid` is the session row's id, which rotation deliberately leaves alone — the device keeps
         // one identity for its whole life, so consumers can correlate across refreshes.
@@ -110,7 +110,7 @@ public sealed class RefreshTokenCommandHandler
         await _securityAudit.TokenIssuedAsync(
             userId: subject,
             userName: claims.FirstOrDefault(c => c.Type == ClaimTypes.Name)?.Value ?? string.Empty,
-            clientId: clientId!,
+            clientId: clientId,
             tokenFingerprint: fingerprint,
             expiresUtc: accessTokenExpiresAt,
             ct: cancellationToken);

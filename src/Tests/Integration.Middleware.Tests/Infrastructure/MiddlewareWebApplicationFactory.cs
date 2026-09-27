@@ -51,7 +51,7 @@ public sealed class MiddlewareWebApplicationFactory : WebApplicationFactory<Prog
     private const string StorageBucket = "boilerplate-middleware-test-uploads";
 
     private static readonly SemaphoreSlim _migrationLock = new(1, 1);
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18-alpine")
         .WithDatabase("boilerplate_middleware_tests")
         .WithUsername("postgres")
         .WithPassword("integration_test_pwd")
