@@ -6,6 +6,9 @@
 # wrong client's domain, the reader hits a dead end (or the wrong sign-in
 # screen) with nothing in the file to say why. These pin the fix rather than
 # leaving it to a future edit to notice the drift again.
+# The patterns below are single-quoted on purpose: a literal $ or backtick is
+# what they match, so nothing in them should expand.
+# shellcheck disable=SC2016
 set -uo pipefail
 
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

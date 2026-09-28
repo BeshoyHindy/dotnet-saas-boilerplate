@@ -7,6 +7,9 @@
 # the repository, and an .env.example that is exactly the set of variables the
 # files interpolate. Every one of them has a plausible "helpful" edit that would
 # silently break a deploy, which is why they are tests and not a review note.
+# The patterns below are single-quoted on purpose: a literal $ or backtick is
+# what they match, so nothing in them should expand.
+# shellcheck disable=SC2016
 set -uo pipefail
 
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
