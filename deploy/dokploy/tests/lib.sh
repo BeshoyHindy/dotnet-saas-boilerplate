@@ -58,13 +58,17 @@ refute_contains() {
 }
 
 # assert_match <description> <text> <extended-regex>
+#
+# The text goes in as a here-string, not through a pipe: grep -q exits on the
+# first match, and under `set -o pipefail` a printf still writing a long text
+# then dies of SIGPIPE and fails the pipeline, so a match could read as a miss.
 assert_match() {
-  if printf '%s\n' "$2" | grep -qE "$3"; then _pass "$1"; else _fail "$1" "no line matched /$3/"; fi
+  if grep -qE "$3" <<<"$2"; then _pass "$1"; else _fail "$1" "no line matched /$3/"; fi
 }
 
 # refute_match <description> <text> <extended-regex>
 refute_match() {
-  if printf '%s\n' "$2" | grep -qE "$3"; then
+  if grep -qE "$3" <<<"$2"; then
     _fail "$1" "matched /$3/: $(printf '%s\n' "$2" | grep -E "$3" | head -3)"
   else
     _pass "$1"
