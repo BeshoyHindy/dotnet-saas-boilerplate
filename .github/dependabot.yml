@@ -100,3 +100,9 @@ updates:
     groups:
       docker:
         patterns: ['*']
+    # The client build stage tracks Node's active LTS line (see each Dockerfile), and
+    # an odd or not-yet-LTS major must not arrive as a routine bump. Digest and patch
+    # updates within the line still come; moving to the next LTS is a deliberate change.
+    ignore:
+      - dependency-name: node
+        update-types: ['version-update:semver-major']
