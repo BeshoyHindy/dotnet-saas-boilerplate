@@ -18,7 +18,7 @@ RUN pnpm build
 # nginx-unprivileged, not nginx: the master process runs as uid 101 rather than root.
 # The stock image needs root purely to bind :80, so this one listens on 8080 instead —
 # see docker/default.conf.template, and every compose/Traefik port that names it.
-FROM nginxinc/nginx-unprivileged:1.31-alpine@sha256:6a23acdfca2b9cfbcec61419e3f1426bcbedb91362f2f19306a8567423bb4612 AS runtime
+FROM nginxinc/nginx-unprivileged:1.31-alpine@sha256:26b0bf6fbf07297983cb341998d79c831508787de26627dd2a112321b9c3a4af AS runtime
 
 # Package installation and the file layout need root; the image drops back to 101 below.
 USER root
